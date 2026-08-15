@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Functions Quiz — Ezz Nasr : Teaching</title>
+<meta name="description" content="A short 5-question quiz on Python functions: parameters, return values, and scope.">
+<link rel="canonical" href="https://teaching.ezznasr.dev/programming/quizzes/functions.html">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B2318; --bg-soft:#0F2C1E; --panel:#123420; --line:#25523A;
+    --line-faint:rgba(201,151,76,0.14); --copper:#C9974C; --copper-bright:#E3B168;
+    --ink:#EDEAE0; --ink-dim:#9FB3A6;
+    --status-shipped:#7CB68A; --status-fail:#D97757;
+    --mono:'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --serif:'Source Serif 4', Georgia, serif;
+    --maxw:720px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:linear-gradient(var(--line-faint) 1px, transparent 1px) 0 0/100% 42px,
+      linear-gradient(90deg, var(--line-faint) 1px, transparent 1px) 0 0/42px 100%, var(--bg);
+    color:var(--ink); font-family:var(--serif); font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--copper-bright);}
+  button{ font-family:inherit; }
+  a:focus-visible, button:focus-visible{ outline:2px solid var(--copper-bright); outline-offset:3px; }
+  .wrap{ max-width:var(--maxw); margin:0 auto; padding:0 28px; }
+  h1{ font-family:var(--mono); text-transform:uppercase; letter-spacing:0.03em; color:var(--ink); margin:0; }
+  .frame{ position:relative; border:1px solid var(--line); background:var(--bg); }
+  .frame::before,.frame::after,.frame .tick-br,.frame .tick-bl{
+    content:""; position:absolute; width:10px; height:10px; border-color:var(--copper); border-style:solid; border-width:0; opacity:.85;
+  }
+  .frame::before{ top:-1px; left:-1px; border-top-width:2px; border-left-width:2px; }
+  .frame::after{ top:-1px; right:-1px; border-top-width:2px; border-right-width:2px; }
+  .frame .tick-bl{ bottom:-1px; left:-1px; border-bottom-width:2px; border-left-width:2px; }
+  .frame .tick-br{ bottom:-1px; right:-1px; border-bottom-width:2px; border-right-width:2px; }
+  header{ position:sticky; top:0; z-index:20; background:rgba(11,35,24,0.92); backdrop-filter:blur(6px); border-bottom:1px solid var(--line); }
+  .titlebar{ display:flex; align-items:center; justify-content:space-between; padding:14px 0; gap:16px; max-width:var(--maxw); margin:0 auto; padding-left:28px; padding-right:28px; }
+  .titlebar .mark{ font-family:var(--mono); font-weight:600; letter-spacing:0.06em; font-size:14px; color:var(--ink); display:flex; align-items:center; gap:8px; text-decoration:none; }
+  .titlebar .mark .dot{ width:7px;height:7px;border-radius:1px;background:var(--copper); box-shadow:0 0 6px var(--copper); }
+  .titlebar nav a{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-dim); text-decoration:none; }
+  .titlebar nav a::before{ content:"\2190 "; }
+  .page-head{ padding:44px 0 8px; }
+  .page-head p.lede{ color:var(--ink-dim); font-size:15.5px; margin:10px 0 0; }
+  main{ padding:24px 0 64px; }
+
+  /* ---- quiz engine styling ---- */
+  .qz-progress{ font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); letter-spacing:0.04em; margin-bottom:12px; }
+  .qz-card{ padding:24px; }
+  .qz-question{ font-size:17px; margin:0 0 18px; color:var(--ink); }
+  .qz-question code{ font-family:var(--mono); background:var(--bg-soft); padding:0.1em 0.4em; font-size:0.9em; border:1px solid var(--line); }
+  .qz-options{ display:flex; flex-direction:column; gap:9px; }
+  .qz-option{
+    display:flex; align-items:flex-start; gap:10px; text-align:left; width:100%;
+    padding:12px 14px; border:1px solid var(--line); background:var(--bg-soft); color:var(--ink);
+    cursor:pointer; font-size:14.5px; transition:border-color .15s ease, transform .1s ease;
+  }
+  .qz-option:hover:not(:disabled){ border-color:var(--copper); }
+  .qz-option:active:not(:disabled){ transform:scale(0.995); }
+  .qz-option__tag{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); flex-shrink:0; padding-top:2px; }
+  .qz-option:disabled{ cursor:default; }
+  .qz-option--correct{ border-color:var(--status-shipped); }
+  .qz-option--correct .qz-option__tag{ color:var(--status-shipped); }
+  .qz-option--incorrect{ border-color:var(--status-fail); }
+  .qz-option--incorrect .qz-option__tag{ color:var(--status-fail); }
+  .qz-verdict{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); font-family:var(--mono); font-size:13px; }
+  .qz-verdict__tag{ display:inline-block; letter-spacing:0.06em; text-transform:uppercase; font-size:11px; padding:3px 8px; border:1px solid currentColor; margin-bottom:8px; }
+  .qz-verdict__tag--pass{ color:var(--status-shipped); }
+  .qz-verdict__tag--fail{ color:var(--status-fail); }
+  .qz-verdict__explain{ display:block; color:var(--ink-dim); font-family:var(--serif); font-size:14.5px; margin-top:4px; }
+  .qz-actions{ display:flex; justify-content:flex-end; margin-top:16px; }
+  .qz-next{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:var(--copper-bright); color:#0B2318; border:none; padding:10px 16px; cursor:pointer; }
+  .qz-next:hover{ filter:brightness(1.08); }
+  .qz-summary{ padding:36px 24px; text-align:center; }
+  .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--copper-bright); margin-bottom:6px; }
+  .qz-summary__label{ color:var(--ink-dim); font-family:var(--mono); font-size:12.5px; letter-spacing:0.04em; margin-bottom:20px; }
+  .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); color:var(--ink-dim); padding:9px 16px; cursor:pointer; }
+  .qz-retry:hover{ border-color:var(--copper); color:var(--copper-bright); }
+
+  footer{ border-top:1px solid var(--line); padding:32px 0; }
+  .footer-note{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); letter-spacing:0.04em; text-align:center; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR : TEACHING</a>
+    <nav><a href="/programming/">Back to Programming</a></nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>Functions — quiz</h1>
+    <p class="lede">Five quick questions. Instant feedback, nothing recorded or submitted.</p>
+  </div>
+
+  <div class="wrap">
+    <div id="quiz-root" aria-live="polite"></div>
+  </div>
+</main>
+
+<footer><p class="footer-note">teaching.ezznasr.dev/programming/quizzes/functions</p></footer>
+
+<script type="application/json" id="quiz-data">
+{
+  "title": "Functions",
+  "questions": [
+    {
+      "q": "What does the <code>def</code> keyword do in Python?",
+      "options": [
+        "Deletes a variable",
+        "Starts a function definition",
+        "Defines a class",
+        "Imports a module"
+      ],
+      "correct": 1,
+      "explain": "def marks the start of a function definition — the block that follows is the function's body."
+    },
+    {
+      "q": "In <code>def greet(name):</code>, what is <code>name</code>?",
+      "options": [
+        "A return value",
+        "A global variable",
+        "A parameter — a placeholder for the input",
+        "A function call"
+      ],
+      "correct": 2,
+      "explain": "name is a parameter: a placeholder that gets filled in with a real value (the argument) when the function is called."
+    },
+    {
+      "q": "A function has no <code>return</code> statement. What happens when you call it?",
+      "options": [
+        "It raises an error",
+        "It runs, but gives back None",
+        "It returns the last variable used",
+        "It won't run at all"
+      ],
+      "correct": 1,
+      "explain": "Without a return statement, a function still runs fully — it just implicitly returns None."
+    },
+    {
+      "q": "A variable created inside a function...",
+      "options": [
+        "Is available everywhere in the program",
+        "Only exists inside that function (its scope)",
+        "Overwrites any global variable with the same name",
+        "Must be declared outside the function first"
+      ],
+      "correct": 1,
+      "explain": "Variables created inside a function are local to it — they don't exist outside its scope."
+    },
+    {
+      "q": "What's the main benefit of writing a function instead of repeating code?",
+      "options": [
+        "It makes the code run faster",
+        "It's required by Python's syntax",
+        "Write the logic once, reuse it anywhere — easier to fix and maintain",
+        "It hides the code from other programmers"
+      ],
+      "correct": 2,
+      "explain": "This is the DRY principle — Don't Repeat Yourself. One place to fix bugs, one place to update logic."
+    }
+  ]
+}
+</script>
+<script src="/assets/quiz.js"></script>
+<script>QuizEngine.mount('#quiz-root', '#quiz-data');</script>
+
+</body>
+</html>
