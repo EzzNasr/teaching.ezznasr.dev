@@ -28,9 +28,10 @@
     color:var(--ink); font-family:var(--serif); font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased;
   }
   a{color:var(--copper-bright);}
-  a:focus-visible, button:focus-visible{ outline:2px solid var(--copper-bright); outline-offset:3px; }
+  a:focus-visible, button:focus-visible, textarea:focus-visible{ outline:2px solid var(--copper-bright); outline-offset:3px; }
   .wrap{ max-width:var(--maxw); margin:0 auto; padding:0 28px; }
   h1{ font-family:var(--mono); text-transform:uppercase; letter-spacing:0.03em; color:var(--ink); margin:0; }
+  h2{ font-family:var(--mono); text-transform:uppercase; letter-spacing:0.03em; color:var(--ink); font-size:13px; margin:0 0 12px; }
   .frame{ position:relative; border:1px solid var(--line); background:var(--bg); }
   .frame::before,.frame::after,.frame .tick-br,.frame .tick-bl{
     content:""; position:absolute; width:10px; height:10px; border-color:var(--copper); border-style:solid; border-width:0; opacity:.85;
@@ -58,6 +59,17 @@
   .no-result{ padding:20px 22px; margin:28px 0; color:var(--ink-dim); font-size:14.5px; }
   .no-result a{ color:var(--copper-bright); }
 
+  .answer-block{ margin:28px 0; }
+  .answer-block p.hint{ color:var(--ink-dim); font-size:14px; margin:0 0 10px; }
+  .answer-textarea{
+    width:100%; min-height:260px; resize:vertical;
+    background:var(--bg-soft); color:var(--ink); border:1px solid var(--line);
+    font-family:var(--serif); font-size:15px; line-height:1.6; padding:14px 16px;
+  }
+  .answer-textarea:focus{ border-color:var(--copper); }
+  .save-status{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); letter-spacing:0.04em; margin-top:8px; min-height:1.4em; }
+  .save-status.saved{ color:var(--status-shipped); }
+
   .assign-box{ padding:24px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:18px; margin-top:8px; }
   .assign-box p{ color:var(--ink-dim); font-size:14.5px; margin:0; max-width:520px; }
   .assign-btn{ font-family:var(--mono); font-size:12.5px; letter-spacing:0.06em; text-transform:uppercase; text-decoration:none;
@@ -80,13 +92,13 @@
 <main>
   <div class="wrap page-head">
     <h1>Functions — assignment</h1>
-    <p class="lede">Submit your completed assignment below.</p>
+    <p class="lede">Write your answer below, then submit. Your quiz result and answer are saved as you go.</p>
   </div>
 
   <div class="wrap">
     <div id="result-box" class="result-box frame">
       <span class="tick-br"></span><span class="tick-bl"></span>
-      <div class="rb-title">Your quiz result — include this with your submission</div>
+      <div class="rb-title">Your quiz result</div>
       <div class="result-grid">
         <div><b>Score</b><span id="rb-score">—</span></div>
         <div><b>Date</b><span id="rb-date">—</span></div>
@@ -96,12 +108,19 @@
     </div>
     <div id="no-result" class="no-result frame" style="display:none;">
       <span class="tick-br"></span><span class="tick-bl"></span>
-      Haven't taken the quiz yet? <a href="/programming/functions/quiz.html">Take it first \u2192</a> — your score and timestamps will show up here automatically.
+      Haven't taken the quiz yet? <a href="/programming/functions/quiz.html">Take it first &rarr;</a> — your score and timestamps will show up here automatically and get saved alongside your answer below.
+    </div>
+
+    <div class="answer-block">
+      <h2>Your answer</h2>
+      <p class="hint">Write your response to the assignment prompt here.</p>
+      <textarea id="answer-text" class="answer-textarea" placeholder="Start typing your answer…" aria-label="Assignment answer"></textarea>
+      <div id="save-status" class="save-status"></div>
     </div>
 
     <div class="assign-box frame">
       <span class="tick-br"></span><span class="tick-bl"></span>
-      <p>Submit your completed assignment for review — include your name, the session date, and your quiz result above.</p>
+      <p>When you're ready, submit through the form below — include your name and the session date. Your quiz result and written answer are already saved and will be included.</p>
       <!-- TODO: replace with the real Google Form URL for the Functions assignment -->
       <a class="assign-btn" href="https://forms.google.com/REPLACE_WITH_FUNCTIONS_ASSIGNMENT_FORM" target="_blank" rel="noopener">Submit assignment</a>
     </div>
@@ -112,20 +131,11 @@
 
 <script>
   (function () {
-    var quizPath = location.pathname.replace(/assignment\.html$/, "quiz.html");
-    var raw;
-    try { raw = sessionStorage.getItem("quizResult:" + quizPath); } catch (e) { raw = null; }
+    var recordKey = "assignmentRecord:" + location.pathname;
+    var quizKey = "quizResult:" + location.pathname.replace(/assignment\.html$/, "quiz.html");
 
-    if (!raw) {
-      document.getElementById("no-result").style.display = "block";
-      return;
-    }
-    var result;
-    try { result = JSON.parse(raw); } catch (e) { result = null; }
-    if (!result) {
-      document.getElementById("no-result").style.display = "block";
-      return;
-    }
+    var textarea = document.getElementById("answer-text");
+    var status = document.getElementById("save-status");
 
     function fmtClock(iso) {
       if (!iso) return "—";
@@ -133,11 +143,62 @@
       catch (e) { return iso; }
     }
 
-    document.getElementById("rb-score").textContent = result.score + " / " + result.total;
-    document.getElementById("rb-date").textContent = result.date;
-    document.getElementById("rb-started").textContent = fmtClock(result.startedAt);
-    document.getElementById("rb-finished").textContent = fmtClock(result.finishedAt);
-    document.getElementById("result-box").classList.add("has-result");
+    function readJson(key) {
+      try {
+        var raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) { return null; }
+    }
+
+    // Show the quiz result, if one exists.
+    var quizResult = readJson(quizKey);
+    if (quizResult) {
+      document.getElementById("rb-score").textContent = quizResult.score + " / " + quizResult.total;
+      document.getElementById("rb-date").textContent = quizResult.date;
+      document.getElementById("rb-started").textContent = fmtClock(quizResult.startedAt);
+      document.getElementById("rb-finished").textContent = fmtClock(quizResult.finishedAt);
+      document.getElementById("result-box").classList.add("has-result");
+    } else {
+      document.getElementById("no-result").style.display = "block";
+    }
+
+    // Load any previously saved answer/record for this assignment.
+    var existing = readJson(recordKey);
+    if (existing && existing.answer) {
+      textarea.value = existing.answer;
+      status.textContent = "Loaded your saved answer from " + fmtClock(existing.updatedAt) + ".";
+    }
+
+    var saveTimer = null;
+    function saveRecord() {
+      var record = {
+        path: location.pathname,
+        answer: textarea.value,
+        quizResult: quizResult,
+        updatedAt: new Date().toISOString(),
+      };
+      try {
+        localStorage.setItem(recordKey, JSON.stringify(record));
+        status.textContent = "Saved — " + fmtClock(record.updatedAt);
+        status.classList.add("saved");
+      } catch (e) {
+        status.textContent = "Couldn't save locally — copy your answer somewhere safe.";
+        status.classList.remove("saved");
+      }
+    }
+
+    textarea.addEventListener("input", function () {
+      status.classList.remove("saved");
+      status.textContent = "Saving…";
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveRecord, 600);
+    });
+
+    // Also save once on unload in case the debounce timer hasn't fired yet.
+    window.addEventListener("beforeunload", function () {
+      clearTimeout(saveTimer);
+      if (textarea.value) saveRecord();
+    });
   })();
 </script>
 
