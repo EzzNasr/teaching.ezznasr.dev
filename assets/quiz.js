@@ -1,7 +1,18 @@
 /* ==========================================================================
    quiz.js — dependency-free MCQ engine for teaching.ezznasr.dev
    Renders into a container from a <script type="application/json"> block.
-   Scoring is entirely client-side; nothing is sent anywhere.
+   Scoring is entirely client-side; nothing is sent to any server.
+
+   Timing/result data:
+   - Captured: date (YYYY-MM-DD), startedAt (quiz mounted), firstAnsweredAt
+     (moment the very first option is clicked, across the whole quiz — this
+     doubles as "when the student actually started answering", easier to
+     capture than per-question timing), finishedAt (last question scored).
+   - Persisted to sessionStorage under "quizResult:<pathname>" so a sibling
+     assignment.html in the same lesson folder can read it and show it back
+     to the student before they submit.
+   - Also dispatched as a "quiz:completed" CustomEvent on document, in case
+     a page wants to react without polling sessionStorage.
    ========================================================================== */
 
 (function () {
@@ -21,6 +32,19 @@
     return node;
   }
 
+  function nowIso() {
+    return new Date().toISOString();
+  }
+
+  function fmtClock(iso) {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    } catch (e) {
+      return iso;
+    }
+  }
+
   function mount(rootSelector, dataSelector) {
     var root = document.querySelector(rootSelector);
     var dataNode = document.querySelector(dataSelector);
@@ -34,7 +58,44 @@
       return;
     }
 
+    var storageKey = "quizResult:" + location.pathname;
+
     var state = { index: 0, score: 0, answered: false };
+    var timing = {
+      date: new Date().toISOString().slice(0, 10),
+      startedAt: nowIso(),
+      firstAnsweredAt: null,
+      finishedAt: null,
+    };
+
+    function recordFirstAnswer() {
+      if (!timing.firstAnsweredAt) timing.firstAnsweredAt = nowIso();
+    }
+
+    function saveResult() {
+      timing.finishedAt = nowIso();
+      var result = {
+        path: location.pathname,
+        title: quiz.title || document.title,
+        date: timing.date,
+        startedAt: timing.startedAt,
+        firstAnsweredAt: timing.firstAnsweredAt,
+        finishedAt: timing.finishedAt,
+        score: state.score,
+        total: quiz.questions.length,
+      };
+      try {
+        sessionStorage.setItem(storageKey, JSON.stringify(result));
+      } catch (e) {
+        /* storage unavailable (private mode etc.) — degrade silently */
+      }
+      try {
+        document.dispatchEvent(new CustomEvent("quiz:completed", { detail: result }));
+      } catch (e) {
+        /* older browsers without CustomEvent support — ignore */
+      }
+      return result;
+    }
 
     function render() {
       root.innerHTML = "";
@@ -63,6 +124,7 @@
         btn.addEventListener("click", function () {
           if (state.answered) return;
           state.answered = true;
+          recordFirstAnswer();
           var correct = i === q.correct;
           if (correct) state.score++;
 
@@ -106,18 +168,29 @@
     }
 
     function renderSummary() {
+      var result = saveResult();
       var total = quiz.questions.length;
       var pct = Math.round((state.score / total) * 100);
+
+      var timestamp = el("div", { class: "qz-timestamp" }, [
+        result.date + "  ·  started " + fmtClock(result.startedAt) +
+        "  ·  finished " + fmtClock(result.finishedAt),
+      ]);
+
       var summary = el("div", { class: "qz-summary frame" }, [
         el("span", { class: "tick-br" }),
         el("span", { class: "tick-bl" }),
         el("div", { class: "qz-summary__score" }, [state.score + " / " + total]),
         el("div", { class: "qz-summary__label" }, [pct + "% correct"]),
+        timestamp,
         el("button", { class: "qz-retry", type: "button" }, ["Try again"]),
       ]);
       summary.querySelector(".qz-retry").addEventListener("click", function () {
         state.index = 0;
         state.score = 0;
+        timing.startedAt = nowIso();
+        timing.firstAnsweredAt = null;
+        timing.finishedAt = null;
         render();
       });
       root.appendChild(summary);

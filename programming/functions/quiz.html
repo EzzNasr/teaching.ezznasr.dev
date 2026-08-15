@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Functions Quiz — Ezz Nasr : Teaching</title>
+<title>Functions — Quiz — Ezz Nasr : Teaching</title>
 <meta name="description" content="A short 5-question quiz on Python functions: parameters, return values, and scope.">
-<link rel="canonical" href="https://teaching.ezznasr.dev/programming/quizzes/functions.html">
+<link rel="canonical" href="https://teaching.ezznasr.dev/programming/functions/quiz.html">
 <link rel="icon" href="/icons/favicon.ico" sizes="any">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -79,9 +79,15 @@
   .qz-next:hover{ filter:brightness(1.08); }
   .qz-summary{ padding:36px 24px; text-align:center; }
   .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--copper-bright); margin-bottom:6px; }
-  .qz-summary__label{ color:var(--ink-dim); font-family:var(--mono); font-size:12.5px; letter-spacing:0.04em; margin-bottom:20px; }
-  .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); color:var(--ink-dim); padding:9px 16px; cursor:pointer; }
+  .qz-summary__label{ color:var(--ink-dim); font-family:var(--mono); font-size:12.5px; letter-spacing:0.04em; margin-bottom:14px; }
+  .qz-timestamp{ font-family:var(--mono); font-size:10.5px; color:var(--ink-dim); letter-spacing:0.02em; margin-bottom:22px; opacity:.8; }
+  .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); color:var(--ink-dim); padding:9px 16px; cursor:pointer; margin-right:8px; }
   .qz-retry:hover{ border-color:var(--copper); color:var(--copper-bright); }
+  .qz-summary__next{
+    font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; text-decoration:none;
+    color:#0B2318; background:var(--copper-bright); padding:9px 16px; display:inline-block;
+  }
+  .qz-summary__next:hover{ filter:brightness(1.08); }
 
   footer{ border-top:1px solid var(--line); padding:32px 0; }
   .footer-note{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); letter-spacing:0.04em; text-align:center; }
@@ -92,22 +98,25 @@
 <header>
   <div class="titlebar">
     <a href="/" class="mark"><span class="dot"></span> EZZ NASR : TEACHING</a>
-    <nav><a href="/programming/">Back to Programming</a></nav>
+    <nav><a href="/programming/functions/">Back to lesson</a></nav>
   </div>
 </header>
 
 <main>
   <div class="wrap page-head">
     <h1>Functions — quiz</h1>
-    <p class="lede">Five quick questions. Instant feedback, nothing recorded or submitted.</p>
+    <p class="lede">Five quick questions. Instant feedback, nothing recorded or submitted anywhere.</p>
   </div>
 
   <div class="wrap">
     <div id="quiz-root" aria-live="polite"></div>
+    <p style="margin-top:20px;">
+      <a class="qz-summary__next" href="/programming/functions/assignment.html">Go to assignment \u2192</a>
+    </p>
   </div>
 </main>
 
-<footer><p class="footer-note">teaching.ezznasr.dev/programming/quizzes/functions</p></footer>
+<footer><p class="footer-note">teaching.ezznasr.dev/programming/functions/quiz</p></footer>
 
 <script type="application/json" id="quiz-data">
 {
