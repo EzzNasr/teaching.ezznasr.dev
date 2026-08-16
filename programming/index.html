@@ -57,6 +57,15 @@
   .tb-meta b{ display:block; color:var(--copper); font-weight:600; margin-bottom:2px; font-size:10px; }
   .page-head h1{ font-size:clamp(28px,4.5vw,44px); line-height:1.05; margin-bottom:12px; }
   .page-head p.lede{ max-width:620px; font-size:16.5px; color:var(--ink-dim); margin:0; }
+
+  /* ---- optional about/stat panel ---- */
+  .stat-panel{ width:100%; max-width:620px; border:1px solid var(--line); background:var(--bg-soft); padding:16px 18px; display:grid; grid-template-columns:repeat(3,1fr); gap:0; margin-top:22px; }
+  .stat-panel .stat{ padding:6px 14px; border-left:1px dashed var(--line); text-align:left; }
+  .stat-panel .stat:first-child{ border-left:none; padding-left:0; }
+  .stat-panel .stat b{ display:block; font-family:var(--mono); font-size:22px; color:var(--copper-bright); letter-spacing:0.01em; line-height:1.1; }
+  .stat-panel .stat span{ display:block; margin-top:4px; font-family:var(--mono); font-size:10px; letter-spacing:0.07em; text-transform:uppercase; color:var(--ink-dim); }
+  @media (max-width:520px){ .stat-panel{ grid-template-columns:1fr; } .stat-panel .stat{ border-left:none; border-top:1px dashed var(--line); padding:10px 0; } .stat-panel .stat:first-child{ border-top:none; padding-top:0; } }
+
   section.block{ padding:48px 0; border-top:1px solid var(--line); scroll-margin-top:76px; }
   .section-head{ margin-bottom:26px; }
   .section-head h2{ font-size:19px; margin-top:6px; }
@@ -105,6 +114,7 @@
     </div>
     <h1>Programming</h1>
     <p class="lede">Taught with second-degree and career-switching learners in mind: no assumed CS background, real code from the first example.</p>
+
   </div>
 
   <section class="block" id="lessons">
@@ -112,25 +122,11 @@
       <div class="section-head"><span class="eyebrow">Lessons</span><h2>Lessons</h2><p class="blurb">Each lesson is the entry point for its own quiz and assignment.</p></div>
       <div class="lessons">
 <!-- LESSON_CARDS_START -->
-
         <a class="lesson-card frame" href="/programming/functions/">
           <span class="tick-br"></span><span class="tick-bl"></span>
           <div class="lc-top"><h3>Functions</h3><span class="stamp demo">Lesson</span></div>
           <p>Why functions exist (reuse, abstraction, testability), then parameters, return values, and scope.</p>
           <div class="lc-chips"><span class="chip">5 question quiz</span><span class="chip">Assignment</span></div>
-          <span class="lc-go">Open lesson</span>
-        </a>
-        <a class="lesson-card frame" href="/programming/demi-ministry-of-communication/">
-          <span class="tick-br"></span><span class="tick-bl"></span>
-          <div class="lc-top"><h3>DEMI - Ministry of Communication</h3><span class="stamp demo">Lesson</span></div>
-          <p>DEMI – Robotics Adventures
-
-A practical robotics session delivered as part of DEMI (Digital Egypt Makes Innovation), an initiative supported by the Ministry of Communications and Information Technology (MCIT).
-
-Students learned how robots use Distance and Eye Sensors to detect obstacles, colors, and their surroundings. The session combined concepts with hands-on programming in VEXcode VR, where students applied conditional logic to navigate the Disk Maze and Wall Maze Challenges.
-
-The session focused on developing problem-solving, computational thinking, and practical programming skills through interactive robotics challenges.</p>
-          <div class="lc-chips"><span class="chip">10 question quiz</span><span class="chip">Assignment</span></div>
           <span class="lc-go">Open lesson</span>
         </a>
 <!-- LESSON_CARDS_END -->

@@ -59,6 +59,16 @@
   .lesson-link .ll-desc{ color:var(--ink-dim); font-size:13.5px; margin-top:6px; }
   .lesson-link .ll-go{ font-family:var(--mono); font-size:11.5px; color:var(--copper-bright); margin-top:10px; display:block; }
   .lesson-link .ll-go::after{ content:" \2192"; }
+
+  /* ---- attachments (coming soon) ---- */
+  .attachments{ margin-top:32px; }
+  .attach-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+  .attach-head h2{ font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-dim); }
+  .stamp{ font-family:var(--mono); font-size:10px; letter-spacing:0.1em; text-transform:uppercase; padding:4px 8px; border:1px solid currentColor; white-space:nowrap; }
+  .stamp.planned{ color:var(--ink-dim); }
+  .attach-empty{ padding:18px 20px; color:var(--ink-dim); font-size:13.5px; }
+  .attach-empty code{ font-family:var(--mono); background:var(--bg-soft); padding:0.1em 0.4em; font-size:0.85em; border:1px solid var(--line); }
+
   footer{ border-top:1px solid var(--line); padding:32px 0; }
   .footer-note{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); letter-spacing:0.04em; text-align:center; }
 </style>
@@ -80,13 +90,9 @@
 
   <div class="wrap">
     <div class="media-slot">
-      <iframe 
-        src="https://www.youtube.com/embed/hIwSQZpAQ_I" 
-        title="YouTube video player" 
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-        allowfullscreen>
-      </iframe>
+      Video placeholder &mdash; 8&ndash;12 min<br>iPad walkthrough + sample code + live Q&amp;A
     </div>
+
     <div class="lesson-links">
       <a class="lesson-link frame" href="/programming/functions/quiz.html">
         <div class="ll-title">Quiz</div>
@@ -98,6 +104,24 @@
         <div class="ll-desc">Paste your work as text</div>
         <span class="ll-go">Submit</span>
       </a>
+    </div>
+
+    <div class="attachments">
+      <div class="attach-head">
+        <h2>Attachments</h2>
+        <span class="stamp planned">Coming soon</span>
+      </div>
+      <!--
+        Future: this block will read functions/attachments.json and render
+        one row per entry as an inline Google Drive preview, e.g.:
+          <iframe src="https://drive.google.com/file/d/DRIVE_FILE_ID/preview"></iframe>
+        Students view the file on this page — never redirected to drive.google.com.
+        attachments.json ships empty ([]) until that's wired up.
+      -->
+      <div class="attach-empty frame">
+        <span class="tick-br"></span><span class="tick-bl"></span>
+        No attachments for this lesson yet. Files will appear here once uploaded — viewable directly on this page, no download required.
+      </div>
     </div>
   </div>
 </main>
