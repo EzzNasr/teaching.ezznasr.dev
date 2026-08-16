@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Programming — Ezz Nasr : Teaching</title>
-<meta name="description" content="Programming fundamentals taught concept-first: each lesson bundles a sample video, an interactive quiz, and assignment submission.">
+<meta name="description" content="Programming lessons, quizzes, and assignments.">
 <link rel="canonical" href="https://teaching.ezznasr.dev/programming/">
 <link rel="icon" href="/icons/favicon.ico" sizes="any">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -57,26 +57,25 @@
   .tb-meta b{ display:block; color:var(--copper); font-weight:600; margin-bottom:2px; font-size:10px; }
   .page-head h1{ font-size:clamp(28px,4.5vw,44px); line-height:1.05; margin-bottom:12px; }
   .page-head p.lede{ max-width:620px; font-size:16.5px; color:var(--ink-dim); margin:0; }
-  section.block{ padding:16px 0 48px; }
+  section.block{ padding:48px 0; border-top:1px solid var(--line); scroll-margin-top:76px; }
+  .section-head{ margin-bottom:26px; }
+  .section-head h2{ font-size:19px; margin-top:6px; }
+  .section-head p.blurb{ color:var(--ink-dim); font-size:15px; max-width:640px; margin:8px 0 0; }
 
-  /* ---- lesson list (each lesson = entry point for its own video / quiz / assignment) ---- */
-  .lesson-list{ display:flex; flex-direction:column; gap:14px; margin-top:8px; }
-  .lesson-row{
-    display:flex; align-items:center; justify-content:space-between; gap:16px;
-    padding:20px 22px; text-decoration:none; transition:border-color .18s ease, transform .18s ease;
-  }
-  .lesson-row:hover{ border-color:var(--copper); transform:translateX(2px); }
-  .lesson-row.disabled{ opacity:.5; pointer-events:none; }
-  .lr-main{ display:flex; flex-direction:column; gap:6px; }
-  .lr-title{ font-family:var(--mono); font-size:14.5px; color:var(--ink); letter-spacing:0.02em; }
-  .lr-desc{ font-family:var(--serif); font-size:14px; color:var(--ink-dim); max-width:560px; }
-  .lr-includes{ display:flex; gap:6px; margin-top:2px; }
-  .lr-tag{ font-family:var(--mono); font-size:10px; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-dim); border:1px solid var(--line); padding:2px 7px; }
-  .lr-right{ display:flex; align-items:center; gap:14px; flex-shrink:0; }
-  .stamp{ font-family:var(--mono); font-size:10px; letter-spacing:0.1em; text-transform:uppercase; padding:4px 8px; border:1px solid currentColor; white-space:nowrap; }
+  /* ---- lesson cards: entry point for quiz + assignment ---- */
+  .lessons{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:24px; }
+  .lesson-card{ padding:22px; display:flex; flex-direction:column; gap:14px; text-decoration:none; transition:transform .22s ease, border-color .22s ease, box-shadow .22s ease; }
+  .lesson-card:hover{ transform:translateY(-3px); border-color:var(--copper); box-shadow:0 14px 28px -18px rgba(0,0,0,.55), 0 0 0 1px rgba(201,151,76,.08); }
+  .lc-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .lesson-card h3{ font-size:14.5px; letter-spacing:0.04em; }
+  .stamp{ font-family:var(--mono); font-size:10px; letter-spacing:0.1em; text-transform:uppercase; padding:4px 8px; border:1px solid currentColor; white-space:nowrap; flex:0 0 auto; }
   .stamp.demo{ color:var(--status-progress); } .stamp.shipped{ color:var(--status-shipped); } .stamp.planned{ color:var(--ink-dim); }
-  .lr-go{ font-family:var(--mono); font-size:11.5px; color:var(--copper-bright); white-space:nowrap; }
-  .lr-go::after{ content:" \2192"; }
+  .lesson-card p{ color:var(--ink-dim); font-size:14.5px; margin:0; }
+  .lc-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:auto; padding-top:4px; }
+  .chip{ font-family:var(--mono); font-size:10.5px; letter-spacing:0.04em; color:var(--ink-dim); border:1px solid var(--line); padding:3px 8px; }
+  .lesson-card:hover .chip{ border-color:rgba(201,151,76,0.4); }
+  .lc-go{ font-family:var(--mono); font-size:11.5px; color:var(--copper-bright); }
+  .lc-go::after{ content:" \2192"; }
 
   footer{ border-top:1px solid var(--line); padding:44px 0 32px; }
   .footer-grid{ display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:24px; }
@@ -84,9 +83,7 @@
   .footer-links a{ color:var(--ink-dim); text-decoration:none; }
   .footer-links a:hover{ color:var(--copper-bright); }
   .footer-note{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); letter-spacing:0.04em; }
-  .reveal{ opacity:0; transform:translateY(14px); transition:opacity .5s ease, transform .5s ease; }
-  .reveal.in{ opacity:1; transform:translateY(0); }
-  @media (max-width:760px){ nav{ display:none; } .tb-meta{ grid-template-columns:repeat(2,auto); } .lesson-row{ flex-direction:column; align-items:flex-start; } .lr-right{ align-self:flex-end; } }
+  @media (max-width:760px){ nav{ display:none; } .tb-meta{ grid-template-columns:repeat(2,auto); } .lessons{ grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -103,49 +100,26 @@
 
 <main>
   <div class="wrap page-head">
-    <div class="tb-meta reveal">
+    <div class="tb-meta">
       <div><b>Dwg No.</b>EN-2026-02</div><div><b>Rev</b>2026.08</div><div><b>Doc</b>Programming</div><div><b>Status</b>Active</div>
     </div>
-    <h1 class="reveal">Programming fundamentals</h1>
-    <p class="lede reveal">Taught with second-degree and career-switching learners in mind: no assumed CS background, real code from the first example. Each lesson below is self-contained — video, quiz, and assignment all live together.</p>
+    <h1>Programming</h1>
+    <p class="lede">Taught with second-degree and career-switching learners in mind: no assumed CS background, real code from the first example.</p>
   </div>
 
   <section class="block" id="lessons">
     <div class="wrap">
-      <div class="lesson-list reveal">
-        <a class="lesson-row frame" href="/programming/functions/">
+      <div class="section-head"><span class="eyebrow">Lessons</span><h2>Lessons</h2><p class="blurb">Each lesson is the entry point for its own quiz and assignment.</p></div>
+      <div class="lessons">
+<!-- LESSON_CARDS_START -->
+        <a class="lesson-card frame" href="/programming/functions/">
           <span class="tick-br"></span><span class="tick-bl"></span>
-          <div class="lr-main">
-            <div class="lr-title">Functions — concept &amp; mechanics</div>
-            <div class="lr-desc">Why functions exist before syntax, then live problem-solving with participants.</div>
-            <div class="lr-includes">
-              <span class="lr-tag">Video</span>
-              <span class="lr-tag">5-q quiz</span>
-              <span class="lr-tag">Assignment</span>
-            </div>
-          </div>
-          <div class="lr-right">
-            <span class="stamp demo">Demo</span>
-            <span class="lr-go">Enter</span>
-          </div>
+          <div class="lc-top"><h3>Functions</h3><span class="stamp demo">Lesson</span></div>
+          <p>Why functions exist (reuse, abstraction, testability), then parameters, return values, and scope.</p>
+          <div class="lc-chips"><span class="chip">5 question quiz</span><span class="chip">Assignment</span></div>
+          <span class="lc-go">Open lesson</span>
         </a>
-
-        <div class="lesson-row frame disabled">
-          <span class="tick-br"></span><span class="tick-bl"></span>
-          <div class="lr-main">
-            <div class="lr-title">Loops &amp; iteration</div>
-            <div class="lr-desc">Coming soon.</div>
-            <div class="lr-includes">
-              <span class="lr-tag">Video</span>
-              <span class="lr-tag">Quiz</span>
-              <span class="lr-tag">Assignment</span>
-            </div>
-          </div>
-          <div class="lr-right">
-            <span class="stamp planned">Planned</span>
-            <span class="lr-go">Enter</span>
-          </div>
-        </div>
+<!-- LESSON_CARDS_END -->
       </div>
     </div>
   </section>
@@ -153,29 +127,16 @@
 
 <footer>
   <div class="wrap">
-    <div class="footer-grid reveal">
+    <div class="footer-grid">
       <div class="footer-links">
         <a href="mailto:ezznasrone@gmail.com">ezznasrone@gmail.com</a>
         <a href="https://www.linkedin.com/in/EzzNasr" target="_blank" rel="noopener">LinkedIn</a>
         <a href="https://github.com/EzzNasr" target="_blank" rel="noopener">GitHub</a>
       </div>
-      <div class="footer-note">Dwg No. EN-2026-02 &nbsp;·&nbsp; Rev 2026.08 &nbsp;·&nbsp; teaching.ezznasr.dev/programming</div>
+      <div class="footer-note">Dwg No. EN-2026-02 &nbsp;&middot;&nbsp; Rev 2026.08 &nbsp;&middot;&nbsp; teaching.ezznasr.dev/programming</div>
     </div>
   </div>
 </footer>
-
-<script>
-  (function(){
-    var els = document.querySelectorAll('.reveal');
-    if(!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches){
-      els.forEach(function(el){ el.classList.add('in'); }); return;
-    }
-    var io = new IntersectionObserver(function(entries){
-      entries.forEach(function(entry){ if(entry.isIntersecting){ entry.target.classList.add('in'); io.unobserve(entry.target); } });
-    }, { threshold: 0.12 });
-    els.forEach(function(el){ io.observe(el); });
-  })();
-</script>
 
 </body>
 </html>

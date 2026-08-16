@@ -1,22 +1,14 @@
 /* ==========================================================================
    quiz.js — dependency-free MCQ engine for teaching.ezznasr.dev
    Renders into a container from a <script type="application/json"> block.
-   Scoring is entirely client-side; nothing is sent to any server.
-
-   Timing/result data:
-   - Captured: date (YYYY-MM-DD), startedAt (quiz mounted), firstAnsweredAt
-     (moment the very first option is clicked, across the whole quiz — this
-     doubles as "when the student actually started answering", easier to
-     capture than per-question timing), finishedAt (last question scored).
-   - Persisted to sessionStorage under "quizResult:<pathname>" so a sibling
-     assignment.html in the same lesson folder can read it and show it back
-     to the student before they submit.
-   - Also dispatched as a "quiz:completed" CustomEvent on document, in case
-     a page wants to react without polling sessionStorage.
+   Scoring is client-side. Results are queued into localStorage under
+   "teaching_pending_submissions" so a future sync step can POST them.
    ========================================================================== */
 
 (function () {
   "use strict";
+
+  var QUEUE_KEY = "teaching_pending_submissions";
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
@@ -32,16 +24,17 @@
     return node;
   }
 
-  function nowIso() {
-    return new Date().toISOString();
+  function isoDate(d) {
+    return d.toISOString().slice(0, 10);
   }
 
-  function fmtClock(iso) {
-    if (!iso) return "—";
+  function queueSubmission(payload) {
     try {
-      return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      var existing = JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
+      existing.push(payload);
+      localStorage.setItem(QUEUE_KEY, JSON.stringify(existing));
     } catch (e) {
-      return iso;
+      /* localStorage unavailable — fail silently, nothing to recover here */
     }
   }
 
@@ -58,73 +51,88 @@
       return;
     }
 
-    var storageKey = "quizResult:" + location.pathname;
-
-    var state = { index: 0, score: 0, answered: false };
-    var timing = {
-      date: new Date().toISOString().slice(0, 10),
-      startedAt: nowIso(),
-      firstAnsweredAt: null,
-      finishedAt: null,
+    var state = {
+      index: 0,
+      score: 0,
+      started: false,
+      finished: false,
+      name: "",
+      email: "",
+      startTime: null,
+      endTime: null,
     };
-
-    function recordFirstAnswer() {
-      if (!timing.firstAnsweredAt) timing.firstAnsweredAt = nowIso();
-    }
-
-    function saveResult() {
-      timing.finishedAt = nowIso();
-      var result = {
-        path: location.pathname,
-        title: quiz.title || document.title,
-        date: timing.date,
-        startedAt: timing.startedAt,
-        firstAnsweredAt: timing.firstAnsweredAt,
-        finishedAt: timing.finishedAt,
-        score: state.score,
-        total: quiz.questions.length,
-      };
-      try {
-        sessionStorage.setItem(storageKey, JSON.stringify(result));
-      } catch (e) {
-        /* storage unavailable (private mode etc.) — degrade silently */
-      }
-      try {
-        document.dispatchEvent(new CustomEvent("quiz:completed", { detail: result }));
-      } catch (e) {
-        /* older browsers without CustomEvent support — ignore */
-      }
-      return result;
-    }
 
     function render() {
       root.innerHTML = "";
+      if (!state.started) { renderStart(); return; }
+      if (state.index >= quiz.questions.length) { renderSummary(); return; }
+      renderQuestion();
+    }
 
-      if (state.index >= quiz.questions.length) {
-        renderSummary();
-        return;
-      }
+    function renderStart() {
+      var nameInput = el("input", { class: "qz-input", type: "text", placeholder: "Your name", required: "required" });
+      var emailInput = el("input", { class: "qz-input", type: "email", placeholder: "Email (optional)" });
 
+      var errorMsg = el("div", { class: "qz-error" });
+
+      var beginBtn = el("button", { class: "qz-next", type: "button" }, ["Begin quiz \u2192"]);
+      beginBtn.addEventListener("click", function () {
+        var name = nameInput.value.trim();
+        if (!name) {
+          errorMsg.textContent = "Please enter your name to start.";
+          nameInput.focus();
+          return;
+        }
+        state.name = name;
+        state.email = emailInput.value.trim();
+        state.startTime = new Date().toISOString();
+        state.started = true;
+        render();
+      });
+
+      var card = el("div", { class: "qz-card frame" }, [
+        el("span", { class: "tick-br" }),
+        el("span", { class: "tick-bl" }),
+        el("p", { class: "qz-question" }, [quiz.title ? (quiz.title + " — before you start") : "Before you start"]),
+        el("div", { class: "qz-field" }, [nameInput]),
+        el("div", { class: "qz-field" }, [emailInput]),
+        errorMsg,
+        el("div", { class: "qz-actions" }, [beginBtn]),
+      ]);
+
+      root.appendChild(card);
+    }
+
+    function renderQuestion() {
       var q = quiz.questions[state.index];
-      state.answered = false;
+      var answered = false;
 
       var progress = el("div", { class: "qz-progress" }, [
         "Question " + (state.index + 1) + " of " + quiz.questions.length +
-        "  ·  Score " + state.score + "/" + state.index,
+        "  \u00b7  Score " + state.score + "/" + state.index,
       ]);
 
       var questionEl = el("p", { class: "qz-question", html: q.q });
-
       var optionsWrap = el("div", { class: "qz-options" });
+      var actions = el("div", { class: "qz-actions" });
+
+      var card = el("div", { class: "qz-card frame" }, [
+        el("span", { class: "tick-br" }),
+        el("span", { class: "tick-bl" }),
+        questionEl,
+        optionsWrap,
+        actions,
+      ]);
+
       q.options.forEach(function (opt, i) {
         var btn = el("button", { class: "qz-option", type: "button" }, [
           el("span", { class: "qz-option__tag" }, [String.fromCharCode(65 + i)]),
           el("span", {}, [opt]),
         ]);
         btn.addEventListener("click", function () {
-          if (state.answered) return;
-          state.answered = true;
-          recordFirstAnswer();
+          if (answered) return;
+          answered = true;
+
           var correct = i === q.correct;
           if (correct) state.score++;
 
@@ -141,10 +149,12 @@
           ]);
           card.appendChild(verdict);
 
-          var nextBtn = el("button", { class: "qz-next", type: "button" }, [
-            state.index + 1 < quiz.questions.length ? "Next \u2192" : "See score \u2192",
-          ]);
+          var isLast = state.index + 1 >= quiz.questions.length;
+          var nextBtn = el("button", { class: "qz-next", type: "button" }, [isLast ? "See score \u2192" : "Next \u2192"]);
           nextBtn.addEventListener("click", function () {
+            if (isLast && !state.endTime) {
+              state.endTime = new Date().toISOString();
+            }
             state.index++;
             render();
           });
@@ -153,44 +163,46 @@
         optionsWrap.appendChild(btn);
       });
 
-      var actions = el("div", { class: "qz-actions" });
-
-      var card = el("div", { class: "qz-card frame" }, [
-        el("span", { class: "tick-br" }),
-        el("span", { class: "tick-bl" }),
-        questionEl,
-        optionsWrap,
-        actions,
-      ]);
-
       root.appendChild(progress);
       root.appendChild(card);
     }
 
     function renderSummary() {
-      var result = saveResult();
+      if (!state.finished) {
+        state.finished = true;
+        if (!state.endTime) state.endTime = new Date().toISOString();
+
+        queueSubmission({
+          type: "quiz",
+          subject: quiz.subject || null,
+          lesson: quiz.lesson || null,
+          quiz_title: quiz.title || null,
+          name: state.name,
+          email: state.email || null,
+          date: isoDate(new Date(state.startTime)),
+          start_time: state.startTime,
+          end_time: state.endTime,
+          score: state.score,
+          total: quiz.questions.length,
+        });
+      }
+
       var total = quiz.questions.length;
-      var pct = Math.round((state.score / total) * 100);
-
-      var timestamp = el("div", { class: "qz-timestamp" }, [
-        result.date + "  ·  started " + fmtClock(result.startedAt) +
-        "  ·  finished " + fmtClock(result.finishedAt),
-      ]);
-
+      var pct = total ? Math.round((state.score / total) * 100) : 0;
       var summary = el("div", { class: "qz-summary frame" }, [
         el("span", { class: "tick-br" }),
         el("span", { class: "tick-bl" }),
         el("div", { class: "qz-summary__score" }, [state.score + " / " + total]),
-        el("div", { class: "qz-summary__label" }, [pct + "% correct"]),
-        timestamp,
+        el("div", { class: "qz-summary__label" }, [pct + "% correct \u00b7 " + state.name]),
         el("button", { class: "qz-retry", type: "button" }, ["Try again"]),
       ]);
       summary.querySelector(".qz-retry").addEventListener("click", function () {
         state.index = 0;
         state.score = 0;
-        timing.startedAt = nowIso();
-        timing.firstAnsweredAt = null;
-        timing.finishedAt = null;
+        state.started = false;
+        state.finished = false;
+        state.startTime = null;
+        state.endTime = null;
         render();
       });
       root.appendChild(summary);
