@@ -72,7 +72,13 @@
     }
     return fetch(DRIVE_ENDPOINT, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // text/plain is CORS-safelisted, so the browser skips the preflight
+      // OPTIONS request. Apps Script has no doOptions() handler, so a
+      // preflighted request (e.g. Content-Type: application/json) gets
+      // silently blocked by the browser before doPost ever runs. doPost
+      // still JSON.parses e.postData.contents regardless of the declared
+      // type, so this is a pure client-side header change.
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload),
     }).then(function (resp) {
       return resp.json().then(function (data) {
