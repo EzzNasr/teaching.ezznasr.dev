@@ -1,0 +1,11 @@
+{
+  "name": "Ezz Nasr",
+  "short_name": "Ezz Nasr",
+  "icons": [
+    { "src": "/icons/favicon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/favicon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "theme_color": "#0B2318",
+  "background_color": "#0B2318",
+  "display": "standalone"
+}
