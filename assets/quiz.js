@@ -3,12 +3,19 @@
    Renders into a container from a <script type="application/json"> block.
    Scoring is client-side. Results are queued into localStorage under
    "teaching_pending_submissions" so a future sync step can POST them.
+
+   v2 change: the browser now remembers each student's *last* attempt per
+   lesson (keyed by subject+lesson, stored under "teaching_last_attempt:"),
+   and shows it on the start screen instead of forgetting on navigation —
+   the actual gap that was reported. This is still per-browser, per-device
+   (no server), same limitation as before, just no longer silently lost.
    ========================================================================== */
 
 (function () {
   "use strict";
 
   var QUEUE_KEY = "teaching_pending_submissions";
+  var LAST_ATTEMPT_PREFIX = "teaching_last_attempt:";
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
@@ -26,6 +33,27 @@
 
   function isoDate(d) {
     return d.toISOString().slice(0, 10);
+  }
+
+  function lastAttemptKey(quiz) {
+    return LAST_ATTEMPT_PREFIX + (quiz.subject || "?") + ":" + (quiz.lesson || "?");
+  }
+
+  function loadLastAttempt(quiz) {
+    try {
+      var raw = localStorage.getItem(lastAttemptKey(quiz));
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveLastAttempt(quiz, attempt) {
+    try {
+      localStorage.setItem(lastAttemptKey(quiz), JSON.stringify(attempt));
+    } catch (e) {
+      /* localStorage unavailable — nothing to recover here */
+    }
   }
 
   function queueSubmission(payload) {
@@ -90,16 +118,32 @@
         render();
       });
 
-      var card = el("div", { class: "qz-card frame" }, [
+      var cardChildren = [
         el("span", { class: "tick-br" }),
         el("span", { class: "tick-bl" }),
         el("p", { class: "qz-question" }, [quiz.title ? (quiz.title + " — before you start") : "Before you start"]),
-        el("div", { class: "qz-field" }, [nameInput]),
-        el("div", { class: "qz-field" }, [emailInput]),
-        errorMsg,
-        el("div", { class: "qz-actions" }, [beginBtn]),
-      ]);
+      ];
 
+      var last = loadLastAttempt(quiz);
+      if (last && typeof last.score === "number" && typeof last.total === "number") {
+        var pct = last.total ? Math.round((last.score / last.total) * 100) : 0;
+        var whenLabel = last.date ? " \u00b7 " + last.date : "";
+        cardChildren.push(el("div", { class: "qz-verdict" }, [
+          el("span", { class: "qz-verdict__tag qz-verdict__tag--pass" }, ["Last attempt"]),
+          el("span", { class: "qz-verdict__explain" }, [
+            (last.name ? last.name + " \u2014 " : "") + last.score + " / " + last.total +
+            " (" + pct + "%)" + whenLabel + ". Starting again will record a new attempt."
+          ]),
+        ]));
+        if (last.name && !nameInput.value) nameInput.value = last.name;
+      }
+
+      cardChildren.push(el("div", { class: "qz-field" }, [nameInput]));
+      cardChildren.push(el("div", { class: "qz-field" }, [emailInput]));
+      cardChildren.push(errorMsg);
+      cardChildren.push(el("div", { class: "qz-actions" }, [beginBtn]));
+
+      var card = el("div", { class: "qz-card frame" }, cardChildren);
       root.appendChild(card);
     }
 
@@ -172,7 +216,7 @@
         state.finished = true;
         if (!state.endTime) state.endTime = new Date().toISOString();
 
-        queueSubmission({
+        var record = {
           type: "quiz",
           subject: quiz.subject || null,
           lesson: quiz.lesson || null,
@@ -184,7 +228,10 @@
           end_time: state.endTime,
           score: state.score,
           total: quiz.questions.length,
-        });
+        };
+
+        queueSubmission(record);
+        saveLastAttempt(quiz, record);
       }
 
       var total = quiz.questions.length;
