@@ -1,82 +1,95 @@
-/**
- * attachments.js — renders the Attachments block on a lesson page.
- *
- * Reads ./attachments.json (co-located with the lesson's index.html),
- * then links/embeds each file straight from drive.google.com. Files must
- * be shared "Anyone with the link — Viewer" (Code.gs does this
- * automatically for new uploads via handleUploadAttachment).
- *
- * No Apps Script involved in serving files — Drive's own preview/view/
- * download URLs are what actually work reliably in an iframe and for
- * downloads, unlike proxying bytes through Apps Script's doGet.
- */
+/* ==========================================================================
+   attachments.js — renders a lesson's attachments.json as inline previews
+   and download links, proxied through the Drive bridge Web App so the
+   student's browser only ever sees this site + the Apps Script URL —
+   never drive.google.com or the folder it lives in.
+
+   DRIVE_ENDPOINT is baked in at build time (see assign.js header comment).
+   ========================================================================== */
+
 (function () {
-  var INLINE_TYPES = { pdf: true, image: true, png: true, jpg: true, jpeg: true, gif: true };
+  "use strict";
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
+  var EMBEDDABLE_TYPES = ["pdf", "png", "jpg", "jpeg", "gif", "webp"];
+
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === "class") node.className = attrs[k];
+      else if (k === "html") node.innerHTML = attrs[k];
+      else node.setAttribute(k, attrs[k]);
     });
+    (children || []).forEach(function (c) {
+      if (c) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    });
+    return node;
   }
 
-  function driveUrls(id) {
-    return {
-      preview: "https://drive.google.com/file/d/" + encodeURIComponent(id) + "/preview",
-      view: "https://drive.google.com/file/d/" + encodeURIComponent(id) + "/view",
-      download: "https://drive.google.com/uc?export=download&id=" + encodeURIComponent(id),
-    };
+  function fileUrl(fileId, forceDownload) {
+    var url = DRIVE_ENDPOINT + (DRIVE_ENDPOINT.indexOf("?") >= 0 ? "&" : "?") + "action=file&id=" + encodeURIComponent(fileId);
+    if (forceDownload) url += "&dl=1";
+    return url;
   }
 
-  function renderItem(item) {
-    var urls = driveUrls(item.drive_file_id);
-    var inline = !!INLINE_TYPES[String(item.type || "").toLowerCase()];
-
-    var html = '<div class="attach-item frame">';
-    html += '<span class="tick-br"></span><span class="tick-bl"></span>';
-    html += '<div class="attach-item__title">';
-    html += "<span>" + escapeHtml(item.title || "Attachment") + "</span>";
-    html += '<span class="attach-item__actions">';
-    html += '<a href="' + urls.view + '" target="_blank" rel="noopener">Open</a>';
-    html += " &middot; ";
-    html += '<a href="' + urls.download + '" target="_blank" rel="noopener">Download</a>';
-    html += "</span></div>";
-    if (inline) {
-      html += '<iframe src="' + urls.preview + '" loading="lazy" title="' + escapeHtml(item.title || "Attachment preview") + '"></iframe>';
-    }
-    html += "</div>";
-    return html;
-  }
-
-  function setStamp(stampEl, text, cls) {
-    if (!stampEl) return;
-    stampEl.textContent = text;
-    stampEl.className = "stamp " + cls;
-  }
-
-  function mount(selector) {
-    var root = document.querySelector(selector);
+  function mount(rootSelector) {
+    var root = document.querySelector(rootSelector);
     if (!root) return;
 
-    var stamp = document.getElementById("attachments-stamp");
-    var list = document.getElementById("attachments-list");
-    if (!list) return;
+    var stamp = root.querySelector("#attachments-stamp");
+    var listWrap = root.querySelector("#attachments-list");
+    if (!listWrap) return;
 
     fetch("attachments.json", { cache: "no-store" })
-      .then(function (res) {
-        if (!res.ok) throw new Error("No attachments.json (" + res.status + ")");
-        return res.json();
-      })
+      .then(function (resp) { return resp.ok ? resp.json() : []; })
+      .catch(function () { return []; })
       .then(function (items) {
-        if (!Array.isArray(items) || items.length === 0) {
-          setStamp(stamp, "None yet", "planned");
+        renderList(Array.isArray(items) ? items : []);
+      });
+
+    function renderList(items) {
+      listWrap.innerHTML = "";
+
+      if (!items.length) {
+        if (stamp) { stamp.textContent = "Coming soon"; stamp.className = "stamp planned"; }
+        listWrap.appendChild(el("div", { class: "attach-empty frame" }, [
+          el("span", { class: "tick-br" }),
+          el("span", { class: "tick-bl" }),
+          "No attachments for this lesson yet.",
+        ]));
+        return;
+      }
+
+      if (stamp) { stamp.textContent = items.length + (items.length === 1 ? " file" : " files"); stamp.className = "stamp ready"; }
+
+      items.forEach(function (item) {
+        var fileId = item.drive_file_id;
+        var type = (item.type || "").toLowerCase();
+        var title = item.title || "Untitled";
+
+        if (!fileId || !DRIVE_ENDPOINT) {
+          listWrap.appendChild(el("div", { class: "attach-item frame" }, [
+            el("div", { class: "attach-item__title" }, [title, el("span", { class: "attach-item__actions" }, ["Not available yet"])]),
+          ]));
           return;
         }
-        list.innerHTML = items.map(renderItem).join("");
-        setStamp(stamp, items.length + (items.length === 1 ? " file" : " files"), "ready");
-      })
-      .catch(function () {
-        setStamp(stamp, "None yet", "planned");
+
+        var url = fileUrl(fileId, false);
+        var downloadUrl = fileUrl(fileId, true);
+        var openLink = el("a", { href: url, target: "_blank", rel: "noopener" }, ["Open \u2192"]);
+        var downloadLink = el("a", { href: downloadUrl, target: "_blank", rel: "noopener", style: "margin-left:12px;" }, ["Download"]);
+        var row = el("div", { class: "attach-item frame" }, [
+          el("div", { class: "attach-item__title" }, [title, el("span", { class: "attach-item__actions" }, [openLink, downloadLink])]),
+        ]);
+
+        if (EMBEDDABLE_TYPES.indexOf(type) !== -1) {
+          row.appendChild(el("iframe", { src: url, title: title, loading: "lazy" }));
+        }
+
+        listWrap.appendChild(row);
       });
+    }
   }
 
   window.AttachEngine = { mount: mount };
