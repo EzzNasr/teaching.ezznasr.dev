@@ -73,6 +73,8 @@
   .footer-note{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); letter-spacing:0.04em; text-align:center; }
 </style>
 </head>
+<script src="/assets/attachments.js"></script>
+<script>AttachEngine.mount('#attachments-root');</script>
 <body>
 
 <header>
@@ -111,11 +113,18 @@
       </a>
     </div>
 
-    <div class="attachments">
+    <div class="attachments" id="attachments-root" data-subject="programming" data-lesson="functions">
       <div class="attach-head">
         <h2>Attachments</h2>
-        <span class="stamp planned">Coming soon</span>
+        <span class="stamp planned" id="attachments-stamp">Loading&hellip;</span>
       </div>
+      <div id="attachments-list">
+        <div class="attach-empty frame">
+          <span class="tick-br"></span><span class="tick-bl"></span>
+          No attachments for this lesson yet.
+        </div>
+      </div>
+    </div>
       <!--
         Future: this block will read functions/attachments.json and render
         one row per entry as an inline Google Drive preview, e.g.:
