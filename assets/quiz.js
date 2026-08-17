@@ -16,6 +16,23 @@
 
   var QUEUE_KEY = "teaching_pending_submissions";
   var LAST_ATTEMPT_PREFIX = "teaching_last_attempt:";
+  var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
+
+  function postToDrive(payload) {
+    if (!DRIVE_ENDPOINT) return Promise.reject(new Error("not-configured"));
+    return fetch(DRIVE_ENDPOINT, {
+      method: "POST",
+      // text/plain avoids a CORS preflight against Apps Script (no
+      // doOptions handler there) — see assign.js for the full note.
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload),
+    }).then(function (resp) {
+      return resp.json().then(function (data) {
+        if (!data || !data.ok) throw new Error((data && data.error) || "Drive bridge rejected the result.");
+        return data;
+      });
+    });
+  }
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
@@ -88,6 +105,7 @@
       email: "",
       startTime: null,
       endTime: null,
+      answers: [], // { question, chosen, correct_answer, is_correct }
     };
 
     function render() {
@@ -180,6 +198,13 @@
           var correct = i === q.correct;
           if (correct) state.score++;
 
+          state.answers.push({
+            question: q.q,
+            chosen: opt,
+            correct_answer: q.options[q.correct],
+            is_correct: correct,
+          });
+
           Array.prototype.forEach.call(optionsWrap.children, function (child, j) {
             child.disabled = true;
             if (j === q.correct) child.classList.add("qz-option--correct");
@@ -216,6 +241,12 @@
         state.finished = true;
         if (!state.endTime) state.endTime = new Date().toISOString();
 
+        var wrongQuestions = state.answers
+          .filter(function (a) { return !a.is_correct; })
+          .map(function (a) {
+            return { question: a.question, your_answer: a.chosen, correct_answer: a.correct_answer };
+          });
+
         var record = {
           type: "quiz",
           subject: quiz.subject || null,
@@ -228,10 +259,16 @@
           end_time: state.endTime,
           score: state.score,
           total: quiz.questions.length,
+          wrong_questions: wrongQuestions,
         };
 
         queueSubmission(record);
         saveLastAttempt(quiz, record);
+
+        // Best-effort — same fallback philosophy as the rest of the site:
+        // if the Drive bridge isn't configured or unreachable, the result
+        // still lives in localStorage via queueSubmission above.
+        postToDrive(Object.assign({ action: "upload_quiz_result" }, record)).catch(function () {});
       }
 
       var total = quiz.questions.length;
