@@ -60,7 +60,7 @@
   .lesson-link .ll-go{ font-family:var(--mono); font-size:11.5px; color:var(--copper-bright); margin-top:10px; display:block; }
   .lesson-link .ll-go::after{ content:" \2192"; }
 
-  /* ---- attachments (coming soon) ---- */
+  /* ---- attachments ---- */
   .attachments{ margin-top:32px; }
   .attach-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
   .attach-head h2{ font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-dim); }
@@ -78,8 +78,6 @@
   .attach-item iframe{ width:100%; height:340px; border:1px solid var(--line); background:var(--bg-soft); }
 </style>
 </head>
-<script src="/assets/attachments.js"></script>
-<script>AttachEngine.mount('#attachments-root');</script>
 <body>
 
 <header>
@@ -130,22 +128,13 @@
         </div>
       </div>
     </div>
-      <!--
-        Future: this block will read functions/attachments.json and render
-        one row per entry as an inline Google Drive preview, e.g.:
-          <iframe src="https://drive.google.com/file/d/DRIVE_FILE_ID/preview"></iframe>
-        Students view the file on this page — never redirected to drive.google.com.
-        attachments.json ships empty ([]) until that's wired up.
-      -->
-      <div class="attach-empty frame">
-        <span class="tick-br"></span><span class="tick-bl"></span>
-        No attachments for this lesson yet. Files will appear here once uploaded — viewable directly on this page, no download required.
-      </div>
-    </div>
   </div>
 </main>
 
 <footer><p class="footer-note">teaching.ezznasr.dev/programming/functions</p></footer>
+
+<script src="/assets/attachments.js"></script>
+<script>AttachEngine.mount('#attachments-root');</script>
 
 </body>
 </html>
