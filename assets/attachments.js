@@ -10,7 +10,7 @@
 (function () {
   "use strict";
 
-  var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
+  var DRIVE_ENDPOINT = "{{DRIVE_ENDPOINT}}";
   var EMBEDDABLE_TYPES = ["pdf", "png", "jpg", "jpeg", "gif", "webp"];
 
   function el(tag, attrs, children) {
@@ -27,8 +27,10 @@
     return node;
   }
 
-  function fileUrl(fileId) {
-    return DRIVE_ENDPOINT + (DRIVE_ENDPOINT.indexOf("?") >= 0 ? "&" : "?") + "action=file&id=" + encodeURIComponent(fileId);
+  function fileUrl(fileId, forceDownload) {
+    var url = DRIVE_ENDPOINT + (DRIVE_ENDPOINT.indexOf("?") >= 0 ? "&" : "?") + "action=file&id=" + encodeURIComponent(fileId);
+    if (forceDownload) url += "&dl=1";
+    return url;
   }
 
   function mount(rootSelector) {
@@ -73,10 +75,12 @@
           return;
         }
 
-        var url = fileUrl(fileId);
+        var url = fileUrl(fileId, false);
+        var downloadUrl = fileUrl(fileId, true);
         var openLink = el("a", { href: url, target: "_blank", rel: "noopener" }, ["Open \u2192"]);
+        var downloadLink = el("a", { href: downloadUrl, target: "_blank", rel: "noopener", style: "margin-left:12px;" }, ["Download"]);
         var row = el("div", { class: "attach-item frame" }, [
-          el("div", { class: "attach-item__title" }, [title, el("span", { class: "attach-item__actions" }, [openLink])]),
+          el("div", { class: "attach-item__title" }, [title, el("span", { class: "attach-item__actions" }, [openLink, downloadLink])]),
         ]);
 
         if (EMBEDDABLE_TYPES.indexOf(type) !== -1) {
