@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get into Call Centre Quiz — Ezz Nasr : Teaching</title>
+<meta name="description" content="A quiz on Get into Call Centre.">
+<link rel="canonical" href="https://teaching.ezznasr.dev/english/get-into-call-centre/quiz.html">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/base.css">
+<link rel="stylesheet" href="/assets/forms.css">
+<style>
+  :root{ --maxw:720px; }
+  main{ padding:24px 0 64px; }
+
+  /* ---- nav (single "back to lesson" link) ---- */
+  .titlebar nav a{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-dim); text-decoration:none; }
+  .titlebar nav a::before{ content:"\2190 "; }
+
+  /* ---- quiz engine styling ---- */
+  .qz-progress{ font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); letter-spacing:0.04em; margin-bottom:12px; }
+  .qz-question{ font-size:17px; margin:0 0 18px; color:var(--ink); }
+  .qz-question code{ font-family:var(--mono); background:var(--bg-soft); padding:0.1em 0.4em; font-size:0.9em; border:1px solid var(--line); }
+  .qz-options{ display:flex; flex-direction:column; gap:9px; }
+  .qz-option{
+    display:flex; align-items:flex-start; gap:10px; text-align:left; width:100%;
+    padding:12px 14px; border:1px solid var(--line); background:var(--bg-soft); color:var(--ink);
+    cursor:pointer; font-size:14.5px; transition:border-color .15s ease, transform .1s ease;
+  }
+  .qz-option:hover:not(:disabled){ border-color:var(--copper); }
+  .qz-option:active:not(:disabled){ transform:scale(0.995); }
+  .qz-option__tag{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); flex-shrink:0; padding-top:2px; }
+  .qz-option:disabled{ cursor:default; }
+  .qz-option--correct{ border-color:var(--status-shipped); }
+  .qz-option--correct .qz-option__tag{ color:var(--status-shipped); }
+  .qz-option--incorrect{ border-color:var(--status-fail); }
+  .qz-option--incorrect .qz-option__tag{ color:var(--status-fail); }
+  .qz-verdict{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); font-family:var(--mono); font-size:13px; }
+  .qz-verdict__tag{ display:inline-block; letter-spacing:0.06em; text-transform:uppercase; font-size:11px; padding:3px 8px; border:1px solid currentColor; margin-bottom:8px; }
+  .qz-verdict__tag--pass{ color:var(--status-shipped); }
+  .qz-verdict__tag--fail{ color:var(--status-fail); }
+  .qz-verdict__explain{ display:block; color:var(--ink-dim); font-family:var(--serif); font-size:14.5px; margin-top:4px; }
+  .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--copper-bright); margin-bottom:6px; }
+  .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); color:var(--ink-dim); padding:9px 16px; cursor:pointer; }
+  .qz-retry:hover{ border-color:var(--copper); color:var(--copper-bright); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR : TEACHING</a>
+    <nav><a href="/english/get-into-call-centre/">Back to Get into Call Centre</a></nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>Get into Call Centre — quiz</h1>
+    <p class="lede">35 questions. Instant feedback.</p>
+  </div>
+
+  <div class="wrap">
+    <div id="quiz-root" aria-live="polite"></div>
+  </div>
+</main>
+
+<footer><p class="footer-note">teaching.ezznasr.dev/english/get-into-call-centre/quiz</p></footer>
+
+<script type="application/json" id="quiz-data">
+{
+  "title": "Get into Call Centre",
+  "subject": "english",
+  "lesson": "get-into-call-centre",
+  "questions": [
+    {
+      "q": "What is the main purpose of a call center?",
+      "options": [
+        "To communicate with customers and provide support or services.",
+        "To entertain customers.",
+        "To avoid speaking with customers.",
+        "To sell products without answering questions."
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "What is the best way to start a professional customer service call?",
+      "options": [
+        "Hello, what do you want?",
+        "Good morning, thank you for calling. How may I help you?",
+        "Yeah, tell me.",
+        "What happened?"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "What is active listening?",
+      "options": [
+        "Waiting for your turn to speak.",
+        "Listening carefully and showing that you understand the customer.",
+        "Speaking louder than the customer.",
+        "Interrupting the customer."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "What should you do if a customer is angry?",
+      "options": [
+        "Argue with them.",
+        "Hang up immediately.",
+        "Stay calm, listen, and try to understand the problem.",
+        "Tell them to calm down."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "Which phrase is the most professional?",
+      "options": [
+        "That's not my problem.",
+        "I don't know.",
+        "Let me look into that for you.",
+        "You need to figure it out yourself."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "What does \"How may I assist you?\" mean?",
+      "options": [
+        "What do you want?",
+        "How can I help you?",
+        "Where are you going?",
+        "What is your name?"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Why is tone of voice important in a call center?",
+      "options": [
+        "It can affect how the customer feels about the interaction.",
+        "It is more important than solving the problem.",
+        "It allows you to speak without listening.",
+        "It does not matter."
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "What should you do if you don't know the answer to a customer's question?",
+      "options": [
+        "Make up an answer.",
+        "Ignore the question.",
+        "Politely tell the customer you will check the information.",
+        "Blame another employee."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "Which phrase is appropriate when placing a customer on hold?",
+      "options": [
+        "Wait.",
+        "Hold on.",
+        "May I place you on hold for a moment while I check that for you?",
+        "Don't talk while I check."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "What should you do before transferring a customer to another department?",
+      "options": [
+        "Transfer them without saying anything.",
+        "Explain why you are transferring them and, when possible, provide context to the next agent.",
+        "Tell them to call again.",
+        "End the call."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "What is empathy in customer service?",
+      "options": [
+        "Understanding and acknowledging the customer's feelings.",
+        "Agreeing with everything the customer says.",
+        "Ignoring the customer's emotions.",
+        "Speaking as quickly as possible."
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "Which response shows empathy?",
+      "options": [
+        "You are wrong.",
+        "That's your problem.",
+        "I understand how frustrating that must be. Let me see what I can do.",
+        "There is nothing I can do."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "What should you do if you cannot understand the customer clearly?",
+      "options": [
+        "Pretend you understood.",
+        "Politely ask them to repeat or clarify.",
+        "End the call.",
+        "Guess what they said."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which question is best for understanding a customer's problem?",
+      "options": [
+        "Why did you do that?",
+        "Can you tell me what happened?",
+        "What's wrong with you?",
+        "Didn't you read the instructions?"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "What does \"resolve an issue\" mean?",
+      "options": [
+        "Create a problem.",
+        "Solve a problem.",
+        "Transfer a call.",
+        "End a conversation."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence is grammatically correct?",
+      "options": [
+        "How I can help you?",
+        "How can I help you?",
+        "How can I helping you?",
+        "How I helping you?"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence is the most professional?",
+      "options": [
+        "Send me your information.",
+        "Can you please provide your account number?",
+        "Give me your number.",
+        "I need your details now."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "What should you do when a customer is speaking?",
+      "options": [
+        "Interrupt them frequently.",
+        "Listen carefully and allow them to explain the issue.",
+        "Talk over them.",
+        "Start typing without listening."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Why should a call center agent take notes?",
+      "options": [
+        "To make the call longer.",
+        "To remember important information and document the interaction.",
+        "To avoid listening.",
+        "To impress the customer."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "What should you do if you make a mistake during a call?",
+      "options": [
+        "Hide it.",
+        "Blame the customer.",
+        "Acknowledge it, correct it, and continue professionally.",
+        "End the call."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "Which closing is appropriate for a customer service call?",
+      "options": [
+        "Okay, bye.",
+        "That's it.",
+        "Is there anything else I can help you with today?",
+        "I'm done with you."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "What is the best response when a customer says, \"Thank you for your help\"?",
+      "options": [
+        "Whatever.",
+        "No problem, bye.",
+        "You're very welcome. I'm happy I could help.",
+        "You should thank me."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "What does \"customer satisfaction\" mean?",
+      "options": [
+        "Making sure the customer has a positive experience with the service.",
+        "Making the call as short as possible.",
+        "Giving every customer a refund.",
+        "Avoiding difficult customers."
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "Which skill is especially important for a call center agent?",
+      "options": [
+        "Active listening",
+        "Ignoring details",
+        "Speaking without pauses",
+        "Avoiding questions"
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "What should you do if a customer asks for something you are not authorized to provide?",
+      "options": [
+        "Give it to them anyway.",
+        "Explain the limitation and offer an appropriate alternative if possible.",
+        "Argue with the customer.",
+        "Pretend you are authorized."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which phrase can be used to politely apologize?",
+      "options": [
+        "That's not my fault.",
+        "Sorry you feel that way.",
+        "I apologize for the inconvenience.",
+        "You should have known."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "What does \"follow up\" mean in customer service?",
+      "options": [
+        "To contact the customer again about an issue or request.",
+        "To end the conversation.",
+        "To ignore the customer.",
+        "To transfer the customer randomly."
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "A customer says, \"I've been waiting for two hours!\" What is the best response?",
+      "options": [
+        "That's not my fault.",
+        "You'll have to wait longer.",
+        "I'm sorry for the delay. Let me check the status for you.",
+        "Calm down."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "Which quality is important when dealing with difficult customers?",
+      "options": [
+        "Patience",
+        "Anger",
+        "Sarcasm",
+        "Impatience"
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "What is the best way to improve your communication skills for a call center job?",
+      "options": [
+        "Practice speaking and listening regularly.",
+        "Avoid speaking English.",
+        "Memorize every possible conversation.",
+        "Speak as quickly as possible."
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence is suitable for asking a customer to wait?",
+      "options": [
+        "Wait there.",
+        "Just wait.",
+        "Would you mind holding for a moment while I check that information?",
+        "Don't interrupt me."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "What should a professional call center agent focus on?",
+      "options": [
+        "Winning arguments with customers.",
+        "Understanding the customer's needs and providing effective assistance.",
+        "Ending every call quickly.",
+        "Avoiding responsibility."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which phrase is best when you need more information?",
+      "options": [
+        "What?",
+        "Explain.",
+        "Could you please provide a few more details about the issue?",
+        "I don't understand anything."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "What does \"escalate an issue\" mean?",
+      "options": [
+        "Ignore the issue.",
+        "Send the issue to someone with the appropriate authority or expertise to handle it.",
+        "Make the issue worse.",
+        "End the call."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Why should a call center agent avoid using slang with customers?",
+      "options": [
+        "Professional language helps maintain a clear and respectful interaction.",
+        "Slang always makes customers angry.",
+        "Slang is impossible to understand.",
+        "Professional language is unnecessary."
+      ],
+      "correct": 0,
+      "explain": ""
+    }
+  ]
+}
+</script>
+<script src="/assets/quiz.js"></script>
+<script>QuizEngine.mount('#quiz-root', '#quiz-data');</script>
+
+</body>
+</html>
