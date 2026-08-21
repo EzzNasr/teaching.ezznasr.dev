@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ace the Interview Quiz — Ezz Nasr : Teaching</title>
+<meta name="description" content="A quiz on Ace the Interview.">
+<link rel="canonical" href="https://teaching.ezznasr.dev/english/ace-the-interview/quiz.html">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/base.css">
+<link rel="stylesheet" href="/assets/forms.css">
+<style>
+  :root{ --maxw:720px; }
+  main{ padding:24px 0 64px; }
+
+  /* ---- nav (single "back to lesson" link) ---- */
+  .titlebar nav a{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-dim); text-decoration:none; }
+  .titlebar nav a::before{ content:"\2190 "; }
+
+  /* ---- quiz engine styling ---- */
+  .qz-progress{ font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); letter-spacing:0.04em; margin-bottom:12px; }
+  .qz-question{ font-size:17px; margin:0 0 18px; color:var(--ink); }
+  .qz-question code{ font-family:var(--mono); background:var(--bg-soft); padding:0.1em 0.4em; font-size:0.9em; border:1px solid var(--line); }
+  .qz-options{ display:flex; flex-direction:column; gap:9px; }
+  .qz-option{
+    display:flex; align-items:flex-start; gap:10px; text-align:left; width:100%;
+    padding:12px 14px; border:1px solid var(--line); background:var(--bg-soft); color:var(--ink);
+    cursor:pointer; font-size:14.5px; transition:border-color .15s ease, transform .1s ease;
+  }
+  .qz-option:hover:not(:disabled){ border-color:var(--copper); }
+  .qz-option:active:not(:disabled){ transform:scale(0.995); }
+  .qz-option__tag{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); flex-shrink:0; padding-top:2px; }
+  .qz-option:disabled{ cursor:default; }
+  .qz-option--correct{ border-color:var(--status-shipped); }
+  .qz-option--correct .qz-option__tag{ color:var(--status-shipped); }
+  .qz-option--incorrect{ border-color:var(--status-fail); }
+  .qz-option--incorrect .qz-option__tag{ color:var(--status-fail); }
+  .qz-verdict{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); font-family:var(--mono); font-size:13px; }
+  .qz-verdict__tag{ display:inline-block; letter-spacing:0.06em; text-transform:uppercase; font-size:11px; padding:3px 8px; border:1px solid currentColor; margin-bottom:8px; }
+  .qz-verdict__tag--pass{ color:var(--status-shipped); }
+  .qz-verdict__tag--fail{ color:var(--status-fail); }
+  .qz-verdict__explain{ display:block; color:var(--ink-dim); font-family:var(--serif); font-size:14.5px; margin-top:4px; }
+  .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--copper-bright); margin-bottom:6px; }
+  .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); color:var(--ink-dim); padding:9px 16px; cursor:pointer; }
+  .qz-retry:hover{ border-color:var(--copper); color:var(--copper-bright); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR : TEACHING</a>
+    <nav><a href="/english/ace-the-interview/">Back to Ace the Interview</a></nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>Ace the Interview — quiz</h1>
+    <p class="lede">26 questions. Instant feedback.</p>
+  </div>
+
+  <div class="wrap">
+    <div id="quiz-root" aria-live="polite"></div>
+  </div>
+</main>
+
+<footer><p class="footer-note">teaching.ezznasr.dev/english/ace-the-interview/quiz</p></footer>
+
+<script type="application/json" id="quiz-data">
+{
+  "title": "Ace the Interview",
+  "subject": "english",
+  "lesson": "ace-the-interview",
+  "questions": [
+    {
+      "q": "What should you do before a job interview?",
+      "options": [
+        "Arrive without preparing",
+        "Research the company and prepare your answers",
+        "Ignore the job description",
+        "Arrive late"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which is the best way to answer \"Tell me about yourself\"?",
+      "options": [
+        "Tell your entire life story",
+        "Give a short summary of your relevant experience, skills, and goals.",
+        "Talk only about your hobbies",
+        "Say \"I don't know\""
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "What should you do when you do not understand an interviewer's question?",
+      "options": [
+        "Guess the answer",
+        "Stay silent",
+        "Politely ask the interviewer to repeat or clarify the question.",
+        "Change the subject"
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "Which is the most professional interview greeting?",
+      "options": [
+        "What's up?",
+        "Hey, what's going on?",
+        "Good morning, it's a pleasure to meet you.",
+        "Yo, nice to meet you."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "Which answer is best when an interviewer asks about your strengths?",
+      "options": [
+        "I don't have any weaknesses.",
+        "I am hardworking and organized, and I always try to meet deadlines.",
+        "Everyone says I'm perfect.",
+        "I don't know."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "How should you talk about a weakness in an interview?",
+      "options": [
+        "Say you have no weaknesses.",
+        "Give an honest weakness and explain how you are working to improve it.",
+        "Blame someone else.",
+        "Refuse to answer."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Why is body language important during an interview?",
+      "options": [
+        "It can help communicate confidence and professionalism.",
+        "It replaces all spoken answers.",
+        "It makes preparation unnecessary.",
+        "It is more important than qualifications."
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "Which behavior should you avoid during an interview?",
+      "options": [
+        "Making appropriate eye contact",
+        "Listening carefully",
+        "Checking your phone repeatedly",
+        "Sitting professionally"
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "What should you do if you arrive at an interview?",
+      "options": [
+        "Arrive as late as possible",
+        "Arrive a little early.",
+        "Arrive exactly at the interviewer's desk time",
+        "Wait until someone calls you"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which answer is appropriate when asked, \"Why do you want this job?\"",
+      "options": [
+        "Because I need money.",
+        "Because the job matches my skills and interests, and I want to contribute to the company.",
+        "Because my friend told me to apply.",
+        "I don't really care about the job."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "What is a good question to ask at the end of an interview?",
+      "options": [
+        "When can I leave?",
+        "How many holidays can I take?",
+        "What would success look like in this position?",
+        "Can I use my phone at work?"
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence is the most professional?",
+      "options": [
+        "I wanna work here.",
+        "I want this job because it looks cool.",
+        "I am interested in this position because it matches my skills and experience.",
+        "Give me the job."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "What should you do when answering an interview question?",
+      "options": [
+        "Interrupt the interviewer",
+        "Listen carefully and give a clear, relevant answer.",
+        "Speak as quickly as possible",
+        "Avoid answering directly"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "What is the purpose of an interview?",
+      "options": [
+        "Only to test your memory",
+        "For the employer and candidate to learn whether they are a good match.",
+        "To discuss personal problems",
+        "To avoid talking about the job"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which response shows confidence without sounding arrogant?",
+      "options": [
+        "I am the best person you will ever meet.",
+        "I believe my skills and experience would allow me to contribute effectively to the team.",
+        "Nobody is better than me.",
+        "I never make mistakes."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "If an interviewer asks, \"Where do you see yourself in five years?\", what should you focus on?",
+      "options": [
+        "Your professional growth and career goals",
+        "Your weekend plans",
+        "Your favorite movies",
+        "Your personal shopping plans"
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "What should you do after an interview?",
+      "options": [
+        "Forget about it immediately",
+        "Send a polite follow-up or thank-you message.",
+        "Call the interviewer every hour",
+        "Post the interviewer's personal information online"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which answer is most appropriate for \"Why should we hire you?\"",
+      "options": [
+        "Because I really need the salary.",
+        "Because I have relevant skills, a strong work ethic, and I can contribute to the team.",
+        "Because nobody else applied.",
+        "Because I said so."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "What does \"experience\" mean in a job interview?",
+      "options": [
+        "The knowledge and skills gained from previous work or activities.",
+        "Your favorite activity",
+        "Your future plans",
+        "Your salary expectation"
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "What is the best approach if you make a mistake while answering?",
+      "options": [
+        "Panic and stop speaking",
+        "Correct yourself calmly and continue.",
+        "Blame the interviewer",
+        "Leave the interview"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which of these can help you make a good first impression?",
+      "options": [
+        "Being punctual and professionally dressed",
+        "Looking at your phone",
+        "Arriving late",
+        "Avoiding eye contact"
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "Complete the sentence: \"I am interested ______ this position.\"",
+      "options": [
+        "on",
+        "at",
+        "in",
+        "for"
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "Complete the sentence: \"I have experience ______ working with customers.\"",
+      "options": [
+        "in",
+        "at",
+        "on",
+        "to"
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "Which question is commonly asked in a job interview?",
+      "options": [
+        "What is your favorite cartoon?",
+        "What are your strengths and weaknesses?",
+        "What did you eat yesterday?",
+        "What is your favorite game character?"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "What should you do when the interviewer is speaking?",
+      "options": [
+        "Interrupt them",
+        "Listen actively and wait for them to finish.",
+        "Prepare a completely unrelated answer",
+        "Check your phone"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which statement shows a positive attitude?",
+      "options": [
+        "I can't do anything I haven't done before.",
+        "I am willing to learn and develop new skills.",
+        "I don't like learning new things.",
+        "I only work when someone tells me what to do."
+      ],
+      "correct": 1,
+      "explain": ""
+    }
+  ]
+}
+</script>
+<script src="/assets/quiz.js"></script>
+<script>QuizEngine.mount('#quiz-root', '#quiz-data');</script>
+
+</body>
+</html>
