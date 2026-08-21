@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>If Conditional Quiz — Ezz Nasr : Teaching</title>
+<meta name="description" content="A quiz on If Conditional.">
+<link rel="canonical" href="https://teaching.ezznasr.dev/programming/if-conditional/quiz.html">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/base.css">
+<link rel="stylesheet" href="/assets/forms.css">
+<style>
+  :root{ --maxw:720px; }
+  main{ padding:24px 0 64px; }
+
+  /* ---- nav (single "back to lesson" link) ---- */
+  .titlebar nav a{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-dim); text-decoration:none; }
+  .titlebar nav a::before{ content:"\2190 "; }
+
+  /* ---- quiz engine styling ---- */
+  .qz-progress{ font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); letter-spacing:0.04em; margin-bottom:12px; }
+  .qz-question{ font-size:17px; margin:0 0 18px; color:var(--ink); }
+  .qz-question code{ font-family:var(--mono); background:var(--bg-soft); padding:0.1em 0.4em; font-size:0.9em; border:1px solid var(--line); }
+  .qz-options{ display:flex; flex-direction:column; gap:9px; }
+  .qz-option{
+    display:flex; align-items:flex-start; gap:10px; text-align:left; width:100%;
+    padding:12px 14px; border:1px solid var(--line); background:var(--bg-soft); color:var(--ink);
+    cursor:pointer; font-size:14.5px; transition:border-color .15s ease, transform .1s ease;
+  }
+  .qz-option:hover:not(:disabled){ border-color:var(--copper); }
+  .qz-option:active:not(:disabled){ transform:scale(0.995); }
+  .qz-option__tag{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); flex-shrink:0; padding-top:2px; }
+  .qz-option:disabled{ cursor:default; }
+  .qz-option--correct{ border-color:var(--status-shipped); }
+  .qz-option--correct .qz-option__tag{ color:var(--status-shipped); }
+  .qz-option--incorrect{ border-color:var(--status-fail); }
+  .qz-option--incorrect .qz-option__tag{ color:var(--status-fail); }
+  .qz-verdict{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); font-family:var(--mono); font-size:13px; }
+  .qz-verdict__tag{ display:inline-block; letter-spacing:0.06em; text-transform:uppercase; font-size:11px; padding:3px 8px; border:1px solid currentColor; margin-bottom:8px; }
+  .qz-verdict__tag--pass{ color:var(--status-shipped); }
+  .qz-verdict__tag--fail{ color:var(--status-fail); }
+  .qz-verdict__explain{ display:block; color:var(--ink-dim); font-family:var(--serif); font-size:14.5px; margin-top:4px; }
+  .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--copper-bright); margin-bottom:6px; }
+  .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); color:var(--ink-dim); padding:9px 16px; cursor:pointer; }
+  .qz-retry:hover{ border-color:var(--copper); color:var(--copper-bright); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR : TEACHING</a>
+    <nav><a href="/programming/if-conditional/">Back to If Conditional</a></nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>If Conditional — quiz</h1>
+    <p class="lede">11 questions. Instant feedback.</p>
+  </div>
+
+  <div class="wrap">
+    <div id="quiz-root" aria-live="polite"></div>
+  </div>
+</main>
+
+<footer><p class="footer-note">teaching.ezznasr.dev/programming/if-conditional/quiz</p></footer>
+
+<script type="application/json" id="quiz-data">
+{
+  "title": "If Conditional",
+  "subject": "programming",
+  "lesson": "if-conditional",
+  "questions": [
+    {
+      "q": "What does the if keyword do in Python?",
+      "options": [
+        "Deletes a variable",
+        "Checks whether a condition is True or False",
+        "Defines a class",
+        "Imports a module"
+      ],
+      "correct": 1,
+      "explain": "An if statement evaluates a condition and runs code only when it's True (slide 4)."
+    },
+    {
+      "q": "In the trace example, age = 20 and the check is age >= 18. What happens?",
+      "options": [
+        "The condition is False, so nothing prints",
+        "The condition is True, so \"You are eligible to vote\" prints",
+        "A syntax error occurs",
+        "The program skips the if entirely"
+      ],
+      "correct": 1,
+      "explain": "20 >= 18 is True, so the indented line runs and prints the message (slide 5)."
+    },
+    {
+      "q": "Which operator compares two values for equality in Python?",
+      "options": [
+        "=",
+        "==",
+        "!=",
+        "==="
+      ],
+      "correct": 1,
+      "explain": "A single = assigns a value; == compares values \u2014 a distinction the deck specifically flags (slide 6)."
+    },
+    {
+      "q": "What does != mean?",
+      "options": [
+        "Equal to",
+        "Greater than",
+        "Not equal to",
+        "Less than or equal to"
+      ],
+      "correct": 2,
+      "explain": "!= checks that two values are different (slide 6)."
+    },
+    {
+      "q": "age = 15. What does this code print?",
+      "options": [
+        "You can vote",
+        "You cannot vote yet",
+        "Nothing prints",
+        "Both lines print"
+      ],
+      "correct": 1,
+      "explain": "15 >= 18 is False, so the else block runs instead (slide 7)."
+    },
+    {
+      "q": "score = 95, using three SEPARATE if statements (each checking >=60, >=75, >=90). What prints?",
+      "options": [
+        "Excellent only",
+        "Pass",
+        "Pass, Good, and Excellent \u2014 all three",
+        "Nothing"
+      ],
+      "correct": 2,
+      "explain": "Independent if statements each run on their own if their condition is true, so all three conditions being met means all three print (slide 8)."
+    },
+    {
+      "q": "score = 95, using an if/elif/elif chain (>=90, >=75, >=60 in that order). What prints?",
+      "options": [
+        "Pass, Good, and Excellent",
+        "Excellent only",
+        "Pass only",
+        "Nothing"
+      ],
+      "correct": 1,
+      "explain": "An elif chain stops at the first True condition and skips the rest \u2014 so only \"Excellent\" prints (slide 8)."
+    },
+    {
+      "q": "x = 10. What does this code print?",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "A and B"
+      ],
+      "correct": 0,
+      "explain": "The first condition (x > 5) is already True, so Python runs that block and skips elif and else entirely (slide 9)."
+    },
+    {
+      "q": "age = 15, but the print line has NO indentation before it (it's outside the if block). What happens?",
+      "options": [
+        "\"You can vote\" prints",
+        "Nothing prints, since the print line is now outside the if block",
+        "A logic error is silently ignored",
+        "It still runs since Python ignores indentation"
+      ],
+      "correct": 1,
+      "explain": "Without indentation, the print line is not part of the if block at all \u2014 it's a separate statement, and here nothing prints for age=15 (slide 10)."
+    },
+    {
+      "q": "What decides which lines belong inside an if block in Python?",
+      "options": [
+        "Curly braces {}",
+        "Semicolons",
+        "Indentation (spaces at the start of the line)",
+        "Parentheses"
+      ],
+      "correct": 2,
+      "explain": "Python uses indentation, not braces, to define which lines belong to a branch (slide 10)."
+    },
+    {
+      "q": "When should you use separate if statements instead of an elif chain?",
+      "options": [
+        "When only one outcome should ever run",
+        "When every matching condition's action should run",
+        "Never \u2014 elif is always better",
+        "Only when there's no else"
+      ],
+      "correct": 1,
+      "explain": "Separate ifs each get checked independently, so all true ones execute \u2014 unlike elif, which stops at the first match (slide 8)."
+    }
+  ]
+}
+</script>
+<script src="/assets/quiz.js"></script>
+<script>QuizEngine.mount('#quiz-root', '#quiz-data');</script>
+
+</body>
+</html>
