@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Present Perfect Vs Past Simple Quiz — Ezz Nasr : Teaching</title>
+<meta name="description" content="A quiz on Present Perfect Vs Past Simple.">
+<link rel="canonical" href="https://teaching.ezznasr.dev/english/present-perfect-vs-past-simple/quiz.html">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/base.css">
+<link rel="stylesheet" href="/assets/forms.css">
+<style>
+  :root{ --maxw:720px; }
+  main{ padding:24px 0 64px; }
+
+  /* ---- nav (single "back to lesson" link) ---- */
+  .titlebar nav a{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-dim); text-decoration:none; }
+  .titlebar nav a::before{ content:"\2190 "; }
+
+  /* ---- quiz engine styling ---- */
+  .qz-progress{ font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); letter-spacing:0.04em; margin-bottom:12px; }
+  .qz-question{ font-size:17px; margin:0 0 18px; color:var(--ink); }
+  .qz-question code{ font-family:var(--mono); background:var(--bg-soft); padding:0.1em 0.4em; font-size:0.9em; border:1px solid var(--line); }
+  .qz-options{ display:flex; flex-direction:column; gap:9px; }
+  .qz-option{
+    display:flex; align-items:flex-start; gap:10px; text-align:left; width:100%;
+    padding:12px 14px; border:1px solid var(--line); background:var(--bg-soft); color:var(--ink);
+    cursor:pointer; font-size:14.5px; transition:border-color .15s ease, transform .1s ease;
+  }
+  .qz-option:hover:not(:disabled){ border-color:var(--copper); }
+  .qz-option:active:not(:disabled){ transform:scale(0.995); }
+  .qz-option__tag{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); flex-shrink:0; padding-top:2px; }
+  .qz-option:disabled{ cursor:default; }
+  .qz-option--correct{ border-color:var(--status-shipped); }
+  .qz-option--correct .qz-option__tag{ color:var(--status-shipped); }
+  .qz-option--incorrect{ border-color:var(--status-fail); }
+  .qz-option--incorrect .qz-option__tag{ color:var(--status-fail); }
+  .qz-verdict{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); font-family:var(--mono); font-size:13px; }
+  .qz-verdict__tag{ display:inline-block; letter-spacing:0.06em; text-transform:uppercase; font-size:11px; padding:3px 8px; border:1px solid currentColor; margin-bottom:8px; }
+  .qz-verdict__tag--pass{ color:var(--status-shipped); }
+  .qz-verdict__tag--fail{ color:var(--status-fail); }
+  .qz-verdict__explain{ display:block; color:var(--ink-dim); font-family:var(--serif); font-size:14.5px; margin-top:4px; }
+  .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--copper-bright); margin-bottom:6px; }
+  .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); color:var(--ink-dim); padding:9px 16px; cursor:pointer; }
+  .qz-retry:hover{ border-color:var(--copper); color:var(--copper-bright); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR : TEACHING</a>
+    <nav><a href="/english/present-perfect-vs-past-simple/">Back to Present Perfect Vs Past Simple</a></nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>Present Perfect Vs Past Simple — quiz</h1>
+    <p class="lede">20 questions. Instant feedback.</p>
+  </div>
+
+  <div class="wrap">
+    <div id="quiz-root" aria-live="polite"></div>
+  </div>
+</main>
+
+<footer><p class="footer-note">teaching.ezznasr.dev/english/present-perfect-vs-past-simple/quiz</p></footer>
+
+<script type="application/json" id="quiz-data">
+{
+  "title": "Present Perfect Vs Past Simple",
+  "subject": "english",
+  "lesson": "present-perfect-vs-past-simple",
+  "questions": [
+    {
+      "q": "Which sentence is in the Present Perfect?",
+      "options": [
+        "I visited Egypt last year.",
+        "She traveled to Cairo yesterday.",
+        "I have visited Egypt before.",
+        "He ate sushi on Friday."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "What is the structure of the Present Perfect?",
+      "options": [
+        "Subject + did + V2",
+        "Subject + have/has + V3",
+        "Subject + was/were + V-ing",
+        "Subject + V2 + object"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which helper verb is used with \"He\"?",
+      "options": [
+        "have",
+        "did",
+        "has",
+        "were"
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "Which helper verb is used with \"They\"?",
+      "options": [
+        "has",
+        "have",
+        "did",
+        "was"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "When do we use the Present Perfect for life experiences?",
+      "options": [
+        "When we give an exact time",
+        "When the exact time is not important",
+        "Only for actions happening now",
+        "Only for actions happening yesterday"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence uses the Past Simple?",
+      "options": [
+        "I have eaten sushi.",
+        "She has visited the pyramids.",
+        "We have seen that movie.",
+        "I ate sushi yesterday."
+      ],
+      "correct": 3,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence correctly uses the Present Perfect?",
+      "options": [
+        "She has traveled to Japan.",
+        "She has travel to Japan.",
+        "She have traveled to Japan.",
+        "She traveled has to Japan."
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence correctly uses the Past Simple?",
+      "options": [
+        "I have visited Cairo yesterday.",
+        "I visited Cairo yesterday.",
+        "I have visit Cairo yesterday.",
+        "I has visited Cairo yesterday."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence uses the Present Perfect?",
+      "options": [
+        "Sara traveled to Cairo last summer.",
+        "Sara visited the Pyramids last summer.",
+        "Sara has become interested in ancient history.",
+        "Sara took hundreds of photos."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence uses the Past Simple?",
+      "options": [
+        "She has read five books about Egypt.",
+        "She has watched three documentaries.",
+        "She has fallen in love with the culture.",
+        "She visited the Pyramids of Giza."
+      ],
+      "correct": 3,
+      "explain": ""
+    },
+    {
+      "q": "Complete the sentence: \"I _______ never _______ a lion in the wild.\"",
+      "options": [
+        "have / seen",
+        "has / saw",
+        "did / seen",
+        "have / saw"
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "Complete the sentence: \"He _______ just _______ lunch.\"",
+      "options": [
+        "have / eat",
+        "has / eaten",
+        "has / ate",
+        "have / eaten"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence is correct?",
+      "options": [
+        "They has finished their homework.",
+        "They have finished their homework.",
+        "They have finish their homework.",
+        "They finished have their homework."
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence gives a specific time in the past?",
+      "options": [
+        "I have eaten sushi.",
+        "She has visited Egypt.",
+        "We have seen that movie.",
+        "We saw that movie on Friday."
+      ],
+      "correct": 3,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence does NOT give a specific time?",
+      "options": [
+        "I ate sushi yesterday.",
+        "She visited the pyramids last year.",
+        "We saw that movie on Friday.",
+        "I have eaten sushi."
+      ],
+      "correct": 3,
+      "explain": ""
+    },
+    {
+      "q": "What does the Present Perfect connect?",
+      "options": [
+        "Two future events",
+        "The past to the present moment",
+        "Only two past events",
+        "The present to the future"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Which form is the past participle (V3) in \"She has spoken several languages\"?",
+      "options": [
+        "has",
+        "spoken",
+        "several",
+        "languages"
+      ],
+      "correct": 1,
+      "explain": ""
+    },
+    {
+      "q": "Choose the correct sentence.",
+      "options": [
+        "We have been to the pyramids before.",
+        "We has been to the pyramids before.",
+        "We have went to the pyramids before.",
+        "We been to the pyramids before."
+      ],
+      "correct": 0,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence is in the Past Simple?",
+      "options": [
+        "Einstein has changed the way we understand physics.",
+        "Cleopatra has spoken several languages.",
+        "Sara took hundreds of photos.",
+        "Leonardo has inspired artists for centuries."
+      ],
+      "correct": 2,
+      "explain": ""
+    },
+    {
+      "q": "Which sentence is in the Present Perfect?",
+      "options": [
+        "Sara traveled to Cairo.",
+        "Sara visited the Pyramids.",
+        "Sara took hundreds of photos.",
+        "Sara has watched three documentaries."
+      ],
+      "correct": 3,
+      "explain": ""
+    }
+  ]
+}
+</script>
+<script src="/assets/quiz.js"></script>
+<script>QuizEngine.mount('#quiz-root', '#quiz-data');</script>
+
+</body>
+</html>
