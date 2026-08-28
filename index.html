@@ -1,267 +1,68 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ezz Nasr : Teaching</title>
-<meta name="description" content="Ezz Nasr's teaching portfolio — programming, math (SAT/EST), and English, taught with a concept-first, mechanics-second method.">
-
+<title>Ezz Nasr | Teaching Portal</title>
+<meta name="description" content="Ezz Nasr's teaching portal for programming, math (SAT/EST), and English. Concept-first lessons, quizzes, and guided practice.">
 <link rel="canonical" href="https://teaching.ezznasr.dev/">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Ezz Nasr : Teaching">
-<meta property="og:description" content="Teaching portfolio — programming, math (SAT/EST), and English. Sample lessons, quizzes, and methodology.">
-<meta property="og:url" content="https://teaching.ezznasr.dev/">
-<meta property="og:image" content="https://ezznasr.dev/images/ezz-nasr.jpg">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Ezz Nasr : Teaching">
-<meta name="twitter:description" content="Teaching portfolio — programming, math (SAT/EST), and English. Sample lessons, quizzes, and methodology.">
-<meta name="twitter:image" content="https://ezznasr.dev/images/ezz-nasr.jpg">
-
+<meta property="og:type" content="website"><meta property="og:title" content="Ezz Nasr | Teaching Portal"><meta property="og:description" content="Concept-first teaching across programming, math, and English."><meta property="og:url" content="https://teaching.ezznasr.dev/">
+<meta property="og:image" content="https://ezznasr.dev/images/ezz-nasr.jpg"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Ezz Nasr | Teaching Portal"><meta name="twitter:description" content="Concept-first teaching across programming, math, and English."><meta name="twitter:image" content="https://ezznasr.dev/images/ezz-nasr.jpg">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "Person",
-  "name": "Ezz Nasr",
-  "url": "https://ezznasr.dev",
-  "image": "https://ezznasr.dev/images/ezz-nasr.jpg",
-  "sameAs": [
-    "https://github.com/EzzNasr",
-    "https://www.linkedin.com/in/EzzNasr"
+  "@graph": [
+    {
+      "@type": "EducationalOrganization",
+      "@id": "https://teaching.ezznasr.dev/#organization",
+      "name": "Ezz Nasr Teaching Portal",
+      "url": "https://teaching.ezznasr.dev/",
+      "description": "Concept-first teaching across programming fundamentals, math (SAT/EST), and English.",
+      "sameAs": ["https://github.com/EzzNasr", "https://www.linkedin.com/in/EzzNasr", "https://www.facebook.com/profile.php?id=61593926633619"]
+    },
+    {
+      "@type": "Course",
+      "name": "Programming fundamentals",
+      "description": "Concept-first lessons, live-coding demos, quizzes, and guided assignments.",
+      "url": "https://teaching.ezznasr.dev/programming/",
+      "provider": { "@id": "https://teaching.ezznasr.dev/#organization" }
+    },
+    {
+      "@type": "Course",
+      "name": "Math — SAT / EST",
+      "description": "Probability, differential equations, and focused SAT / EST problem sets.",
+      "url": "https://teaching.ezznasr.dev/math/",
+      "provider": { "@id": "https://teaching.ezznasr.dev/#organization" }
+    },
+    {
+      "@type": "Course",
+      "name": "English",
+      "description": "C1+ instruction, guided practice, clear feedback, and practical quizzes.",
+      "url": "https://teaching.ezznasr.dev/english/",
+      "provider": { "@id": "https://teaching.ezznasr.dev/#organization" }
+    }
   ]
 }
 </script>
-
-<link rel="icon" href="/icons/favicon.ico" sizes="any">
-<link rel="icon" href="/icons/favicon-32.png" type="image/png" sizes="32x32">
-<link rel="icon" href="/icons/favicon-192.png" type="image/png" sizes="192x192">
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-<link rel="manifest" href="/icons/site.webmanifest">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg:#0B2318;
-    --bg-soft:#0F2C1E;
-    --panel:#123420;
-    --line:#25523A;
-    --line-faint:rgba(201,151,76,0.14);
-    --copper:#C9974C;
-    --copper-bright:#E3B168;
-    --ink:#EDEAE0;
-    --ink-dim:#9FB3A6;
-    --status-shipped:#7CB68A;
-    --status-progress:#C9974C;
-    --status-active:#8FB3D9;
-    --mono:'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-    --serif:'Source Serif 4', Georgia, serif;
-    --maxw:1080px;
-  }
-  *{box-sizing:border-box;}
-  html{scroll-behavior:smooth;}
-  @media (prefers-reduced-motion: reduce){
-    html{scroll-behavior:auto;}
-    *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; scroll-behavior:auto !important;}
-  }
-  body{
-    margin:0;
-    background:
-      linear-gradient(var(--line-faint) 1px, transparent 1px) 0 0/100% 42px,
-      linear-gradient(90deg, var(--line-faint) 1px, transparent 1px) 0 0/42px 100%,
-      var(--bg);
-    color:var(--ink);
-    font-family:var(--serif);
-    font-size:17px;
-    line-height:1.6;
-    -webkit-font-smoothing:antialiased;
-  }
-  a{color:var(--copper-bright);}
-  a:focus-visible, button:focus-visible{
-    outline:2px solid var(--copper-bright);
-    outline-offset:3px;
-  }
-  .wrap{ max-width:var(--maxw); margin:0 auto; padding:0 28px; }
-  .eyebrow{
-    font-family:var(--mono);
-    font-size:12px;
-    letter-spacing:0.18em;
-    text-transform:uppercase;
-    color:var(--copper);
-  }
-  h1,h2,h3{
-    font-family:var(--mono);
-    text-transform:uppercase;
-    letter-spacing:0.03em;
-    color:var(--ink);
-    margin:0;
-  }
-  .frame{ position:relative; border:1px solid var(--line); background:var(--bg); }
-  .frame::before,.frame::after,
-  .frame .tick-br,.frame .tick-bl{
-    content:"";
-    position:absolute;
-    width:10px; height:10px;
-    border-color:var(--copper);
-    border-style:solid;
-    border-width:0;
-    opacity:0.85;
-  }
-  .frame::before{ top:-1px; left:-1px; border-top-width:2px; border-left-width:2px; }
-  .frame::after{ top:-1px; right:-1px; border-top-width:2px; border-right-width:2px; }
-  .frame .tick-bl{ bottom:-1px; left:-1px; border-bottom-width:2px; border-left-width:2px; }
-  .frame .tick-br{ bottom:-1px; right:-1px; border-bottom-width:2px; border-right-width:2px; }
-  header{
-    position:sticky; top:0; z-index:20;
-    background:rgba(11,35,24,0.92);
-    backdrop-filter:blur(6px);
-    border-bottom:1px solid var(--line);
-  }
-  .titlebar{ display:flex; align-items:center; justify-content:space-between; padding:14px 0; gap:16px; }
-  .titlebar .mark{
-    font-family:var(--mono); font-weight:600; letter-spacing:0.06em; font-size:14px;
-    color:var(--ink); display:flex; align-items:center; gap:8px; text-decoration:none;
-  }
-  .titlebar .mark .dot{ width:7px;height:7px;border-radius:1px;background:var(--copper); box-shadow:0 0 6px var(--copper); }
-  nav{ display:flex; gap:22px; font-family:var(--mono); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; }
-  nav a{ color:var(--ink-dim); text-decoration:none; transition:color .15s ease; }
-  nav a:hover, nav a.current{ color:var(--copper-bright); }
-  nav a.back::before{ content:"\2190 "; }
-  .page-head{ padding:56px 0 40px; }
-  .tb-meta{
-    display:grid; grid-template-columns:repeat(4,auto); gap:0;
-    border:1px solid var(--line);
-    font-family:var(--mono); font-size:11px; letter-spacing:0.06em; color:var(--ink-dim);
-    margin-bottom:32px; width:fit-content;
-  }
-  .tb-meta div{ padding:8px 14px; border-right:1px solid var(--line); }
-  .tb-meta div:last-child{ border-right:none; }
-  .tb-meta b{ display:block; color:var(--copper); font-weight:600; margin-bottom:2px; font-size:10px; }
-  .page-head h1{ font-size:clamp(32px,5vw,52px); line-height:1.05; margin-bottom:14px; }
-  .page-head p.lede{ max-width:620px; font-size:17px; color:var(--ink-dim); margin:0 0 10px; }
-  .page-head p.lede.method{ font-size:15px; color:var(--ink-dim); }
-  .page-head p.lede.method strong{ color:var(--ink); font-weight:600; }
-
-  section.subjects{ padding:16px 0 64px; }
-  .subject-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
-  .subject-card{
-    padding:26px 22px; display:flex; flex-direction:column; gap:12px; text-decoration:none;
-    transition:transform .22s ease, border-color .22s ease, box-shadow .22s ease;
-  }
-  .subject-card:hover{
-    transform:translateY(-3px);
-    border-color:var(--copper);
-    box-shadow:0 14px 28px -18px rgba(0,0,0,0.55), 0 0 0 1px rgba(201,151,76,0.08);
-  }
-  .subject-card .eyebrow{ margin-bottom:2px; }
-  .subject-card h2{ font-size:18px; letter-spacing:0.03em; }
-  .subject-card p{ color:var(--ink-dim); font-size:14.5px; margin:0; font-family:var(--serif); }
-  .subject-card .go{
-    margin-top:auto; padding-top:6px; font-family:var(--mono); font-size:11.5px;
-    letter-spacing:0.06em; color:var(--copper-bright);
-  }
-  .subject-card .go::after{ content:" \2192"; display:inline-block; transition:transform .18s ease; }
-  .subject-card:hover .go::after{ transform:translateX(3px); }
-
-  footer{ border-top:1px solid var(--line); padding:48px 0 36px; }
-  .footer-grid{ display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:24px; }
-  .footer-links{ display:flex; gap:22px; flex-wrap:wrap; font-family:var(--mono); font-size:12.5px; letter-spacing:0.06em; }
-  .footer-links a{ color:var(--ink-dim); text-decoration:none; }
-  .footer-links a:hover{ color:var(--copper-bright); }
-  .footer-note{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); letter-spacing:0.04em; }
-
-  .reveal{ opacity:0; transform:translateY(14px); transition:opacity .5s ease, transform .5s ease; }
-  .reveal.in{ opacity:1; transform:translateY(0); }
-
-  @media (max-width:760px){
-    nav{ display:none; }
-    .tb-meta{ grid-template-columns:repeat(2,auto); }
-    .subject-grid{ grid-template-columns:1fr; }
-  }
-</style>
+<link rel="icon" href="/icons/favicon.ico" sizes="any"><link rel="icon" href="/icons/favicon-32.png" type="image/png" sizes="32x32"><link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"><link rel="manifest" href="/icons/site.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-<header>
-  <div class="wrap titlebar">
-    <a href="/" class="mark"><span class="dot"></span> EZZ NASR : TEACHING</a>
-    <nav>
-      <a href="https://ezznasr.dev/" class="back">ezznasr.dev</a>
-    </nav>
-  </div>
-</header>
-
-<main>
-  <div class="wrap page-head">
-    <div class="tb-meta reveal">
-      <div><b>Dwg No.</b>EN-2026-02</div>
-      <div><b>Rev</b>2026.08</div>
-      <div><b>Doc</b>Teaching</div>
-      <div><b>Status</b>Active</div>
-    </div>
-
-    <h1 class="reveal">Teaching</h1>
-    <p class="lede reveal">I teach across three areas — programming fundamentals, math (SAT / EST), and English — using the same core method every time: <strong>concept first, mechanics second.</strong> Establish why something works before drilling how to use it, then move to problem-solving and application.</p>
-    <p class="lede method reveal">Each subject page below has sample lessons, a short interactive quiz, and an assignment submission link.</p>
-  </div>
-
-  <section class="subjects">
-    <div class="wrap subject-grid">
-      <a class="subject-card frame reveal" href="/programming/">
-        <span class="tick-br"></span><span class="tick-bl"></span>
-        <span class="eyebrow">01 / Programming</span>
-        <h2>Programming fundamentals</h2>
-        <p>Concept-first lessons, live-coding demos, quizzes, and assignment submission.</p>
-        <span class="go">Enter</span>
-      </a>
-      <a class="subject-card frame reveal" href="/math/">
-        <span class="tick-br"></span><span class="tick-bl"></span>
-        <span class="eyebrow">02 / Math</span>
-        <h2>Math — SAT / EST</h2>
-        <p>Probability, Differential Equations, and SAT/EST-paced problem sets.</p>
-        <span class="go">Enter</span>
-      </a>
-      <a class="subject-card frame reveal" href="/english/">
-        <span class="tick-br"></span><span class="tick-bl"></span>
-        <span class="eyebrow">03 / English</span>
-        <h2>English</h2>
-        <p>C1+ certified instruction, guided practice, and quizzes.</p>
-        <span class="go">Enter</span>
-      </a>
-    </div>
-  </section>
-</main>
-
-<footer>
-  <div class="wrap">
-    <div class="footer-grid reveal">
-      <div class="footer-links">
-        <a href="mailto:ezznasrone@gmail.com">ezznasrone@gmail.com</a>
-        <a href="https://www.linkedin.com/in/EzzNasr" target="_blank" rel="noopener">LinkedIn</a>
-        <a href="https://github.com/EzzNasr" target="_blank" rel="noopener">GitHub</a>
-      </div>
-      <div class="footer-note">Dwg No. EN-2026-02 &nbsp;·&nbsp; Rev 2026.08 &nbsp;·&nbsp; teaching.ezznasr.dev</div>
-    </div>
-  </div>
-</footer>
-
+<header><div class="wrap titlebar"><a href="/" class="mark"><span class="dot"></span> EZZ NASR <span aria-hidden="true">·</span> TEACHING</a><nav><button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">☾</span><span class="theme-label"></span></button></nav></div></header>
+<main><div class="wrap page-head"><div class="welcome">A place to learn, practice, and grow</div><h1>Learn with clarity.<br><span>Build with confidence.</span></h1><p class="lede">I teach programming fundamentals, math (SAT / EST), and English through one simple approach: <strong>understand the idea first, then make it yours through practice.</strong></p><p class="lede method">Explore a subject below for sample lessons, interactive quizzes, and assignment support.</p><div class="intro-rule" aria-hidden="true"></div></div>
+<section class="subjects"><div class="wrap"><div class="section-heading"><h2>Choose your learning path</h2><p>Start wherever you are.</p></div><div class="subject-grid"><a class="subject-card" href="/programming/"><span class="eyebrow">01 / Programming</span><h3>Programming fundamentals</h3><p>Build a strong foundation with concept-first lessons, live-coding demos, quizzes, and guided assignments.</p><span class="go">Explore programming</span></a><a class="subject-card" href="/math/"><span class="eyebrow">02 / Math</span><h3>Math — SAT / EST</h3><p>Strengthen your reasoning with probability, differential equations, and focused SAT / EST problem sets.</p><span class="go">Explore math</span></a><a class="subject-card" href="/english/"><span class="eyebrow">03 / English</span><h3>English</h3><p>Grow your fluency with C1+ instruction, guided practice, clear feedback, and practical quizzes.</p><span class="go">Explore English</span></a></div></div></section></main>
+<a class="social-float whatsapp-float" href="https://wa.me/201065194613?text=Hi%20Ezz%2C%20I%27d%20like%20to%20learn%20more%20about%20your%20lessons." target="_blank" rel="noopener" aria-label="Chat on WhatsApp"><span class="social-icon" aria-hidden="true"><svg viewBox="0 0 24 24" role="img"><path d="M20.5 3.5A11.85 11.85 0 0 0 12.06 0C5.5 0 .16 5.34.16 11.9c0 2.1.55 4.15 1.6 5.96L.06 24l6.28-1.65a11.88 11.88 0 0 0 5.72 1.46h.01c6.56 0 11.9-5.34 11.9-11.9 0-3.18-1.24-6.17-3.47-8.41Zm-8.44 18.3h-.01a9.88 9.88 0 0 1-5.04-1.38l-.36-.21-3.73.98 1-3.64-.23-.37a9.87 9.87 0 1 1 8.37 4.62Zm5.42-7.4c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.39-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.49s1.07 2.89 1.22 3.09c.15.2 2.11 3.22 5.11 4.51.71.31 1.27.49 1.7.63.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2.01-1.42.25-.7.25-1.3.17-1.42-.07-.13-.27-.2-.57-.35Z"/></svg></span><span>Chat on WhatsApp</span></a>
+<a class="social-float facebook-float" href="https://www.facebook.com/profile.php?id=61593926633619" target="_blank" rel="noopener" aria-label="Visit Facebook page"><span class="social-icon" aria-hidden="true"><svg viewBox="0 0 24 24" role="img"><path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5 3.66 9.15 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.51 1.49-3.9 3.77-3.9 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.78-1.63 1.57v1.88h2.78l-.44 2.91h-2.34V22c4.78-.79 8.44-4.94 8.44-9.94Z"/></svg></span><span>Facebook Page</span></a>
+<footer><div class="wrap"><div class="footer-grid"><div class="footer-intro"><strong>Keep learning at your own pace.</strong><p>Questions, ideas, or ready to get started? I’d be happy to hear from you.</p></div><div class="footer-links"><a href="mailto:ezznasrone@gmail.com">Email me</a><a href="https://wa.me/201065194613" target="_blank" rel="noopener">WhatsApp</a><a href="https://www.facebook.com/profile.php?id=61593926633619" target="_blank" rel="noopener">Facebook</a><a href="https://www.linkedin.com/in/EzzNasr" target="_blank" rel="noopener">LinkedIn</a><a href="https://github.com/EzzNasr" target="_blank" rel="noopener">GitHub</a></div></div><div class="footer-bottom"><span>© 2026 Ezz Nasr · Teaching Portal</span><span>Concept first · Mechanics second</span></div></div></footer>
 <script>
-  (function(){
-    var els = document.querySelectorAll('.reveal');
-    if(!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches){
-      els.forEach(function(el){ el.classList.add('in'); });
-      return;
-    }
-    var io = new IntersectionObserver(function(entries){
-      entries.forEach(function(entry){
-        if(entry.isIntersecting){
-          entry.target.classList.add('in');
-          io.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.12 });
-    els.forEach(function(el){ io.observe(el); });
-  })();
+(function(){
+  var root=document.documentElement, toggle=document.getElementById('theme-toggle'), stored;
+  try{stored=localStorage.getItem('teaching-theme')}catch(e){}
+  var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+  function apply(theme){root.setAttribute('data-theme',theme);toggle.setAttribute('aria-pressed',theme==='dark'?'true':'false');toggle.setAttribute('aria-label',theme==='dark'?'Switch to light mode':'Switch to dark mode');toggle.querySelector('.theme-icon').textContent=theme==='dark'?'☀':'☾';try{localStorage.setItem('teaching-theme',theme)}catch(e){}}
+  apply(initial);toggle.addEventListener('click',function(){apply(root.getAttribute('data-theme')==='dark'?'light':'dark')});
+})();
 </script>
-
 </body>
 </html>
