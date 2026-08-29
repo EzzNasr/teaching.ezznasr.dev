@@ -120,7 +120,8 @@ header {
     backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--line);
     border-bottom: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
-    transition: background .35s ease, border-color .35s ease
+    transition: background .35s ease, border-color .35s ease;
+    padding-top: env(safe-area-inset-top)
 }
 
 .titlebar {
@@ -576,11 +577,11 @@ footer {
 
 @media (max-width:760px) {
     .wrap {
-        padding: 0 24px
+        padding: 0 28px
     }
 
     .titlebar {
-        padding: 15px 0
+        padding: 18px 0
     }
 
     .mark {
