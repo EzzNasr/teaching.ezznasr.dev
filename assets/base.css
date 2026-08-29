@@ -24,47 +24,7 @@
        still written as font-family:var(--serif) keeps working without
        being hunted down one by one.
      - --maxw has a sensible default here; page <style> blocks may still
-       override :root{--maxw:...} for pages that want a narrower or
-       wider column (quiz/assignment ~720-760px, subject pages wider).
-   ========================================================================== */
-
-:root{
-  color-scheme:light;
-  --bg:#f4f7fb; --bg-soft:#e8eef7; --panel:#fff; --panel-soft:#eef4fb;
-  --line:#d6e1ef; --line-strong:#b8c9df;
-  --ink:#10233f; --ink-dim:#63738a;
-  --accent:#2f6fed; --accent-strong:#2056bd; --accent-soft:#dce9ff;
-  --sage:#397b75; --honey:#e5a94f;
-  --status-shipped:#2f9e6f; --status-fail:#e2574c; --status-progress:#e5a94f; --status-active:#2f6fed;
-  --footer:#e7eef7;
-  --whatsapp:#25d366; --whatsapp-deep:#128c4a;
-  --mono:'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --sans:'Manrope', ui-sans-serif, system-ui, sans-serif;
-  --arabic:'Cairo', var(--sans);
-  --serif:var(--sans); /* alias — legacy page CSS referencing var(--serif) still resolves */
-  --maxw:1160px;
-  --shadow:0 16px 32px rgba(16,35,63,.09);
-}
-html[data-theme="dark"]{
-  color-scheme:dark;
-  --bg:#091a32; --bg-soft:#0d2340; --panel:#102744; --panel-soft:#132d4d;
-  --line:#244260; --line-strong:#385979;
-  --ink:#f5f8ff; --ink-dim:#aabbd0;
-  --accent:#72a5ff; --accent-strong:#9fc2ff; --accent-soft:#1c3e6a;
-  --sage:#82c9bd; --honey:#f0c36d;
-  --status-shipped:#7cdba0; --status-fail:#ff8a75; --status-progress:#f0c36d; --status-active:#72a5ff;
-  --footer:#07162a;
-  --shadow:0 18px 40px rgba(4,17,38,.28);
-}
-
-/* ---- accent "tracks" — override just the accent trio per lesson group.
-   Values mirror programming/baccalaureate's own style.css exactly, so a
-   lesson page's accent matches its parent group's portal page. ---- */
-body.track-one{ --accent:#e58a45; --accent-strong:#b86127; --accent-soft:#ffead8; } /* grade 1 — orange */
-body.track-two{ --accent:#2f6fed; --accent-strong:#2056bd; --accent-soft:#dce9ff; } /* grade 2 — blue (= default) */
-html[data-theme="dark"] body.track-one{ --accent:#ffb36f; --accent-strong:#ffc78e; --accent-soft:#5a3926; }
-html[data-theme="dark"] body.track-two{ --accent:#72a5ff; --accent-strong:#9fc2ff; --accent-soft:#1c3e6a; }
-
+       override 
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{
