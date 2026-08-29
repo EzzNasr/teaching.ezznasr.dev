@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DEMI - Ministry of Communication Quiz — Ezz Nasr : Teaching</title>
 <meta name="description" content="A quiz on DEMI - Ministry of Communication.">
-<link rel="canonical" href="https://teaching.ezznasr.dev/programming/demi-ministry-of-communication/quiz.html">
+<link rel="canonical" href="https://teaching.ezznasr.dev/programming/other/demi-ministry-of-communication/quiz.html">
 <link rel="icon" href="/icons/favicon.ico" sizes="any">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./base.css">
-<link rel="stylesheet" href="./forms.css">
+<link rel="stylesheet" href="/assets/base.css">
+<link rel="stylesheet" href="/assets/forms.css">
 <style>
   :root{ --maxw:720px; }
   main{ padding:24px 0 64px; }
@@ -43,6 +43,8 @@
   .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); border-radius:9px; color:var(--ink-dim); padding:9px 16px; cursor:pointer; transition:border-color .15s ease, color .15s ease; }
   .qz-retry:hover{ border-color:var(--accent); color:var(--accent-strong); }
 </style>
+<link rel="stylesheet" href="/assets/theme.css">
+<script src="/assets/theme.js" defer></script>
 </head>
 <body class="">
 
@@ -50,7 +52,7 @@
   <div class="titlebar">
     <a href="/" class="mark"><span class="dot"></span> EZZ NASR <span aria-hidden="true">&middot;</span> TEACHING</a>
     <nav>
-      <a href="/programming/demi-ministry-of-communication/" class="back">Back to DEMI - Ministry of Communication</a>
+      <a href="/programming/other/demi-ministry-of-communication/" class="back">Back to DEMI - Ministry of Communication</a>
       <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">&#9789;</span><span class="theme-label"></span></button>
     </nav>
   </div>
@@ -67,7 +69,7 @@
   </div>
 </main>
 
-<footer><div class="wrap"><p class="footer-note">teaching.ezznasr.dev/programming/demi-ministry-of-communication/quiz</p></div></footer>
+<footer><div class="wrap"><p class="footer-note">teaching.ezznasr.dev/programming/other/demi-ministry-of-communication/quiz</p></div></footer>
 
 <script type="application/json" id="quiz-data">
 {
@@ -190,7 +192,6 @@
 </script>
 <script src="/assets/quiz.js"></script>
 <script>QuizEngine.mount('#quiz-root', '#quiz-data');</script>
-<script>(function(){var root=document.documentElement,toggle=document.getElementById('theme-toggle'),stored;try{stored=localStorage.getItem('teaching-theme')}catch(e){}var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');function apply(theme){root.setAttribute('data-theme',theme);toggle.setAttribute('aria-pressed',theme==='dark'?'true':'false');toggle.setAttribute('aria-label',theme==='dark'?'Switch to light mode':'Switch to dark mode');toggle.querySelector('.theme-icon').textContent=theme==='dark'?'\u2600':'\u263E';try{localStorage.setItem('teaching-theme',theme)}catch(e){}}apply(initial);toggle.addEventListener('click',function(){apply(root.getAttribute('data-theme')==='dark'?'light':'dark')})})();</script>
 
 </body>
 </html>

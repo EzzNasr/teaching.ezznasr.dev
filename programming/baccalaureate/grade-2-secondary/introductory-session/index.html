@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>introductory Session | المحاضرة التعريفيه — Ezz Nasr : Teaching</title>
 <meta name="description" content="التعريف ب المنهج كاملا في اقل من 60 ثانيه">
-<link rel="canonical" href="https://teaching.ezznasr.dev/programming/introductory-session/">
+<link rel="canonical" href="https://teaching.ezznasr.dev/programming/baccalaureate/grade-2-secondary/introductory-session/">
 <link rel="icon" href="/icons/favicon.ico" sizes="any">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./base.css">
+<link rel="stylesheet" href="/assets/base.css">
 <style>
   main{ padding:24px 0 64px; }
 
@@ -37,6 +37,8 @@
   .attach-item__actions a{ font-family:var(--mono); font-size:11px; letter-spacing:0.04em; color:var(--accent-strong); text-decoration:none; }
   .attach-item iframe{ width:100%; height:340px; border:1px solid var(--line); border-radius:10px; background:var(--panel-soft); }
 </style>
+<link rel="stylesheet" href="/assets/theme.css">
+<script src="/assets/theme.js" defer></script>
 </head>
 <body class="track-two">
 
@@ -62,7 +64,7 @@
     </div>
 
     <div class="lesson-links">
-      <a class="lesson-link frame" href="/programming/introductory-session/quiz.html">
+      <a class="lesson-link frame" href="/programming/baccalaureate/grade-2-secondary/introductory-session/quiz.html">
         <div class="ll-title">Quiz</div>
         <div class="ll-desc">1 questions &middot; instant feedback</div>
         <span class="ll-go">Start</span>
@@ -94,7 +96,6 @@
 
 <script src="/assets/attachments.js"></script>
 <script>AttachEngine.mount('#attachments-root');</script>
-<script>(function(){var root=document.documentElement,toggle=document.getElementById('theme-toggle'),stored;try{stored=localStorage.getItem('teaching-theme')}catch(e){}var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');function apply(theme){root.setAttribute('data-theme',theme);toggle.setAttribute('aria-pressed',theme==='dark'?'true':'false');toggle.setAttribute('aria-label',theme==='dark'?'Switch to light mode':'Switch to dark mode');toggle.querySelector('.theme-icon').textContent=theme==='dark'?'\u2600':'\u263E';try{localStorage.setItem('teaching-theme',theme)}catch(e){}}apply(initial);toggle.addEventListener('click',function(){apply(root.getAttribute('data-theme')==='dark'?'light':'dark')})})();</script>
 
 </body>
 </html>
