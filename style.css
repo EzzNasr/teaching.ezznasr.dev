@@ -106,9 +106,11 @@ button:focus-visible {
 }
 
 .wrap {
+    width: 100%;
     max-width: var(--maxw);
     margin: 0 auto;
-    padding: 0 32px
+    padding-left: 48px;
+    padding-right: 48px
 }
 
 header {
@@ -120,16 +122,15 @@ header {
     backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--line);
     border-bottom: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
-    transition: background .35s ease, border-color .35s ease;
-    padding-top: env(safe-area-inset-top)
+    transition: background .35s ease, border-color .35s ease
 }
 
 .titlebar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 17px 0;
-    gap: 18px
+    padding: 20px 0;
+    gap: 24px
 }
 
 .mark {
@@ -212,7 +213,7 @@ html[data-theme="dark"] .theme-label:after {
 }
 
 .page-head {
-    padding: 78px 0 58px;
+    padding: 90px 0 72px;
     position: relative
 }
 
@@ -577,11 +578,12 @@ footer {
 
 @media (max-width:760px) {
     .wrap {
-        padding: 0 28px
+        padding-left: 24px;
+        padding-right: 24px
     }
 
     .titlebar {
-        padding: 18px 0
+        padding: 16px 0
     }
 
     .mark {
@@ -601,7 +603,7 @@ footer {
     }
 
     .page-head {
-        padding: 56px 0 44px
+        padding: 64px 0 52px
     }
 
     .welcome {
