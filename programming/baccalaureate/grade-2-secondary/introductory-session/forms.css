@@ -1,0 +1,33 @@
+/* ==========================================================================
+   forms.css — shared .qz-* card/input/button system, used by quiz.html
+   and assignment.html (quiz.js and assign.js both render into these
+   classes — class names unchanged from v2, only the look is new).
+   Synced from assets_templates/forms.css by sync_site_assets(), same as
+   base.css.
+
+   Quiz-only rules (progress bar, options, verdict, retry button, score
+   display) and assignment-only rules (mode toggle) stay inline in their
+   own templates — they're not shared, so extracting them here would just
+   move duplication around instead of removing it.
+   ========================================================================== */
+
+.qz-card{ padding:24px; }
+.qz-field{ margin-bottom:12px; }
+.qz-input, .qz-textarea, .qz-select{
+  width:100%; background:var(--panel-soft); border:1px solid var(--line-strong); color:var(--ink);
+  font-family:var(--sans); font-size:15px; padding:11px 13px; border-radius:9px;
+  transition:border-color .15s ease;
+}
+.qz-input:focus, .qz-textarea:focus, .qz-select:focus{ outline:none; border-color:var(--accent); }
+.qz-textarea{ resize:vertical; font-family:var(--mono); font-size:13.5px; line-height:1.5; }
+.qz-error{ color:var(--status-fail); font-family:var(--mono); font-size:12px; margin-bottom:8px; min-height:1em; }
+.qz-actions{ display:flex; justify-content:flex-end; margin-top:16px; }
+.qz-next{
+  font:600 12px var(--mono); letter-spacing:0.06em; text-transform:uppercase;
+  background:var(--accent); color:#fff; border:none; padding:11px 18px; border-radius:9px; cursor:pointer;
+  transition:transform .2s ease, background .2s ease;
+}
+.qz-next:hover:not(:disabled){ transform:translateY(-2px); background:var(--accent-strong); }
+.qz-next:disabled{ opacity:.55; cursor:default; transform:none; }
+.qz-summary{ padding:36px 24px; text-align:center; }
+.qz-summary__label{ color:var(--ink-dim); font-family:var(--mono); font-size:13.5px; letter-spacing:0.04em; }
