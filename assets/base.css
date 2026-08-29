@@ -1,63 +1,169 @@
 /* ==========================================================================
    base.css — shared design tokens + page chrome for teaching.ezznasr.dev.
-   Extracted from the near-identical <style> blocks that used to be
-   copy-pasted into every template (subject_index, lesson_index, quiz,
-   assignment). Synced from assets_templates/base.css by
-   common.py's sync_site_assets(), same mechanism as the JS engines.
+   v3: rebuilt to match the new light/dark "portal" visual identity
+   (Manrope + DM Mono + Cairo, blue accent, rounded panels, radial-gradient
+   background, sticky header with a light/dark theme toggle, WhatsApp
+   float). Synced to assets_templates/base.css by common.py's
+   sync_site_assets(), same mechanism as the JS engines.
 
-   What's deliberately NOT here (kept page-specific instead, because the
-   values genuinely differ or merging risked a visual regression):
-     - .page-head padding, p.lede sizing — subject_index uses different
-       values than the other three
-     - main{padding:...} — only 3 of 4 templates use <main> this way;
-       subject_index already spaces itself via section.block and would
-       shift if this were forced globally
-     - nav / nav a — subject_index has a 2-link nav with hover/current
-       states; the other three have a single always-arrowed "back" link.
-       Different enough behavior that merging risked one bleeding into
-       the other via selector specificity.
-     - footer layout beyond the shared border/padding/note style —
-       subject_index's footer-grid is its own thing
+   v3.1: added "track" accent overrides (body.track-one, body.track-two,
+   ...), mirroring the pattern already used in the baccalaureate group
+   pages' style.css. A lesson page picks its accent by carrying one of
+   these classes on <body> — set by the generator based on which group
+   the lesson lives in (see common.py's TRACK_CLASS_BY_GROUP). No class
+   at all falls back to the default blue below, same as track-two.
+
+   Backwards-compat notes for anyone editing this later:
+     - .frame used to be the tick-corner "engineering drawing" motif. It
+       is now the shared rounded/shadowed panel look instead. quiz.js,
+       assign.js and attachments.js still append <span class="tick-br">
+       and <span class="tick-bl"> children into .frame — they are
+       intentionally left unstyled here (zero-size, invisible), so the
+       JS engines did not need to change.
+     - --serif is kept as an alias for --sans so any page-specific CSS
+       still written as font-family:var(--serif) keeps working without
+       being hunted down one by one.
+     - --maxw has a sensible default here; page <style> blocks may still
+       override :root{--maxw:...} for pages that want a narrower or
+       wider column (quiz/assignment ~720-760px, subject pages wider).
    ========================================================================== */
 
 :root{
-  --bg:#0B2318; --bg-soft:#0F2C1E; --panel:#123420; --line:#25523A;
-  --line-faint:rgba(201,151,76,0.14); --copper:#C9974C; --copper-bright:#E3B168;
-  --ink:#EDEAE0; --ink-dim:#9FB3A6;
-  --status-shipped:#7CB68A; --status-progress:#C9974C; --status-active:#8FB3D9; --status-fail:#D97757;
-  --mono:'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --serif:'Source Serif 4', Georgia, serif;
-  --maxw:760px; /* default — quiz/assignment override to 720px, subject_index to 1080px */
+  color-scheme:light;
+  --bg:#f4f7fb; --bg-soft:#e8eef7; --panel:#fff; --panel-soft:#eef4fb;
+  --line:#d6e1ef; --line-strong:#b8c9df;
+  --ink:#10233f; --ink-dim:#63738a;
+  --accent:#2f6fed; --accent-strong:#2056bd; --accent-soft:#dce9ff;
+  --sage:#397b75; --honey:#e5a94f;
+  --status-shipped:#2f9e6f; --status-fail:#e2574c; --status-progress:#e5a94f; --status-active:#2f6fed;
+  --footer:#e7eef7;
+  --whatsapp:#25d366; --whatsapp-deep:#128c4a;
+  --mono:'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans:'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --arabic:'Cairo', var(--sans);
+  --serif:var(--sans); /* alias — legacy page CSS referencing var(--serif) still resolves */
+  --maxw:1160px;
+  --shadow:0 16px 32px rgba(16,35,63,.09);
 }
-*{box-sizing:border-box;}
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#091a32; --bg-soft:#0d2340; --panel:#102744; --panel-soft:#132d4d;
+  --line:#244260; --line-strong:#385979;
+  --ink:#f5f8ff; --ink-dim:#aabbd0;
+  --accent:#72a5ff; --accent-strong:#9fc2ff; --accent-soft:#1c3e6a;
+  --sage:#82c9bd; --honey:#f0c36d;
+  --status-shipped:#7cdba0; --status-fail:#ff8a75; --status-progress:#f0c36d; --status-active:#72a5ff;
+  --footer:#07162a;
+  --shadow:0 18px 40px rgba(4,17,38,.28);
+}
+
+/* ---- accent "tracks" — override just the accent trio per lesson group.
+   Values mirror programming/baccalaureate's own style.css exactly, so a
+   lesson page's accent matches its parent group's portal page. ---- */
+body.track-one{ --accent:#e58a45; --accent-strong:#b86127; --accent-soft:#ffead8; } /* grade 1 — orange */
+body.track-two{ --accent:#2f6fed; --accent-strong:#2056bd; --accent-soft:#dce9ff; } /* grade 2 — blue (= default) */
+html[data-theme="dark"] body.track-one{ --accent:#ffb36f; --accent-strong:#ffc78e; --accent-soft:#5a3926; }
+html[data-theme="dark"] body.track-two{ --accent:#72a5ff; --accent-strong:#9fc2ff; --accent-soft:#1c3e6a; }
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
 body{
   margin:0;
-  background:linear-gradient(var(--line-faint) 1px, transparent 1px) 0 0/100% 42px,
-    linear-gradient(90deg, var(--line-faint) 1px, transparent 1px) 0 0/42px 100%, var(--bg);
-  color:var(--ink); font-family:var(--serif); font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  background:radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--accent-soft) 58%, transparent), transparent 30rem), var(--bg);
+  color:var(--ink); font-family:var(--sans); font-size:16px; line-height:1.65;
+  -webkit-font-smoothing:antialiased; transition:background .35s ease, color .35s ease; overflow-x:hidden;
 }
-a{color:var(--copper-bright);}
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none; opacity:.2;
+  background-image:linear-gradient(color-mix(in srgb, var(--accent) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 7%, transparent) 1px, transparent 1px);
+  background-size:56px 56px;
+  mask-image:linear-gradient(180deg, black, transparent 65%);
+}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *, *::before, *::after{ animation-duration:.01ms!important; transition-duration:.01ms!important; scroll-behavior:auto!important; }
+}
+a{ color:var(--accent-strong); }
 button{ font-family:inherit; }
-a:focus-visible, button:focus-visible{ outline:2px solid var(--copper-bright); outline-offset:3px; }
-.wrap{ max-width:var(--maxw); margin:0 auto; padding:0 28px; }
-h1,h2,h3{ font-family:var(--mono); text-transform:uppercase; letter-spacing:0.03em; color:var(--ink); margin:0; }
+a:focus-visible, button:focus-visible{ outline:3px solid var(--accent); outline-offset:4px; border-radius:8px; }
+.wrap{ max-width:var(--maxw); margin:0 auto; padding:0 32px; }
+h1,h2,h3{ font-family:var(--sans); font-weight:800; letter-spacing:-0.03em; color:var(--ink); margin:0; }
 
-.frame{ position:relative; border:1px solid var(--line); background:var(--bg); }
-.frame::before,.frame::after,.frame .tick-br,.frame .tick-bl{
-  content:""; position:absolute; width:10px; height:10px; border-color:var(--copper); border-style:solid; border-width:0; opacity:.85;
+/* ---- shared rounded/shadowed panel (was the tick-corner "frame") ---- */
+.frame{ position:relative; border:1px solid var(--line); border-radius:14px; background:var(--panel); box-shadow:var(--shadow); }
+
+/* ---- status stamps (lesson cards, attachments) ---- */
+.stamp{ font:10px var(--mono); letter-spacing:.08em; text-transform:uppercase; padding:4px 7px; border:1px solid currentColor; border-radius:5px; white-space:nowrap; }
+.stamp.demo{ color:var(--honey); }
+.stamp.shipped, .stamp.ready{ color:var(--sage); }
+.stamp.planned{ color:var(--ink-dim); }
+
+/* ---- header / titlebar ---- */
+header{
+  position:sticky; top:0; z-index:20;
+  background:color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter:blur(16px);
+  border-bottom:1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  transition:background .35s ease, border-color .35s ease;
 }
-.frame::before{ top:-1px; left:-1px; border-top-width:2px; border-left-width:2px; }
-.frame::after{ top:-1px; right:-1px; border-top-width:2px; border-right-width:2px; }
-.frame .tick-bl{ bottom:-1px; left:-1px; border-bottom-width:2px; border-left-width:2px; }
-.frame .tick-br{ bottom:-1px; right:-1px; border-bottom-width:2px; border-right-width:2px; }
+.titlebar{ display:flex; align-items:center; justify-content:space-between; padding:17px 0; gap:18px; max-width:var(--maxw); margin:0 auto; padding-left:32px; padding-right:32px; }
+.titlebar .mark{ font:600 13px var(--mono); letter-spacing:.02em; color:var(--ink); display:flex; align-items:center; gap:10px; text-decoration:none; }
+.titlebar .mark .dot{ width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 5px var(--accent-soft); transition:transform .25s ease; flex:0 0 auto; }
+.titlebar .mark:hover .dot{ transform:scale(1.18); }
+.titlebar nav{ display:flex; align-items:center; gap:20px; font:11px var(--mono); letter-spacing:.08em; text-transform:uppercase; }
+.titlebar nav a{ color:var(--ink-dim); text-decoration:none; transition:color .2s ease; }
+.titlebar nav a:hover, .titlebar nav a.current{ color:var(--accent-strong); }
+.titlebar nav a.back::before{ content:"\2190 "; }
 
-header{ position:sticky; top:0; z-index:20; background:rgba(11,35,24,0.92); backdrop-filter:blur(6px); border-bottom:1px solid var(--line); }
-.titlebar{ display:flex; align-items:center; justify-content:space-between; padding:14px 0; gap:16px; max-width:var(--maxw); margin:0 auto; padding-left:28px; padding-right:28px; }
-.titlebar .mark{ font-family:var(--mono); font-weight:600; letter-spacing:0.06em; font-size:14px; color:var(--ink); display:flex; align-items:center; gap:8px; text-decoration:none; }
-.titlebar .mark .dot{ width:7px;height:7px;border-radius:1px;background:var(--copper); box-shadow:0 0 6px var(--copper); }
+/* ---- theme toggle ---- */
+.theme-toggle{
+  border:1px solid var(--line-strong); background:var(--panel); color:var(--ink);
+  display:inline-flex; align-items:center; gap:8px; padding:9px 13px; border-radius:9px;
+  font:500 11px var(--mono); cursor:pointer;
+  transition:transform .2s ease, background .3s ease, border-color .2s ease, color .2s ease;
+}
+.theme-toggle:hover{ transform:translateY(-2px); border-color:var(--accent); color:var(--accent-strong); }
+.theme-toggle:active{ transform:translateY(0); }
+.theme-icon{ font-size:14px; line-height:1; }
+.theme-label::after{ content:'Dark mode'; }
+html[data-theme="dark"] .theme-label::after{ content:'Light mode'; }
 
+/* ---- generic page head ---- */
 .page-head{ padding:44px 0 8px; }
 .page-head p.lede{ color:var(--ink-dim); font-size:15.5px; margin:10px 0 0; }
 
-footer{ border-top:1px solid var(--line); padding:32px 0; }
-.footer-note{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); letter-spacing:0.04em; text-align:center; }
+/* ---- footer ---- */
+footer{ border-top:1px solid var(--line); padding:42px 0 34px; background:var(--footer); transition:background .35s ease, border-color .35s ease; }
+.footer-note{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); letter-spacing:.04em; text-align:center; }
+.footer-grid{ display:grid; grid-template-columns:1fr auto; gap:26px; align-items:end; }
+.footer-intro strong{ display:block; font-size:17px; letter-spacing:-.03em; margin-bottom:5px; }
+.footer-intro p{ margin:0; color:var(--ink-dim); font-size:13px; }
+.footer-links{ display:flex; gap:9px; flex-wrap:wrap; justify-content:flex-end; }
+.footer-links a{ color:var(--ink); text-decoration:none; border:1px solid var(--line-strong); background:var(--panel); padding:10px 13px; border-radius:9px; font:500 11px var(--mono); transition:transform .2s ease, border-color .2s ease, color .2s ease; }
+.footer-links a:hover{ transform:translateY(-3px); border-color:var(--accent); color:var(--accent-strong); }
+.footer-bottom{ display:flex; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-top:30px; padding-top:17px; border-top:1px solid var(--line); color:var(--ink-dim); font:10px var(--mono); }
+
+/* ---- WhatsApp float ---- */
+.whatsapp-float{
+  position:fixed; right:24px; bottom:24px; z-index:30;
+  display:inline-flex; align-items:center; gap:10px; padding:13px 17px; border-radius:999px;
+  background:var(--whatsapp); color:#fff; text-decoration:none; font:700 12px var(--mono);
+  box-shadow:0 12px 26px rgba(18,140,74,.28), 0 0 0 5px color-mix(in srgb, var(--whatsapp) 18%, transparent);
+  transition:transform .24s ease, box-shadow .24s ease, background .24s ease;
+}
+.whatsapp-float:hover{ transform:translateY(-5px) scale(1.02); background:var(--whatsapp-deep); box-shadow:0 18px 34px rgba(18,140,74,.34); }
+.whatsapp-icon{ display:grid; place-items:center; width:22px; height:22px; border-radius:50%; background:#fff; color:var(--whatsapp-deep); flex:0 0 22px; }
+.whatsapp-icon svg{ width:15px; height:15px; fill:currentColor; }
+
+@media (max-width:800px){
+  .wrap{ padding:0 20px; }
+  .titlebar{ padding:15px 0; padding-left:20px; padding-right:20px; }
+  .titlebar .mark{ font-size:11px; }
+  .titlebar nav{ gap:10px; }
+  .theme-label{ display:none; }
+  .footer-grid{ grid-template-columns:1fr; gap:24px; }
+  .footer-links{ justify-content:flex-start; }
+  .footer-bottom{ display:block; line-height:1.8; }
+  .footer-bottom span{ display:block; }
+  .whatsapp-float{ right:16px; bottom:max(16px, env(safe-area-inset-bottom)); padding:13px 16px; }
+}

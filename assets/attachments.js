@@ -1,23 +1,17 @@
 /* ==========================================================================
    attachments.js — renders a lesson's attachments.json as inline previews
-   and download links, linking straight to Drive's own file URLs.
+   and download links, proxied through the Drive bridge Web App so the
+   student's browser only ever sees this site + the Apps Script URL —
+   never drive.google.com or the folder it lives in.
 
-   Files are expected to be shared "Anyone with the link / Viewer" (the
-   Attachment Maker tab + Code.gs's handleUploadAttachment set this
-   automatically on upload). No Apps Script proxy is involved in serving
-   files back out anymore — Code.gs's doGet is just a health check now.
-   See the note at the top of Code.gs for why (the old base64 data-URI
-   proxy lived inside the Apps Script HTML sandbox, which blocks
-   downloads outright).
+   DRIVE_ENDPOINT is baked in at build time (see assign.js header comment).
    ========================================================================== */
 
 (function () {
   "use strict";
 
-  // Types Drive's own /preview endpoint can render inline in an iframe.
-  // Covers images/PDF plus Office formats, which Drive converts on the fly.
-  var EMBEDDABLE_TYPES = ["pdf", "png", "jpg", "jpeg", "gif", "webp",
-    "pptx", "ppt", "docx", "doc", "xlsx", "xls"];
+  var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
+  var EMBEDDABLE_TYPES = ["pdf", "png", "jpg", "jpeg", "gif", "webp"];
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
@@ -33,24 +27,10 @@
     return node;
   }
 
-  function previewUrl(fileId) {
-    // Drive's own inline-embed endpoint — works in an <iframe> without
-    // the file ever needing "download" permission, just "view".
-    return "https://drive.google.com/file/d/" + encodeURIComponent(fileId) + "/preview";
-  }
-
-  function viewUrl(fileId) {
-    // Drive's normal viewer page — what "Open" should point at.
-    return "https://drive.google.com/file/d/" + encodeURIComponent(fileId) + "/view";
-  }
-
-  function downloadUrl(fileId) {
-    // Direct download. Works for anyone-with-link files under Drive's
-    // per-file daily quota; large/heavily-hit files may show Drive's
-    // "can't scan for viruses" interstitial with a "Download anyway" link
-    // instead of streaming immediately — that's Drive's own behavior,
-    // not a bug here.
-    return "https://drive.google.com/uc?export=download&id=" + encodeURIComponent(fileId);
+  function fileUrl(fileId, forceDownload) {
+    var url = DRIVE_ENDPOINT + (DRIVE_ENDPOINT.indexOf("?") >= 0 ? "&" : "?") + "action=file&id=" + encodeURIComponent(fileId);
+    if (forceDownload) url += "&dl=1";
+    return url;
   }
 
   function mount(rootSelector) {
@@ -88,21 +68,23 @@
         var type = (item.type || "").toLowerCase();
         var title = item.title || "Untitled";
 
-        if (!fileId) {
+        if (!fileId || !DRIVE_ENDPOINT) {
           listWrap.appendChild(el("div", { class: "attach-item frame" }, [
             el("div", { class: "attach-item__title" }, [title, el("span", { class: "attach-item__actions" }, ["Not available yet"])]),
           ]));
           return;
         }
 
-        var openLink = el("a", { href: viewUrl(fileId), target: "_blank", rel: "noopener" }, ["Open \u2192"]);
-        var downloadLink = el("a", { href: downloadUrl(fileId), target: "_blank", rel: "noopener", style: "margin-left:12px;" }, ["Download"]);
+        var url = fileUrl(fileId, false);
+        var downloadUrl = fileUrl(fileId, true);
+        var openLink = el("a", { href: url, target: "_blank", rel: "noopener" }, ["Open \u2192"]);
+        var downloadLink = el("a", { href: downloadUrl, target: "_blank", rel: "noopener", style: "margin-left:12px;" }, ["Download"]);
         var row = el("div", { class: "attach-item frame" }, [
           el("div", { class: "attach-item__title" }, [title, el("span", { class: "attach-item__actions" }, [openLink, downloadLink])]),
         ]);
 
         if (EMBEDDABLE_TYPES.indexOf(type) !== -1) {
-          row.appendChild(el("iframe", { src: previewUrl(fileId), title: title, loading: "lazy", allow: "autoplay" }));
+          row.appendChild(el("iframe", { src: url, title: title, loading: "lazy" }));
         }
 
         listWrap.appendChild(row);
