@@ -25,15 +25,17 @@
   .qz-mode-toggle{ display:flex; gap:8px; margin-bottom:12px; }
   .qz-mode-btn{ flex:1; font-family:var(--mono); font-size:11.5px; letter-spacing:0.05em; text-transform:uppercase;
     background:var(--bg-soft); color:var(--ink-dim); border:1px solid var(--line); padding:9px; cursor:pointer; }
-  .qz-mode-btn.active{ border-color:var(--copper); color:var(--copper-bright); }
+  .qz-mode-btn.active{ border-color:var(--accent); color:var(--accent-strong); }
 </style>
+<link rel="stylesheet" href="/assets/theme.css">
+<script src="/assets/theme.js" defer></script>
 </head>
 <body>
 
 <header>
   <div class="titlebar">
     <a href="/" class="mark"><span class="dot"></span> EZZ NASR : TEACHING</a>
-    <nav><a href="/english/get-into-call-centre/">Back to Get into Call Centre</a></nav>
+    <nav><a href="/english/get-into-call-centre/">Back to Get into Call Centre</a><button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">&#9789;</span><span class="theme-label"></span></button></nav>
   </div>
 </header>
 

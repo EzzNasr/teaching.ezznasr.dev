@@ -16,21 +16,25 @@
         rel="stylesheet">
     <style>
         :root {
+            /* matches assets/theme.css exactly now — this block used to
+               carry its own drifted --accent (#356fe8 vs canonical #2f6fed) */
             color-scheme: light;
-            --bg: #f7f9fc;
-            --bg-soft: #edf2f8;
+            --bg: #f4f7fb;
+            --bg-soft: #e8eef7;
             --panel: #fff;
-            --panel-soft: #f0f4fa;
-            --line: #dbe4ef;
-            --line-strong: #b9c9dc;
-            --ink: #0b1f3a;
-            --ink-dim: #667892;
-            --accent: #356fe8;
-            --accent-strong: #2458bd;
-            --accent-soft: #e1ebff;
+            --panel-soft: #eef4fb;
+            --line: #d6e1ef;
+            --line-strong: #b8c9df;
+            --ink: #10233f;
+            --ink-dim: #63738a;
+            --accent: #2f6fed;
+            --accent-strong: #2056bd;
+            --accent-soft: #dce9ff;
+            --mint: #1fae6b;
+            --mint-strong: #168a56;
             --sage: #397b75;
             --honey: #e5a94f;
-            --footer: #eaf0f7;
+            --footer: #e7eef7;
             --whatsapp: #25d366;
             --whatsapp-deep: #128c4a;
             --mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -53,6 +57,8 @@
             --accent: #72a5ff;
             --accent-strong: #9fc2ff;
             --accent-soft: #1c3e6a;
+            --mint: #22c47a;
+            --mint-strong: #34d68f;
             --sage: #82c9bd;
             --honey: #f0c36d;
             --footer: #07162a;
@@ -150,16 +156,17 @@
         }
 
         .mark .dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--accent);
-            box-shadow: 0 0 0 5px var(--accent-soft);
-            transition: transform .25s ease
+            width: 16px;
+            height: 16px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            box-shadow: 0 0 0 5px var(--accent-soft), inset 0 1px 1px rgba(255, 255, 255, .35);
+            transition: transform .25s ease, border-radius .25s ease
         }
 
         .mark:hover .dot {
-            transform: scale(1.18)
+            transform: scale(1.15) rotate(-6deg);
+            border-radius: 9px
         }
 
         nav {
@@ -188,17 +195,18 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            padding: 9px 13px;
-            border-radius: 9px;
-            font: 500 11px var(--mono);
+            padding: 7px 13px 7px 7px;
+            border-radius: 999px;
+            font: 600 11px var(--mono);
             cursor: pointer;
-            transition: transform .2s ease, background .3s ease, border-color .2s ease, color .2s ease
+            transition: transform .2s ease, background .3s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease
         }
 
         .theme-toggle:hover {
             transform: translateY(-2px);
             border-color: var(--accent);
-            color: var(--accent-strong)
+            color: var(--accent-strong);
+            box-shadow: 0 7px 16px color-mix(in srgb, var(--accent) 18%, transparent)
         }
 
         .theme-toggle:active {
@@ -206,7 +214,14 @@
         }
 
         .theme-icon {
-            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--accent-soft);
+            color: var(--accent-strong);
             line-height: 1
         }
 
@@ -795,7 +810,6 @@
                     second</span></div>
         </div>
     </footer>
-    <script>(function () { var root = document.documentElement, toggle = document.getElementById('theme-toggle'), stored; try { stored = localStorage.getItem('teaching-theme') } catch (e) { } var initial = stored || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); function apply(theme, write) { root.setAttribute('data-theme', theme); toggle.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false'); toggle.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'); toggle.querySelector('.theme-icon').textContent = theme === 'dark' ? '☀' : '☾'; if (write !== false) try { localStorage.setItem('teaching-theme', theme) } catch (e) { } } var channel = 'BroadcastChannel' in window ? new BroadcastChannel('teaching-theme') : null; apply(initial, false); toggle.addEventListener('click', function () { var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'; apply(next, true); if (channel) channel.postMessage(next) }); window.addEventListener('storage', function (event) { if (event.key === 'teaching-theme' && event.newValue) apply(event.newValue, false) }); if (channel) channel.addEventListener('message', function (event) { if (event.data === 'dark' || event.data === 'light') apply(event.data, false) }); window.addEventListener('pageshow', function () { var current; try { current = localStorage.getItem('teaching-theme') } catch (e) { } if (current) apply(current, false) }) })();</script>
 </body>
 
 </html>

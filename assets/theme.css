@@ -1,10 +1,11 @@
 :root{
   color-scheme:light;
-  --bg:#f7f9fc;--bg-soft:#edf2f8;--panel:#fff;--panel-soft:#f0f4fa;
-  --line:#dbe4ef;--line-strong:#b9c9dc;--ink:#0b1f3a;--ink-dim:#667892;
-  --accent:#356fe8;--accent-strong:#2458bd;--accent-soft:#e1ebff;
-  --sage:#397b75;--honey:#e5a94f;--status-shipped:#2f9e6f;--status-fail:#e2574c;--status-progress:#e5a94f;--status-active:#356fe8;
-  --footer:#eaf0f7;--whatsapp:#25d366;--whatsapp-deep:#128c4a;
+  --bg:#f4f7fb;--bg-soft:#e8eef7;--panel:#fff;--panel-soft:#eef4fb;
+  --line:#d6e1ef;--line-strong:#b8c9df;--ink:#10233f;--ink-dim:#63738a;
+  --accent:#2f6fed;--accent-strong:#2056bd;--accent-soft:#dce9ff;
+  --mint:#1fae6b;--mint-strong:#168a56;--mint-soft:#d7f5e6;
+  --sage:#397b75;--honey:#e5a94f;--status-shipped:#2f9e6f;--status-fail:#e2574c;--status-progress:#e5a94f;--status-active:#2f6fed;
+  --footer:#e7eef7;--whatsapp:#25d366;--whatsapp-deep:#128c4a;--facebook:#1877f2;--facebook-deep:#0c5dcb;
   --mono:'DM Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
   --sans:'Manrope',ui-sans-serif,system-ui,sans-serif;
   --arabic:'Cairo',var(--sans);--serif:var(--sans);--maxw:1160px;
@@ -15,10 +16,14 @@ html[data-theme="dark"]{
   --bg:#091a32;--bg-soft:#0d2340;--panel:#102744;--panel-soft:#132d4d;
   --line:#244260;--line-strong:#385979;--ink:#f5f8ff;--ink-dim:#aabbd0;
   --accent:#72a5ff;--accent-strong:#9fc2ff;--accent-soft:#1c3e6a;
+  --mint:#22c47a;--mint-strong:#34d68f;--mint-soft:#0e3324;
   --sage:#82c9bd;--honey:#f0c36d;--status-shipped:#7cdba0;--status-fail:#ff8a75;--status-progress:#f0c36d;--status-active:#72a5ff;
-  --footer:#07162a;--shadow:0 18px 40px rgba(4,17,38,.28)
+  --footer:#07162a;--whatsapp:#35dc78;--whatsapp-deep:#1eaa5e;--facebook:#3d8bff;--facebook-deep:#1d6fe0;
 }
+/* accent "tracks" — one lesson group can override just the accent trio.
+   Values are unchanged from before (they were already consistent across
+   every place that defined them) — only the base palette above changed. */
 body.track-one{--accent:#e58a45;--accent-strong:#b86127;--accent-soft:#ffead8}
-body.track-two{--accent:#356fe8;--accent-strong:#2458bd;--accent-soft:#e1ebff}
+body.track-two{--accent:#2f6fed;--accent-strong:#2056bd;--accent-soft:#dce9ff}
 html[data-theme="dark"] body.track-one{--accent:#ffb36f;--accent-strong:#ffc78e;--accent-soft:#5a3926}
 html[data-theme="dark"] body.track-two{--accent:#72a5ff;--accent-strong:#9fc2ff;--accent-soft:#1c3e6a}

@@ -6,13 +6,19 @@
 
   if (!toggle) return;
 
+  // Crisp inline SVGs instead of emoji glyphs (☾/☀), which render
+  // inconsistently across OS emoji sets/fonts (including some Arabic-
+  // locale systems) — this looks the same everywhere.
+  var ICON_MOON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.4A8.5 8.5 0 1 1 9.6 3.5a7 7 0 0 0 10.9 10.9Z"/></svg>';
+  var ICON_SUN = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/></svg>';
+
   function apply(theme, write) {
     if (theme !== 'dark' && theme !== 'light') return;
     root.setAttribute('data-theme', theme);
     toggle.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
     toggle.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
     var icon = toggle.querySelector('.theme-icon');
-    if (icon) icon.textContent = theme === 'dark' ? '\u2600' : '\u263E';
+    if (icon) icon.innerHTML = theme === 'dark' ? ICON_SUN : ICON_MOON;
     if (write !== false) {
       try { localStorage.setItem(storageKey, theme); } catch (e) {}
     }

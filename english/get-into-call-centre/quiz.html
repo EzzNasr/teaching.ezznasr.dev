@@ -30,7 +30,7 @@
     padding:12px 14px; border:1px solid var(--line); background:var(--bg-soft); color:var(--ink);
     cursor:pointer; font-size:14.5px; transition:border-color .15s ease, transform .1s ease;
   }
-  .qz-option:hover:not(:disabled){ border-color:var(--copper); }
+  .qz-option:hover:not(:disabled){ border-color:var(--accent); }
   .qz-option:active:not(:disabled){ transform:scale(0.995); }
   .qz-option__tag{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); flex-shrink:0; padding-top:2px; }
   .qz-option:disabled{ cursor:default; }
@@ -43,17 +43,19 @@
   .qz-verdict__tag--pass{ color:var(--status-shipped); }
   .qz-verdict__tag--fail{ color:var(--status-fail); }
   .qz-verdict__explain{ display:block; color:var(--ink-dim); font-family:var(--serif); font-size:14.5px; margin-top:4px; }
-  .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--copper-bright); margin-bottom:6px; }
+  .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--accent-strong); margin-bottom:6px; }
   .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); color:var(--ink-dim); padding:9px 16px; cursor:pointer; }
-  .qz-retry:hover{ border-color:var(--copper); color:var(--copper-bright); }
+  .qz-retry:hover{ border-color:var(--accent); color:var(--accent-strong); }
 </style>
+<link rel="stylesheet" href="/assets/theme.css">
+<script src="/assets/theme.js" defer></script>
 </head>
 <body>
 
 <header>
   <div class="titlebar">
     <a href="/" class="mark"><span class="dot"></span> EZZ NASR : TEACHING</a>
-    <nav><a href="/english/get-into-call-centre/">Back to Get into Call Centre</a></nav>
+    <nav><a href="/english/get-into-call-centre/">Back to Get into Call Centre</a><button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">&#9789;</span><span class="theme-label"></span></button></nav>
   </div>
 </header>
 
