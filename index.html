@@ -14,45 +14,6 @@
   <meta property="og:url" content="https://teaching.ezznasr.dev/">
   <meta property="og:image" content="https://ezznasr.dev/images/ezz-nasr.jpg">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Ezz Nasr | Teaching Portal">
-  <meta name="twitter:description" content="Concept-first teaching across programming, math, and English.">
-  <meta name="twitter:image" content="https://ezznasr.dev/images/ezz-nasr.jpg">
-  <script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "EducationalOrganization",
-      "@id": "https://teaching.ezznasr.dev/#organization",
-      "name": "Ezz Nasr Teaching Portal",
-      "url": "https://teaching.ezznasr.dev/",
-      "description": "Concept-first teaching across programming fundamentals, math (SAT/EST), and English.",
-      "sameAs": ["https://github.com/EzzNasr", "https://www.linkedin.com/in/EzzNasr", "https://www.facebook.com/profile.php?id=61593926633619"]
-    },
-    {
-      "@type": "Course",
-      "name": "Programming fundamentals",
-      "description": "Concept-first lessons, live-coding demos, quizzes, and guided assignments.",
-      "url": "https://teaching.ezznasr.dev/programming/",
-      "provider": { "@id": "https://teaching.ezznasr.dev/#organization" }
-    },
-    {
-      "@type": "Course",
-      "name": "Math — SAT / EST",
-      "description": "Probability, differential equations, and focused SAT / EST problem sets.",
-      "url": "https://teaching.ezznasr.dev/math/",
-      "provider": { "@id": "https://teaching.ezznasr.dev/#organization" }
-    },
-    {
-      "@type": "Course",
-      "name": "English",
-      "description": "C1+ instruction, guided practice, clear feedback, and practical quizzes.",
-      "url": "https://teaching.ezznasr.dev/english/",
-      "provider": { "@id": "https://teaching.ezznasr.dev/#organization" }
-    }
-  ]
-}
-</script>
   <link rel="icon" href="/icons/favicon.ico" sizes="any">
   <link rel="icon" href="/icons/favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -60,7 +21,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="/assets/theme.css">
@@ -69,46 +30,81 @@
 
 <body>
   <header>
-    <div class="wrap titlebar"><a href="/" class="mark"><span class="dot"></span> EZZ NASR <span
-          aria-hidden="true">·</span> TEACHING</a>
-      <nav><button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode"
-          aria-pressed="false"><span class="theme-icon" aria-hidden="true">☾</span><span
-            class="theme-label"></span></button></nav>
+    <div class="wrap titlebar">
+      <a href="/" class="mark"><span class="dot" aria-hidden="true"></span> EZZ NASR · TEACHING</a>
+      <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode"
+        aria-pressed="false"><span class="theme-icon" aria-hidden="true">☾</span><span
+          class="theme-label"></span></button>
     </div>
   </header>
+
   <main>
-    <div class="wrap page-head">
-      <div class="welcome">A place to learn, practice, and grow</div>
-      <h1>Learn with clarity.<br><span>Build with confidence.</span></h1>
-      <p class="lede">I teach programming fundamentals, math (SAT / EST), and English through one simple approach:
-        <strong>understand the idea first, then make it yours through practice.</strong></p>
-      <p class="lede method">Explore a subject below for sample lessons, interactive quizzes, and assignment support.
-      </p>
-      <div class="intro-rule" aria-hidden="true"></div>
-    </div>
-    <section class="subjects">
+    <section class="hero" aria-labelledby="hero-title">
       <div class="wrap">
-        <div class="section-heading">
-          <h2>Choose your learning path</h2>
-          <p>Start wherever you are.</p>
+        <p class="hero-kicker">A place to learn, practice, and grow</p>
+        <h1 id="hero-title">Learn clearly.<br>Grow confidently.</h1>
+        <p>A focused teaching portal for school learners — structured paths, real lessons, quizzes, and support whenever
+          you need it.</p>
+        <a class="cta" href="#lessons">Start learning <span aria-hidden="true">→</span></a>
+      </div>
+    </section>
+
+    <section class="steps" aria-labelledby="steps-title">
+      <div class="wrap">
+        <div class="steps-head">
+          <h2 id="steps-title">How it works</h2>
+          <p>Three steps between “just landed” and “actually learning.”</p>
         </div>
-        <div class="subject-grid"><a class="subject-card" href="/programming/"><span class="eyebrow">01 /
-              Programming</span>
+        <div class="step-grid">
+          <article class="step step--a"><span class="num">1</span>
+            <div>
+              <h3>Pick your lesson</h3>
+              <p>Choose your grade and subject — everything is grouped so you find it fast.</p>
+            </div>
+          </article>
+          <article class="step step--b"><span class="num">2</span>
+            <div>
+              <h3>Watch &amp; work through it</h3>
+              <p>Video walkthrough, then a quiz with instant feedback on every answer.</p>
+            </div>
+          </article>
+          <article class="step step--c"><span class="num">3</span>
+            <div>
+              <h3>Submit your assignment</h3>
+              <p>Paste text, drop a link, or upload a file — whatever the lesson calls for.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="lessons" id="lessons" aria-labelledby="lessons-title">
+      <div class="wrap">
+        <div class="lessons-head">
+          <h2 id="lessons-title">Learning paths</h2>
+          <p>Each subject is the entry point for focused lessons, quizzes, and assignment support.</p>
+        </div>
+        <div class="grid">
+          <a class="card" href="/programming/"><span class="chip-top">01</span>
             <h3>Programming fundamentals</h3>
             <p>Build a strong foundation with concept-first lessons, live-coding demos, quizzes, and guided assignments.
-            </p><span class="go">Explore programming</span>
-          </a><a class="subject-card" href="/math/"><span class="eyebrow">02 / Math</span>
+            </p><span class="go">Explore programming <span aria-hidden="true">→</span></span>
+          </a>
+          <a class="card" href="/math/"><span class="chip-top">02</span>
             <h3>Math — SAT / EST</h3>
             <p>Strengthen your reasoning with probability, differential equations, and focused SAT / EST problem sets.
-            </p><span class="go">Explore math</span>
-          </a><a class="subject-card" href="/english/"><span class="eyebrow">03 / English</span>
+            </p><span class="go">Explore math <span aria-hidden="true">→</span></span>
+          </a>
+          <a class="card" href="/english/"><span class="chip-top">03</span>
             <h3>English</h3>
             <p>Grow your fluency with C1+ instruction, guided practice, clear feedback, and practical quizzes.</p><span
-              class="go">Explore English</span>
-          </a></div>
+              class="go">Explore English <span aria-hidden="true">→</span></span>
+          </a>
+        </div>
       </div>
     </section>
   </main>
+
   <a class="social-float whatsapp-float"
     href="https://wa.me/201275001758?text=Hi%20Ezz%2C%20I%27d%20like%20to%20learn%20more%20about%20your%20lessons."
     target="_blank" rel="noopener" aria-label="Chat on WhatsApp"><span class="social-icon" aria-hidden="true"><svg
@@ -122,6 +118,7 @@
         <path
           d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5 3.66 9.15 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.51 1.49-3.9 3.77-3.9 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.78-1.63 1.57v1.88h2.78l-.44 2.91h-2.34V22c4.78-.79 8.44-4.94 8.44-9.94Z" />
       </svg></span><span>Facebook Page</span></a>
+
   <footer>
     <div class="wrap">
       <div class="footer-grid">
