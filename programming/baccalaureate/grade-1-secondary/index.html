@@ -8,6 +8,42 @@
     <link rel="stylesheet" href="./style.css">
     <link rel="stylesheet" href="/assets/theme.css">
     <script src="/assets/theme.js" defer></script>
+    <script>
+        (function () {
+            function init() {
+                var root = document.documentElement;
+                var toggle = document.getElementById('theme-toggle');
+                if (!toggle || toggle.dataset.bound) return;
+                toggle.dataset.bound = '1';
+                var icon = toggle.querySelector('.theme-icon');
+                var label = toggle.querySelector('.theme-label');
+                function sync() {
+                    var isDark = root.getAttribute('data-theme') === 'dark';
+                    toggle.setAttribute('aria-pressed', String(isDark));
+                    toggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+                    if (icon) icon.textContent = isDark ? '☀' : '☾';
+                    if (label) label.textContent = isDark ? 'Light mode' : 'Dark mode';
+                }
+                var stored = localStorage.getItem('theme');
+                if (stored === 'dark') root.setAttribute('data-theme', 'dark');
+                else if (stored === 'light') root.removeAttribute('data-theme');
+                sync();
+                toggle.addEventListener('click', function () {
+                    var isDark = root.getAttribute('data-theme') === 'dark';
+                    if (isDark) {
+                        root.removeAttribute('data-theme');
+                        localStorage.setItem('theme', 'light');
+                    } else {
+                        root.setAttribute('data-theme', 'dark');
+                        localStorage.setItem('theme', 'dark');
+                    }
+                    sync();
+                });
+            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+            else init();
+        })();
+    </script>
 </head>
 
 <body class="track-one">
@@ -33,6 +69,7 @@
                     <p>مسار تعليمي منظم</p>
                 </div>
                 <div class="lessons">
+                    <div class="empty">الدروس لهذا الصف قيد الإعداد حاليًا — تابعنا قريبًا، أو استكشف دروس <code>البرمجة</code> في الوقت الحالي.</div>
                 </div>
             </div>
         </section>
