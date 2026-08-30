@@ -5,7 +5,7 @@
   --accent:#2f6fed;--accent-strong:#2056bd;--accent-soft:#dce9ff;
   --mint:#1fae6b;--mint-strong:#168a56;--mint-soft:#d7f5e6;
   --sage:#397b75;--honey:#e5a94f;--status-shipped:#2f9e6f;--status-fail:#e2574c;--status-progress:#e5a94f;--status-active:#2f6fed;
-  --footer:#e7eef7;--whatsapp:#25d366;--whatsapp-deep:#128c4a;--facebook:#1877f2;--facebook-deep:#0c5dcb;
+  --footer:#fff;--whatsapp:#25d366;--whatsapp-deep:#128c4a;--facebook:#1877f2;--facebook-deep:#0c5dcb;
   --mono:'DM Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
   --sans:'Manrope',ui-sans-serif,system-ui,sans-serif;
   --arabic:'Cairo',var(--sans);--serif:var(--sans);--maxw:1160px;

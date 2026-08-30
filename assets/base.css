@@ -59,10 +59,18 @@ h1,h2,h3{ font-family:var(--sans); font-weight:800; letter-spacing:-0.03em; colo
 .btn-cta:hover{ transform:translateY(-2px); background:var(--mint-strong); }
 
 /* ---- status stamps (lesson cards, attachments) ---- */
-.stamp{ font:10px var(--mono); letter-spacing:.08em; text-transform:uppercase; padding:4px 7px; border:1px solid currentColor; border-radius:5px; white-space:nowrap; }
-.stamp.demo{ color:var(--honey); }
-.stamp.shipped, .stamp.ready{ color:var(--sage); }
-.stamp.planned{ color:var(--ink-dim); }
+.stamp{ font:700 10px var(--mono); letter-spacing:.08em; text-transform:uppercase; padding:4px 8px; border:none; border-radius:999px; white-space:nowrap; background:color-mix(in srgb, var(--sage) 18%, var(--panel)); color:color-mix(in srgb, var(--sage) 65%, var(--ink)); }
+.stamp.demo{ background:color-mix(in srgb, var(--honey) 24%, var(--panel)); color:color-mix(in srgb, var(--honey) 60%, var(--ink)); }
+.stamp.shipped, .stamp.ready{ background:color-mix(in srgb, var(--sage) 18%, var(--panel)); color:color-mix(in srgb, var(--sage) 65%, var(--ink)); }
+.stamp.planned{ background:var(--panel-soft); color:var(--ink-dim); }
+
+/* ---- quiz/assignment chips on lesson cards ---- */
+.chip{ font:700 10px var(--mono); letter-spacing:.02em; padding:5px 10px; border-radius:999px; border:none; }
+.chip-quiz{ background:color-mix(in srgb, var(--mint) 18%, var(--panel)); color:var(--mint-strong); }
+.chip-assignment{ background:color-mix(in srgb, var(--honey) 24%, var(--panel)); color:color-mix(in srgb, var(--honey) 60%, var(--ink)); }
+
+/* ---- small numbered pill for ordered lesson lists ---- */
+.number{ display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; width:22px; height:22px; border-radius:999px; background:var(--accent-soft); color:var(--accent-strong); font:700 10px var(--mono); }
 
 /* ---- header / titlebar ---- */
 header{
