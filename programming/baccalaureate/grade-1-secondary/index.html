@@ -7,10 +7,11 @@
     <title>الصف الأول الثانوي | Teaching Portal</title>
     <link rel="stylesheet" href="./style.css">
     <link rel="stylesheet" href="/assets/theme.css">
-    <script src="/assets/theme.js" defer></script>
+    <script src="/assets/theme.js" defer onerror="window.__themeJsFailed = true"></script>
     <script>
         (function () {
             function init() {
+                if (!window.__themeJsFailed) return; // theme.js loaded fine — don't double-bind
                 var root = document.documentElement;
                 var toggle = document.getElementById('theme-toggle');
                 if (!toggle || toggle.dataset.bound) return;
@@ -40,8 +41,7 @@
                     sync();
                 });
             }
-            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-            else init();
+            document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
 </head>
