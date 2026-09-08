@@ -9,6 +9,12 @@
    and shows it on the start screen instead of forgetting on navigation —
    the actual gap that was reported. This is still per-browser, per-device
    (no server), same limitation as before, just no longer silently lost.
+
+   Login (v2): the free-typed name/email start screen is gone. auth.js
+   (must be loaded first — see quiz.html) gates entry with phone+password
+   and hands back { student_id, student_name }; every answer now also
+   carries the question's chapter, and the full question list (not just
+   misses) is what gets recorded, so results can be aggregated by chapter.
    ========================================================================== */
 
 (function () {
@@ -96,203 +102,220 @@
       return;
     }
 
-    var state = {
-      index: 0,
-      score: 0,
-      started: false,
-      finished: false,
-      name: "",
-      email: "",
-      startTime: null,
-      endTime: null,
-      answers: [], // { question, chosen, correct_answer, is_correct }
-    };
-
-    function render() {
-      root.innerHTML = "";
-      if (!state.started) { renderStart(); return; }
-      if (state.index >= quiz.questions.length) { renderSummary(); return; }
-      renderQuestion();
+    if (!window.AuthEngine) {
+      root.textContent = "Sign-in couldn't load. Please refresh the page.";
+      return;
     }
 
-    function renderStart() {
-      var nameInput = el("input", { class: "qz-input", type: "text", placeholder: "Your name", required: "required" });
-      var emailInput = el("input", { class: "qz-input", type: "email", placeholder: "Email (optional)" });
+    window.AuthEngine.mount(rootSelector, function (session) {
+      startQuiz(session);
+    });
 
-      var errorMsg = el("div", { class: "qz-error" });
+    function startQuiz(session) {
+      var state = {
+        index: 0,
+        score: 0,
+        started: false,
+        finished: false,
+        studentId: session.student_id,
+        studentName: session.student_name,
+        startTime: null,
+        endTime: null,
+        answers: [], // { question, chosen, correct_answer, is_correct, chapter }
+      };
 
-      var beginBtn = el("button", { class: "qz-next", type: "button" }, ["Begin quiz \u2192"]);
-      beginBtn.addEventListener("click", function () {
-        var name = nameInput.value.trim();
-        if (!name) {
-          errorMsg.textContent = "Please enter your name to start.";
-          nameInput.focus();
-          return;
-        }
-        state.name = name;
-        state.email = emailInput.value.trim();
-        state.startTime = new Date().toISOString();
-        state.started = true;
-        render();
-      });
+      render();
 
-      var cardChildren = [
-        el("span", { class: "tick-br" }),
-        el("span", { class: "tick-bl" }),
-        el("p", { class: "qz-question" }, [quiz.title ? (quiz.title + " — before you start") : "Before you start"]),
-      ];
-
-      var last = loadLastAttempt(quiz);
-      if (last && typeof last.score === "number" && typeof last.total === "number") {
-        var pct = last.total ? Math.round((last.score / last.total) * 100) : 0;
-        var whenLabel = last.date ? " \u00b7 " + last.date : "";
-        cardChildren.push(el("div", { class: "qz-verdict" }, [
-          el("span", { class: "qz-verdict__tag qz-verdict__tag--pass" }, ["Last attempt"]),
-          el("span", { class: "qz-verdict__explain" }, [
-            (last.name ? last.name + " \u2014 " : "") + last.score + " / " + last.total +
-            " (" + pct + "%)" + whenLabel + ". Starting again will record a new attempt."
-          ]),
-        ]));
-        if (last.name && !nameInput.value) nameInput.value = last.name;
+      function render() {
+        root.innerHTML = "";
+        if (!state.started) { renderStart(); return; }
+        if (state.index >= quiz.questions.length) { renderSummary(); return; }
+        renderQuestion();
       }
 
-      cardChildren.push(el("div", { class: "qz-field" }, [nameInput]));
-      cardChildren.push(el("div", { class: "qz-field" }, [emailInput]));
-      cardChildren.push(errorMsg);
-      cardChildren.push(el("div", { class: "qz-actions" }, [beginBtn]));
+      function renderStart() {
+        var errorMsg = el("div", { class: "qz-error" });
 
-      var card = el("div", { class: "qz-card frame" }, cardChildren);
-      root.appendChild(card);
-    }
-
-    function renderQuestion() {
-      var q = quiz.questions[state.index];
-      var answered = false;
-
-      var progress = el("div", { class: "qz-progress" }, [
-        "Question " + (state.index + 1) + " of " + quiz.questions.length +
-        "  \u00b7  Score " + state.score + "/" + state.index,
-      ]);
-
-      var questionEl = el("p", { class: "qz-question", html: q.q });
-      var optionsWrap = el("div", { class: "qz-options" });
-      var actions = el("div", { class: "qz-actions" });
-
-      var card = el("div", { class: "qz-card frame" }, [
-        el("span", { class: "tick-br" }),
-        el("span", { class: "tick-bl" }),
-        questionEl,
-        optionsWrap,
-        actions,
-      ]);
-
-      q.options.forEach(function (opt, i) {
-        var btn = el("button", { class: "qz-option", type: "button" }, [
-          el("span", { class: "qz-option__tag" }, [String.fromCharCode(65 + i)]),
-          el("span", {}, [opt]),
-        ]);
-        btn.addEventListener("click", function () {
-          if (answered) return;
-          answered = true;
-
-          var correct = i === q.correct;
-          if (correct) state.score++;
-
-          state.answers.push({
-            question: q.q,
-            chosen: opt,
-            correct_answer: q.options[q.correct],
-            is_correct: correct,
-          });
-
-          Array.prototype.forEach.call(optionsWrap.children, function (child, j) {
-            child.disabled = true;
-            if (j === q.correct) child.classList.add("qz-option--correct");
-            else if (j === i) child.classList.add("qz-option--incorrect");
-          });
-
-          var verdict = el("div", { class: "qz-verdict" }, [
-            el("span", { class: correct ? "qz-verdict__tag qz-verdict__tag--pass" : "qz-verdict__tag qz-verdict__tag--fail" },
-              [correct ? "Correct" : "Not quite"]),
-            q.explain ? el("span", { class: "qz-verdict__explain" }, [q.explain]) : null,
-          ]);
-          card.appendChild(verdict);
-
-          var isLast = state.index + 1 >= quiz.questions.length;
-          var nextBtn = el("button", { class: "qz-next", type: "button" }, [isLast ? "See score \u2192" : "Next \u2192"]);
-          nextBtn.addEventListener("click", function () {
-            if (isLast && !state.endTime) {
-              state.endTime = new Date().toISOString();
-            }
-            state.index++;
-            render();
-          });
-          actions.appendChild(nextBtn);
+        var beginBtn = el("button", { class: "qz-next", type: "button" }, ["Begin quiz \u2192"]);
+        beginBtn.addEventListener("click", function () {
+          state.startTime = new Date().toISOString();
+          state.started = true;
+          render();
         });
-        optionsWrap.appendChild(btn);
-      });
 
-      root.appendChild(progress);
-      root.appendChild(card);
-    }
+        var cardChildren = [
+          el("span", { class: "tick-br" }),
+          el("span", { class: "tick-bl" }),
+          el("p", { class: "qz-question" }, [quiz.title ? (quiz.title + " — before you start") : "Before you start"]),
+          el("div", { class: "qz-verdict" }, [
+            el("span", { class: "qz-verdict__explain" }, ["Signed in as " + state.studentName]),
+          ]),
+        ];
 
-    function renderSummary() {
-      if (!state.finished) {
-        state.finished = true;
-        if (!state.endTime) state.endTime = new Date().toISOString();
+        var last = loadLastAttempt(quiz);
+        if (last && typeof last.score === "number" && typeof last.total === "number") {
+          var pct = last.total ? Math.round((last.score / last.total) * 100) : 0;
+          var whenLabel = last.date ? " \u00b7 " + last.date : "";
+          cardChildren.push(el("div", { class: "qz-verdict" }, [
+            el("span", { class: "qz-verdict__tag qz-verdict__tag--pass" }, ["Last attempt"]),
+            el("span", { class: "qz-verdict__explain" }, [
+              last.score + " / " + last.total + " (" + pct + "%)" + whenLabel +
+              ". Starting again will record a new attempt."
+            ]),
+          ]));
+        }
 
-        var wrongQuestions = state.answers
-          .filter(function (a) { return !a.is_correct; })
-          .map(function (a) {
-            return { question: a.question, your_answer: a.chosen, correct_answer: a.correct_answer };
-          });
+        cardChildren.push(errorMsg);
+        cardChildren.push(el("div", { class: "qz-actions" }, [beginBtn]));
 
-        var record = {
-          type: "quiz",
-          subject: quiz.subject || null,
-          lesson: quiz.lesson || null,
-          quiz_title: quiz.title || null,
-          name: state.name,
-          email: state.email || null,
-          date: isoDate(new Date(state.startTime)),
-          start_time: state.startTime,
-          end_time: state.endTime,
-          score: state.score,
-          total: quiz.questions.length,
-          wrong_questions: wrongQuestions,
-        };
-
-        queueSubmission(record);
-        saveLastAttempt(quiz, record);
-
-        // Best-effort — same fallback philosophy as the rest of the site:
-        // if the Drive bridge isn't configured or unreachable, the result
-        // still lives in localStorage via queueSubmission above.
-        postToDrive(Object.assign({ action: "upload_quiz_result" }, record)).catch(function () {});
+        var card = el("div", { class: "qz-card frame" }, cardChildren);
+        root.appendChild(card);
       }
 
-      var total = quiz.questions.length;
-      var pct = total ? Math.round((state.score / total) * 100) : 0;
-      var summary = el("div", { class: "qz-summary frame" }, [
-        el("span", { class: "tick-br" }),
-        el("span", { class: "tick-bl" }),
-        el("div", { class: "qz-summary__score" }, [state.score + " / " + total]),
-        el("div", { class: "qz-summary__label" }, [pct + "% correct \u00b7 " + state.name]),
-        el("button", { class: "qz-retry", type: "button" }, ["Try again"]),
-      ]);
-      summary.querySelector(".qz-retry").addEventListener("click", function () {
-        state.index = 0;
-        state.score = 0;
-        state.started = false;
-        state.finished = false;
-        state.startTime = null;
-        state.endTime = null;
-        render();
-      });
-      root.appendChild(summary);
-    }
+      function renderQuestion() {
+        var q = quiz.questions[state.index];
+        var answered = false;
 
-    render();
+        var progress = el("div", { class: "qz-progress" }, [
+          "Question " + (state.index + 1) + " of " + quiz.questions.length +
+          "  \u00b7  Score " + state.score + "/" + state.index,
+        ]);
+
+        var questionEl = el("p", { class: "qz-question", html: q.q });
+        var optionsWrap = el("div", { class: "qz-options" });
+        var actions = el("div", { class: "qz-actions" });
+
+        var card = el("div", { class: "qz-card frame" }, [
+          el("span", { class: "tick-br" }),
+          el("span", { class: "tick-bl" }),
+          questionEl,
+          optionsWrap,
+          actions,
+        ]);
+
+        q.options.forEach(function (opt, i) {
+          var btn = el("button", { class: "qz-option", type: "button" }, [
+            el("span", { class: "qz-option__tag" }, [String.fromCharCode(65 + i)]),
+            el("span", {}, [opt]),
+          ]);
+          btn.addEventListener("click", function () {
+            if (answered) return;
+            answered = true;
+
+            var correct = i === q.correct;
+            if (correct) state.score++;
+
+            state.answers.push({
+              question: q.q,
+              chosen: opt,
+              correct_answer: q.options[q.correct],
+              is_correct: correct,
+              chapter: (typeof q.chapter !== "undefined") ? q.chapter : null,
+            });
+
+            Array.prototype.forEach.call(optionsWrap.children, function (child, j) {
+              child.disabled = true;
+              if (j === q.correct) child.classList.add("qz-option--correct");
+              else if (j === i) child.classList.add("qz-option--incorrect");
+            });
+
+            var verdict = el("div", { class: "qz-verdict" }, [
+              el("span", { class: correct ? "qz-verdict__tag qz-verdict__tag--pass" : "qz-verdict__tag qz-verdict__tag--fail" },
+                [correct ? "Correct" : "Not quite"]),
+              q.explain ? el("span", { class: "qz-verdict__explain" }, [q.explain]) : null,
+            ]);
+            card.appendChild(verdict);
+
+            var isLast = state.index + 1 >= quiz.questions.length;
+            var nextBtn = el("button", { class: "qz-next", type: "button" }, [isLast ? "See score \u2192" : "Next \u2192"]);
+            nextBtn.addEventListener("click", function () {
+              if (isLast && !state.endTime) {
+                state.endTime = new Date().toISOString();
+              }
+              state.index++;
+              render();
+            });
+            actions.appendChild(nextBtn);
+          });
+          optionsWrap.appendChild(btn);
+        });
+
+        root.appendChild(progress);
+        root.appendChild(card);
+      }
+
+      function renderSummary() {
+        if (!state.finished) {
+          state.finished = true;
+          if (!state.endTime) state.endTime = new Date().toISOString();
+
+          // Full question list (v2 record shape), not just misses — lets
+          // grading aggregate by chapter later. wrong_questions is still
+          // sent alongside for Code.gs instances that haven't picked up
+          // the v2 handler yet.
+          var allQuestions = state.answers.map(function (a) {
+            return {
+              question: a.question,
+              your_answer: a.chosen,
+              correct_answer: a.correct_answer,
+              is_correct: a.is_correct,
+              chapter: a.chapter,
+            };
+          });
+          var wrongQuestions = state.answers
+            .filter(function (a) { return !a.is_correct; })
+            .map(function (a) {
+              return { question: a.question, your_answer: a.chosen, correct_answer: a.correct_answer };
+            });
+
+          var record = {
+            type: "quiz",
+            subject: quiz.subject || null,
+            lesson: quiz.lesson || null,
+            quiz_title: quiz.title || null,
+            student_id: state.studentId,
+            name: state.studentName,
+            email: null,
+            date: isoDate(new Date(state.startTime)),
+            start_time: state.startTime,
+            end_time: state.endTime,
+            score: state.score,
+            total: quiz.questions.length,
+            questions: allQuestions,
+            wrong_questions: wrongQuestions,
+          };
+
+          queueSubmission(record);
+          saveLastAttempt(quiz, record);
+
+          // Best-effort — same fallback philosophy as the rest of the site:
+          // if the Drive bridge isn't configured or unreachable, the result
+          // still lives in localStorage via queueSubmission above.
+          postToDrive(Object.assign({ action: "upload_quiz_result" }, record)).catch(function () {});
+        }
+
+        var total = quiz.questions.length;
+        var pct = total ? Math.round((state.score / total) * 100) : 0;
+        var summary = el("div", { class: "qz-summary frame" }, [
+          el("span", { class: "tick-br" }),
+          el("span", { class: "tick-bl" }),
+          el("div", { class: "qz-summary__score" }, [state.score + " / " + total]),
+          el("div", { class: "qz-summary__label" }, [pct + "% correct \u00b7 " + state.studentName]),
+          el("button", { class: "qz-retry", type: "button" }, ["Try again"]),
+        ]);
+        summary.querySelector(".qz-retry").addEventListener("click", function () {
+          state.index = 0;
+          state.score = 0;
+          state.started = false;
+          state.finished = false;
+          state.startTime = null;
+          state.endTime = null;
+          state.answers = [];
+          render();
+        });
+        root.appendChild(summary);
+      }
+    }
   }
 
   window.QuizEngine = { mount: mount };
