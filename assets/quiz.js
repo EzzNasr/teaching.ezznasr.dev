@@ -15,10 +15,6 @@
    and hands back { student_id, student_name }; every answer now also
    carries the question's chapter, and the full question list (not just
    misses) is what gets recorded, so results can be aggregated by chapter.
-
-   Login status/logout is no longer this file's concern — auth.js mounts
-   its own persistent corner widget site-wide, independent of whatever
-   #quiz-root does on every render() call here.
    ========================================================================== */
 
 (function () {

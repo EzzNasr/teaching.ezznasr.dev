@@ -29,6 +29,7 @@
 }
 .qz-next:hover:not(:disabled){ transform:translateY(-2px); background:var(--accent-strong); }
 .qz-next:disabled{ opacity:.55; cursor:default; transform:none; }
+.qz-next.is-loading:disabled{ opacity:1; }
 .qz-summary{ padding:36px 24px; text-align:center; }
 .qz-summary__label{ color:var(--ink-dim); font-family:var(--mono); font-size:13.5px; letter-spacing:0.04em; }
 
@@ -39,3 +40,23 @@
   cursor:pointer; padding:0; transition:color .15s ease;
 }
 .qz-authswitch:hover{ color:var(--accent-strong); }
+.qz-subtle{ color:var(--ink-dim); font-family:var(--mono); font-size:12.5px; margin:-4px 0 12px; }
+.qz-pwfield{ position:relative; }
+.qz-pwfield .qz-input{ padding-right:56px; }
+.qz-pwtoggle{
+  position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none;
+  color:var(--ink-dim); font-family:var(--mono); font-size:11px; cursor:pointer; padding:4px 6px;
+}
+.qz-pwtoggle:hover{ color:var(--accent-strong); }
+
+/* Loading ring — label fades out (button keeps its size), a ring spins
+   around the button's own edge via ::after. Used on qz-next while an
+   async check/login/register request is in flight. */
+.qz-next{ position:relative; }
+.is-loading{ color:transparent !important; pointer-events:none; }
+.is-loading::after{
+  content:""; position:absolute; inset:-4px; border-radius:inherit;
+  border:2px solid transparent; border-top-color:currentColor; border-right-color:currentColor;
+  color:var(--accent-strong); animation:qz-spin .7s linear infinite;
+}
+@keyframes qz-spin{ to{ transform:rotate(360deg); } }

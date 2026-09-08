@@ -19,16 +19,11 @@
       while signed out; once signed in, calls onReady(session) and leaves
       rootSelector alone (the caller's own engine takes over from there).
 
-   2. The global corner widget — a small "Signed in as X" pill with a
-      Log out menu, fixed to the bottom-right corner. This auto-mounts
-      itself on ANY page that simply loads this script, independent of
-      whether mount() above is used on that page at all. It renders
-      nothing when signed out — it's a status/logout affordance, never a
-      login prompt. This is what makes sign-in state visible and gives a
-      way to log out from every page on the site (lesson pages, subject
-      pages, home), not just quiz/assignment pages. Its own CSS is
-      injected by this file, so no per-page <style> block is needed —
-      just include this script tag.
+   2. The global corner widget — a small "Signed in as X" pill (or "Sign
+      in" pill when signed out) fixed to the bottom-right corner, present
+      on ANY page that loads this script. Clicking it when signed out opens
+      the same phone -> login/register flow in a floating modal. Its own
+      CSS is injected by this file — no per-page <style> block needed.
    ========================================================================== */
 
 (function () {
@@ -49,6 +44,46 @@
       if (c) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
     });
     return node;
+  }
+
+  // Toggles a button between idle and "working" — working hides the label
+  // (color made transparent, so the button doesn't resize) and shows a
+  // ring spinning around the button's own edge via ::after (see CSS).
+  // Disables the button either way so a slow network can't double-fire it.
+  function setBusy(btn, busy) {
+    btn.disabled = busy;
+    if (busy) btn.classList.add("is-loading");
+    else btn.classList.remove("is-loading");
+  }
+
+  function maskPhone(phone) {
+    var digits = String(phone || "").replace(/[^0-9]/g, "");
+    if (digits.length <= 4) return digits;
+    return "\u2022\u2022\u2022\u2022 " + digits.slice(-4);
+  }
+
+  function looksLikePhone(value) {
+    return String(value || "").replace(/[^0-9]/g, "").length >= 6;
+  }
+
+  // A password <input> plus a "Show"/"Hide" toggle, wrapped together so
+  // the toggle can be positioned inside the field. inputClass is applied
+  // to the <input> itself (callers use different class names: "qz-input"
+  // inline vs. none in the floating modal, which styles via ".aew-modal
+  // input" instead); toggleClass picks which button skin to use.
+  function passwordField(placeholder, inputClass, toggleClass) {
+    var input = el("input", {
+      class: inputClass || "", type: "password", placeholder: placeholder, required: "required",
+      autocomplete: "current-password",
+    });
+    var toggle = el("button", { class: toggleClass, type: "button", tabindex: "-1" }, ["Show"]);
+    toggle.addEventListener("click", function () {
+      var show = input.type === "password";
+      input.type = show ? "text" : "password";
+      toggle.textContent = show ? "Hide" : "Show";
+    });
+    var wrap = el("div", { class: "qz-pwfield" }, [input, toggle]);
+    return { wrap: wrap, input: input };
   }
 
   function getSession() {
@@ -122,15 +157,27 @@
     "#" + WIDGET_ID + " .aew-logout{color:var(--status-fail,#c1443b);}" +
     ".aew-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;}" +
     ".aew-modal{background:var(--panel-soft,#fff);border:1px solid var(--line,#ddd);border-radius:16px;padding:28px 26px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.28);font-family:var(--sans,sans-serif);position:relative;box-sizing:border-box;}" +
-    ".aew-modal h3{margin:0 0 16px;font-size:16px;color:var(--ink,#111);font-family:var(--sans,sans-serif);}" +
+    ".aew-modal h3{margin:0 0 4px;font-size:16px;color:var(--ink,#111);font-family:var(--sans,sans-serif);}" +
+    ".aew-modal .aew-sub{margin:0 0 16px;font-size:12.5px;color:var(--ink-dim,#888);font-family:var(--mono,monospace);}" +
     ".aew-modal .aew-field{margin-bottom:12px;}" +
     ".aew-modal input{width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid var(--line,#ddd);border-radius:9px;background:var(--panel,#fff);color:var(--ink,#111);font-size:14px;font-family:inherit;}" +
     ".aew-modal input:focus{outline:none;border-color:var(--accent,#7c5cff);}" +
+    ".aew-modal .qz-pwfield{position:relative;}" +
+    ".aew-modal .qz-pwfield input{padding-right:52px;}" +
     ".aew-modal .aew-error{color:var(--status-fail,#c1443b);font-size:12.5px;margin:2px 0 10px;min-height:1em;}" +
-    ".aew-modal .aew-primary{width:100%;padding:11px;border:none;border-radius:9px;background:var(--accent,#7c5cff);color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;}" +
-    ".aew-modal .aew-primary:disabled{opacity:.6;cursor:default;}" +
+    ".aew-modal .aew-primary{width:100%;padding:11px;border:none;border-radius:9px;background:var(--accent,#7c5cff);color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;position:relative;}" +
+    ".aew-modal .aew-primary:disabled{opacity:.85;cursor:default;}" +
     ".aew-modal .aew-link{display:block;background:none;border:none;padding:0;color:var(--ink-dim,#888);font-size:12.5px;cursor:pointer;text-decoration:underline;margin-top:12px;font-family:inherit;}" +
-    ".aew-modal .aew-close{position:absolute;top:10px;right:12px;background:none;border:none;font-size:20px;line-height:1;color:var(--ink-dim,#888);cursor:pointer;padding:4px;}";
+    ".aew-modal .aew-close{position:absolute;top:10px;right:12px;background:none;border:none;font-size:20px;line-height:1;color:var(--ink-dim,#888);cursor:pointer;padding:4px;}" +
+    ".aew-pwtoggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--ink-dim,#888);font-family:var(--mono,monospace);font-size:11px;cursor:pointer;padding:4px 6px;}" +
+    ".aew-pwtoggle:hover{color:var(--accent,#7c5cff);}" +
+    // Loading ring: label fades to transparent (keeps the button's size
+    // stable), a ring spins around the button's own edge via ::after.
+    ".is-loading{color:transparent!important;pointer-events:none;}" +
+    ".is-loading::after{content:\"\";position:absolute;inset:-4px;border-radius:inherit;" +
+    "border:2px solid transparent;border-top-color:currentColor;border-right-color:currentColor;" +
+    "color:var(--accent-strong,var(--accent,#7c5cff));animation:qz-spin .7s linear infinite;}" +
+    "@keyframes qz-spin{to{transform:rotate(360deg);}}";
 
   function injectWidgetStyle() {
     if (document.getElementById(WIDGET_STYLE_ID)) return;
@@ -150,7 +197,13 @@
   function mountGlobalWidget() {
     var existingNode = document.getElementById(WIDGET_ID);
     if (existingNode) existingNode.remove();
-    if (!document.body) return;
+    if (!document.body) {
+      // Script tag ran before <body> existed (e.g. placed in <head>
+      // without defer). Try again once the DOM is actually ready instead
+      // of silently giving up.
+      document.addEventListener("DOMContentLoaded", mountGlobalWidget, { once: true });
+      return;
+    }
 
     injectWidgetStyle();
 
@@ -191,7 +244,7 @@
       var signInBtn = el("button", { class: "aew-toggle", type: "button" }, ["Sign in"]);
       signInBtn.addEventListener("click", function (e) {
         e.stopPropagation();
-        openSignInModal();
+        openSignInModal(signInBtn);
       });
       widget = el("div", { id: WIDGET_ID }, [signInBtn]);
     }
@@ -203,22 +256,26 @@
   // modal so it can be triggered from the corner widget on ANY page
   // (subject pages, lesson pages, home) — not just quiz.html/
   // assignment.html, which still use their own inline version further
-  // below (unchanged, since that one already matches each page's own
-  // forms.css styling).
-  function openSignInModal() {
+  // below (unchanged in shape, since that one already matches each
+  // page's own forms.css styling, just sharing the same polish).
+  function openSignInModal(triggerEl) {
     if (document.getElementById("aew-overlay")) return;
     injectWidgetStyle();
 
     var phone = "";
+    var knownName = null; // filled in from check_student's response, once we have it
     var step = "phone";
+    var busy = false; // guards against a double-fire (Enter + click racing the disabled flag)
+    var previouslyFocused = triggerEl || document.activeElement;
 
-    var modal = el("div", { class: "aew-modal" });
+    var modal = el("div", { class: "aew-modal", role: "dialog", "aria-modal": "true", "aria-label": "Sign in" });
     var closeBtn = el("button", { class: "aew-close", type: "button", "aria-label": "Close" }, ["\u00d7"]);
     var overlay = el("div", { id: "aew-overlay", class: "aew-overlay" }, [modal]);
 
     function closeModal() {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       document.removeEventListener("keydown", onKeydown);
+      if (previouslyFocused && typeof previouslyFocused.focus === "function") previouslyFocused.focus();
     }
     function onKeydown(e) { if (e.key === "Escape") closeModal(); }
     document.addEventListener("keydown", onKeydown);
@@ -235,21 +292,31 @@
     }
 
     function renderPhoneStep() {
-      var input = el("input", { type: "tel", inputmode: "tel", placeholder: "Phone number" });
+      var input = el("input", { type: "tel", inputmode: "tel", placeholder: "Phone number", autocomplete: "tel" });
       var error = el("div", { class: "aew-error" });
       var btn = el("button", { class: "aew-primary", type: "button" }, ["Continue \u2192"]);
 
       function submit() {
+        if (busy) return;
         var val = input.value.trim();
-        if (!val) { error.textContent = "Enter your phone number."; return; }
+        if (!looksLikePhone(val)) {
+          error.textContent = "Enter a valid phone number.";
+          input.focus();
+          return;
+        }
         phone = val;
-        btn.disabled = true;
-        btn.textContent = "Checking\u2026";
+        busy = true;
+        setBusy(btn, true);
         postToDrive({ action: "check_student", phone: phone })
-          .then(function (data) { step = data.known ? "login" : "register"; renderStep(); })
+          .then(function (data) {
+            knownName = data.display_name || null;
+            step = data.known ? "login" : "register";
+            busy = false;
+            renderStep();
+          })
           .catch(function (err) {
-            btn.disabled = false;
-            btn.textContent = "Continue \u2192";
+            busy = false;
+            setBusy(btn, false);
             error.textContent = (err.message === "not-configured")
               ? "Login isn't set up yet \u2014 let your instructor know."
               : (err.message || "Couldn't reach the server. Try again.");
@@ -267,77 +334,96 @@
     }
 
     function renderLoginStep() {
-      var input = el("input", { type: "password", placeholder: "Password" });
+      var pw = passwordField("Password", "", "aew-pwtoggle");
       var error = el("div", { class: "aew-error" });
       var btn = el("button", { class: "aew-primary", type: "button" }, ["Log in \u2192"]);
-      var back = el("button", { class: "aew-link", type: "button" }, ["\u2190 Not you?"]);
+      var back = el("button", { class: "aew-link", type: "button" },
+        [knownName ? "\u2190 Not " + knownName + "?" : "\u2190 Wrong number?"]);
 
       back.addEventListener("click", function () { step = "phone"; renderStep(); });
 
       function submit() {
-        var pw = input.value;
-        if (!pw) { error.textContent = "Enter your password."; return; }
-        btn.disabled = true;
-        btn.textContent = "Logging in\u2026";
-        sha256Hex(pw)
+        if (busy) return;
+        var val = pw.input.value;
+        if (!val) {
+          error.textContent = "Enter your password.";
+          pw.input.focus();
+          return;
+        }
+        busy = true;
+        setBusy(btn, true);
+        sha256Hex(val)
           .then(function (hash) { return postToDrive({ action: "login_student", phone: phone, password_hash: hash }); })
           .then(function (data) {
             saveSession({ student_id: data.student_id, student_name: data.student_name });
             location.reload();
           })
           .catch(function (err) {
-            btn.disabled = false;
-            btn.textContent = "Log in \u2192";
+            busy = false;
+            setBusy(btn, false);
             error.textContent = err.message || "Couldn't log in.";
           });
       }
 
       btn.addEventListener("click", submit);
-      input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+      pw.input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
 
-      modal.appendChild(el("h3", {}, ["Welcome back"]));
-      modal.appendChild(el("div", { class: "aew-field" }, [input]));
+      modal.appendChild(el("h3", {}, [knownName ? "Welcome back, " + knownName : "Welcome back"]));
+      modal.appendChild(el("p", { class: "aew-sub" }, [maskPhone(phone)]));
+      modal.appendChild(el("div", { class: "aew-field" }, [pw.wrap]));
       modal.appendChild(error);
       modal.appendChild(btn);
       modal.appendChild(back);
-      input.focus();
+      pw.input.focus();
     }
 
     function renderRegisterStep() {
-      var nameInput = el("input", { type: "text", placeholder: "Your name" });
-      var passInput = el("input", { type: "password", placeholder: "Set a password" });
+      var nameInput = el("input", { type: "text", placeholder: "Your name", autocomplete: "name" });
+      var pw = passwordField("Set a password", "", "aew-pwtoggle");
       var error = el("div", { class: "aew-error" });
       var btn = el("button", { class: "aew-primary", type: "button" }, ["Create account \u2192"]);
-      var back = el("button", { class: "aew-link", type: "button" }, ["\u2190 Not you?"]);
+      var back = el("button", { class: "aew-link", type: "button" }, ["\u2190 Wrong number?"]);
 
       back.addEventListener("click", function () { step = "phone"; renderStep(); });
 
       function submit() {
+        if (busy) return;
         var name = nameInput.value.trim();
-        var pw = passInput.value;
-        if (!name) { error.textContent = "Enter your name."; return; }
-        if (!pw || pw.length < 4) { error.textContent = "Choose a password (4+ characters)."; return; }
-        btn.disabled = true;
-        btn.textContent = "Creating\u2026";
-        sha256Hex(pw)
-          .then(function (hash) { return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name }); })
+        var val = pw.input.value;
+        if (!name) {
+          error.textContent = "Enter your name.";
+          nameInput.focus();
+          return;
+        }
+        if (!val || val.length < 4) {
+          error.textContent = "Choose a password (4+ characters).";
+          pw.input.focus();
+          return;
+        }
+        busy = true;
+        setBusy(btn, true);
+        sha256Hex(val)
+          .then(function (hash) {
+            return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name });
+          })
           .then(function (data) {
             saveSession({ student_id: data.student_id, student_name: data.student_name });
             location.reload();
           })
           .catch(function (err) {
-            btn.disabled = false;
-            btn.textContent = "Create account \u2192";
+            busy = false;
+            setBusy(btn, false);
             error.textContent = err.message || "Couldn't create your account.";
           });
       }
 
       btn.addEventListener("click", submit);
-      passInput.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+      pw.input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
 
       modal.appendChild(el("h3", {}, ["First time here"]));
+      modal.appendChild(el("p", { class: "aew-sub" }, [maskPhone(phone)]));
       modal.appendChild(el("div", { class: "aew-field" }, [nameInput]));
-      modal.appendChild(el("div", { class: "aew-field" }, [passInput]));
+      modal.appendChild(el("div", { class: "aew-field" }, [pw.wrap]));
       modal.appendChild(error);
       modal.appendChild(btn);
       modal.appendChild(back);
@@ -377,6 +463,8 @@
 
     var step = "phone"; // "phone" | "login" | "register"
     var phone = "";
+    var knownName = null;
+    var busy = false;
 
     render();
 
@@ -389,30 +477,33 @@
 
     function renderPhoneStep() {
       var phoneInput = el("input", {
-        class: "qz-input", type: "tel", inputmode: "tel",
+        class: "qz-input", type: "tel", inputmode: "tel", autocomplete: "tel",
         placeholder: "Phone number", required: "required",
       });
       var errorMsg = el("div", { class: "qz-error" });
       var nextBtn = el("button", { class: "qz-next", type: "button" }, ["Continue \u2192"]);
 
       function submit() {
+        if (busy) return;
         var val = phoneInput.value.trim();
-        if (!val) {
-          errorMsg.textContent = "Enter your phone number.";
+        if (!looksLikePhone(val)) {
+          errorMsg.textContent = "Enter a valid phone number.";
           phoneInput.focus();
           return;
         }
         phone = val;
-        nextBtn.disabled = true;
-        nextBtn.textContent = "Checking\u2026";
+        busy = true;
+        setBusy(nextBtn, true);
         postToDrive({ action: "check_student", phone: phone })
           .then(function (data) {
+            knownName = data.display_name || null;
             step = data.known ? "login" : "register";
+            busy = false;
             render();
           })
           .catch(function (err) {
-            nextBtn.disabled = false;
-            nextBtn.textContent = "Continue \u2192";
+            busy = false;
+            setBusy(nextBtn, false);
             errorMsg.textContent = (err.message === "not-configured")
               ? "Login isn't set up on this page yet \u2014 let your instructor know."
               : (err.message || "Couldn't reach the server. Try again.");
@@ -434,23 +525,25 @@
     }
 
     function renderLoginStep() {
-      var passInput = el("input", { class: "qz-input", type: "password", placeholder: "Password", required: "required" });
+      var pw = passwordField("Password", "qz-input", "qz-pwtoggle");
       var errorMsg = el("div", { class: "qz-error" });
-      var backBtn = el("button", { class: "qz-authswitch", type: "button" }, ["\u2190 Not you?"]);
+      var backBtn = el("button", { class: "qz-authswitch", type: "button" },
+        [knownName ? "\u2190 Not " + knownName + "?" : "\u2190 Wrong number?"]);
       var loginBtn = el("button", { class: "qz-next", type: "button" }, ["Log in \u2192"]);
 
       backBtn.addEventListener("click", function () { step = "phone"; render(); });
 
       function submit() {
-        var pw = passInput.value;
-        if (!pw) {
+        if (busy) return;
+        var val = pw.input.value;
+        if (!val) {
           errorMsg.textContent = "Enter your password.";
-          passInput.focus();
+          pw.input.focus();
           return;
         }
-        loginBtn.disabled = true;
-        loginBtn.textContent = "Logging in\u2026";
-        sha256Hex(pw)
+        busy = true;
+        setBusy(loginBtn, true);
+        sha256Hex(val)
           .then(function (hash) {
             return postToDrive({ action: "login_student", phone: phone, password_hash: hash });
           })
@@ -461,20 +554,21 @@
             onReady(session);
           })
           .catch(function (err) {
-            loginBtn.disabled = false;
-            loginBtn.textContent = "Log in \u2192";
+            busy = false;
+            setBusy(loginBtn, false);
             errorMsg.textContent = err.message || "Couldn't log in.";
           });
       }
 
       loginBtn.addEventListener("click", submit);
-      passInput.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+      pw.input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
 
       var card = el("div", { class: "qz-card frame" }, [
         el("span", { class: "tick-br" }),
         el("span", { class: "tick-bl" }),
-        el("p", { class: "qz-question" }, ["Welcome back \u2014 enter your password"]),
-        el("div", { class: "qz-field" }, [passInput]),
+        el("p", { class: "qz-question" }, [knownName ? "Welcome back, " + knownName : "Welcome back"]),
+        el("p", { class: "qz-subtle" }, [maskPhone(phone)]),
+        el("div", { class: "qz-field" }, [pw.wrap]),
         errorMsg,
         el("div", { class: "qz-actions-row" }, [backBtn, loginBtn]),
       ]);
@@ -482,30 +576,31 @@
     }
 
     function renderRegisterStep() {
-      var nameInput = el("input", { class: "qz-input", type: "text", placeholder: "Your name", required: "required" });
-      var passInput = el("input", { class: "qz-input", type: "password", placeholder: "Set a password", required: "required" });
+      var nameInput = el("input", { class: "qz-input", type: "text", placeholder: "Your name", required: "required", autocomplete: "name" });
+      var pw = passwordField("Set a password", "qz-input", "qz-pwtoggle");
       var errorMsg = el("div", { class: "qz-error" });
-      var backBtn = el("button", { class: "qz-authswitch", type: "button" }, ["\u2190 Not you?"]);
+      var backBtn = el("button", { class: "qz-authswitch", type: "button" }, ["\u2190 Wrong number?"]);
       var registerBtn = el("button", { class: "qz-next", type: "button" }, ["Create account \u2192"]);
 
       backBtn.addEventListener("click", function () { step = "phone"; render(); });
 
       function submit() {
+        if (busy) return;
         var name = nameInput.value.trim();
-        var pw = passInput.value;
+        var val = pw.input.value;
         if (!name) {
           errorMsg.textContent = "Enter your name.";
           nameInput.focus();
           return;
         }
-        if (!pw || pw.length < 4) {
+        if (!val || val.length < 4) {
           errorMsg.textContent = "Choose a password (4+ characters).";
-          passInput.focus();
+          pw.input.focus();
           return;
         }
-        registerBtn.disabled = true;
-        registerBtn.textContent = "Creating\u2026";
-        sha256Hex(pw)
+        busy = true;
+        setBusy(registerBtn, true);
+        sha256Hex(val)
           .then(function (hash) {
             return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name });
           })
@@ -516,21 +611,22 @@
             onReady(session);
           })
           .catch(function (err) {
-            registerBtn.disabled = false;
-            registerBtn.textContent = "Create account \u2192";
+            busy = false;
+            setBusy(registerBtn, false);
             errorMsg.textContent = err.message || "Couldn't create your account.";
           });
       }
 
       registerBtn.addEventListener("click", submit);
-      passInput.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+      pw.input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
 
       var card = el("div", { class: "qz-card frame" }, [
         el("span", { class: "tick-br" }),
         el("span", { class: "tick-bl" }),
         el("p", { class: "qz-question" }, ["First time here \u2014 set up your account"]),
+        el("p", { class: "qz-subtle" }, [maskPhone(phone)]),
         el("div", { class: "qz-field" }, [nameInput]),
-        el("div", { class: "qz-field" }, [passInput]),
+        el("div", { class: "qz-field" }, [pw.wrap]),
         errorMsg,
         el("div", { class: "qz-actions-row" }, [backBtn, registerBtn]),
       ]);

@@ -19,10 +19,6 @@
    loaded first — see assignment.html) gates entry with phone+password and
    hands back { student_id, student_name }, which now identifies every
    submission instead.
-
-   Login status/logout is no longer this file's concern — auth.js mounts
-   its own persistent corner widget site-wide, independent of whatever
-   #assign-root does on every render() call here.
    ========================================================================== */
 
 (function () {
