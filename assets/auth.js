@@ -11,10 +11,18 @@
    "teaching_session" so a returning student on the same device/browser
    skips straight past this gate on their next quiz/assignment.
 
-   Usage: AuthEngine.mount(rootSelector, onReady). If a session already
-   exists, onReady(session) fires immediately and nothing is rendered into
-   root. Otherwise a phone -> login-or-register flow renders into root, and
-   onReady(session) fires once it succeeds.
+   Usage: AuthEngine.mount(rootSelector, onReady, barSelector).
+     - rootSelector: where the phone -> login/register flow renders while
+       signed out. Once a quiz/assignment engine takes over, that engine
+       typically wipes this container on every screen change — don't rely
+       on anything staying here after onReady() fires.
+     - onReady(session): fires once a session exists (immediately, if one
+       was already cached; after login/register succeeds, otherwise).
+     - barSelector (optional): a container that the calling engine's own
+       render loop never touches. If given, a small "Signed in as ... —
+       Log out" bar is rendered there whenever a session is active, and it
+       survives however many times the engine re-renders rootSelector.
+       Without it, there's simply no logout control rendered.
    ========================================================================== */
 
 (function () {
@@ -88,9 +96,28 @@
     });
   }
 
-  function mount(rootSelector, onReady) {
+  // Renders "Signed in as X — Log out" into barSelector. Lives outside
+  // whatever container the calling engine (quiz.js/assign.js) re-renders,
+  // so it isn't wiped out the moment the engine draws its next screen.
+  function renderLoggedInBar(barSelector, session) {
+    var bar = document.querySelector(barSelector);
+    if (!bar) return;
+    bar.innerHTML = "";
+    var logoutBtn = el("button", { class: "qz-authswitch", type: "button" }, ["Log out"]);
+    logoutBtn.addEventListener("click", function () {
+      clearSession();
+      location.reload();
+    });
+    bar.appendChild(el("div", { class: "qz-loggedinbar" }, [
+      document.createTextNode("Signed in as " + session.student_name + " \u2014 "),
+      logoutBtn,
+    ]));
+  }
+
+  function mount(rootSelector, onReady, barSelector) {
     var existing = getSession();
     if (existing) {
+      if (barSelector) renderLoggedInBar(barSelector, existing);
       onReady(existing);
       return;
     }
@@ -180,6 +207,7 @@
           .then(function (data) {
             var session = { student_id: data.student_id, student_name: data.student_name };
             saveSession(session);
+            if (barSelector) renderLoggedInBar(barSelector, session);
             onReady(session);
           })
           .catch(function (err) {
@@ -234,6 +262,7 @@
           .then(function (data) {
             var session = { student_id: data.student_id, student_name: data.student_name };
             saveSession(session);
+            if (barSelector) renderLoggedInBar(barSelector, session);
             onReady(session);
           })
           .catch(function (err) {
