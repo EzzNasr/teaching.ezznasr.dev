@@ -16,11 +16,9 @@
    carries the question's chapter, and the full question list (not just
    misses) is what gets recorded, so results can be aggregated by chapter.
 
-   Login bar: AuthEngine.mount is given '#auth-bar' as its third argument
-   below. That's a container outside #quiz-root, so the "Signed in as ... —
-   Log out" bar it renders survives every render() call in this file (which
-   wipes #quiz-root on every screen change) instead of flashing and
-   disappearing the instant the quiz starts.
+   Login status/logout is no longer this file's concern — auth.js mounts
+   its own persistent corner widget site-wide, independent of whatever
+   #quiz-root does on every render() call here.
    ========================================================================== */
 
 (function () {
@@ -115,7 +113,7 @@
 
     window.AuthEngine.mount(rootSelector, function (session) {
       startQuiz(session);
-    }, "#auth-bar");
+    });
 
     function startQuiz(session) {
       var state = {

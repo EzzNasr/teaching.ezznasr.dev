@@ -20,11 +20,9 @@
    hands back { student_id, student_name }, which now identifies every
    submission instead.
 
-   Login bar: AuthEngine.mount is given '#auth-bar' as its third argument
-   below. That's a container outside #assign-root, so the "Signed in as
-   ... — Log out" bar it renders survives every render() call in this file
-   (which wipes #assign-root on every screen change) instead of flashing
-   and disappearing the instant the assignment form mounts.
+   Login status/logout is no longer this file's concern — auth.js mounts
+   its own persistent corner widget site-wide, independent of whatever
+   #assign-root does on every render() call here.
    ========================================================================== */
 
 (function () {
@@ -114,7 +112,7 @@
 
     window.AuthEngine.mount(rootSelector, function (session) {
       startAssignment(session);
-    }, "#auth-bar");
+    });
 
     function startAssignment(session) {
       var uiMode = mode === "both" ? "url" : mode; // for "both", start on the link tab
