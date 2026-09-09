@@ -122,6 +122,7 @@
         startTime: null,
         endTime: null,
         answers: [], // { question, chosen, correct_answer, is_correct, chapter }
+        syncStatus: null, // null | "pending" | "ok" | "failed" | "not-configured"
       };
 
       render();
@@ -288,21 +289,43 @@
           queueSubmission(record);
           saveLastAttempt(quiz, record);
 
-          // Best-effort — same fallback philosophy as the rest of the site:
-          // if the Drive bridge isn't configured or unreachable, the result
-          // still lives in localStorage via queueSubmission above.
-          postToDrive(Object.assign({ action: "upload_quiz_result" }, record)).catch(function () {});
+          // Was a silent no-op catch before — the student had no way to
+          // know a result never reached the server. state.syncStatus
+          // drives the note rendered below; render() gets called again
+          // once the promise settles (safe — the `!state.finished` guard
+          // above means this whole block won't run a second time).
+          state.syncStatus = "pending";
+          postToDrive(Object.assign({ action: "upload_quiz_result" }, record))
+            .then(function () { state.syncStatus = "ok"; render(); })
+            .catch(function (err) {
+              state.syncStatus = (err && err.message === "not-configured") ? "not-configured" : "failed";
+              render();
+            });
         }
 
         var total = quiz.questions.length;
         var pct = total ? Math.round((state.score / total) * 100) : 0;
-        var summary = el("div", { class: "qz-summary frame" }, [
+        var summaryChildren = [
           el("span", { class: "tick-br" }),
           el("span", { class: "tick-bl" }),
           el("div", { class: "qz-summary__score" }, [state.score + " / " + total]),
           el("div", { class: "qz-summary__label" }, [pct + "% correct \u00b7 " + state.studentName]),
-          el("button", { class: "qz-retry", type: "button" }, ["Try again"]),
-        ]);
+        ];
+        // Matches assign.js's existing wording/tone for the same two cases,
+        // so a student sees consistent language whether it's a quiz or an
+        // assignment that didn't make it to the server.
+        if (state.syncStatus === "not-configured") {
+          summaryChildren.push(el("div", { class: "qz-error" }, [
+            "Saved on this device. Result delivery isn't fully set up yet \u2014 let your instructor know.",
+          ]));
+        } else if (state.syncStatus === "failed") {
+          summaryChildren.push(el("div", { class: "qz-error" }, [
+            "Saved on this device, but couldn't reach the server just now. It'll still be here if you check back \u2014 consider letting your instructor know just in case.",
+          ]));
+        }
+        summaryChildren.push(el("button", { class: "qz-retry", type: "button" }, ["Try again"]));
+
+        var summary = el("div", { class: "qz-summary frame" }, summaryChildren);
         summary.querySelector(".qz-retry").addEventListener("click", function () {
           state.index = 0;
           state.score = 0;
@@ -311,6 +334,7 @@
           state.startTime = null;
           state.endTime = null;
           state.answers = [];
+          state.syncStatus = null;
           render();
         });
         root.appendChild(summary);

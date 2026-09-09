@@ -2,7 +2,7 @@
    assign.js — assignment submission engine for teaching.ezznasr.dev.
 
    Reads data-subject / data-lesson / data-mode off the mount container.
-   data-mode is one of: "text" | "url" | "file" | "both".
+   data-mode is one of: "text" | "url" | "file" | "both" | "graded".
 
    Every submission is queued into localStorage ("teaching_pending_submissions",
    same bucket quiz.js uses) as a durability fallback, AND — when the Drive
@@ -19,6 +19,19 @@
    loaded first — see assignment.html) gates entry with phone+password and
    hands back { student_id, student_name }, which now identifies every
    submission instead.
+
+   Graded mode (new): a fifth submission type, alongside text/url/file/both
+   rather than replacing them. Assignment Maker writes a
+   <script type="application/json" id="assign-questions"> block into
+   assignment.html (same convention as quiz.html's #quiz-data) containing
+   { items: [...] } — each item is "mcq", "truefalse", or "match". Every
+   item renders as a question with one or more <select> dropdowns in front
+   of it (deliberately different from quiz.js's click-to-answer buttons —
+   this mirrors how these question types are usually laid out on paper: a
+   dropdown per line). Grading is entirely deterministic and happens
+   client-side the instant the student submits — no server round trip
+   needed to know the score, though the score is still POSTed up alongside
+   the answer breakdown so it shows in the Submissions sheet/dashboard.
    ========================================================================== */
 
 (function () {
@@ -93,6 +106,27 @@
     });
   }
 
+  function loadGradedQuestions() {
+    var node = document.querySelector("#assign-questions");
+    if (!node) return null;
+    try {
+      var data = JSON.parse(node.textContent);
+      return (data && Array.isArray(data.items)) ? data : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // First option is always the unanswered placeholder (value ""), so a
+  // student can't accidentally submit with a dropdown left at its default
+  // — onSubmit below checks for value === "" to catch that.
+  function buildSelect(options, placeholder) {
+    var sel = el("select", { class: "qz-select" }, [
+      el("option", { value: "" }, [placeholder || "Choose\u2026"]),
+    ].concat(options.map(function (opt) { return el("option", { value: opt }, [opt]); })));
+    return sel;
+  }
+
   function mount(rootSelector) {
     var root = document.querySelector(rootSelector);
     if (!root) return;
@@ -107,8 +141,195 @@
     }
 
     window.AuthEngine.mount(rootSelector, function (session) {
-      startAssignment(session);
+      if (mode === "graded") startGraded(session);
+      else startAssignment(session);
     });
+
+    function startGraded(session) {
+      var data = loadGradedQuestions();
+      if (!data || !data.items.length) {
+        root.innerHTML = "";
+        root.appendChild(el("div", { class: "qz-error" }, [
+          "This assignment doesn't have any graded questions configured yet.",
+        ]));
+        return;
+      }
+
+      var state = { submitted: false, score: 0, total: 0, answers: [], syncStatus: null };
+      render();
+
+      function render() {
+        root.innerHTML = "";
+        if (state.submitted) { renderResult(); return; }
+        renderForm();
+      }
+
+      function renderForm() {
+        var errorMsg = el("div", { class: "qz-error" });
+        var itemsWrap = el("div", {});
+        var entries = []; // { item, select } for mcq/truefalse, { item, rowSelects } for match
+
+        data.items.forEach(function (item) {
+          var block = el("div", { class: "qz-graded-item" }, [
+            el("p", { class: "qz-question", html: item.prompt }),
+          ]);
+
+          if (item.type === "mcq") {
+            if (item.correct.length > 1) {
+              var checks = item.options.map(function (opt) {
+                var cb = el("input", { type: "checkbox", value: opt });
+                var label = el("label", { class: "qz-graded-check" }, [cb, " " + opt]);
+                return { opt: opt, cb: cb, label: label };
+              });
+              checks.forEach(function (c) { block.appendChild(el("div", { class: "qz-graded-row" }, [c.label])); });
+              entries.push({ item: item, checks: checks });
+            } else {
+              var sel = buildSelect(item.options);
+              block.appendChild(el("div", { class: "qz-graded-row" }, [sel]));
+              entries.push({ item: item, select: sel });
+            }
+          } else if (item.type === "truefalse") {
+            var sel = buildSelect(["True", "False"]);
+            block.appendChild(el("div", { class: "qz-graded-row" }, [sel]));
+            entries.push({ item: item, select: sel });
+          } else if (item.type === "match") {
+            var rowSelects = [];
+            (item.rows || []).forEach(function (row) {
+              var rsel = buildSelect(item.options);
+              rowSelects.push(rsel);
+              block.appendChild(el("div", { class: "qz-graded-row" }, [
+                el("span", { class: "qz-graded-row__label" }, [row.label]),
+                rsel,
+              ]));
+            });
+            entries.push({ item: item, rowSelects: rowSelects });
+          }
+
+          itemsWrap.appendChild(block);
+        });
+
+        var submitBtn = el("button", { class: "qz-next", type: "button" }, ["Submit assignment \u2192"]);
+        submitBtn.addEventListener("click", function () { onSubmit(); });
+
+        function onSubmit() {
+          var incomplete = entries.some(function (e) {
+            if (e.checks) return !e.checks.some(function (c) { return c.cb.checked; });
+            return e.select ? e.select.value === "" : e.rowSelects.some(function (rs) { return rs.value === ""; });
+          });
+          if (incomplete) {
+            errorMsg.textContent = "Please answer every question before submitting.";
+            return;
+          }
+          submitBtn.disabled = true;
+          grade(entries);
+        }
+
+        var card = el("div", { class: "qz-card frame" }, [
+          el("span", { class: "tick-br" }),
+          el("span", { class: "tick-bl" }),
+          el("div", { class: "qz-verdict" }, [
+            el("span", { class: "qz-verdict__explain" }, ["Signed in as " + session.student_name]),
+          ]),
+          itemsWrap,
+          errorMsg,
+          el("div", { class: "qz-actions" }, [submitBtn]),
+        ]);
+        root.appendChild(card);
+      }
+
+      function grade(entries) {
+        var score = 0, total = 0, answers = [];
+
+        entries.forEach(function (e) {
+          var item = e.item;
+          if (item.type === "match") {
+            item.rows.forEach(function (row, i) {
+              total++;
+              var chosen = e.rowSelects[i].value;
+              var isCorrect = chosen === row.correct;
+              if (isCorrect) score++;
+              answers.push({
+                id: item.id + ":" + i, type: "match", prompt: item.prompt + " \u2014 " + row.label,
+                chosen: chosen, correct_answer: row.correct, is_correct: isCorrect,
+              });
+            });
+          } else if (item.type === "mcq" && e.checks) {
+            total++;
+            var chosenOpts = e.checks.filter(function (c) { return c.cb.checked; }).map(function (c) { return c.opt; });
+            var correctOpts = item.correct.map(function (i) { return item.options[i]; });
+            var isCorrect = chosenOpts.length === correctOpts.length &&
+              chosenOpts.slice().sort().every(function (v, i) { return v === correctOpts.slice().sort()[i]; });
+            if (isCorrect) score++;
+            answers.push({
+              id: item.id, type: "mcq", prompt: item.prompt,
+              chosen: chosenOpts.join(", "), correct_answer: correctOpts.join(", "), is_correct: isCorrect,
+            });
+          } else {
+            total++;
+            var chosen = e.select.value;
+            var correctAnswer = item.type === "truefalse" ? (item.correct ? "True" : "False") : item.options[item.correct[0]];
+            var isCorrect = chosen === correctAnswer;
+            if (isCorrect) score++;
+            answers.push({
+              id: item.id, type: item.type, prompt: item.prompt,
+              chosen: chosen, correct_answer: correctAnswer, is_correct: isCorrect,
+            });
+          }
+        });
+
+        state.score = score;
+        state.total = total;
+        state.answers = answers;
+        state.submitted = true;
+
+        var now = new Date();
+        var record = {
+          type: "assignment",
+          subject: subject,
+          lesson: lesson,
+          student_id: session.student_id,
+          name: session.student_name,
+          email: null,
+          date: isoDate(now),
+          submitted_time: now.toISOString(),
+          submission_type: "graded",
+          score: score,
+          total: total,
+          answers: answers,
+        };
+
+        queueSubmission(record);
+        state.syncStatus = "pending";
+        render();
+
+        postToDrive(Object.assign({ action: "upload_submission" }, record))
+          .then(function () { state.syncStatus = "ok"; render(); })
+          .catch(function (err) {
+            state.syncStatus = (err && err.message === "not-configured") ? "not-configured" : "failed";
+            render();
+          });
+      }
+
+      function renderResult() {
+        var pct = state.total ? Math.round((state.score / state.total) * 100) : 0;
+        var children = [
+          el("span", { class: "tick-br" }),
+          el("span", { class: "tick-bl" }),
+          el("div", { class: "qz-summary__score" }, [state.score + " / " + state.total]),
+          el("div", { class: "qz-summary__label" }, [pct + "% correct \u00b7 " + session.student_name]),
+        ];
+        if (state.syncStatus === "not-configured") {
+          children.push(el("div", { class: "qz-error" }, [
+            "Saved on this device. Result delivery isn't fully set up yet \u2014 let your instructor know.",
+          ]));
+        } else if (state.syncStatus === "failed") {
+          children.push(el("div", { class: "qz-error" }, [
+            "Saved on this device, but couldn't reach the server just now. It'll still be here if you check back \u2014 consider letting your instructor know just in case.",
+          ]));
+        }
+        root.appendChild(el("div", { class: "qz-summary frame" }, children));
+      }
+    }
 
     function startAssignment(session) {
       var uiMode = mode === "both" ? "url" : mode; // for "both", start on the link tab
