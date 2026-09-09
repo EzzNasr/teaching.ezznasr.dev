@@ -75,6 +75,20 @@
     return "\u2022\u2022\u2022\u2022 " + digits.slice(-4);
   }
 
+  // Shared checkmark-draw success content, used by both the inline gate
+  // and the floating modal so the animation/timing feels identical.
+  var SUCCESS_ANIM_MS = 1100; // must match the CSS: circle .5s + check .3s@.5s + msg .35s@.75s
+  function buildSuccessContent(name) {
+    var svg = "<svg viewBox=\"0 0 52 52\" class=\"qz-success__check\" aria-hidden=\"true\">" +
+      "<circle cx=\"26\" cy=\"26\" r=\"24\"/>" +
+      "<path d=\"M14 27l7 7 16-16\"/>" +
+      "</svg>";
+    return [
+      el("div", { class: "qz-success__badge", html: svg }),
+      el("p", { class: "qz-success__msg" }, [name ? ("Welcome, " + name + "!") : "You're signed in!"]),
+    ];
+  }
+
   function looksLikePhone(value) {
     return String(value || "").replace(/[^0-9]/g, "").length >= 6;
   }
@@ -192,7 +206,18 @@
     ".is-loading{opacity:.7;pointer-events:none;}" +
     ".qz-loadbar{margin-top:8px;height:4px;width:100%;background:var(--line,#ddd);border-radius:999px;overflow:hidden;}" +
     ".qz-loadbar__fill{height:100%;width:40%;background:var(--accent-strong,var(--accent,#7c5cff));border-radius:999px;animation:qz-loadbar-slide 1.1s ease-in-out infinite;}" +
-    "@keyframes qz-loadbar-slide{0%{transform:translateX(-100%);}50%{transform:translateX(75%);}100%{transform:translateX(220%);}}";
+    "@keyframes qz-loadbar-slide{0%{transform:translateX(-100%);}50%{transform:translateX(75%);}100%{transform:translateX(220%);}}" +
+    // Sign-in success (checkmark draw-in) — same shapes/timing as forms.css
+    // so the modal and the inline gate feel identical.
+    ".aew-modal .qz-success{padding:14px 0 6px;text-align:center;}" +
+    ".qz-success__badge{width:64px;height:64px;margin:0 auto 14px;}" +
+    ".qz-success__check{width:100%;height:100%;}" +
+    ".qz-success__check circle{stroke:var(--status-shipped,#2f9e6f);stroke-width:2;fill:none;stroke-dasharray:151;stroke-dashoffset:151;animation:qz-circle .5s ease-out forwards;}" +
+    ".qz-success__check path{stroke:var(--status-shipped,#2f9e6f);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke-dasharray:36;stroke-dashoffset:36;animation:qz-check .3s .5s ease-out forwards;}" +
+    ".qz-success__msg{font-family:var(--mono,monospace);font-size:14px;color:var(--ink,#111);margin:0;opacity:0;animation:qz-fadeup .35s .75s ease-out forwards;}" +
+    "@keyframes qz-circle{to{stroke-dashoffset:0;}}" +
+    "@keyframes qz-check{to{stroke-dashoffset:0;}}" +
+    "@keyframes qz-fadeup{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}";
 
   function injectWidgetStyle() {
     if (document.getElementById(WIDGET_STYLE_ID)) return;
@@ -306,6 +331,12 @@
       else renderPhoneStep();
     }
 
+    function showModalSuccess(name) {
+      modal.innerHTML = "";
+      modal.appendChild(closeBtn);
+      modal.appendChild(el("div", { class: "qz-success" }, buildSuccessContent(name)));
+    }
+
     function renderPhoneStep() {
       var input = el("input", { type: "tel", inputmode: "tel", placeholder: "Phone number", autocomplete: "tel" });
       var error = el("div", { class: "aew-error" });
@@ -371,7 +402,8 @@
           .then(function (hash) { return postToDrive({ action: "login_student", phone: phone, password_hash: hash }); })
           .then(function (data) {
             saveSession({ student_id: data.student_id, student_name: data.student_name });
-            location.reload();
+            showModalSuccess(data.student_name);
+            setTimeout(function () { location.reload(); }, SUCCESS_ANIM_MS);
           })
           .catch(function (err) {
             busy = false;
@@ -423,7 +455,8 @@
           })
           .then(function (data) {
             saveSession({ student_id: data.student_id, student_name: data.student_name });
-            location.reload();
+            showModalSuccess(data.student_name);
+            setTimeout(function () { location.reload(); }, SUCCESS_ANIM_MS);
           })
           .catch(function (err) {
             busy = false;
@@ -480,6 +513,16 @@
     var phone = "";
     var knownName = null;
     var busy = false;
+
+    function renderSuccessThenReady(session) {
+      root.innerHTML = "";
+      var card = el("div", { class: "qz-card frame qz-success" }, [
+        el("span", { class: "tick-br" }),
+        el("span", { class: "tick-bl" }),
+      ].concat(buildSuccessContent(session.student_name)));
+      root.appendChild(card);
+      setTimeout(function () { onReady(session); }, SUCCESS_ANIM_MS);
+    }
 
     render();
 
@@ -566,7 +609,7 @@
             var session = { student_id: data.student_id, student_name: data.student_name };
             saveSession(session);
             mountGlobalWidget();
-            onReady(session);
+            renderSuccessThenReady(session);
           })
           .catch(function (err) {
             busy = false;
@@ -623,7 +666,7 @@
             var session = { student_id: data.student_id, student_name: data.student_name };
             saveSession(session);
             mountGlobalWidget();
-            onReady(session);
+            renderSuccessThenReady(session);
           })
           .catch(function (err) {
             busy = false;
