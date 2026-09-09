@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Master Dashboard — Teaching Portal</title>
+<title>My Dashboard — Teaching Portal</title>
 <link rel="icon" href="/icons/favicon.ico">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,22 +16,22 @@
 <style>
   :root {
     color-scheme: light;
-    --bg: #f5f7fb;
-    --bg-glow: rgba(99, 102, 241, .14);
-    --surface: rgba(255, 255, 255, .86);
+    --bg: #f7f8fc;
+    --bg-glow: rgba(91, 92, 226, .11);
+    --surface: rgba(255, 255, 255, .94);
     --surface-strong: #ffffff;
-    --surface-soft: #f8f9fd;
-    --ink: #172033;
-    --ink-dim: #68738a;
-    --line: #e4e8f1;
-    --line-strong: #d7ddea;
-    --accent: #5b5ce2;
-    --accent-2: #8b5cf6;
-    --accent-soft: #eeedff;
-    --good: #159a72;
-    --low: #d04d57;
-    --shadow: 0 20px 55px rgba(30, 41, 72, .10);
-    --shadow-soft: 0 8px 24px rgba(30, 41, 72, .07);
+    --surface-soft: #f4f5fb;
+    --ink: #20263a;
+    --ink-dim: #69748c;
+    --line: #e6e9f2;
+    --line-strong: #cfd5e5;
+    --accent: #5557d9;
+    --accent-2: #7959e8;
+    --accent-soft: #eeefff;
+    --good: #138866;
+    --low: #c94b5a;
+    --shadow: 0 24px 60px rgba(52, 63, 101, .10);
+    --shadow-soft: 0 8px 24px rgba(52, 63, 101, .075);
     --sans: 'Manrope', system-ui, sans-serif;
     --mono: 'DM Mono', ui-monospace, monospace;
   }
@@ -64,13 +64,13 @@
     color: var(--ink);
     background:
       radial-gradient(circle at 12% 0%, var(--bg-glow), transparent 32rem),
-      radial-gradient(circle at 95% 18%, rgba(139, 92, 246, .08), transparent 28rem),
+      radial-gradient(circle at 95% 18%, rgba(121, 89, 232, .065), transparent 28rem),
       var(--bg);
     font-family: var(--sans);
     transition: color .25s ease, background .25s ease;
   }
 
-  .dash-shell { width: min(100% - 32px, 1180px); margin: 0 auto; padding: 34px 0 72px; }
+  .dash-shell { width: min(100% - 32px, 1040px); margin: 0 auto; padding: 34px 0 72px; }
   .dash-topbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom: 44px; }
   .dash-back { display:inline-flex; align-items:center; gap:8px; color:var(--ink-dim); font: 600 12px/1 var(--mono); text-decoration:none; letter-spacing:.01em; transition:color .2s ease, transform .2s ease; }
   .dash-back:hover { color:var(--accent); transform:translateX(-2px); }
@@ -84,33 +84,20 @@
   .dash-head { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:26px; }
   .dash-head h1 { margin:0; color:var(--ink); font:800 clamp(28px, 5vw, 42px)/1.08 var(--sans); letter-spacing:-.045em; }
   .dash-head p { margin:10px 0 0; color:var(--ink-dim); font: 13px/1.6 var(--mono); }
-  .dash-head:after { content:'MASTER PORTAL'; color:var(--accent); font:700 10px var(--mono); letter-spacing:.16em; white-space:nowrap; }
+  .dash-head:after { content:'STUDENT PORTAL'; color:var(--accent); font:700 10px var(--mono); letter-spacing:.16em; white-space:nowrap; }
 
-  .dash-stats { display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-bottom:32px; }
+  .dash-stats { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; margin-bottom:46px; }
   .dash-stat { position:relative; overflow:hidden; min-height:112px; padding:20px; border:1px solid var(--line); border-radius:18px; background:var(--surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(14px); }
   .dash-stat:after { content:''; position:absolute; width:72px; height:72px; right:-22px; bottom:-30px; border-radius:50%; background:var(--accent-soft); }
   .dash-stat b { position:relative; z-index:1; display:block; color:var(--ink); font:800 30px/1 var(--sans); letter-spacing:-.04em; }
   .dash-stat span { position:relative; z-index:1; display:block; margin-top:9px; color:var(--ink-dim); font:11px var(--mono); }
 
-  .dash-filters { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:24px; padding:16px 18px; border:1px solid var(--line); border-radius:16px; background:var(--surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(14px); }
-  .dash-filters label { display:flex; flex-direction:column; gap:5px; color:var(--ink-dim); font:600 10px var(--mono); letter-spacing:.04em; }
-  .dash-select, .dash-search { border:1px solid var(--line-strong); border-radius:9px; padding:8px 10px; color:var(--ink); background:var(--surface-strong); font:13px var(--sans); min-width:150px; }
-  .dash-select:focus, .dash-search:focus { outline:2px solid color-mix(in srgb, var(--accent) 35%, transparent); outline-offset:1px; }
-  .dash-search { min-width:220px; }
-  .dash-clear { align-self:flex-end; border:1px solid var(--line-strong); border-radius:9px; padding:8px 12px; color:var(--ink-dim); background:var(--surface-soft); font:600 11px var(--mono); cursor:pointer; }
-  .dash-clear:hover { color:var(--accent); border-color:var(--accent); }
-
-  .dash-section { margin-bottom:28px; padding:22px 24px; border:1px solid var(--line); border-radius:20px; background:var(--surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(14px); }
+  .dash-section { margin-bottom:34px; padding:22px 24px; border:1px solid var(--line); border-radius:20px; background:var(--surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(14px); }
   .dash-section h2 { display:flex; align-items:center; gap:10px; margin:0 0 8px; padding:0 0 15px; border-bottom:1px solid var(--line); color:var(--ink); font:800 16px var(--sans); letter-spacing:-.02em; }
   .dash-section h2:before { content:''; width:8px; height:8px; border-radius:3px; background:linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow:0 0 0 5px var(--accent-soft); }
-  .dash-section-note { margin:-4px 0 14px; color:var(--ink-dim); font:11px var(--mono); }
   .dash-empty { padding:20px 0 6px; color:var(--ink-dim); font:13px/1.6 var(--mono); }
-
   .dash-row { display:flex; align-items:center; gap:16px; min-height:66px; padding:14px 2px; border-bottom:1px solid var(--line); }
   .dash-row:last-child { border-bottom:0; }
-  .dash-row.is-clickable { cursor:pointer; border-radius:10px; transition:background .15s ease; }
-  .dash-row.is-clickable:hover { background:var(--surface-soft); }
-  .dash-row.is-selected { background:var(--accent-soft); }
   .dash-row-main { flex:1; min-width:0; }
   .dash-row-title { overflow:hidden; color:var(--ink); font:700 14px var(--sans); text-overflow:ellipsis; white-space:nowrap; }
   .dash-row-sub { margin-top:5px; overflow:hidden; color:var(--ink-dim); font:11px var(--mono); text-overflow:ellipsis; white-space:nowrap; }
@@ -133,22 +120,30 @@
   .qz-next { border:0; border-radius:10px; padding:11px 15px; color:#fff; background:var(--accent); font:700 12px var(--mono); cursor:pointer; box-shadow:var(--shadow-soft); }
   .qz-next:hover { filter:brightness(1.08); }
 
-  .dash-rank { flex-shrink:0; width:26px; color:var(--ink-dim); font:700 13px var(--mono); text-align:center; }
-  .dash-missed-q { overflow:hidden; color:var(--ink); font:600 13px/1.4 var(--sans); text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
 
-  @media (max-width: 900px) {
-    .dash-stats { grid-template-columns:repeat(2, 1fr); }
+  html:not([data-theme="dark"]) .dash-stat,
+  html:not([data-theme="dark"]) .dash-section,
+  html:not([data-theme="dark"]) .theme-toggle {
+    border-color: rgba(207, 213, 229, .82);
+    box-shadow: 0 10px 28px rgba(67, 77, 112, .065), 0 2px 5px rgba(67, 77, 112, .035);
   }
+  html:not([data-theme="dark"]) .dash-stat {
+    background: linear-gradient(145deg, rgba(255, 255, 255, .98), rgba(248, 249, 253, .92));
+  }
+  html:not([data-theme="dark"]) .dash-section {
+    background: rgba(255, 255, 255, .9);
+  }
+  html:not([data-theme="dark"]) .dash-stat:after {
+    background: linear-gradient(135deg, rgba(238, 239, 255, .95), rgba(239, 232, 255, .78));
+  }
+
   @media (max-width: 640px) {
-    .dash-shell { width:min(100% - 24px, 1180px); padding-top:20px; }
+    .dash-shell { width:min(100% - 24px, 1040px); padding-top:20px; }
     .dash-topbar { margin-bottom:34px; }
     .dash-head { display:block; }
     .dash-head:after { display:block; margin-top:18px; }
-    .dash-stats { grid-template-columns:1fr; gap:10px; margin-bottom:24px; }
+    .dash-stats { grid-template-columns:1fr; gap:10px; margin-bottom:28px; }
     .dash-stat { min-height:0; padding:16px; }
-    .dash-filters { flex-direction:column; align-items:stretch; }
-    .dash-select, .dash-search { min-width:0; width:100%; }
-    .dash-clear { align-self:stretch; }
     .dash-section { padding:18px 16px; border-radius:16px; }
     .dash-row { align-items:flex-start; gap:10px; }
     .dash-score { min-width:72px; padding-top:2px; font-size:11px; }
@@ -175,7 +170,7 @@
 <script>
 (function () {
   "use strict";
-  var key = "master-dashboard-theme";
+  var key = "student-dashboard-theme";
   var root = document.documentElement;
   var button = document.getElementById("themeToggle");
   var saved = null;
@@ -204,7 +199,18 @@
 (function () {
   "use strict";
 
-  // -- Small helpers (same conventions as student.html) -------------------
+  function fmtPct(score, total) {
+    if (!total) return "\u2014";
+    return Math.round((score / total) * 100) + "%";
+  }
+
+  function scoreClass(score, total) {
+    if (!total) return "is-mid";
+    var pct = score / total;
+    if (pct >= 0.8) return "is-good";
+    if (pct >= 0.5) return "is-mid";
+    return "is-low";
+  }
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
@@ -220,27 +226,12 @@
     return node;
   }
 
-  function fmtPct(score, total) {
-    if (!total) return "\u2014";
-    return Math.round((score / total) * 100) + "%";
-  }
-
-  function scoreClass(score, total) {
-    if (!total) return "is-mid";
-    var pct = score / total;
-    if (pct >= 0.8) return "is-good";
-    if (pct >= 0.5) return "is-mid";
-    return "is-low";
-  }
-
   function isTruthyFlag(v) {
     return v === true || String(v).toUpperCase() === "TRUE";
   }
 
-  function normalizePhone(s) {
-    return String(s || "").replace(/[^0-9]/g, "");
-  }
-
+  // Sheet rows come back oldest-first (appendRow order) — newest attempt
+  // first is more useful for a student glancing at their own history.
   function newestFirst(rows) {
     return (rows || []).slice().reverse();
   }
@@ -254,14 +245,9 @@
     }
   }
 
-  function maskPhone(phone) {
-    var digits = normalizePhone(phone);
-    if (digits.length <= 4) return digits;
-    return "\u2022\u2022\u2022\u2022 " + digits.slice(-4);
-  }
-
-  // -- Aggregation (all client-side, over whatever's currently filtered) --
-
+  // Chapter aggregation across every attempt this student has ever taken.
+  // Defensive about the answer-field name since the field has gone by
+  // "chosen" (v1) and "your_answer" (v2 record shape) at different points.
   function aggregateChapters(quizRows) {
     var byChapter = {};
     quizRows.forEach(function (row) {
@@ -269,7 +255,9 @@
         var chapter = q.chapter || "Unlabeled";
         if (!byChapter[chapter]) byChapter[chapter] = { correct: 0, total: 0 };
         byChapter[chapter].total += 1;
-        if (isTruthyFlag(q.is_correct)) byChapter[chapter].correct += 1;
+        if (q.is_correct === true || String(q.is_correct).toUpperCase() === "TRUE") {
+          byChapter[chapter].correct += 1;
+        }
       });
     });
     return Object.keys(byChapter)
@@ -277,206 +265,59 @@
         var c = byChapter[chapter];
         return { chapter: chapter, correct: c.correct, total: c.total, pct: c.total ? c.correct / c.total : 0 };
       })
+      // Weakest chapters first — that's the useful ordering for a student
+      // deciding what to review.
       .sort(function (a, b) { return a.pct - b.pct; });
   }
 
-  // Keyed on lesson + exact question text (per the master plan's decision
-  // #3) so identical wording in two different lessons is never merged.
-  function aggregateMostMissed(quizRows) {
-    var byKey = {};
-    quizRows.forEach(function (row) {
-      parseQuestions(row).forEach(function (q) {
-        var key = (row.lesson || "") + "||" + (q.question || "");
-        if (!byKey[key]) {
-          byKey[key] = { question: q.question || "(untitled question)", lesson: row.lesson || "", subject: row.subject || "", wrong: 0, total: 0 };
-        }
-        byKey[key].total += 1;
-        if (!isTruthyFlag(q.is_correct)) byKey[key].wrong += 1;
-      });
-    });
-    return Object.keys(byKey)
-      .map(function (k) { return byKey[k]; })
-      .filter(function (x) { return x.wrong > 0; })
-      .sort(function (a, b) { return b.wrong - a.wrong; })
-      .slice(0, 15);
-  }
-
-  function buildRoster(students, quizRows, subRows) {
-    return (students || []).map(function (s) {
-      var digits = normalizePhone(s.phone);
-      var sq = quizRows.filter(function (r) { return normalizePhone(r.student_id) === digits; });
-      var ss = subRows.filter(function (r) { return normalizePhone(r.student_id) === digits; });
-      var totalScore = 0, totalMax = 0;
-      sq.forEach(function (r) { totalScore += Number(r.score) || 0; totalMax += Number(r.total) || 0; });
-      return {
-        phone: s.phone,
-        digits: digits,
-        display_name: s.display_name || digits,
-        created_at: s.created_at,
-        quizzes: sq.length,
-        avgPct: totalMax ? Math.round((totalScore / totalMax) * 100) + "%" : "\u2014",
-        submissions: ss.length,
-      };
-    }).sort(function (a, b) { return String(a.display_name).localeCompare(String(b.display_name)); });
-  }
-
-  function distinctSubjects(quizRows, subRows) {
-    var set = {};
-    quizRows.forEach(function (r) { if (r.subject) set[r.subject] = true; });
-    subRows.forEach(function (r) { if (r.subject) set[r.subject] = true; });
-    return Object.keys(set).sort();
-  }
-
-  // -- App state ------------------------------------------------------------
-
-  var STATE = {
-    students: [],
-    quizRows: [],
-    subRows: [],
-    filterPhone: "",   // "" = all students
-    filterSubject: "", // "" = all subjects
-    search: "",         // matched against lesson / quiz_title / question text
-  };
-
-  function matchesSearch(text) {
-    if (!STATE.search) return true;
-    return String(text || "").toLowerCase().indexOf(STATE.search.toLowerCase()) !== -1;
-  }
-
-  function getFilteredQuiz() {
-    return STATE.quizRows.filter(function (r) {
-      if (STATE.filterPhone && normalizePhone(r.student_id) !== STATE.filterPhone) return false;
-      if (STATE.filterSubject && r.subject !== STATE.filterSubject) return false;
-      if (STATE.search && !(matchesSearch(r.quiz_title) || matchesSearch(r.lesson) || matchesSearch(r.name))) return false;
-      return true;
-    });
-  }
-
-  function getFilteredSubs() {
-    return STATE.subRows.filter(function (r) {
-      if (STATE.filterPhone && normalizePhone(r.student_id) !== STATE.filterPhone) return false;
-      if (STATE.filterSubject && r.subject !== STATE.filterSubject) return false;
-      if (STATE.search && !(matchesSearch(r.lesson) || matchesSearch(r.name) || matchesSearch(r.text))) return false;
-      return true;
-    });
-  }
-
-  // -- Rendering ------------------------------------------------------------
-
-  function renderOverviewStats() {
+  function renderStats(quizRows, subRows) {
+    var attempted = quizRows.length;
     var totalScore = 0, totalMax = 0;
-    STATE.quizRows.forEach(function (r) { totalScore += Number(r.score) || 0; totalMax += Number(r.total) || 0; });
+    quizRows.forEach(function (r) {
+      totalScore += Number(r.score) || 0;
+      totalMax += Number(r.total) || 0;
+    });
     var avgPct = totalMax ? Math.round((totalScore / totalMax) * 100) + "%" : "\u2014";
-    return el("div", { class: "dash-stats" }, [
-      el("div", { class: "dash-stat" }, [el("b", {}, [String(STATE.students.length)]), el("span", {}, ["Students"])]),
-      el("div", { class: "dash-stat" }, [el("b", {}, [String(STATE.quizRows.length)]), el("span", {}, ["Quiz attempts (all-time)"])]),
-      el("div", { class: "dash-stat" }, [el("b", {}, [avgPct]), el("span", {}, ["Average score (all-time)"])]),
-      el("div", { class: "dash-stat" }, [el("b", {}, [String(STATE.subRows.length)]), el("span", {}, ["Submissions (all-time)"])]),
+
+    var stats = el("div", { class: "dash-stats" }, [
+      el("div", { class: "dash-stat" }, [el("b", {}, [String(attempted)]), el("span", {}, ["Quizzes taken"])]),
+      el("div", { class: "dash-stat" }, [el("b", {}, [avgPct]), el("span", {}, ["Average score"])]),
+      el("div", { class: "dash-stat" }, [el("b", {}, [String(subRows.length)]), el("span", {}, ["Assignments submitted"])]),
     ]);
+    return stats;
   }
 
-  function renderFilters(onChange) {
-    var roster = buildRoster(STATE.students, STATE.quizRows, STATE.subRows);
-    var subjects = distinctSubjects(STATE.quizRows, STATE.subRows);
-
-    var studentSelect = el("select", { class: "dash-select" }, [el("option", { value: "" }, ["All students"])]);
-    roster.forEach(function (r) {
-      var opt = el("option", { value: r.digits }, [r.display_name]);
-      if (r.digits === STATE.filterPhone) opt.setAttribute("selected", "selected");
-      studentSelect.appendChild(opt);
-    });
-    studentSelect.addEventListener("change", function () { STATE.filterPhone = studentSelect.value; onChange(); });
-
-    var subjectSelect = el("select", { class: "dash-select" }, [el("option", { value: "" }, ["All subjects"])]);
-    subjects.forEach(function (s) {
-      var opt = el("option", { value: s }, [s]);
-      if (s === STATE.filterSubject) opt.setAttribute("selected", "selected");
-      subjectSelect.appendChild(opt);
-    });
-    subjectSelect.addEventListener("change", function () { STATE.filterSubject = subjectSelect.value; onChange(); });
-
-    var searchInput = el("input", { class: "dash-search", type: "search", placeholder: "Search lesson, quiz, question\u2026" });
-    searchInput.value = STATE.search;
-    searchInput.addEventListener("input", function () { STATE.search = searchInput.value; onChange(); });
-
-    var clearBtn = el("button", { class: "dash-clear", type: "button" }, ["Clear filters"]);
-    clearBtn.addEventListener("click", function () {
-      STATE.filterPhone = ""; STATE.filterSubject = ""; STATE.search = "";
-      onChange();
-    });
-
-    return el("div", { class: "dash-filters" }, [
-      el("label", {}, ["Student", studentSelect]),
-      el("label", {}, ["Subject", subjectSelect]),
-      el("label", {}, ["Search", searchInput]),
-      clearBtn,
-    ]);
-  }
-
-  function renderRoster(onChange) {
-    var roster = buildRoster(STATE.students, STATE.quizRows, STATE.subRows);
-    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Roster"])]);
-    if (!roster.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, ["No registered students yet."]));
+  function renderQuizSection(quizRows) {
+    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Quiz history"])]);
+    if (!quizRows.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, ["No quizzes taken yet \u2014 they'll show up here as soon as you finish one."]));
       return section;
     }
-    roster.forEach(function (r) {
-      var rowClass = "dash-row is-clickable" + (STATE.filterPhone === r.digits ? " is-selected" : "");
-      var row = el("div", { class: rowClass }, [
+    newestFirst(quizRows).forEach(function (r) {
+      var score = Number(r.score) || 0, total = Number(r.total) || 0;
+      var row = el("div", { class: "dash-row" }, [
         el("div", { class: "dash-row-main" }, [
-          el("div", { class: "dash-row-title" }, [r.display_name]),
-          el("div", { class: "dash-row-sub" }, [maskPhone(r.phone) + (r.created_at ? " \u00b7 joined " + r.created_at : "")]),
+          el("div", { class: "dash-row-title" }, [r.quiz_title || r.lesson || "Quiz"]),
+          el("div", { class: "dash-row-sub" }, [(r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.date ? " \u00b7 " + r.date : "")]),
         ]),
-        el("div", { class: "dash-badge" }, [r.quizzes + " quiz" + (r.quizzes === 1 ? "" : "zes")]),
-        el("div", { class: "dash-score " + (r.avgPct === "\u2014" ? "is-mid" : "") }, [r.avgPct]),
-        el("div", { class: "dash-badge" }, [r.submissions + " sub" + (r.submissions === 1 ? "" : "s")]),
+        el("div", { class: "dash-score " + scoreClass(score, total) }, [score + "/" + total + " (" + fmtPct(score, total) + ")"]),
       ]);
-      row.addEventListener("click", function () {
-        STATE.filterPhone = (STATE.filterPhone === r.digits) ? "" : r.digits;
-        onChange();
-      });
       section.appendChild(row);
     });
     return section;
   }
 
-  function renderMostMissed(quizRows) {
-    var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, ["Most missed questions"]),
-      el("div", { class: "dash-section-note" }, ["Ranked by wrong-answer count \u2014 respects the filters above."]),
-    ]);
-    var ranked = aggregateMostMissed(quizRows);
-    if (!ranked.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, ["No missed questions in the current view."]));
-      return section;
-    }
-    ranked.forEach(function (q, i) {
-      section.appendChild(el("div", { class: "dash-row" }, [
-        el("div", { class: "dash-rank" }, [String(i + 1)]),
-        el("div", { class: "dash-row-main" }, [
-          el("div", { class: "dash-missed-q" }, [q.question]),
-          el("div", { class: "dash-row-sub" }, [(q.subject || "") + (q.lesson ? " \u00b7 " + q.lesson : "")]),
-        ]),
-        el("div", { class: "dash-score is-low" }, [q.wrong + "/" + q.total + " missed"]),
-      ]));
-    });
-    return section;
-  }
-
   function renderChapterSection(quizRows) {
-    var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, ["By chapter"]),
-      el("div", { class: "dash-section-note" }, ["Aggregated across the current view."]),
-    ]);
+    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["By chapter"])]);
     var chapters = aggregateChapters(quizRows);
     if (!chapters.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, ["No chapter-tagged questions in the current view."]));
+      section.appendChild(el("div", { class: "dash-empty" }, ["No chapter-tagged questions yet."]));
       return section;
     }
     chapters.forEach(function (c) {
       var pctLabel = Math.round(c.pct * 100) + "%";
       var barClass = c.pct >= 0.8 ? "is-good" : (c.pct < 0.5 ? "is-low" : "");
-      section.appendChild(el("div", { class: "dash-chapter" }, [
+      var wrap = el("div", { class: "dash-chapter" }, [
         el("div", { class: "dash-chapter-top" }, [
           el("b", {}, [c.chapter]),
           document.createTextNode(c.correct + "/" + c.total + " \u00b7 " + pctLabel),
@@ -484,39 +325,21 @@
         el("div", { class: "dash-bar" }, [
           el("div", { class: "dash-bar-fill " + barClass, style: "width:" + Math.max(3, Math.round(c.pct * 100)) + "%" }),
         ]),
-      ]));
-    });
-    return section;
-  }
-
-  function renderQuizSection(quizRows) {
-    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Quiz attempts"])]);
-    if (!quizRows.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, ["No quiz attempts match the current filters."]));
-      return section;
-    }
-    newestFirst(quizRows).forEach(function (r) {
-      var score = Number(r.score) || 0, total = Number(r.total) || 0;
-      section.appendChild(el("div", { class: "dash-row" }, [
-        el("div", { class: "dash-row-main" }, [
-          el("div", { class: "dash-row-title" }, [(r.name || "Unknown") + " \u2014 " + (r.quiz_title || r.lesson || "Quiz")]),
-          el("div", { class: "dash-row-sub" }, [(r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.date ? " \u00b7 " + r.date : "")]),
-        ]),
-        el("div", { class: "dash-score " + scoreClass(score, total) }, [score + "/" + total + " (" + fmtPct(score, total) + ")"]),
-      ]));
+      ]);
+      section.appendChild(wrap);
     });
     return section;
   }
 
   function renderSubmissionsSection(subRows) {
-    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Submissions"])]);
+    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Assignments submitted"])]);
     if (!subRows.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, ["No submissions match the current filters."]));
+      section.appendChild(el("div", { class: "dash-empty" }, ["No assignments submitted yet."]));
       return section;
     }
     newestFirst(subRows).forEach(function (r) {
       var main = el("div", { class: "dash-row-main" }, [
-        el("div", { class: "dash-row-title" }, [(r.name || "Unknown") + " \u2014 " + (r.lesson || "Assignment")]),
+        el("div", { class: "dash-row-title" }, [(r.lesson || "Assignment")]),
         el("div", { class: "dash-row-sub" }, [(r.subject || "") + (r.date ? " \u00b7 " + r.date : "")]),
       ]);
       if (r.submission_type === "text" && r.text) {
@@ -535,43 +358,22 @@
     return section;
   }
 
-  function renderDashboard(session) {
+  function renderDashboard(session, data) {
     var root = document.getElementById("dashboard");
     root.innerHTML = "";
     root.hidden = false;
 
     root.appendChild(el("div", { class: "dash-head" }, [
       el("div", {}, [
-        el("h1", {}, ["Master dashboard"]),
-        el("p", {}, ["Signed in as " + (session.student_name || "admin") + " \u2014 every student's quiz history and submissions."]),
+        el("h1", {}, ["Hey, " + (session.student_name || "there")]),
+        el("p", {}, ["Your quiz history and submissions, all in one place."]),
       ]),
     ]));
 
-    root.appendChild(renderOverviewStats());
-
-    var below = el("div", {}, []);
-    root.appendChild(el("div", { id: "dash-filters-slot" }, []));
-    root.appendChild(below);
-
-    function rerenderFiltered() {
-      var filteredQuiz = getFilteredQuiz();
-      var filteredSubs = getFilteredSubs();
-      below.innerHTML = "";
-      below.appendChild(renderMostMissed(filteredQuiz));
-      below.appendChild(renderChapterSection(filteredQuiz));
-      below.appendChild(renderQuizSection(filteredQuiz));
-      below.appendChild(renderSubmissionsSection(filteredSubs));
-    }
-
-    function rerenderAll() {
-      var slot = document.getElementById("dash-filters-slot");
-      slot.innerHTML = "";
-      slot.appendChild(renderRoster(rerenderAll));
-      slot.appendChild(renderFilters(rerenderFiltered));
-      rerenderFiltered();
-    }
-
-    rerenderAll();
+    root.appendChild(renderStats(data.quiz_results || [], data.submissions || []));
+    root.appendChild(renderQuizSection(data.quiz_results || []));
+    root.appendChild(renderChapterSection(data.quiz_results || []));
+    root.appendChild(renderSubmissionsSection(data.submissions || []));
   }
 
   function renderError(message) {
@@ -602,7 +404,7 @@
     var root = document.getElementById("dashboard");
     root.innerHTML = "";
     root.hidden = false;
-    root.appendChild(el("div", { class: "dash-empty", style: "padding-top:0;" }, ["Loading the master dashboard\u2026"]));
+    root.appendChild(el("div", { class: "dash-empty", style: "padding-top:0;" }, ["Loading your dashboard\u2026"]));
     root.appendChild(el("div", { class: "dash-loadbar" }, [el("div", { class: "dash-loadbar-fill" })]));
   }
 
@@ -613,19 +415,10 @@
       return;
     }
     renderLoading();
-    window.AuthEngine.adminGetAll(session)
-      .then(function (data) {
-        STATE.students = data.students || [];
-        STATE.quizRows = data.quiz_results || [];
-        STATE.subRows = data.submissions || [];
-        renderDashboard(session);
-      })
+    window.AuthEngine.getMyResults(session)
+      .then(function (data) { renderDashboard(session, data); })
       .catch(function (err) {
-        var msg = (err && err.message) || "Couldn't load the master dashboard. Try refreshing.";
-        if (msg === "Not authorized.") {
-          msg = "This account is signed in, but doesn't have admin access. Set is_admin = TRUE on this row in the Students sheet to use this dashboard.";
-        }
-        renderError(msg);
+        renderError(err.message || "Couldn't load your dashboard. Try refreshing.");
       });
   });
 })();

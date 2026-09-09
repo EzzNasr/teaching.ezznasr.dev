@@ -464,6 +464,12 @@
 
     function renderRegisterStep() {
       var nameInput = el("input", { type: "text", placeholder: "Your name", autocomplete: "name" });
+      var yearSelect = el("select", {}, [
+        el("option", { value: "", disabled: "disabled", selected: "selected" }, ["Which year are you in?"]),
+        el("option", { value: "Senior 1" }, ["Senior 1"]),
+        el("option", { value: "Senior 2" }, ["Senior 2"]),
+      ]);
+      var parentPhoneInput = el("input", { type: "tel", inputmode: "tel", placeholder: "Parent's phone number", autocomplete: "tel" });
       var pw = passwordField("Set a password", "", "aew-pwtoggle");
       var error = el("div", { class: "aew-error" });
       var btn = el("button", { class: "aew-primary", type: "button" }, ["Create account \u2192"]);
@@ -474,10 +480,22 @@
       function submit() {
         if (busy) return;
         var name = nameInput.value.trim();
+        var year = yearSelect.value;
+        var parentPhone = parentPhoneInput.value.trim();
         var val = pw.input.value;
         if (!name) {
           error.textContent = "Enter your name.";
           nameInput.focus();
+          return;
+        }
+        if (!year) {
+          error.textContent = "Choose your year.";
+          yearSelect.focus();
+          return;
+        }
+        if (!looksLikePhone(parentPhone)) {
+          error.textContent = "Enter a valid parent's phone number.";
+          parentPhoneInput.focus();
           return;
         }
         if (!val || val.length < 4) {
@@ -489,7 +507,7 @@
         setBusy(btn, true);
         sha256Hex(val)
           .then(function (hash) {
-            return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name });
+            return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name, year: year, parent_phone: parentPhone });
           })
           .then(function (data) {
             saveSession({ student_id: data.student_id, student_name: data.student_name, session_token: data.session_token });
@@ -509,6 +527,8 @@
       modal.appendChild(el("h3", {}, ["First time here"]));
       modal.appendChild(el("p", { class: "aew-sub" }, [maskPhone(phone)]));
       modal.appendChild(el("div", { class: "aew-field" }, [nameInput]));
+      modal.appendChild(el("div", { class: "aew-field" }, [yearSelect]));
+      modal.appendChild(el("div", { class: "aew-field" }, [parentPhoneInput]));
       modal.appendChild(el("div", { class: "aew-field" }, [pw.wrap]));
       modal.appendChild(error);
       modal.appendChild(btn);
@@ -673,6 +693,12 @@
 
     function renderRegisterStep() {
       var nameInput = el("input", { class: "qz-input", type: "text", placeholder: "Your name", required: "required", autocomplete: "name" });
+      var yearSelect = el("select", { class: "qz-input", required: "required" }, [
+        el("option", { value: "", disabled: "disabled", selected: "selected" }, ["Which year are you in?"]),
+        el("option", { value: "Senior 1" }, ["Senior 1"]),
+        el("option", { value: "Senior 2" }, ["Senior 2"]),
+      ]);
+      var parentPhoneInput = el("input", { class: "qz-input", type: "tel", inputmode: "tel", placeholder: "Parent's phone number", required: "required", autocomplete: "tel" });
       var pw = passwordField("Set a password", "qz-input", "qz-pwtoggle");
       var errorMsg = el("div", { class: "qz-error" });
       var backBtn = el("button", { class: "qz-authswitch", type: "button" }, ["\u2190 Wrong number?"]);
@@ -683,10 +709,22 @@
       function submit() {
         if (busy) return;
         var name = nameInput.value.trim();
+        var year = yearSelect.value;
+        var parentPhone = parentPhoneInput.value.trim();
         var val = pw.input.value;
         if (!name) {
           errorMsg.textContent = "Enter your name.";
           nameInput.focus();
+          return;
+        }
+        if (!year) {
+          errorMsg.textContent = "Choose your year.";
+          yearSelect.focus();
+          return;
+        }
+        if (!looksLikePhone(parentPhone)) {
+          errorMsg.textContent = "Enter a valid parent's phone number.";
+          parentPhoneInput.focus();
           return;
         }
         if (!val || val.length < 4) {
@@ -698,7 +736,7 @@
         setBusy(registerBtn, true);
         sha256Hex(val)
           .then(function (hash) {
-            return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name });
+            return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name, year: year, parent_phone: parentPhone });
           })
           .then(function (data) {
             var session = { student_id: data.student_id, student_name: data.student_name, session_token: data.session_token };
@@ -722,6 +760,8 @@
         el("p", { class: "qz-question" }, ["First time here \u2014 set up your account"]),
         el("p", { class: "qz-subtle" }, [maskPhone(phone)]),
         el("div", { class: "qz-field" }, [nameInput]),
+        el("div", { class: "qz-field" }, [yearSelect]),
+        el("div", { class: "qz-field" }, [parentPhoneInput]),
         el("div", { class: "qz-field" }, [pw.wrap]),
         errorMsg,
         el("div", { class: "qz-actions-row" }, [backBtn, registerBtn]),
