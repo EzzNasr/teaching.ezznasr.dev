@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Dashboard — Teaching Portal</title>
+<link rel="icon" href="/icons/favicon.ico">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/theme.css">
+<link rel="stylesheet" href="/assets/base.css">
+<link rel="stylesheet" href="/assets/forms.css">
+<script src="/assets/theme.js" defer></script>
+<style>
+  /* Dashboard-specific layout only — everything else (fonts, colors,
+     .frame/.tick-br/.tick-bl corner motif, .qz-card, form controls) comes
+     from theme.css/base.css/forms.css, same as every other page. Scoped
+     under "dash-" so nothing here can collide with those. */
+
+  .dash-shell {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 96px 20px 80px;
+  }
+
+  .dash-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+
+  .dash-head h1 {
+    font-family: var(--sans, sans-serif);
+    font-size: 28px;
+    font-weight: 800;
+    margin: 0;
+    color: var(--ink, #111);
+  }
+
+  .dash-head p {
+    font-family: var(--mono, monospace);
+    font-size: 12.5px;
+    color: var(--ink-dim, #888);
+    margin: 4px 0 0;
+  }
+
+  .dash-back {
+    font-family: var(--mono, monospace);
+    font-size: 12.5px;
+    color: var(--ink-dim, #888);
+    text-decoration: none;
+  }
+  .dash-back:hover { color: var(--accent, #7c5cff); }
+
+  .dash-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 36px;
+  }
+
+  .dash-stat {
+    position: relative;
+    background: var(--panel-soft, #f2f2f2);
+    border: 1px solid var(--line, #ddd);
+    border-radius: 14px;
+    padding: 16px 18px;
+  }
+
+  .dash-stat b {
+    display: block;
+    font-family: var(--sans, sans-serif);
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--ink, #111);
+    line-height: 1.1;
+  }
+
+  .dash-stat span {
+    display: block;
+    font-family: var(--mono, monospace);
+    font-size: 11.5px;
+    color: var(--ink-dim, #888);
+    margin-top: 4px;
+  }
+
+  .dash-section {
+    margin-bottom: 40px;
+  }
+
+  .dash-section h2 {
+    font-family: var(--sans, sans-serif);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink, #111);
+    margin: 0 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line, #ddd);
+  }
+
+  .dash-empty {
+    font-family: var(--mono, monospace);
+    font-size: 13px;
+    color: var(--ink-dim, #888);
+    padding: 18px 0;
+  }
+
+  /* Quiz attempt rows */
+  .dash-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 4px;
+    border-bottom: 1px solid var(--line, #eee);
+  }
+  .dash-row:last-child { border-bottom: none; }
+
+  .dash-row-main { flex: 1; min-width: 0; }
+
+  .dash-row-title {
+    font-family: var(--sans, sans-serif);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink, #111);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dash-row-sub {
+    font-family: var(--mono, monospace);
+    font-size: 11.5px;
+    color: var(--ink-dim, #888);
+    margin-top: 2px;
+  }
+
+  .dash-score {
+    font-family: var(--mono, monospace);
+    font-size: 13px;
+    font-weight: 600;
+    flex-shrink: 0;
+    min-width: 64px;
+    text-align: right;
+  }
+  .dash-score.is-good { color: var(--status-shipped, #2f9e6f); }
+  .dash-score.is-mid { color: var(--ink, #111); }
+  .dash-score.is-low { color: var(--status-fail, #c1443b); }
+
+  .dash-badge {
+    font-family: var(--mono, monospace);
+    font-size: 10.5px;
+    letter-spacing: .02em;
+    color: var(--ink-dim, #888);
+    border: 1px solid var(--line, #ddd);
+    border-radius: 5px;
+    padding: 2px 6px;
+    flex-shrink: 0;
+  }
+
+  .dash-link {
+    font-family: var(--mono, monospace);
+    font-size: 12px;
+    color: var(--accent, #7c5cff);
+    text-decoration: none;
+    flex-shrink: 0;
+  }
+  .dash-link:hover { text-decoration: underline; }
+
+  /* Chapter accuracy bars */
+  .dash-chapter { padding: 10px 4px; }
+  .dash-chapter-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--mono, monospace);
+    font-size: 12.5px;
+    color: var(--ink, #111);
+    margin-bottom: 6px;
+  }
+  .dash-chapter-top b { font-family: var(--sans, sans-serif); font-weight: 600; }
+  .dash-bar {
+    height: 7px;
+    border-radius: 999px;
+    background: var(--line, #ddd);
+    overflow: hidden;
+  }
+  .dash-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--accent, #7c5cff);
+  }
+  .dash-bar-fill.is-low { background: var(--status-fail, #c1443b); }
+  .dash-bar-fill.is-good { background: var(--status-shipped, #2f9e6f); }
+
+  .dash-sub-text {
+    font-family: var(--sans, sans-serif);
+    font-size: 13px;
+    color: var(--ink, #111);
+    margin-top: 6px;
+    white-space: pre-wrap;
+    max-height: 4.5em;
+    overflow: hidden;
+  }
+
+  .dash-err {
+    font-family: var(--mono, monospace);
+    font-size: 13px;
+    color: var(--status-fail, #c1443b);
+    padding: 14px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="dash-shell">
+  <a class="dash-back" href="/">&larr; Back to teaching.ezznasr.dev</a>
+
+  <div id="authgate" style="margin-top:20px;"></div>
+  <div id="dashboard" hidden></div>
+</div>
+
+<script src="/assets/auth.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  function fmtPct(score, total) {
+    if (!total) return "\u2014";
+    return Math.round((score / total) * 100) + "%";
+  }
+
+  function scoreClass(score, total) {
+    if (!total) return "is-mid";
+    var pct = score / total;
+    if (pct >= 0.8) return "is-good";
+    if (pct >= 0.5) return "is-mid";
+    return "is-low";
+  }
+
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === "class") node.className = attrs[k];
+      else if (k === "html") node.innerHTML = attrs[k];
+      else node.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) {
+      if (c) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    });
+    return node;
+  }
+
+  function isTruthyFlag(v) {
+    return v === true || String(v).toUpperCase() === "TRUE";
+  }
+
+  // Sheet rows come back oldest-first (appendRow order) — newest attempt
+  // first is more useful for a student glancing at their own history.
+  function newestFirst(rows) {
+    return (rows || []).slice().reverse();
+  }
+
+  function parseQuestions(row) {
+    try {
+      var parsed = JSON.parse(row.questions_json || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Chapter aggregation across every attempt this student has ever taken.
+  // Defensive about the answer-field name since the field has gone by
+  // "chosen" (v1) and "your_answer" (v2 record shape) at different points.
+  function aggregateChapters(quizRows) {
+    var byChapter = {};
+    quizRows.forEach(function (row) {
+      parseQuestions(row).forEach(function (q) {
+        var chapter = q.chapter || "Unlabeled";
+        if (!byChapter[chapter]) byChapter[chapter] = { correct: 0, total: 0 };
+        byChapter[chapter].total += 1;
+        if (q.is_correct === true || String(q.is_correct).toUpperCase() === "TRUE") {
+          byChapter[chapter].correct += 1;
+        }
+      });
+    });
+    return Object.keys(byChapter)
+      .map(function (chapter) {
+        var c = byChapter[chapter];
+        return { chapter: chapter, correct: c.correct, total: c.total, pct: c.total ? c.correct / c.total : 0 };
+      })
+      // Weakest chapters first — that's the useful ordering for a student
+      // deciding what to review.
+      .sort(function (a, b) { return a.pct - b.pct; });
+  }
+
+  function renderStats(quizRows, subRows) {
+    var attempted = quizRows.length;
+    var totalScore = 0, totalMax = 0;
+    quizRows.forEach(function (r) {
+      totalScore += Number(r.score) || 0;
+      totalMax += Number(r.total) || 0;
+    });
+    var avgPct = totalMax ? Math.round((totalScore / totalMax) * 100) + "%" : "\u2014";
+
+    var stats = el("div", { class: "dash-stats" }, [
+      el("div", { class: "dash-stat" }, [el("b", {}, [String(attempted)]), el("span", {}, ["Quizzes taken"])]),
+      el("div", { class: "dash-stat" }, [el("b", {}, [avgPct]), el("span", {}, ["Average score"])]),
+      el("div", { class: "dash-stat" }, [el("b", {}, [String(subRows.length)]), el("span", {}, ["Assignments submitted"])]),
+    ]);
+    return stats;
+  }
+
+  function renderQuizSection(quizRows) {
+    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Quiz history"])]);
+    if (!quizRows.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, ["No quizzes taken yet \u2014 they'll show up here as soon as you finish one."]));
+      return section;
+    }
+    newestFirst(quizRows).forEach(function (r) {
+      var score = Number(r.score) || 0, total = Number(r.total) || 0;
+      var row = el("div", { class: "dash-row" }, [
+        el("div", { class: "dash-row-main" }, [
+          el("div", { class: "dash-row-title" }, [r.quiz_title || r.lesson || "Quiz"]),
+          el("div", { class: "dash-row-sub" }, [(r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.date ? " \u00b7 " + r.date : "")]),
+        ]),
+        el("div", { class: "dash-score " + scoreClass(score, total) }, [score + "/" + total + " (" + fmtPct(score, total) + ")"]),
+      ]);
+      section.appendChild(row);
+    });
+    return section;
+  }
+
+  function renderChapterSection(quizRows) {
+    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["By chapter"])]);
+    var chapters = aggregateChapters(quizRows);
+    if (!chapters.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, ["No chapter-tagged questions yet."]));
+      return section;
+    }
+    chapters.forEach(function (c) {
+      var pctLabel = Math.round(c.pct * 100) + "%";
+      var barClass = c.pct >= 0.8 ? "is-good" : (c.pct < 0.5 ? "is-low" : "");
+      var wrap = el("div", { class: "dash-chapter" }, [
+        el("div", { class: "dash-chapter-top" }, [
+          el("b", {}, [c.chapter]),
+          document.createTextNode(c.correct + "/" + c.total + " \u00b7 " + pctLabel),
+        ]),
+        el("div", { class: "dash-bar" }, [
+          el("div", { class: "dash-bar-fill " + barClass, style: "width:" + Math.max(3, Math.round(c.pct * 100)) + "%" }),
+        ]),
+      ]);
+      section.appendChild(wrap);
+    });
+    return section;
+  }
+
+  function renderSubmissionsSection(subRows) {
+    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Assignments submitted"])]);
+    if (!subRows.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, ["No assignments submitted yet."]));
+      return section;
+    }
+    newestFirst(subRows).forEach(function (r) {
+      var main = el("div", { class: "dash-row-main" }, [
+        el("div", { class: "dash-row-title" }, [(r.lesson || "Assignment")]),
+        el("div", { class: "dash-row-sub" }, [(r.subject || "") + (r.date ? " \u00b7 " + r.date : "")]),
+      ]);
+      if (r.submission_type === "text" && r.text) {
+        var truncNote = isTruthyFlag(r.text_truncated) ? " (preview only \u2014 full text saved)" : "";
+        main.appendChild(el("div", { class: "dash-sub-text" }, [r.text + truncNote]));
+      }
+      var row = el("div", { class: "dash-row" }, [main, el("div", { class: "dash-badge" }, [r.submission_type || ""])]);
+      if (r.submission_type === "url" && r.url) {
+        row.insertBefore(el("a", { class: "dash-link", href: r.url, target: "_blank", rel: "noopener" }, ["Open link"]), row.lastChild);
+      }
+      if (r.submission_type === "file" && r.file_id) {
+        row.insertBefore(el("a", { class: "dash-link", href: "https://drive.google.com/file/d/" + r.file_id + "/view", target: "_blank", rel: "noopener" }, ["Open file"]), row.lastChild);
+      }
+      section.appendChild(row);
+    });
+    return section;
+  }
+
+  function renderDashboard(session, data) {
+    var root = document.getElementById("dashboard");
+    root.innerHTML = "";
+    root.hidden = false;
+
+    root.appendChild(el("div", { class: "dash-head" }, [
+      el("div", {}, [
+        el("h1", {}, ["Hey, " + (session.student_name || "there")]),
+        el("p", {}, ["Your quiz history and submissions, all in one place."]),
+      ]),
+    ]));
+
+    root.appendChild(renderStats(data.quiz_results || [], data.submissions || []));
+    root.appendChild(renderQuizSection(data.quiz_results || []));
+    root.appendChild(renderChapterSection(data.quiz_results || []));
+    root.appendChild(renderSubmissionsSection(data.submissions || []));
+  }
+
+  function renderError(message) {
+    var root = document.getElementById("dashboard");
+    root.innerHTML = "";
+    root.hidden = false;
+    root.appendChild(el("div", { class: "dash-err" }, [message]));
+  }
+
+  window.AuthEngine.mount("#authgate", function (session) {
+    document.getElementById("authgate").remove();
+    window.AuthEngine.getMyResults(session)
+      .then(function (data) { renderDashboard(session, data); })
+      .catch(function (err) {
+        renderError(err.message || "Couldn't load your dashboard. Try refreshing.");
+      });
+  });
+})();
+</script>
+</body>
+</html>
