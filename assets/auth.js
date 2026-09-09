@@ -7,9 +7,12 @@
    SHA-256 hash of it does (crypto.subtle.digest). The server just compares
    hashes; it never sees the plaintext.
 
-   Session — { student_id, student_name } — is cached in localStorage under
-   "teaching_session" so a returning student on the same device/browser
-   skips straight past this gate on their next quiz/assignment.
+   Session — { student_id, student_name, session_token } — is cached in
+   localStorage under "teaching_session" so a returning student on the
+   same device/browser skips straight past this gate on their next
+   quiz/assignment. session_token is what proves a "give me my data" call
+   (dashboards) actually came from that student having logged in, since
+   student_id alone is just their phone number's digits — not a secret.
 
    Two independent things happen here:
 
@@ -164,6 +167,39 @@
     });
   }
 
+  // -- Dashboard data calls -----------------------------------------------
+  // Thin wrappers around postToDrive so hand-built dashboard pages never
+  // need to know DRIVE_ENDPOINT themselves — they just call
+  // AuthEngine.getMyResults(session) with whatever AuthEngine.getSession()
+  // gave them. Session shape is { student_id, student_name, session_token }.
+
+  function requireSession(session) {
+    if (!session || !session.student_id || !session.session_token) {
+      return Promise.reject(new Error("Not signed in."));
+    }
+    return null;
+  }
+
+  function getMyResults(session) {
+    var missing = requireSession(session);
+    if (missing) return missing;
+    return postToDrive({
+      action: "get_my_results",
+      student_id: session.student_id,
+      session_token: session.session_token,
+    });
+  }
+
+  function adminGetAll(session) {
+    var missing = requireSession(session);
+    if (missing) return missing;
+    return postToDrive({
+      action: "admin_get_all",
+      student_id: session.student_id,
+      session_token: session.session_token,
+    });
+  }
+
   // -- Global corner widget ---------------------------------------------
 
   var WIDGET_ID = "auth-engine-widget";
@@ -251,11 +287,13 @@
     var widget;
 
     if (session) {
+      var dashboardBtn = el("button", { class: "aew-menu-item", type: "button" }, ["My dashboard"]);
+      dashboardBtn.addEventListener("click", function () {
+        location.href = "/dashboard/student.html";
+      });
+
       var menu = el("div", { class: "aew-menu" }, [
-        el("button", { class: "aew-menu-item", type: "button", disabled: "disabled" }, [
-          document.createTextNode("Student dashboard"),
-          el("span", { class: "aew-soon" }, ["Soon"]),
-        ]),
+        dashboardBtn,
         el("button", { class: "aew-menu-item aew-logout", type: "button" }, ["Log out"]),
       ]);
 
@@ -401,7 +439,7 @@
         sha256Hex(val)
           .then(function (hash) { return postToDrive({ action: "login_student", phone: phone, password_hash: hash }); })
           .then(function (data) {
-            saveSession({ student_id: data.student_id, student_name: data.student_name });
+            saveSession({ student_id: data.student_id, student_name: data.student_name, session_token: data.session_token });
             showModalSuccess(data.student_name);
             setTimeout(function () { location.reload(); }, SUCCESS_ANIM_MS);
           })
@@ -454,7 +492,7 @@
             return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name });
           })
           .then(function (data) {
-            saveSession({ student_id: data.student_id, student_name: data.student_name });
+            saveSession({ student_id: data.student_id, student_name: data.student_name, session_token: data.session_token });
             showModalSuccess(data.student_name);
             setTimeout(function () { location.reload(); }, SUCCESS_ANIM_MS);
           })
@@ -606,7 +644,7 @@
             return postToDrive({ action: "login_student", phone: phone, password_hash: hash });
           })
           .then(function (data) {
-            var session = { student_id: data.student_id, student_name: data.student_name };
+            var session = { student_id: data.student_id, student_name: data.student_name, session_token: data.session_token };
             saveSession(session);
             mountGlobalWidget();
             renderSuccessThenReady(session);
@@ -663,7 +701,7 @@
             return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name });
           })
           .then(function (data) {
-            var session = { student_id: data.student_id, student_name: data.student_name };
+            var session = { student_id: data.student_id, student_name: data.student_name, session_token: data.session_token };
             saveSession(session);
             mountGlobalWidget();
             renderSuccessThenReady(session);
@@ -692,5 +730,11 @@
     }
   }
 
-  window.AuthEngine = { mount: mount, getSession: getSession, clearSession: clearSession };
+  window.AuthEngine = {
+    mount: mount,
+    getSession: getSession,
+    clearSession: clearSession,
+    getMyResults: getMyResults,
+    adminGetAll: adminGetAll,
+  };
 })();
