@@ -413,8 +413,29 @@
     root.appendChild(el("div", { class: "dash-err" }, [message]));
   }
 
+  function renderNeedsRelogin() {
+    var root = document.getElementById("dashboard");
+    root.innerHTML = "";
+    root.hidden = false;
+    var btn = el("button", { class: "qz-next", type: "button" }, ["Log out & sign in again \u2192"]);
+    btn.addEventListener("click", function () {
+      window.AuthEngine.clearSession();
+      location.reload();
+    });
+    root.appendChild(el("div", { class: "dash-err" }, [
+      "Your saved sign-in is missing a session token \u2014 this happens once, for anyone " +
+      "who logged in before the dashboard system existed. Log in again to fix it (your " +
+      "phone/password stay the same, this just refreshes your session)."
+    ]));
+    root.appendChild(btn);
+  }
+
   window.AuthEngine.mount("#authgate", function (session) {
     document.getElementById("authgate").remove();
+    if (!session.session_token) {
+      renderNeedsRelogin();
+      return;
+    }
     window.AuthEngine.getMyResults(session)
       .then(function (data) { renderDashboard(session, data); })
       .catch(function (err) {
