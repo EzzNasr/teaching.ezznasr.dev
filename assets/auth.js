@@ -46,14 +46,27 @@
     return node;
   }
 
-  // Toggles a button between idle and "working" — working hides the label
-  // (color made transparent, so the button doesn't resize) and shows a
-  // ring spinning around the button's own edge via ::after (see CSS).
-  // Disables the button either way so a slow network can't double-fire it.
+  // Toggles a button between idle and "working" — working dims the button
+  // (kept visible, just disabled-looking) and inserts a real progress-bar
+  // element right after it in the DOM. This is a plain sibling, not a
+  // positioned ::after — it can't detach from the button and render
+  // somewhere else on the page, unlike the old ring approach.
   function setBusy(btn, busy) {
     btn.disabled = busy;
-    if (busy) btn.classList.add("is-loading");
-    else btn.classList.remove("is-loading");
+    if (busy) {
+      btn.classList.add("is-loading");
+      if (!btn._qzLoadbar) {
+        var bar = el("div", { class: "qz-loadbar" }, [el("div", { class: "qz-loadbar__fill" })]);
+        btn.insertAdjacentElement("afterend", bar);
+        btn._qzLoadbar = bar;
+      }
+    } else {
+      btn.classList.remove("is-loading");
+      if (btn._qzLoadbar) {
+        btn._qzLoadbar.remove();
+        btn._qzLoadbar = null;
+      }
+    }
   }
 
   function maskPhone(phone) {
@@ -171,19 +184,15 @@
     ".aew-modal .aew-close{position:absolute;top:10px;right:12px;background:none;border:none;font-size:20px;line-height:1;color:var(--ink-dim,#888);cursor:pointer;padding:4px;}" +
     ".aew-pwtoggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--ink-dim,#888);font-family:var(--mono,monospace);font-size:11px;cursor:pointer;padding:4px 6px;}" +
     ".aew-pwtoggle:hover{color:var(--accent,#7c5cff);}" +
-    // Loading ring: label fades to transparent (keeps the button's size
-    // stable), a ring spins around the button's own edge via ::after.
-    // position:relative lives on .is-loading itself so the ring's
-    // containing block is guaranteed no matter which button gets the
-    // class — previously it depended on .aew-primary/.qz-next each
-    // separately declaring position:relative, and any gap there let
-    // ::after fall back to the viewport, rendering as a giant rotating
-    // line across the whole page instead of a ring around the button.
-    ".is-loading{position:relative!important;color:transparent!important;pointer-events:none;}" +
-    ".is-loading::after{content:\"\";position:absolute;top:-4px;right:-4px;bottom:-4px;left:-4px;border-radius:inherit;" +
-    "border:2px solid transparent;border-top-color:currentColor;border-right-color:currentColor;" +
-    "color:var(--accent-strong,var(--accent,#7c5cff));animation:qz-spin .7s linear infinite;}" +
-    "@keyframes qz-spin{to{transform:rotate(360deg);}}";
+    // Loading indicator: a real block-level bar inserted after the button
+    // (see setBusy() below), not a positioned ::after ring — a normal
+    // sibling in document flow has no position/inset to break, so it
+    // can't fall back to the viewport and render as a giant line the way
+    // the ring did.
+    ".is-loading{opacity:.7;pointer-events:none;}" +
+    ".qz-loadbar{margin-top:8px;height:4px;width:100%;background:var(--line,#ddd);border-radius:999px;overflow:hidden;}" +
+    ".qz-loadbar__fill{height:100%;width:40%;background:var(--accent-strong,var(--accent,#7c5cff));border-radius:999px;animation:qz-loadbar-slide 1.1s ease-in-out infinite;}" +
+    "@keyframes qz-loadbar-slide{0%{transform:translateX(-100%);}50%{transform:translateX(75%);}100%{transform:translateX(220%);}}";
 
   function injectWidgetStyle() {
     if (document.getElementById(WIDGET_STYLE_ID)) return;

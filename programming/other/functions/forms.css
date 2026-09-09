@@ -49,19 +49,19 @@
 }
 .qz-pwtoggle:hover{ color:var(--accent-strong); }
 
-/* Loading ring — label fades out (button keeps its size), a ring spins
-   around the button's own edge via ::after. Used on qz-next while an
-   async check/login/register request is in flight.
-   position:relative lives on .is-loading itself (not on .qz-next), so the
-   ring's containing block is guaranteed regardless of which button class
-   gets it or what other CSS is loaded — a stale/missing position:relative
-   on the button class previously let ::after fall back to the viewport as
-   its containing block, rendering as a giant rotating line across the
-   whole page instead of a ring around the button. */
-.is-loading{ position:relative !important; color:transparent !important; pointer-events:none; }
-.is-loading::after{
-  content:""; position:absolute; top:-4px; right:-4px; bottom:-4px; left:-4px; border-radius:inherit;
-  border:2px solid transparent; border-top-color:currentColor; border-right-color:currentColor;
-  color:var(--accent-strong); animation:qz-spin .7s linear infinite;
+/* Loading indicator — a real block-level bar inserted right after the
+   button (see setBusy() in auth.js), NOT a positioned ::after ring. The
+   ::after ring approach depended on the button having a reliable
+   containing block; when that broke (stale CSS, a button class that
+   never got position:relative, etc.) the ring rendered as a giant
+   rotating line across the whole page instead of wrapping the button.
+   A normal sibling element in document flow can't do that — it has no
+   position/inset to get wrong. */
+.is-loading{ opacity:.7; pointer-events:none; }
+.qz-loadbar{ margin-top:8px; height:4px; width:100%; background:var(--line); border-radius:999px; overflow:hidden; }
+.qz-loadbar__fill{ height:100%; width:40%; background:var(--accent-strong); border-radius:999px; animation:qz-loadbar-slide 1.1s ease-in-out infinite; }
+@keyframes qz-loadbar-slide{
+  0%{ transform:translateX(-100%); }
+  50%{ transform:translateX(75%); }
+  100%{ transform:translateX(220%); }
 }
-@keyframes qz-spin{ to{ transform:rotate(360deg); } }
