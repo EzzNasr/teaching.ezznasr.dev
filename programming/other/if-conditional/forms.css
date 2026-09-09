@@ -51,11 +51,16 @@
 
 /* Loading ring — label fades out (button keeps its size), a ring spins
    around the button's own edge via ::after. Used on qz-next while an
-   async check/login/register request is in flight. */
-.qz-next{ position:relative; }
-.is-loading{ color:transparent !important; pointer-events:none; }
+   async check/login/register request is in flight.
+   position:relative lives on .is-loading itself (not on .qz-next), so the
+   ring's containing block is guaranteed regardless of which button class
+   gets it or what other CSS is loaded — a stale/missing position:relative
+   on the button class previously let ::after fall back to the viewport as
+   its containing block, rendering as a giant rotating line across the
+   whole page instead of a ring around the button. */
+.is-loading{ position:relative !important; color:transparent !important; pointer-events:none; }
 .is-loading::after{
-  content:""; position:absolute; inset:-4px; border-radius:inherit;
+  content:""; position:absolute; top:-4px; right:-4px; bottom:-4px; left:-4px; border-radius:inherit;
   border:2px solid transparent; border-top-color:currentColor; border-right-color:currentColor;
   color:var(--accent-strong); animation:qz-spin .7s linear infinite;
 }

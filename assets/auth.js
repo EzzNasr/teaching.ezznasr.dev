@@ -173,8 +173,14 @@
     ".aew-pwtoggle:hover{color:var(--accent,#7c5cff);}" +
     // Loading ring: label fades to transparent (keeps the button's size
     // stable), a ring spins around the button's own edge via ::after.
-    ".is-loading{color:transparent!important;pointer-events:none;}" +
-    ".is-loading::after{content:\"\";position:absolute;inset:-4px;border-radius:inherit;" +
+    // position:relative lives on .is-loading itself so the ring's
+    // containing block is guaranteed no matter which button gets the
+    // class — previously it depended on .aew-primary/.qz-next each
+    // separately declaring position:relative, and any gap there let
+    // ::after fall back to the viewport, rendering as a giant rotating
+    // line across the whole page instead of a ring around the button.
+    ".is-loading{position:relative!important;color:transparent!important;pointer-events:none;}" +
+    ".is-loading::after{content:\"\";position:absolute;top:-4px;right:-4px;bottom:-4px;left:-4px;border-radius:inherit;" +
     "border:2px solid transparent;border-top-color:currentColor;border-right-color:currentColor;" +
     "color:var(--accent-strong,var(--accent,#7c5cff));animation:qz-spin .7s linear infinite;}" +
     "@keyframes qz-spin{to{transform:rotate(360deg);}}";
