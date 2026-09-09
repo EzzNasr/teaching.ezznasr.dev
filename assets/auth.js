@@ -439,7 +439,7 @@
         sha256Hex(val)
           .then(function (hash) { return postToDrive({ action: "login_student", phone: phone, password_hash: hash }); })
           .then(function (data) {
-            saveSession({ student_id: data.student_id, student_name: data.student_name, session_token: data.session_token });
+            saveSession({ student_id: data.student_id, student_name: data.student_name, session_token: data.session_token, year: data.year || "", parent_phone: data.parent_phone || "" });
             showModalSuccess(data.student_name);
             setTimeout(function () { location.reload(); }, SUCCESS_ANIM_MS);
           })
@@ -510,7 +510,7 @@
             return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name, year: year, parent_phone: parentPhone });
           })
           .then(function (data) {
-            saveSession({ student_id: data.student_id, student_name: data.student_name, session_token: data.session_token });
+            saveSession({ student_id: data.student_id, student_name: data.student_name, session_token: data.session_token, year: data.year || "", parent_phone: data.parent_phone || "" });
             showModalSuccess(data.student_name);
             setTimeout(function () { location.reload(); }, SUCCESS_ANIM_MS);
           })
@@ -559,18 +559,26 @@
 
   function mount(rootSelector, onReady) {
     var existing = getSession();
-    if (existing) {
+    var root = document.querySelector(rootSelector);
+    if (!root) return;
+
+    // A cached session with both fields already on file skips the gate
+    // entirely, same as before — zero extra network calls for the common
+    // case. Missing either one (old account, or one that only ever went
+    // through the corner-widget flow before it collected these) routes
+    // straight to the completeProfile step below instead of onReady —
+    // no password re-entry needed, the existing session_token is already
+    // proof enough, it just needs these two fields filled in once.
+    if (existing && existing.year && existing.parent_phone) {
       onReady(existing);
       return;
     }
 
-    var root = document.querySelector(rootSelector);
-    if (!root) return;
-
-    var step = "phone"; // "phone" | "login" | "register"
+    var step = existing ? "completeProfile" : "phone"; // "phone" | "login" | "register" | "completeProfile"
     var phone = "";
     var knownName = null;
     var busy = false;
+    var sessionForProfile = existing || null;
 
     function renderSuccessThenReady(session) {
       root.innerHTML = "";
@@ -582,13 +590,94 @@
       setTimeout(function () { onReady(session); }, SUCCESS_ANIM_MS);
     }
 
+    // Shared by both the login and register submit handlers: saves the
+    // session, then either continues straight to the success screen (the
+    // common case), or — if year/parent_phone are still missing on this
+    // account — routes to completeProfile before onReady ever fires.
+    function proceedAfterAuth(data) {
+      var session = {
+        student_id: data.student_id, student_name: data.student_name, session_token: data.session_token,
+        year: data.year || "", parent_phone: data.parent_phone || "",
+      };
+      saveSession(session);
+      mountGlobalWidget();
+      if (!session.year || !session.parent_phone) {
+        sessionForProfile = session;
+        step = "completeProfile";
+        render();
+        return;
+      }
+      renderSuccessThenReady(session);
+    }
+
     render();
 
     function render() {
       root.innerHTML = "";
-      if (step === "login") renderLoginStep();
+      if (step === "completeProfile") renderCompleteProfileStep(sessionForProfile);
+      else if (step === "login") renderLoginStep();
       else if (step === "register") renderRegisterStep();
       else renderPhoneStep();
+    }
+
+    function renderCompleteProfileStep(session) {
+      var yearSelect = el("select", { class: "qz-input", required: "required" }, [
+        el("option", { value: "" }, ["Which year are you in?"]),
+        el("option", { value: "Senior 1" }, ["Senior 1"]),
+        el("option", { value: "Senior 2" }, ["Senior 2"]),
+      ]);
+      if (session.year) yearSelect.value = session.year;
+      var parentPhoneInput = el("input", {
+        class: "qz-input", type: "tel", inputmode: "tel", autocomplete: "tel",
+        placeholder: "Parent's phone number", required: "required",
+      });
+      if (session.parent_phone) parentPhoneInput.value = session.parent_phone;
+      var errorMsg = el("div", { class: "qz-error" });
+      var submitBtn = el("button", { class: "qz-next", type: "button" }, ["Save & continue \u2192"]);
+
+      function submit() {
+        if (busy) return;
+        var year = yearSelect.value;
+        var parentPhone = parentPhoneInput.value.trim();
+        if (!year) {
+          errorMsg.textContent = "Choose your year.";
+          yearSelect.focus();
+          return;
+        }
+        if (!looksLikePhone(parentPhone)) {
+          errorMsg.textContent = "Enter a valid parent's phone number.";
+          parentPhoneInput.focus();
+          return;
+        }
+        busy = true;
+        setBusy(submitBtn, true);
+        postToDrive({ action: "update_profile", student_id: session.student_id, session_token: session.session_token, year: year, parent_phone: parentPhone })
+          .then(function () {
+            session.year = year;
+            session.parent_phone = parentPhone;
+            saveSession(session);
+            onReady(session);
+          })
+          .catch(function (err) {
+            busy = false;
+            setBusy(submitBtn, false);
+            errorMsg.textContent = err.message || "Couldn't save \u2014 try again.";
+          });
+      }
+
+      submitBtn.addEventListener("click", submit);
+
+      var card = el("div", { class: "qz-card frame" }, [
+        el("span", { class: "tick-br" }),
+        el("span", { class: "tick-bl" }),
+        el("p", { class: "qz-question" }, ["A couple of details we still need"]),
+        el("p", { class: "qz-subtle" }, ["Signed in as " + session.student_name]),
+        el("div", { class: "qz-field" }, [yearSelect]),
+        el("div", { class: "qz-field" }, [parentPhoneInput]),
+        errorMsg,
+        el("div", { class: "qz-actions" }, [submitBtn]),
+      ]);
+      root.appendChild(card);
     }
 
     function renderPhoneStep() {
@@ -664,10 +753,7 @@
             return postToDrive({ action: "login_student", phone: phone, password_hash: hash });
           })
           .then(function (data) {
-            var session = { student_id: data.student_id, student_name: data.student_name, session_token: data.session_token };
-            saveSession(session);
-            mountGlobalWidget();
-            renderSuccessThenReady(session);
+            proceedAfterAuth(data);
           })
           .catch(function (err) {
             busy = false;
@@ -739,10 +825,7 @@
             return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name, year: year, parent_phone: parentPhone });
           })
           .then(function (data) {
-            var session = { student_id: data.student_id, student_name: data.student_name, session_token: data.session_token };
-            saveSession(session);
-            mountGlobalWidget();
-            renderSuccessThenReady(session);
+            proceedAfterAuth(data);
           })
           .catch(function (err) {
             busy = false;
