@@ -253,7 +253,23 @@
     ".qz-success__msg{font-family:var(--mono,monospace);font-size:14px;color:var(--ink,#111);margin:0;opacity:0;animation:qz-fadeup .35s .75s ease-out forwards;}" +
     "@keyframes qz-circle{to{stroke-dashoffset:0;}}" +
     "@keyframes qz-check{to{stroke-dashoffset:0;}}" +
-    "@keyframes qz-fadeup{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}";
+    "@keyframes qz-fadeup{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}" +
+    // Custom select chrome — a bare <select> ignores qz-input/modal input
+    // theming entirely (background, radius, and especially the OS-drawn
+    // arrow), which is what made the year dropdown look untouched next to
+    // the styled fields around it. This can't restyle the native open
+    // popup list (that's OS chrome, no CSS reaches it), only the closed
+    // control — but that's the part that actually looked out of place.
+    ".qz-select,.aew-modal select{appearance:none;-webkit-appearance:none;-moz-appearance:none;cursor:pointer;background-repeat:no-repeat;background-position:right 14px center;background-size:11px 7px;padding-right:38px !important;background-image:url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 12 8\"><path d=\"M1 1l5 5 5-5\" stroke=\"%23888a99\" stroke-width=\"2\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>');}" +
+    ".aew-modal select{width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid var(--line,#ddd);border-radius:9px;background-color:var(--panel,#fff);color:var(--ink,#111);font-size:14px;font-family:inherit;}" +
+    ".aew-modal select:focus{outline:none;border-color:var(--accent,#7c5cff);}" +
+    ".qz-select:invalid,.aew-modal select:invalid{color:var(--ink-dim,#888);}" +
+    // Sign-out confirmation — brief, then reload. Mirrors the sign-in
+    // success checkmark's motion language (same fade+rise) without the
+    // full animated checkmark, since "signed out" is a neutral action,
+    // not an achievement.
+    ".aew-signedout{cursor:default;gap:8px;animation:qz-fadeup .25s ease-out;}" +
+    ".aew-signedout .aew-avatar{background:var(--ink-dim,#888);}";
 
   function injectWidgetStyle() {
     if (document.getElementById(WIDGET_STYLE_ID)) return;
@@ -312,7 +328,12 @@
 
       menu.querySelector(".aew-logout").addEventListener("click", function () {
         clearSession();
-        location.reload();
+        widget.innerHTML = "";
+        widget.appendChild(el("div", { class: "aew-toggle aew-signedout" }, [
+          el("span", { class: "aew-avatar" }, ["\u2713"]),
+          el("span", { class: "aew-name" }, ["Signed out"]),
+        ]));
+        setTimeout(function () { location.reload(); }, 700);
       });
 
       document.addEventListener("click", function (e) {
@@ -464,7 +485,7 @@
 
     function renderRegisterStep() {
       var nameInput = el("input", { type: "text", placeholder: "Your name", autocomplete: "name" });
-      var yearSelect = el("select", {}, [
+      var yearSelect = el("select", { class: "qz-select" }, [
         el("option", { value: "", disabled: "disabled", selected: "selected" }, ["Which year are you in?"]),
         el("option", { value: "Senior 1" }, ["Senior 1"]),
         el("option", { value: "Senior 2" }, ["Senior 2"]),
@@ -621,7 +642,7 @@
     }
 
     function renderCompleteProfileStep(session) {
-      var yearSelect = el("select", { class: "qz-input", required: "required" }, [
+      var yearSelect = el("select", { class: "qz-input qz-select", required: "required" }, [
         el("option", { value: "" }, ["Which year are you in?"]),
         el("option", { value: "Senior 1" }, ["Senior 1"]),
         el("option", { value: "Senior 2" }, ["Senior 2"]),
@@ -779,7 +800,7 @@
 
     function renderRegisterStep() {
       var nameInput = el("input", { class: "qz-input", type: "text", placeholder: "Your name", required: "required", autocomplete: "name" });
-      var yearSelect = el("select", { class: "qz-input", required: "required" }, [
+      var yearSelect = el("select", { class: "qz-input qz-select", required: "required" }, [
         el("option", { value: "", disabled: "disabled", selected: "selected" }, ["Which year are you in?"]),
         el("option", { value: "Senior 1" }, ["Senior 1"]),
         el("option", { value: "Senior 2" }, ["Senior 2"]),
