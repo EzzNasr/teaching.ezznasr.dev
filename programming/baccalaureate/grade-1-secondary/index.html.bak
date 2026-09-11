@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>الصف الأول الثانوي | Teaching Portal</title>
+    <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet" href="/assets/theme.css">
+    <script src="/assets/auth.js"></script>
+    <script src="/assets/theme.js" defer onerror="window.__themeJsFailed = true"></script>
+    <script>
+        (function () {
+            function init() {
+                if (!window.__themeJsFailed) return; // theme.js loaded fine — don't double-bind
+                var root = document.documentElement;
+                var toggle = document.getElementById('theme-toggle');
+                if (!toggle || toggle.dataset.bound) return;
+                toggle.dataset.bound = '1';
+                var icon = toggle.querySelector('.theme-icon');
+                var label = toggle.querySelector('.theme-label');
+                function sync() {
+                    var isDark = root.getAttribute('data-theme') === 'dark';
+                    toggle.setAttribute('aria-pressed', String(isDark));
+                    toggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+                    if (icon) icon.textContent = isDark ? '☀' : '☾';
+                    if (label) label.textContent = isDark ? 'Light mode' : 'Dark mode';
+                }
+                var stored = localStorage.getItem('theme');
+                if (stored === 'dark') root.setAttribute('data-theme', 'dark');
+                else if (stored === 'light') root.removeAttribute('data-theme');
+                sync();
+                toggle.addEventListener('click', function () {
+                    var isDark = root.getAttribute('data-theme') === 'dark';
+                    if (isDark) {
+                        root.removeAttribute('data-theme');
+                        localStorage.setItem('theme', 'light');
+                    } else {
+                        root.setAttribute('data-theme', 'dark');
+                        localStorage.setItem('theme', 'dark');
+                    }
+                    sync();
+                });
+            }
+            document.addEventListener('DOMContentLoaded', init);
+        })();
+    </script>
+</head>
+
+<body class="track-one">
+    <header>
+        <div class="wrap topbar"><a class="brand" href="/"><i></i> EZZ NASR · TEACHING</a>
+            <div class="top-actions"><a class="back" href="/">العودة للرئيسية</a><button class="theme-toggle"
+                    id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false"><span
+                        class="theme-icon" aria-hidden="true">☾</span><span class="theme-label">Dark
+                        mode</span></button></div>
+        </div>
+    </header>
+    <main>
+        <section class="hero">
+            <div class="wrap"><span class="kicker">Baccalaureate · Grade 01</span>
+                <h1>الصف الأول الثانوي<br><span>ابدأ من الأساسيات.</span></h1>
+                <p>دروس مرتبة، شرح واضح، وتدريب عملي يساعدك على بناء أساس قوي خطوة بخطوة.</p>
+            </div>
+        </section>
+        <section class="section">
+            <div class="wrap">
+                <div class="section-head">
+                    <h2>دروس الصف الأول الثانوي</h2>
+                    <p>مسار تعليمي منظم</p>
+                </div>
+                <div class="lessons">
+                    <div class="empty">الدروس لهذا الصف قيد الإعداد حاليًا — تابعنا قريبًا، أو استكشف دروس
+                        <code>البرمجة</code> في الوقت الحالي.</div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer>
+        <div class="wrap">EZZ NASR · Teaching Portal · الصف الأول الثانوي</div>
+    </footer>
+</body>
+
+</html>

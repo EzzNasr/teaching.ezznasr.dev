@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Dashboard — Teaching Portal</title>
+<link rel="icon" href="/icons/favicon.ico">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/theme.css">
+<link rel="stylesheet" href="/assets/base.css">
+<link rel="stylesheet" href="/assets/forms.css">
+<script src="/assets/theme.js" defer></script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f7fb;
+    --bg-glow: rgba(99, 102, 241, .14);
+    --surface: rgba(255, 255, 255, .86);
+    --surface-strong: #ffffff;
+    --surface-soft: #f8f9fd;
+    --ink: #172033;
+    --ink-dim: #68738a;
+    --line: #e4e8f1;
+    --line-strong: #d7ddea;
+    --accent: #5b5ce2;
+    --accent-2: #8b5cf6;
+    --accent-soft: #eeedff;
+    --good: #159a72;
+    --low: #d04d57;
+    --shadow: 0 20px 55px rgba(30, 41, 72, .10);
+    --shadow-soft: 0 8px 24px rgba(30, 41, 72, .07);
+    --sans: 'Manrope', system-ui, sans-serif;
+    --mono: 'DM Mono', ui-monospace, monospace;
+  }
+
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0d1120;
+    --bg-glow: rgba(129, 140, 248, .16);
+    --surface: rgba(25, 31, 52, .86);
+    --surface-strong: #1a2035;
+    --surface-soft: #171d31;
+    --ink: #f1f4ff;
+    --ink-dim: #9da7c0;
+    --line: #2a334d;
+    --line-strong: #39435f;
+    --accent: #9b9cff;
+    --accent-2: #c084fc;
+    --accent-soft: #29274d;
+    --good: #50d3a9;
+    --low: #ff858d;
+    --shadow: 0 24px 70px rgba(0, 0, 0, .34);
+    --shadow-soft: 0 10px 30px rgba(0, 0, 0, .22);
+  }
+
+  * { box-sizing: border-box; }
+  html { min-height: 100%; background: var(--bg); transition: background .25s ease; }
+  body {
+    min-height: 100vh;
+    margin: 0;
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 12% 0%, var(--bg-glow), transparent 32rem),
+      radial-gradient(circle at 95% 18%, rgba(139, 92, 246, .08), transparent 28rem),
+      var(--bg);
+    font-family: var(--sans);
+    transition: color .25s ease, background .25s ease;
+  }
+
+  .dash-shell { width: min(100% - 32px, 1040px); margin: 0 auto; padding: 34px 0 72px; }
+  .dash-topbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom: 44px; }
+  .dash-back { display:inline-flex; align-items:center; gap:8px; color:var(--ink-dim); font: 600 12px/1 var(--mono); text-decoration:none; letter-spacing:.01em; transition:color .2s ease, transform .2s ease; }
+  .dash-back:hover { color:var(--accent); transform:translateX(-2px); }
+  .theme-toggle { display:inline-flex; align-items:center; gap:9px; border:1px solid var(--line); border-radius:999px; padding:8px 12px; color:var(--ink-dim); background:var(--surface); box-shadow:var(--shadow-soft); font:600 11px var(--mono); cursor:pointer; transition:all .2s ease; }
+  .theme-toggle:hover { color:var(--accent); border-color:var(--accent); transform:translateY(-1px); }
+  .theme-toggle:focus-visible { outline:3px solid color-mix(in srgb, var(--accent) 30%, transparent); outline-offset:3px; }
+  .theme-toggle-icon { font-size:15px; line-height:1; }
+
+  #dashboard { animation: dash-in .45s ease both; }
+  @keyframes dash-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+  .dash-head { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:26px; }
+  .dash-head h1 { margin:0; color:var(--ink); font:800 clamp(28px, 5vw, 42px)/1.08 var(--sans); letter-spacing:-.045em; }
+  .dash-head p { margin:10px 0 0; color:var(--ink-dim); font: 13px/1.6 var(--mono); }
+  .dash-head:after { content:'STUDENT PORTAL'; color:var(--accent); font:700 10px var(--mono); letter-spacing:.16em; white-space:nowrap; }
+
+  .dash-stats { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; margin-bottom:46px; }
+  .dash-stat { position:relative; overflow:hidden; min-height:112px; padding:20px; border:1px solid var(--line); border-radius:18px; background:var(--surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(14px); }
+  .dash-stat:after { content:''; position:absolute; width:72px; height:72px; right:-22px; bottom:-30px; border-radius:50%; background:var(--accent-soft); }
+  .dash-stat b { position:relative; z-index:1; display:block; color:var(--ink); font:800 30px/1 var(--sans); letter-spacing:-.04em; }
+  .dash-stat span { position:relative; z-index:1; display:block; margin-top:9px; color:var(--ink-dim); font:11px var(--mono); }
+
+  .dash-section { margin-bottom:34px; padding:22px 24px; border:1px solid var(--line); border-radius:20px; background:var(--surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(14px); }
+  .dash-section h2 { display:flex; align-items:center; gap:10px; margin:0 0 8px; padding:0 0 15px; border-bottom:1px solid var(--line); color:var(--ink); font:800 16px var(--sans); letter-spacing:-.02em; }
+  .dash-section h2:before { content:''; width:8px; height:8px; border-radius:3px; background:linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow:0 0 0 5px var(--accent-soft); }
+  .dash-empty { padding:20px 0 6px; color:var(--ink-dim); font:13px/1.6 var(--mono); }
+  .dash-row { display:flex; align-items:center; gap:16px; min-height:66px; padding:14px 2px; border-bottom:1px solid var(--line); }
+  .dash-row:last-child { border-bottom:0; }
+  .dash-row-main { flex:1; min-width:0; }
+  .dash-row-title { overflow:hidden; color:var(--ink); font:700 14px var(--sans); text-overflow:ellipsis; white-space:nowrap; }
+  .dash-row-sub { margin-top:5px; overflow:hidden; color:var(--ink-dim); font:11px var(--mono); text-overflow:ellipsis; white-space:nowrap; }
+  .dash-score { flex-shrink:0; min-width:84px; text-align:right; font:600 12px var(--mono); }
+  .dash-score.is-good { color:var(--good); } .dash-score.is-mid { color:var(--ink); } .dash-score.is-low { color:var(--low); }
+  .dash-badge { flex-shrink:0; padding:5px 8px; border:1px solid var(--line-strong); border-radius:7px; color:var(--ink-dim); background:var(--surface-soft); font:10px var(--mono); letter-spacing:.03em; }
+  .dash-link { flex-shrink:0; color:var(--accent); font:600 11px var(--mono); text-decoration:none; }
+  .dash-link:hover { text-decoration:underline; }
+  .dash-chapter { padding:14px 2px 8px; }
+  .dash-chapter-top { display:flex; justify-content:space-between; gap:14px; margin-bottom:9px; color:var(--ink-dim); font:12px var(--mono); }
+  .dash-chapter-top b { overflow:hidden; color:var(--ink); font:700 13px var(--sans); text-overflow:ellipsis; white-space:nowrap; }
+  .dash-bar { height:9px; overflow:hidden; border-radius:999px; background:var(--line); }
+  .dash-bar-fill { height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--accent), var(--accent-2)); transition:width .5s ease; }
+  .dash-bar-fill.is-low { background:var(--low); } .dash-bar-fill.is-good { background:var(--good); }
+  .dash-sub-text { max-height:4.5em; overflow:hidden; margin-top:8px; color:var(--ink-dim); font:12px/1.5 var(--sans); white-space:pre-wrap; }
+  .dash-err { padding:18px 0; color:var(--low); font:13px/1.6 var(--mono); }
+  .dash-loadbar { width:100%; max-width:260px; height:5px; margin-top:16px; overflow:hidden; border-radius:999px; background:var(--line); }
+  .dash-loadbar-fill { width:42%; height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--accent), var(--accent-2)); animation:dash-loadbar-slide 1.1s ease-in-out infinite; }
+  @keyframes dash-loadbar-slide { 0% { transform:translateX(-120%); } 50% { transform:translateX(85%); } 100% { transform:translateX(260%); } }
+  .qz-next { border:0; border-radius:10px; padding:11px 15px; color:#fff; background:var(--accent); font:700 12px var(--mono); cursor:pointer; box-shadow:var(--shadow-soft); }
+  .qz-next:hover { filter:brightness(1.08); }
+
+  @media (max-width: 640px) {
+    .dash-shell { width:min(100% - 24px, 1040px); padding-top:20px; }
+    .dash-topbar { margin-bottom:34px; }
+    .dash-head { display:block; }
+    .dash-head:after { display:block; margin-top:18px; }
+    .dash-stats { grid-template-columns:1fr; gap:10px; margin-bottom:28px; }
+    .dash-stat { min-height:0; padding:16px; }
+    .dash-section { padding:18px 16px; border-radius:16px; }
+    .dash-row { align-items:flex-start; gap:10px; }
+    .dash-score { min-width:72px; padding-top:2px; font-size:11px; }
+    .dash-badge { padding:4px 6px; }
+    .theme-toggle-label { display:none; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *:before, *:after { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+</style>
+</head>
+<body>
+
+<div class="dash-shell">
+  <div class="dash-topbar">
+    <a class="dash-back" href="/">&larr; Back to teaching.ezznasr.dev</a>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
+      <span class="theme-toggle-icon" aria-hidden="true">☾</span><span class="theme-toggle-label">Dark mode</span>
+    </button>
+  </div>
+
+  <div id="authgate" style="margin-top:20px;"></div>
+  <div id="dashboard" hidden></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var key = "student-dashboard-theme";
+  var root = document.documentElement;
+  var button = document.getElementById("themeToggle");
+  var saved = null;
+  try { saved = localStorage.getItem(key); } catch (e) {}
+  var theme = saved === "dark" || saved === "light" ? saved : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  function apply(next) {
+    theme = next;
+    root.setAttribute("data-theme", next);
+    if (!button) return;
+    var dark = next === "dark";
+    button.setAttribute("aria-pressed", String(dark));
+    button.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+    button.querySelector(".theme-toggle-icon").textContent = dark ? "☀" : "☾";
+    button.querySelector(".theme-toggle-label").textContent = dark ? "Light mode" : "Dark mode";
+  }
+  apply(theme);
+  if (button) button.addEventListener("click", function () {
+    var next = theme === "dark" ? "light" : "dark";
+    try { localStorage.setItem(key, next); } catch (e) {}
+    apply(next);
+  });
+})();
+</script>
+<script src="/assets/auth.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  function fmtPct(score, total) {
+    if (!total) return "\u2014";
+    return Math.round((score / total) * 100) + "%";
+  }
+
+  function scoreClass(score, total) {
+    if (!total) return "is-mid";
+    var pct = score / total;
+    if (pct >= 0.8) return "is-good";
+    if (pct >= 0.5) return "is-mid";
+    return "is-low";
+  }
+
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === "class") node.className = attrs[k];
+      else if (k === "html") node.innerHTML = attrs[k];
+      else node.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) {
+      if (c) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    });
+    return node;
+  }
+
+  function isTruthyFlag(v) {
+    return v === true || String(v).toUpperCase() === "TRUE";
+  }
+
+  // Sheet rows come back oldest-first (appendRow order) — newest attempt
+  // first is more useful for a student glancing at their own history.
+  function newestFirst(rows) {
+    return (rows || []).slice().reverse();
+  }
+
+  function parseQuestions(row) {
+    try {
+      var parsed = JSON.parse(row.questions_json || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Chapter aggregation across every attempt this student has ever taken.
+  // Defensive about the answer-field name since the field has gone by
+  // "chosen" (v1) and "your_answer" (v2 record shape) at different points.
+  function aggregateChapters(quizRows) {
+    var byChapter = {};
+    quizRows.forEach(function (row) {
+      parseQuestions(row).forEach(function (q) {
+        var chapter = q.chapter || "Unlabeled";
+        if (!byChapter[chapter]) byChapter[chapter] = { correct: 0, total: 0 };
+        byChapter[chapter].total += 1;
+        if (q.is_correct === true || String(q.is_correct).toUpperCase() === "TRUE") {
+          byChapter[chapter].correct += 1;
+        }
+      });
+    });
+    return Object.keys(byChapter)
+      .map(function (chapter) {
+        var c = byChapter[chapter];
+        return { chapter: chapter, correct: c.correct, total: c.total, pct: c.total ? c.correct / c.total : 0 };
+      })
+      // Weakest chapters first — that's the useful ordering for a student
+      // deciding what to review.
+      .sort(function (a, b) { return a.pct - b.pct; });
+  }
+
+  function renderStats(quizRows, subRows) {
+    var attempted = quizRows.length;
+    var totalScore = 0, totalMax = 0;
+    quizRows.forEach(function (r) {
+      totalScore += Number(r.score) || 0;
+      totalMax += Number(r.total) || 0;
+    });
+    var avgPct = totalMax ? Math.round((totalScore / totalMax) * 100) + "%" : "\u2014";
+
+    var stats = el("div", { class: "dash-stats" }, [
+      el("div", { class: "dash-stat" }, [el("b", {}, [String(attempted)]), el("span", {}, ["Quizzes taken"])]),
+      el("div", { class: "dash-stat" }, [el("b", {}, [avgPct]), el("span", {}, ["Average score"])]),
+      el("div", { class: "dash-stat" }, [el("b", {}, [String(subRows.length)]), el("span", {}, ["Assignments submitted"])]),
+    ]);
+    return stats;
+  }
+
+  function renderQuizSection(quizRows) {
+    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Quiz history"])]);
+    if (!quizRows.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, ["No quizzes taken yet \u2014 they'll show up here as soon as you finish one."]));
+      return section;
+    }
+    newestFirst(quizRows).forEach(function (r) {
+      var score = Number(r.score) || 0, total = Number(r.total) || 0;
+      var row = el("div", { class: "dash-row" }, [
+        el("div", { class: "dash-row-main" }, [
+          el("div", { class: "dash-row-title" }, [r.quiz_title || r.lesson || "Quiz"]),
+          el("div", { class: "dash-row-sub" }, [(r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.date ? " \u00b7 " + r.date : "")]),
+        ]),
+        el("div", { class: "dash-score " + scoreClass(score, total) }, [score + "/" + total + " (" + fmtPct(score, total) + ")"]),
+      ]);
+      section.appendChild(row);
+    });
+    return section;
+  }
+
+  function renderChapterSection(quizRows) {
+    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["By chapter"])]);
+    var chapters = aggregateChapters(quizRows);
+    if (!chapters.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, ["No chapter-tagged questions yet."]));
+      return section;
+    }
+    chapters.forEach(function (c) {
+      var pctLabel = Math.round(c.pct * 100) + "%";
+      var barClass = c.pct >= 0.8 ? "is-good" : (c.pct < 0.5 ? "is-low" : "");
+      var wrap = el("div", { class: "dash-chapter" }, [
+        el("div", { class: "dash-chapter-top" }, [
+          el("b", {}, [c.chapter]),
+          document.createTextNode(c.correct + "/" + c.total + " \u00b7 " + pctLabel),
+        ]),
+        el("div", { class: "dash-bar" }, [
+          el("div", { class: "dash-bar-fill " + barClass, style: "width:" + Math.max(3, Math.round(c.pct * 100)) + "%" }),
+        ]),
+      ]);
+      section.appendChild(wrap);
+    });
+    return section;
+  }
+
+  function renderSubmissionsSection(subRows) {
+    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Assignments submitted"])]);
+    if (!subRows.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, ["No assignments submitted yet."]));
+      return section;
+    }
+    newestFirst(subRows).forEach(function (r) {
+      var main = el("div", { class: "dash-row-main" }, [
+        el("div", { class: "dash-row-title" }, [(r.lesson || "Assignment")]),
+        el("div", { class: "dash-row-sub" }, [(r.subject || "") + (r.date ? " \u00b7 " + r.date : "")]),
+      ]);
+      if (r.submission_type === "text" && r.text) {
+        var truncNote = isTruthyFlag(r.text_truncated) ? " (preview only \u2014 full text saved)" : "";
+        main.appendChild(el("div", { class: "dash-sub-text" }, [r.text + truncNote]));
+      }
+      var row = el("div", { class: "dash-row" }, [main, el("div", { class: "dash-badge" }, [r.submission_type || ""])]);
+      if (r.submission_type === "url" && r.url) {
+        row.insertBefore(el("a", { class: "dash-link", href: r.url, target: "_blank", rel: "noopener" }, ["Open link"]), row.lastChild);
+      }
+      if (r.submission_type === "file" && r.file_id) {
+        row.insertBefore(el("a", { class: "dash-link", href: "https://drive.google.com/file/d/" + r.file_id + "/view", target: "_blank", rel: "noopener" }, ["Open file"]), row.lastChild);
+      }
+      section.appendChild(row);
+    });
+    return section;
+  }
+
+  function renderDashboard(session, data) {
+    var root = document.getElementById("dashboard");
+    root.innerHTML = "";
+    root.hidden = false;
+
+    root.appendChild(el("div", { class: "dash-head" }, [
+      el("div", {}, [
+        el("h1", {}, ["Hey, " + (session.student_name || "there")]),
+        el("p", {}, ["Your quiz history and submissions, all in one place."]),
+      ]),
+    ]));
+
+    root.appendChild(renderStats(data.quiz_results || [], data.submissions || []));
+    root.appendChild(renderQuizSection(data.quiz_results || []));
+    root.appendChild(renderChapterSection(data.quiz_results || []));
+    root.appendChild(renderSubmissionsSection(data.submissions || []));
+  }
+
+  function renderError(message) {
+    var root = document.getElementById("dashboard");
+    root.innerHTML = "";
+    root.hidden = false;
+    root.appendChild(el("div", { class: "dash-err" }, [message]));
+  }
+
+  function renderNeedsRelogin() {
+    var root = document.getElementById("dashboard");
+    root.innerHTML = "";
+    root.hidden = false;
+    var btn = el("button", { class: "qz-next", type: "button" }, ["Log out & sign in again \u2192"]);
+    btn.addEventListener("click", function () {
+      window.AuthEngine.clearSession();
+      location.reload();
+    });
+    root.appendChild(el("div", { class: "dash-err" }, [
+      "Your saved sign-in is missing a session token \u2014 this happens once, for anyone " +
+      "who logged in before the dashboard system existed. Log in again to fix it (your " +
+      "phone/password stay the same, this just refreshes your session)."
+    ]));
+    root.appendChild(btn);
+  }
+
+  function renderLoading() {
+    var root = document.getElementById("dashboard");
+    root.innerHTML = "";
+    root.hidden = false;
+    root.appendChild(el("div", { class: "dash-empty", style: "padding-top:0;" }, ["Loading your dashboard\u2026"]));
+    root.appendChild(el("div", { class: "dash-loadbar" }, [el("div", { class: "dash-loadbar-fill" })]));
+  }
+
+  window.AuthEngine.mount("#authgate", function (session) {
+    document.getElementById("authgate").remove();
+    if (!session.session_token) {
+      renderNeedsRelogin();
+      return;
+    }
+    renderLoading();
+    window.AuthEngine.getMyResults(session)
+      .then(function (data) { renderDashboard(session, data); })
+      .catch(function (err) {
+        renderError(err.message || "Couldn't load your dashboard. Try refreshing.");
+      });
+  });
+})();
+</script>
+</body>
+</html>

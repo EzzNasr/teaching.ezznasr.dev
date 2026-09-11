@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Math — Ezz Nasr : Teaching</title>
+  <meta name="description" content="Math lessons, quizzes, and assignments.">
+  <link rel="canonical" href="https://teaching.ezznasr.dev/math/">
+  <link rel="icon" href="/icons/favicon.ico" sizes="any">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/assets/base.css">
+  <link rel="stylesheet" href="/assets/theme.css">
+  <link rel="stylesheet" href="./style.css">
+  <script src="/assets/theme.js" defer onerror="window.__themeJsFailed = true"></script>
+  <script src="/assets/auth.js"></script>
+  <script>
+    (function () {
+      function init() {
+        if (!window.__themeJsFailed) return; // theme.js loaded fine — don't double-bind
+        var root = document.documentElement;
+        var toggle = document.getElementById('theme-toggle');
+        if (!toggle || toggle.dataset.bound) return;
+        toggle.dataset.bound = '1';
+        var icon = toggle.querySelector('.theme-icon');
+        var label = toggle.querySelector('.theme-label');
+        function sync() {
+          var isDark = root.getAttribute('data-theme') === 'dark';
+          toggle.setAttribute('aria-pressed', String(isDark));
+          toggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+          if (icon) icon.textContent = isDark ? '\u2600' : '\u263E';
+          if (label) label.textContent = isDark ? 'Light mode' : 'Dark mode';
+        }
+        var stored = localStorage.getItem('theme');
+        if (stored === 'dark') root.setAttribute('data-theme', 'dark');
+        else if (stored === 'light') root.removeAttribute('data-theme');
+        sync();
+        toggle.addEventListener('click', function () {
+          var isDark = root.getAttribute('data-theme') === 'dark';
+          if (isDark) {
+            root.removeAttribute('data-theme');
+            localStorage.setItem('theme', 'light');
+          } else {
+            root.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+          }
+          sync();
+        });
+      }
+      document.addEventListener('DOMContentLoaded', init);
+    })();
+  </script>
+</head>
+
+<body>
+
+  <header>
+    <div class="titlebar">
+      <a href="/" class="mark"><span class="dot"></span> EZZ NASR : TEACHING</a>
+      <nav>
+        <a href="/" class="back">All subjects</a>
+        <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode"
+          aria-pressed="false"><span class="theme-icon" aria-hidden="true">&#9789;</span><span
+            class="theme-label"></span></button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap page-head">
+      <div class="eyebrow">Math</div>
+      <h1>Math</h1>
+      <p class="lede">Math &mdash; SAT / EST. Drawn from prior tutoring in Probability and Differential Equations,
+        adapted to SAT / EST test structure and pacing.</p>
+    </div>
+
+    <section class="block" id="lessons">
+      <div class="wrap">
+        <div class="section-heading">
+          <div>
+            <h2>Lessons</h2>
+            <p>Each lesson is the entry point for its own quiz and assignment.</p>
+          </div>
+        </div>
+        <div class="lessons">
+          <!-- LESSON_CARDS_START -->
+          <div class="lesson-card frame" style="cursor:default;">
+            <div class="lc-top">
+              <div class="lc-title"><span class="number">01</span>
+                <h3>Sample topic &mdash; TBD</h3>
+              </div><span class="stamp planned">Planned</span>
+            </div>
+            <p>First Math lesson is being recorded. Once published it will appear here as a normal lesson card, linking
+              to its own quiz and assignment.</p>
+          </div>
+          <div class="lesson-card frame" style="cursor:default;">
+            <div class="lc-top">
+              <div class="lc-title"><span class="number">02</span>
+                <h3>Sample topic &mdash; TBD</h3>
+              </div><span class="stamp planned">Planned</span>
+            </div>
+            <p>Second Math lesson is being recorded. Once published it will appear here as a normal lesson card, linking
+              to its own quiz and assignment.</p>
+          </div>
+          <div class="lesson-card frame" style="cursor:default;">
+            <div class="lc-top">
+              <div class="lc-title"><span class="number">03</span>
+                <h3>Sample topic &mdash; TBD</h3>
+              </div><span class="stamp planned">Planned</span>
+            </div>
+            <p>Third Math lesson is being recorded. Once published it will appear here as a normal lesson card, linking
+              to its own quiz and assignment.</p>
+          </div>
+          <!-- LESSON_CARDS_END -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <div class="footer-grid">
+        <div class="footer-links">
+          <a href="mailto:ezznasrone@gmail.com">ezznasrone@gmail.com</a>
+          <a href="https://www.linkedin.com/in/EzzNasr" target="_blank" rel="noopener">LinkedIn</a>
+          <a href="https://github.com/EzzNasr" target="_blank" rel="noopener">GitHub</a>
+        </div>
+        <div class="footer-note">teaching.ezznasr.dev/math</div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+
+</html>
