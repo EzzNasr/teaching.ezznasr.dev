@@ -41,6 +41,10 @@
 .qz-graded-row .qz-select{ width:auto; min-width:180px; }
 .qz-graded-check{ display:flex; align-items:center; gap:8px; font-size:14.5px; color:var(--ink); cursor:pointer; }
 .qz-graded-check input{ width:16px; height:16px; accent-color:var(--accent-strong); cursor:pointer; }
+.qz-graded-check--correct{ color:var(--status-shipped); font-weight:600; }
+.qz-graded-check--incorrect{ color:var(--status-fail); font-weight:600; text-decoration:line-through; }
+.qz-graded-row--correct{ border-left:3px solid var(--status-shipped); padding-left:8px; }
+.qz-graded-row--incorrect{ border-left:3px solid var(--status-fail); padding-left:8px; }
 
 /* ---- sign-in success (checkmark draw-in) ---- */
 .qz-success{ padding:36px 24px; text-align:center; }

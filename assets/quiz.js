@@ -23,35 +23,10 @@
   var QUEUE_KEY = "teaching_pending_submissions";
   var LAST_ATTEMPT_PREFIX = "teaching_last_attempt:";
   var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
+  var el = window.TeachingCommon.el;
 
   function postToDrive(payload) {
-    if (!DRIVE_ENDPOINT) return Promise.reject(new Error("not-configured"));
-    return fetch(DRIVE_ENDPOINT, {
-      method: "POST",
-      // text/plain avoids a CORS preflight against Apps Script (no
-      // doOptions handler there) — see assign.js for the full note.
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload),
-    }).then(function (resp) {
-      return resp.json().then(function (data) {
-        if (!data || !data.ok) throw new Error((data && data.error) || "Drive bridge rejected the result.");
-        return data;
-      });
-    });
-  }
-
-  function el(tag, attrs, children) {
-    var node = document.createElement(tag);
-    attrs = attrs || {};
-    Object.keys(attrs).forEach(function (k) {
-      if (k === "class") node.className = attrs[k];
-      else if (k === "html") node.innerHTML = attrs[k];
-      else node.setAttribute(k, attrs[k]);
-    });
-    (children || []).forEach(function (c) {
-      if (c) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
-    });
-    return node;
+    return window.TeachingCommon.postToDrive(DRIVE_ENDPOINT, payload);
   }
 
   function isoDate(d) {
@@ -87,6 +62,49 @@
     } catch (e) {
       /* localStorage unavailable — fail silently, nothing to recover here */
     }
+  }
+
+  // Normalizes every question into one shape regardless of source:
+  // - legacy quizzes (no "type" field): the original {q, options, correct: int}
+  // - new mcq/truefalse/match questions built via the shared Quiz Maker dialogs
+  // "kind" drives which renderer runs: "single" keeps the classic
+  // click-an-option-for-instant-feedback flow (legacy mcq AND true/false,
+  // which is really just a 2-option single-choice question); "multi" and
+  // "match" need an explicit Submit step since more than one input has to
+  // be filled in before grading makes sense.
+  function toChoiceForm(q) {
+    if (!q.type) {
+      return {
+        kind: "single", type: "mcq", prompt: q.q, options: q.options,
+        correctIndices: [q.correct], explain: q.explain, chapter: q.chapter,
+      };
+    }
+    if (q.type === "truefalse") {
+      return {
+        kind: "single", type: "truefalse", prompt: q.prompt, options: ["True", "False"],
+        correctIndices: [q.correct ? 0 : 1], explain: q.explain, chapter: q.chapter,
+      };
+    }
+    if (q.type === "match") {
+      return {
+        kind: "match", type: "match", prompt: q.prompt, rows: q.rows, options: q.options,
+        explain: q.explain, chapter: q.chapter,
+      };
+    }
+    // mcq
+    return {
+      kind: q.correct.length > 1 ? "multi" : "single", type: "mcq", prompt: q.prompt,
+      options: q.options, correctIndices: q.correct, explain: q.explain, chapter: q.chapter,
+    };
+  }
+
+  // First option is always the unanswered placeholder, so a match row
+  // can't be silently left at a default that happens to be correct.
+  function buildSelect(options) {
+    var sel = el("select", { class: "qz-select" }, [
+      el("option", { value: "" }, ["Choose\u2026"]),
+    ].concat(options.map(function (opt) { return el("option", { value: opt }, [opt]); })));
+    return sel;
   }
 
   function mount(rootSelector, dataSelector) {
@@ -173,16 +191,159 @@
         root.appendChild(card);
       }
 
-      function renderQuestion() {
-        var q = quiz.questions[state.index];
+      function recordAnswer(q, isCorrect, chosenText, correctText) {
+        if (isCorrect) state.score++;
+        state.answers.push({
+          question: q.prompt,
+          type: q.type,
+          chosen: chosenText,
+          correct_answer: correctText,
+          is_correct: isCorrect,
+          chapter: (typeof q.chapter !== "undefined") ? q.chapter : null,
+        });
+      }
+
+      function showVerdict(card, correct, explain) {
+        card.appendChild(el("div", { class: "qz-verdict" }, [
+          el("span", { class: correct ? "qz-verdict__tag qz-verdict__tag--pass" : "qz-verdict__tag qz-verdict__tag--fail" },
+            [correct ? "Correct" : "Not quite"]),
+          explain ? el("span", { class: "qz-verdict__explain" }, [explain]) : null,
+        ]));
+      }
+
+      function appendNextButton(actions) {
+        var isLast = state.index + 1 >= quiz.questions.length;
+        var nextBtn = el("button", { class: "qz-next", type: "button" }, [isLast ? "See score \u2192" : "Next \u2192"]);
+        nextBtn.addEventListener("click", function () {
+          if (isLast && !state.endTime) state.endTime = new Date().toISOString();
+          state.index++;
+          render();
+        });
+        actions.appendChild(nextBtn);
+      }
+
+      // Legacy mcq (single correct answer) and true/false both render as
+      // click-an-option-for-instant-feedback — true/false is really just
+      // a 2-option single-choice question, so it reuses this unchanged.
+      function renderSingleChoice(q, card, optionsWrap, actions) {
         var answered = false;
+        q.options.forEach(function (opt, i) {
+          var btn = el("button", { class: "qz-option", type: "button" }, [
+            el("span", { class: "qz-option__tag" }, [String.fromCharCode(65 + i)]),
+            el("span", {}, [opt]),
+          ]);
+          btn.addEventListener("click", function () {
+            if (answered) return;
+            answered = true;
+
+            var correct = q.correctIndices.indexOf(i) !== -1;
+            recordAnswer(q, correct, opt, q.options[q.correctIndices[0]]);
+
+            Array.prototype.forEach.call(optionsWrap.children, function (child, j) {
+              child.disabled = true;
+              if (q.correctIndices.indexOf(j) !== -1) child.classList.add("qz-option--correct");
+              else if (j === i) child.classList.add("qz-option--incorrect");
+            });
+
+            showVerdict(card, correct, q.explain);
+            appendNextButton(actions);
+          });
+          optionsWrap.appendChild(btn);
+        });
+      }
+
+      // "Select all that apply" mcq — needs an explicit Submit since
+      // grading only makes sense once every checkbox has been decided.
+      function renderMultiChoice(q, card, optionsWrap, actions) {
+        var checks = q.options.map(function (opt) {
+          var cb = el("input", { type: "checkbox", value: opt });
+          var label = el("label", { class: "qz-graded-check" }, [cb, " " + opt]);
+          optionsWrap.appendChild(el("div", { class: "qz-graded-row" }, [label]));
+          return { opt: opt, cb: cb, label: label };
+        });
+        var errorMsg = el("div", { class: "qz-error" });
+        var submitBtn = el("button", { class: "qz-next", type: "button" }, ["Submit answer \u2192"]);
+        submitBtn.addEventListener("click", function () {
+          if (!checks.some(function (c) { return c.cb.checked; })) {
+            errorMsg.textContent = "Choose at least one option.";
+            return;
+          }
+          submitBtn.disabled = true;
+          checks.forEach(function (c) { c.cb.disabled = true; });
+
+          var chosenOpts = checks.filter(function (c) { return c.cb.checked; }).map(function (c) { return c.opt; });
+          var correctOpts = q.correctIndices.map(function (i) { return q.options[i]; });
+          var isCorrect = chosenOpts.length === correctOpts.length &&
+            chosenOpts.slice().sort().every(function (v, i) { return v === correctOpts.slice().sort()[i]; });
+
+          checks.forEach(function (c) {
+            var shouldBeChecked = correctOpts.indexOf(c.opt) !== -1;
+            if (shouldBeChecked || c.cb.checked) {
+              c.label.classList.add(shouldBeChecked ? "qz-graded-check--correct" : "qz-graded-check--incorrect");
+            }
+          });
+
+          recordAnswer(q, isCorrect, chosenOpts.join(", "), correctOpts.join(", "));
+          showVerdict(card, isCorrect, q.explain);
+          actions.removeChild(submitBtn);
+          appendNextButton(actions);
+        });
+        actions.appendChild(errorMsg);
+        actions.appendChild(submitBtn);
+      }
+
+      // Matching — one dropdown per row, all graded together on Submit.
+      // Scored as one all-or-nothing question (matches the "Score X/N
+      // questions" progress line elsewhere), not per-row.
+      function renderMatchChoice(q, card, optionsWrap, actions) {
+        var rowSelects = q.rows.map(function (row) {
+          var sel = buildSelect(q.options);
+          var rowEl = el("div", { class: "qz-graded-row" }, [
+            el("span", { class: "qz-graded-row__label" }, [row.label]),
+            sel,
+          ]);
+          optionsWrap.appendChild(rowEl);
+          return { select: sel, rowEl: rowEl };
+        });
+        var errorMsg = el("div", { class: "qz-error" });
+        var submitBtn = el("button", { class: "qz-next", type: "button" }, ["Submit answer \u2192"]);
+        submitBtn.addEventListener("click", function () {
+          if (rowSelects.some(function (r) { return r.select.value === ""; })) {
+            errorMsg.textContent = "Match every row before submitting.";
+            return;
+          }
+          submitBtn.disabled = true;
+          rowSelects.forEach(function (r) { r.select.disabled = true; });
+
+          var allCorrect = true;
+          var chosenParts = [], correctParts = [];
+          q.rows.forEach(function (row, i) {
+            var chosen = rowSelects[i].select.value;
+            var ok = chosen === row.correct;
+            if (!ok) allCorrect = false;
+            chosenParts.push(row.label + ": " + chosen);
+            correctParts.push(row.label + ": " + row.correct);
+            rowSelects[i].rowEl.classList.add(ok ? "qz-graded-row--correct" : "qz-graded-row--incorrect");
+          });
+
+          recordAnswer(q, allCorrect, chosenParts.join("; "), correctParts.join("; "));
+          showVerdict(card, allCorrect, q.explain);
+          actions.removeChild(submitBtn);
+          appendNextButton(actions);
+        });
+        actions.appendChild(errorMsg);
+        actions.appendChild(submitBtn);
+      }
+
+      function renderQuestion() {
+        var q = toChoiceForm(quiz.questions[state.index]);
 
         var progress = el("div", { class: "qz-progress" }, [
           "Question " + (state.index + 1) + " of " + quiz.questions.length +
           "  \u00b7  Score " + state.score + "/" + state.index,
         ]);
 
-        var questionEl = el("p", { class: "qz-question", html: q.q });
+        var questionEl = el("p", { class: "qz-question", html: q.prompt });
         var optionsWrap = el("div", { class: "qz-options" });
         var actions = el("div", { class: "qz-actions" });
 
@@ -194,52 +355,9 @@
           actions,
         ]);
 
-        q.options.forEach(function (opt, i) {
-          var btn = el("button", { class: "qz-option", type: "button" }, [
-            el("span", { class: "qz-option__tag" }, [String.fromCharCode(65 + i)]),
-            el("span", {}, [opt]),
-          ]);
-          btn.addEventListener("click", function () {
-            if (answered) return;
-            answered = true;
-
-            var correct = i === q.correct;
-            if (correct) state.score++;
-
-            state.answers.push({
-              question: q.q,
-              chosen: opt,
-              correct_answer: q.options[q.correct],
-              is_correct: correct,
-              chapter: (typeof q.chapter !== "undefined") ? q.chapter : null,
-            });
-
-            Array.prototype.forEach.call(optionsWrap.children, function (child, j) {
-              child.disabled = true;
-              if (j === q.correct) child.classList.add("qz-option--correct");
-              else if (j === i) child.classList.add("qz-option--incorrect");
-            });
-
-            var verdict = el("div", { class: "qz-verdict" }, [
-              el("span", { class: correct ? "qz-verdict__tag qz-verdict__tag--pass" : "qz-verdict__tag qz-verdict__tag--fail" },
-                [correct ? "Correct" : "Not quite"]),
-              q.explain ? el("span", { class: "qz-verdict__explain" }, [q.explain]) : null,
-            ]);
-            card.appendChild(verdict);
-
-            var isLast = state.index + 1 >= quiz.questions.length;
-            var nextBtn = el("button", { class: "qz-next", type: "button" }, [isLast ? "See score \u2192" : "Next \u2192"]);
-            nextBtn.addEventListener("click", function () {
-              if (isLast && !state.endTime) {
-                state.endTime = new Date().toISOString();
-              }
-              state.index++;
-              render();
-            });
-            actions.appendChild(nextBtn);
-          });
-          optionsWrap.appendChild(btn);
-        });
+        if (q.kind === "single") renderSingleChoice(q, card, optionsWrap, actions);
+        else if (q.kind === "multi") renderMultiChoice(q, card, optionsWrap, actions);
+        else renderMatchChoice(q, card, optionsWrap, actions);
 
         root.appendChild(progress);
         root.appendChild(card);
@@ -257,6 +375,7 @@
           var allQuestions = state.answers.map(function (a) {
             return {
               question: a.question,
+              type: a.type,
               your_answer: a.chosen,
               correct_answer: a.correct_answer,
               is_correct: a.is_correct,

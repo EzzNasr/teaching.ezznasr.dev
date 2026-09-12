@@ -7,9 +7,12 @@
    SHA-256 hash of it does (crypto.subtle.digest). The server just compares
    hashes; it never sees the plaintext.
 
-   Session — { student_id, student_name } — is cached in localStorage under
-   "teaching_session" so a returning student on the same device/browser
-   skips straight past this gate on their next quiz/assignment.
+   Session — { student_id, student_name, session_token } — is cached in
+   localStorage under "teaching_session" so a returning student on the
+   same device/browser skips straight past this gate on their next
+   quiz/assignment. session_token is what proves a "give me my data" call
+   (dashboards) actually came from that student having logged in, since
+   student_id alone is just their phone number's digits — not a secret.
 
    Two independent things happen here:
 
@@ -31,6 +34,7 @@
 
   var SESSION_KEY = "teaching_session";
   var DRIVE_ENDPOINT = "{{DRIVE_ENDPOINT}}";
+
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     attrs = attrs || {};
@@ -147,27 +151,52 @@
     });
   }
 
-  // Retries once if Apps Script returns an HTML page instead of JSON — a
-  // transient Google-side hiccup (seen right after redeploys, under load),
-  // not a code bug.
-  function postToDrive(payload, isRetry) {
+  function postToDrive(payload) {
     if (!DRIVE_ENDPOINT) return Promise.reject(new Error("not-configured"));
     return fetch(DRIVE_ENDPOINT, {
       method: "POST",
+      // text/plain avoids a CORS preflight against Apps Script — see
+      // quiz.js/assign.js for the full note. doPost JSON.parses regardless.
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload),
     }).then(function (resp) {
-      return resp.text().then(function (raw) {
-        var data;
-        try {
-          data = JSON.parse(raw);
-        } catch (e) {
-          if (!isRetry) return postToDrive(payload, true);
-          throw new Error("The server sent back something unexpected. Please try again.");
-        }
-        if (!data || !data.ok) throw new Error((data && data.error) || "Drive bridge rejected the request.");
+      return resp.json().then(function (data) {
+        if (!data || !data.ok) throw new Error((data && data.error) || "Request failed.");
         return data;
       });
+    });
+  }
+
+  // -- Dashboard data calls -----------------------------------------------
+  // Thin wrappers around postToDrive so hand-built dashboard pages never
+  // need to know DRIVE_ENDPOINT themselves — they just call
+  // AuthEngine.getMyResults(session) with whatever AuthEngine.getSession()
+  // gave them. Session shape is { student_id, student_name, session_token }.
+
+  function requireSession(session) {
+    if (!session || !session.student_id || !session.session_token) {
+      return Promise.reject(new Error("Not signed in."));
+    }
+    return null;
+  }
+
+  function getMyResults(session) {
+    var missing = requireSession(session);
+    if (missing) return missing;
+    return postToDrive({
+      action: "get_my_results",
+      student_id: session.student_id,
+      session_token: session.session_token,
+    });
+  }
+
+  function adminGetAll(session) {
+    var missing = requireSession(session);
+    if (missing) return missing;
+    return postToDrive({
+      action: "admin_get_all",
+      student_id: session.student_id,
+      session_token: session.session_token,
     });
   }
 
@@ -224,7 +253,23 @@
     ".qz-success__msg{font-family:var(--mono,monospace);font-size:14px;color:var(--ink,#111);margin:0;opacity:0;animation:qz-fadeup .35s .75s ease-out forwards;}" +
     "@keyframes qz-circle{to{stroke-dashoffset:0;}}" +
     "@keyframes qz-check{to{stroke-dashoffset:0;}}" +
-    "@keyframes qz-fadeup{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}";
+    "@keyframes qz-fadeup{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}" +
+    // Custom select chrome — a bare <select> ignores qz-input/modal input
+    // theming entirely (background, radius, and especially the OS-drawn
+    // arrow), which is what made the year dropdown look untouched next to
+    // the styled fields around it. This can't restyle the native open
+    // popup list (that's OS chrome, no CSS reaches it), only the closed
+    // control — but that's the part that actually looked out of place.
+    ".qz-select,.aew-modal select{appearance:none;-webkit-appearance:none;-moz-appearance:none;cursor:pointer;background-repeat:no-repeat;background-position:right 14px center;background-size:11px 7px;padding-right:38px !important;background-image:url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 12 8\"><path d=\"M1 1l5 5 5-5\" stroke=\"%23888a99\" stroke-width=\"2\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>');}" +
+    ".aew-modal select{width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid var(--line,#ddd);border-radius:9px;background-color:var(--panel,#fff);color:var(--ink,#111);font-size:14px;font-family:inherit;}" +
+    ".aew-modal select:focus{outline:none;border-color:var(--accent,#7c5cff);}" +
+    ".qz-select:invalid,.aew-modal select:invalid{color:var(--ink-dim,#888);}" +
+    // Sign-out confirmation — brief, then reload. Mirrors the sign-in
+    // success checkmark's motion language (same fade+rise) without the
+    // full animated checkmark, since "signed out" is a neutral action,
+    // not an achievement.
+    ".aew-signedout{cursor:default;gap:8px;animation:qz-fadeup .25s ease-out;}" +
+    ".aew-signedout .aew-avatar{background:var(--ink-dim,#888);}";
 
   function injectWidgetStyle() {
     if (document.getElementById(WIDGET_STYLE_ID)) return;
@@ -258,11 +303,13 @@
     var widget;
 
     if (session) {
+      var dashboardBtn = el("button", { class: "aew-menu-item", type: "button" }, ["My dashboard"]);
+      dashboardBtn.addEventListener("click", function () {
+        location.href = "/dashboard/student.html";
+      });
+
       var menu = el("div", { class: "aew-menu" }, [
-        el("button", { class: "aew-menu-item", type: "button", disabled: "disabled" }, [
-          document.createTextNode("Student dashboard"),
-          el("span", { class: "aew-soon" }, ["Soon"]),
-        ]),
+        dashboardBtn,
         el("button", { class: "aew-menu-item aew-logout", type: "button" }, ["Log out"]),
       ]);
 
@@ -281,7 +328,12 @@
 
       menu.querySelector(".aew-logout").addEventListener("click", function () {
         clearSession();
-        location.reload();
+        widget.innerHTML = "";
+        widget.appendChild(el("div", { class: "aew-toggle aew-signedout" }, [
+          el("span", { class: "aew-avatar" }, ["\u2713"]),
+          el("span", { class: "aew-name" }, ["Signed out"]),
+        ]));
+        setTimeout(function () { location.reload(); }, 700);
       });
 
       document.addEventListener("click", function (e) {
@@ -408,7 +460,7 @@
         sha256Hex(val)
           .then(function (hash) { return postToDrive({ action: "login_student", phone: phone, password_hash: hash }); })
           .then(function (data) {
-            saveSession({ student_id: data.student_id, student_name: data.student_name });
+            saveSession({ student_id: data.student_id, student_name: data.student_name, session_token: data.session_token, year: data.year || "", parent_phone: data.parent_phone || "" });
             showModalSuccess(data.student_name);
             setTimeout(function () { location.reload(); }, SUCCESS_ANIM_MS);
           })
@@ -433,6 +485,12 @@
 
     function renderRegisterStep() {
       var nameInput = el("input", { type: "text", placeholder: "Your name", autocomplete: "name" });
+      var yearSelect = el("select", { class: "qz-select" }, [
+        el("option", { value: "", disabled: "disabled", selected: "selected" }, ["Which year are you in?"]),
+        el("option", { value: "Senior 1" }, ["Senior 1"]),
+        el("option", { value: "Senior 2" }, ["Senior 2"]),
+      ]);
+      var parentPhoneInput = el("input", { type: "tel", inputmode: "tel", placeholder: "Parent's phone number", autocomplete: "tel" });
       var pw = passwordField("Set a password", "", "aew-pwtoggle");
       var error = el("div", { class: "aew-error" });
       var btn = el("button", { class: "aew-primary", type: "button" }, ["Create account \u2192"]);
@@ -443,10 +501,22 @@
       function submit() {
         if (busy) return;
         var name = nameInput.value.trim();
+        var year = yearSelect.value;
+        var parentPhone = parentPhoneInput.value.trim();
         var val = pw.input.value;
         if (!name) {
           error.textContent = "Enter your name.";
           nameInput.focus();
+          return;
+        }
+        if (!year) {
+          error.textContent = "Choose your year.";
+          yearSelect.focus();
+          return;
+        }
+        if (!looksLikePhone(parentPhone)) {
+          error.textContent = "Enter a valid parent's phone number.";
+          parentPhoneInput.focus();
           return;
         }
         if (!val || val.length < 4) {
@@ -458,10 +528,10 @@
         setBusy(btn, true);
         sha256Hex(val)
           .then(function (hash) {
-            return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name });
+            return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name, year: year, parent_phone: parentPhone });
           })
           .then(function (data) {
-            saveSession({ student_id: data.student_id, student_name: data.student_name });
+            saveSession({ student_id: data.student_id, student_name: data.student_name, session_token: data.session_token, year: data.year || "", parent_phone: data.parent_phone || "" });
             showModalSuccess(data.student_name);
             setTimeout(function () { location.reload(); }, SUCCESS_ANIM_MS);
           })
@@ -478,6 +548,8 @@
       modal.appendChild(el("h3", {}, ["First time here"]));
       modal.appendChild(el("p", { class: "aew-sub" }, [maskPhone(phone)]));
       modal.appendChild(el("div", { class: "aew-field" }, [nameInput]));
+      modal.appendChild(el("div", { class: "aew-field" }, [yearSelect]));
+      modal.appendChild(el("div", { class: "aew-field" }, [parentPhoneInput]));
       modal.appendChild(el("div", { class: "aew-field" }, [pw.wrap]));
       modal.appendChild(error);
       modal.appendChild(btn);
@@ -508,18 +580,26 @@
 
   function mount(rootSelector, onReady) {
     var existing = getSession();
-    if (existing) {
+    var root = document.querySelector(rootSelector);
+    if (!root) return;
+
+    // A cached session with both fields already on file skips the gate
+    // entirely, same as before — zero extra network calls for the common
+    // case. Missing either one (old account, or one that only ever went
+    // through the corner-widget flow before it collected these) routes
+    // straight to the completeProfile step below instead of onReady —
+    // no password re-entry needed, the existing session_token is already
+    // proof enough, it just needs these two fields filled in once.
+    if (existing && existing.year && existing.parent_phone) {
       onReady(existing);
       return;
     }
 
-    var root = document.querySelector(rootSelector);
-    if (!root) return;
-
-    var step = "phone"; // "phone" | "login" | "register"
+    var step = existing ? "completeProfile" : "phone"; // "phone" | "login" | "register" | "completeProfile"
     var phone = "";
     var knownName = null;
     var busy = false;
+    var sessionForProfile = existing || null;
 
     function renderSuccessThenReady(session) {
       root.innerHTML = "";
@@ -531,13 +611,94 @@
       setTimeout(function () { onReady(session); }, SUCCESS_ANIM_MS);
     }
 
+    // Shared by both the login and register submit handlers: saves the
+    // session, then either continues straight to the success screen (the
+    // common case), or — if year/parent_phone are still missing on this
+    // account — routes to completeProfile before onReady ever fires.
+    function proceedAfterAuth(data) {
+      var session = {
+        student_id: data.student_id, student_name: data.student_name, session_token: data.session_token,
+        year: data.year || "", parent_phone: data.parent_phone || "",
+      };
+      saveSession(session);
+      mountGlobalWidget();
+      if (!session.year || !session.parent_phone) {
+        sessionForProfile = session;
+        step = "completeProfile";
+        render();
+        return;
+      }
+      renderSuccessThenReady(session);
+    }
+
     render();
 
     function render() {
       root.innerHTML = "";
-      if (step === "login") renderLoginStep();
+      if (step === "completeProfile") renderCompleteProfileStep(sessionForProfile);
+      else if (step === "login") renderLoginStep();
       else if (step === "register") renderRegisterStep();
       else renderPhoneStep();
+    }
+
+    function renderCompleteProfileStep(session) {
+      var yearSelect = el("select", { class: "qz-input qz-select", required: "required" }, [
+        el("option", { value: "" }, ["Which year are you in?"]),
+        el("option", { value: "Senior 1" }, ["Senior 1"]),
+        el("option", { value: "Senior 2" }, ["Senior 2"]),
+      ]);
+      if (session.year) yearSelect.value = session.year;
+      var parentPhoneInput = el("input", {
+        class: "qz-input", type: "tel", inputmode: "tel", autocomplete: "tel",
+        placeholder: "Parent's phone number", required: "required",
+      });
+      if (session.parent_phone) parentPhoneInput.value = session.parent_phone;
+      var errorMsg = el("div", { class: "qz-error" });
+      var submitBtn = el("button", { class: "qz-next", type: "button" }, ["Save & continue \u2192"]);
+
+      function submit() {
+        if (busy) return;
+        var year = yearSelect.value;
+        var parentPhone = parentPhoneInput.value.trim();
+        if (!year) {
+          errorMsg.textContent = "Choose your year.";
+          yearSelect.focus();
+          return;
+        }
+        if (!looksLikePhone(parentPhone)) {
+          errorMsg.textContent = "Enter a valid parent's phone number.";
+          parentPhoneInput.focus();
+          return;
+        }
+        busy = true;
+        setBusy(submitBtn, true);
+        postToDrive({ action: "update_profile", student_id: session.student_id, session_token: session.session_token, year: year, parent_phone: parentPhone })
+          .then(function () {
+            session.year = year;
+            session.parent_phone = parentPhone;
+            saveSession(session);
+            onReady(session);
+          })
+          .catch(function (err) {
+            busy = false;
+            setBusy(submitBtn, false);
+            errorMsg.textContent = err.message || "Couldn't save \u2014 try again.";
+          });
+      }
+
+      submitBtn.addEventListener("click", submit);
+
+      var card = el("div", { class: "qz-card frame" }, [
+        el("span", { class: "tick-br" }),
+        el("span", { class: "tick-bl" }),
+        el("p", { class: "qz-question" }, ["A couple of details we still need"]),
+        el("p", { class: "qz-subtle" }, ["Signed in as " + session.student_name]),
+        el("div", { class: "qz-field" }, [yearSelect]),
+        el("div", { class: "qz-field" }, [parentPhoneInput]),
+        errorMsg,
+        el("div", { class: "qz-actions" }, [submitBtn]),
+      ]);
+      root.appendChild(card);
     }
 
     function renderPhoneStep() {
@@ -613,10 +774,7 @@
             return postToDrive({ action: "login_student", phone: phone, password_hash: hash });
           })
           .then(function (data) {
-            var session = { student_id: data.student_id, student_name: data.student_name };
-            saveSession(session);
-            mountGlobalWidget();
-            renderSuccessThenReady(session);
+            proceedAfterAuth(data);
           })
           .catch(function (err) {
             busy = false;
@@ -642,6 +800,12 @@
 
     function renderRegisterStep() {
       var nameInput = el("input", { class: "qz-input", type: "text", placeholder: "Your name", required: "required", autocomplete: "name" });
+      var yearSelect = el("select", { class: "qz-input qz-select", required: "required" }, [
+        el("option", { value: "", disabled: "disabled", selected: "selected" }, ["Which year are you in?"]),
+        el("option", { value: "Senior 1" }, ["Senior 1"]),
+        el("option", { value: "Senior 2" }, ["Senior 2"]),
+      ]);
+      var parentPhoneInput = el("input", { class: "qz-input", type: "tel", inputmode: "tel", placeholder: "Parent's phone number", required: "required", autocomplete: "tel" });
       var pw = passwordField("Set a password", "qz-input", "qz-pwtoggle");
       var errorMsg = el("div", { class: "qz-error" });
       var backBtn = el("button", { class: "qz-authswitch", type: "button" }, ["\u2190 Wrong number?"]);
@@ -652,10 +816,22 @@
       function submit() {
         if (busy) return;
         var name = nameInput.value.trim();
+        var year = yearSelect.value;
+        var parentPhone = parentPhoneInput.value.trim();
         var val = pw.input.value;
         if (!name) {
           errorMsg.textContent = "Enter your name.";
           nameInput.focus();
+          return;
+        }
+        if (!year) {
+          errorMsg.textContent = "Choose your year.";
+          yearSelect.focus();
+          return;
+        }
+        if (!looksLikePhone(parentPhone)) {
+          errorMsg.textContent = "Enter a valid parent's phone number.";
+          parentPhoneInput.focus();
           return;
         }
         if (!val || val.length < 4) {
@@ -667,13 +843,10 @@
         setBusy(registerBtn, true);
         sha256Hex(val)
           .then(function (hash) {
-            return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name });
+            return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name, year: year, parent_phone: parentPhone });
           })
           .then(function (data) {
-            var session = { student_id: data.student_id, student_name: data.student_name };
-            saveSession(session);
-            mountGlobalWidget();
-            renderSuccessThenReady(session);
+            proceedAfterAuth(data);
           })
           .catch(function (err) {
             busy = false;
@@ -691,6 +864,8 @@
         el("p", { class: "qz-question" }, ["First time here \u2014 set up your account"]),
         el("p", { class: "qz-subtle" }, [maskPhone(phone)]),
         el("div", { class: "qz-field" }, [nameInput]),
+        el("div", { class: "qz-field" }, [yearSelect]),
+        el("div", { class: "qz-field" }, [parentPhoneInput]),
         el("div", { class: "qz-field" }, [pw.wrap]),
         errorMsg,
         el("div", { class: "qz-actions-row" }, [backBtn, registerBtn]),
@@ -699,5 +874,11 @@
     }
   }
 
-  window.AuthEngine = { mount: mount, getSession: getSession, clearSession: clearSession };
+  window.AuthEngine = {
+    mount: mount,
+    getSession: getSession,
+    clearSession: clearSession,
+    getMyResults: getMyResults,
+    adminGetAll: adminGetAll,
+  };
 })();

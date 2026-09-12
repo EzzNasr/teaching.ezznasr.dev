@@ -16,13 +16,13 @@
    inside an iframe). The Open/Download links below are plain top-level
    navigations to drive.google.com and are not affected by that — if the
    inline preview ever looks broken, Open/Download are the reliable path.
+
    ========================================================================== */
 
 (function () {
   "use strict";
 
   var EMBEDDABLE_TYPES = ["pdf", "png", "jpg", "jpeg", "gif", "webp"];
-
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     attrs = attrs || {};

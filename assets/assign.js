@@ -40,7 +40,6 @@
   var QUEUE_KEY = "teaching_pending_submissions";
   var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
   var MAX_FILE_BYTES = 15 * 1024 * 1024; // 15MB — keep well under Apps Script's request-size ceiling
-
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     attrs = attrs || {};
@@ -84,23 +83,25 @@
     });
   }
 
-  function postToDrive(payload) {
-    if (!DRIVE_ENDPOINT) {
-      return Promise.reject(new Error("not-configured"));
-    }
+  // Retries once if Apps Script returns an HTML page instead of JSON — a
+  // transient Google-side hiccup (seen right after redeploys, under load),
+  // not a code bug.
+  function postToDrive(payload, isRetry) {
+    if (!DRIVE_ENDPOINT) return Promise.reject(new Error("not-configured"));
     return fetch(DRIVE_ENDPOINT, {
       method: "POST",
-      // text/plain is CORS-safelisted, so the browser skips the preflight
-      // OPTIONS request. Apps Script has no doOptions() handler, so a
-      // preflighted request (e.g. Content-Type: application/json) gets
-      // silently blocked by the browser before doPost ever runs. doPost
-      // still JSON.parses e.postData.contents regardless of the declared
-      // type, so this is a pure client-side header change.
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload),
     }).then(function (resp) {
-      return resp.json().then(function (data) {
-        if (!data || !data.ok) throw new Error((data && data.error) || "Drive bridge rejected the submission.");
+      return resp.text().then(function (raw) {
+        var data;
+        try {
+          data = JSON.parse(raw);
+        } catch (e) {
+          if (!isRetry) return postToDrive(payload, true);
+          throw new Error("The server sent back something unexpected. Please try again.");
+        }
+        if (!data || !data.ok) throw new Error((data && data.error) || "Drive bridge rejected the request.");
         return data;
       });
     });
@@ -327,7 +328,22 @@
             "Saved on this device, but couldn't reach the server just now. It'll still be here if you check back \u2014 consider letting your instructor know just in case.",
           ]));
         }
-        root.appendChild(el("div", { class: "qz-summary frame" }, children));
+        // Each attempt is its own new row on the Submissions sheet (Code.gs
+        // always appendRow()s, never overwrites) — retaking isn't blocked,
+        // so this is just giving that an actual button instead of forcing
+        // a page reload to get back to a blank form.
+        children.push(el("button", { class: "qz-retry", type: "button" }, ["Submit another attempt"]));
+
+        var summary = el("div", { class: "qz-summary frame" }, children);
+        summary.querySelector(".qz-retry").addEventListener("click", function () {
+          state.submitted = false;
+          state.score = 0;
+          state.total = 0;
+          state.answers = [];
+          state.syncStatus = null;
+          render();
+        });
+        root.appendChild(summary);
       }
     }
 
@@ -495,7 +511,13 @@
           el("span", { class: "tick-br" }),
           el("span", { class: "tick-bl" }),
           el("div", { class: "qz-summary__label" }, [label]),
+          el("button", { class: "qz-retry", type: "button" }, ["Submit another"]),
         ]);
+        // Same "each attempt is a new row" story as the graded flow above —
+        // Code.gs appendRow()s every submission, so resubmitting (a new
+        // text paste, a corrected link, a replacement file) just adds
+        // another record rather than overwriting the first one.
+        summary.querySelector(".qz-retry").addEventListener("click", render);
         root.appendChild(summary);
       }
     }
