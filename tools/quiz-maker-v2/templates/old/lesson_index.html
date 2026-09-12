@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{LESSON_TITLE}} — Ezz Nasr : Teaching</title>
+<meta name="description" content="{{LESSON_DESC}}">
+<link rel="canonical" href="https://teaching.ezznasr.dev/{{SUBJECT_SLUG}}/{{LESSON_SLUG}}/">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/base.css">
+<style>
+  main{ padding:24px 0 64px; }
+
+  /* ---- nav (single "back to subject" link) ---- */
+  .titlebar nav a{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-dim); text-decoration:none; }
+  .titlebar nav a::before{ content:"\2190 "; }
+
+  .media-slot{ width:100%; aspect-ratio:16/9; border:1px dashed var(--line); margin:28px 0;
+    background:repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(201,151,76,0.05) 10px, rgba(201,151,76,0.05) 20px), var(--bg-soft);
+    display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); text-align:center; padding:16px; }
+  .media-slot iframe{ width:100%; height:100%; border:0; }
+  .lesson-links{ display:flex; gap:14px; flex-wrap:wrap; margin-top:32px; }
+  .lesson-link{ flex:1 1 220px; padding:20px; text-decoration:none; transition:border-color .18s ease, transform .18s ease; display:block; }
+  .lesson-link:hover{ border-color:var(--copper); transform:translateY(-2px); }
+  .lesson-link .ll-title{ font-family:var(--mono); font-size:13.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink); }
+  .lesson-link .ll-desc{ color:var(--ink-dim); font-size:13.5px; margin-top:6px; }
+  .lesson-link .ll-go{ font-family:var(--mono); font-size:11.5px; color:var(--copper-bright); margin-top:10px; display:block; }
+  .lesson-link .ll-go::after{ content:" \2192"; }
+
+  /* ---- attachments ---- */
+  .attachments{ margin-top:32px; }
+  .attach-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+  .attach-head h2{ font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-dim); }
+  .stamp{ font-family:var(--mono); font-size:10px; letter-spacing:0.1em; text-transform:uppercase; padding:4px 8px; border:1px solid currentColor; white-space:nowrap; }
+  .stamp.planned{ color:var(--ink-dim); }
+  .stamp.ready{ color:var(--status-shipped); }
+  .attach-empty{ padding:18px 20px; color:var(--ink-dim); font-size:13.5px; }
+  .attach-empty code{ font-family:var(--mono); background:var(--bg-soft); padding:0.1em 0.4em; font-size:0.85em; border:1px solid var(--line); }
+  .attach-item{ padding:14px 16px; margin-bottom:10px; }
+  .attach-item__title{ font-family:var(--mono); font-size:13px; color:var(--ink); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .attach-item__actions a{ font-family:var(--mono); font-size:11px; letter-spacing:0.04em; color:var(--copper-bright); text-decoration:none; }
+  .attach-item iframe{ width:100%; height:340px; border:1px solid var(--line); background:var(--bg-soft); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR : TEACHING</a>
+    <nav><a href="/{{SUBJECT_SLUG}}/">Back to {{SUBJECT_TITLE}}</a></nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>{{LESSON_TITLE}}</h1>
+    <p class="lede">{{LESSON_DESC}}</p>
+  </div>
+
+  <div class="wrap">
+    <div class="media-slot">
+      {{VIDEO_BLOCK}}
+    </div>
+
+    <div class="lesson-links">
+      <a class="lesson-link frame" href="/{{SUBJECT_SLUG}}/{{LESSON_SLUG}}/quiz.html">
+        <div class="ll-title">Quiz</div>
+        <div class="ll-desc">{{QUESTION_COUNT}} questions &middot; instant feedback</div>
+        <span class="ll-go">Start</span>
+      </a>
+{{ASSIGNMENT_LINK_BLOCK}}
+    </div>
+
+    <div class="attachments" id="attachments-root" data-subject="{{SUBJECT_SLUG}}" data-lesson="{{LESSON_SLUG}}">
+      <div class="attach-head">
+        <h2>Attachments</h2>
+        <span class="stamp planned" id="attachments-stamp">Loading&hellip;</span>
+      </div>
+      <div id="attachments-list">
+        <div class="attach-empty frame">
+          <span class="tick-br"></span><span class="tick-bl"></span>
+          No attachments for this lesson yet.
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer><p class="footer-note">teaching.ezznasr.dev/{{SUBJECT_SLUG}}/{{LESSON_SLUG}}</p></footer>
+
+<script src="/assets/attachments.js"></script>
+<script>AttachEngine.mount('#attachments-root');</script>
+
+</body>
+</html>

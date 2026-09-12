@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{SUBJECT_TITLE}} — Ezz Nasr : Teaching</title>
+<meta name="description" content="{{SUBJECT_TITLE}} lessons, quizzes, and assignments.">
+<link rel="canonical" href="https://teaching.ezznasr.dev/{{SUBJECT_SLUG}}/">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/base.css">
+<style>
+  :root{ --maxw:1080px; }
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion: reduce){ *{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important;} }
+
+  .eyebrow{ font-family:var(--mono); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:var(--copper); }
+
+  /* ---- nav: two links (All subjects / ezznasr.dev), only .back gets the arrow ---- */
+  nav{ display:flex; gap:22px; font-family:var(--mono); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; }
+  nav a{ color:var(--ink-dim); text-decoration:none; transition:color .15s ease; }
+  nav a:hover, nav a.current{ color:var(--copper-bright); }
+  nav a.back::before{ content:"\2190 "; }
+
+  /* ---- page head: wider lede, different padding, dwg-strip + h1 sizing this page adds ---- */
+  .page-head{ padding:48px 0 34px; }
+  .page-head h1{ font-size:clamp(28px,4.5vw,44px); line-height:1.05; margin-bottom:12px; }
+  .page-head p.lede{ max-width:620px; font-size:16.5px; margin:0; }
+  .tb-meta{ display:grid; grid-template-columns:repeat(4,auto); gap:0; border:1px solid var(--line); font-family:var(--mono); font-size:11px; letter-spacing:0.06em; color:var(--ink-dim); margin-bottom:28px; width:fit-content; }
+  .tb-meta div{ padding:8px 14px; border-right:1px solid var(--line); }
+  .tb-meta div:last-child{ border-right:none; }
+  .tb-meta b{ display:block; color:var(--copper); font-weight:600; margin-bottom:2px; font-size:10px; }
+
+  /* ---- optional about/stat panel ---- */
+  .stat-panel{ width:100%; max-width:620px; border:1px solid var(--line); background:var(--bg-soft); padding:16px 18px; display:grid; grid-template-columns:repeat(3,1fr); gap:0; margin-top:22px; }
+  .stat-panel .stat{ padding:6px 14px; border-left:1px dashed var(--line); text-align:left; }
+  .stat-panel .stat:first-child{ border-left:none; padding-left:0; }
+  .stat-panel .stat b{ display:block; font-family:var(--mono); font-size:22px; color:var(--copper-bright); letter-spacing:0.01em; line-height:1.1; }
+  .stat-panel .stat span{ display:block; margin-top:4px; font-family:var(--mono); font-size:10px; letter-spacing:0.07em; text-transform:uppercase; color:var(--ink-dim); }
+  @media (max-width:520px){ .stat-panel{ grid-template-columns:1fr; } .stat-panel .stat{ border-left:none; border-top:1px dashed var(--line); padding:10px 0; } .stat-panel .stat:first-child{ border-top:none; padding-top:0; } }
+
+  section.block{ padding:48px 0; border-top:1px solid var(--line); scroll-margin-top:76px; }
+  .section-head{ margin-bottom:26px; }
+  .section-head h2{ font-size:19px; margin-top:6px; }
+  .section-head p.blurb{ color:var(--ink-dim); font-size:15px; max-width:640px; margin:8px 0 0; }
+
+  /* ---- lesson cards: entry point for quiz + assignment ---- */
+  .lessons{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:24px; }
+  .lesson-card{ padding:22px; display:flex; flex-direction:column; gap:14px; text-decoration:none; transition:transform .22s ease, border-color .22s ease, box-shadow .22s ease; }
+  .lesson-card:hover{ transform:translateY(-3px); border-color:var(--copper); box-shadow:0 14px 28px -18px rgba(0,0,0,.55), 0 0 0 1px rgba(201,151,76,.08); }
+  .lc-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .lesson-card h3{ font-size:14.5px; letter-spacing:0.04em; }
+  .stamp{ font-family:var(--mono); font-size:10px; letter-spacing:0.1em; text-transform:uppercase; padding:4px 8px; border:1px solid currentColor; white-space:nowrap; flex:0 0 auto; }
+  .stamp.demo{ color:var(--status-progress); } .stamp.shipped{ color:var(--status-shipped); } .stamp.planned{ color:var(--ink-dim); }
+  .lesson-card p{ color:var(--ink-dim); font-size:14.5px; margin:0; }
+  .lc-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:auto; padding-top:4px; }
+  .chip{ font-family:var(--mono); font-size:10.5px; letter-spacing:0.04em; color:var(--ink-dim); border:1px solid var(--line); padding:3px 8px; }
+  .lesson-card:hover .chip{ border-color:rgba(201,151,76,0.4); }
+  .lc-go{ font-family:var(--mono); font-size:11.5px; color:var(--copper-bright); }
+  .lc-go::after{ content:" \2192"; }
+
+  /* ---- footer: this page uses a two-column grid instead of the
+     single centered note the other three templates use ---- */
+  footer{ padding:44px 0 32px; }
+  .footer-note{ text-align:left; }
+  .footer-grid{ display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:24px; }
+  .footer-links{ display:flex; gap:22px; flex-wrap:wrap; font-family:var(--mono); font-size:12.5px; letter-spacing:0.06em; }
+  .footer-links a{ color:var(--ink-dim); text-decoration:none; }
+  .footer-links a:hover{ color:var(--copper-bright); }
+  @media (max-width:760px){ nav{ display:none; } .tb-meta{ grid-template-columns:repeat(2,auto); } .lessons{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR : TEACHING</a>
+    <nav>
+      <a href="/" class="back">All subjects</a>
+      <a href="https://ezznasr.dev/">ezznasr.dev</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <div class="tb-meta">
+      <div><b>Dwg No.</b>EN-2026-{{DWG_NO}}</div><div><b>Rev</b>2026.08</div><div><b>Doc</b>{{SUBJECT_TITLE}}</div><div><b>Status</b>Active</div>
+    </div>
+    <h1>{{SUBJECT_TITLE}}</h1>
+    <p class="lede">{{SUBJECT_LEDE}}</p>
+{{ABOUT_BLOCK}}
+  </div>
+
+  <section class="block" id="lessons">
+    <div class="wrap">
+      <div class="section-head"><span class="eyebrow">Lessons</span><h2>Lessons</h2><p class="blurb">Each lesson is the entry point for its own quiz and assignment.</p></div>
+      <div class="lessons">
+<!-- LESSON_CARDS_START -->
+<!-- LESSON_CARDS_END -->
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-links">
+        <a href="mailto:ezznasrone@gmail.com">ezznasrone@gmail.com</a>
+        <a href="https://www.linkedin.com/in/EzzNasr" target="_blank" rel="noopener">LinkedIn</a>
+        <a href="https://github.com/EzzNasr" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <div class="footer-note">Dwg No. EN-2026-{{DWG_NO}} &nbsp;&middot;&nbsp; Rev 2026.08 &nbsp;&middot;&nbsp; teaching.ezznasr.dev/{{SUBJECT_SLUG}}</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
