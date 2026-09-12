@@ -24,8 +24,6 @@
     transition:border-color .15s ease, color .15s ease; }
   .qz-mode-btn.active{ border-color:var(--accent); color:var(--accent-strong); }
 </style>
-<link rel="stylesheet" href="/assets/theme.css">
-<script src="/assets/theme.js" defer></script>
 </head>
 <body class="">
 
@@ -46,14 +44,19 @@
   </div>
 
   <div class="wrap">
-    <div id="assign-root" data-subject="programming" data-lesson="functions" data-mode="file" aria-live="polite"></div>
+    <div id="assign-root" data-subject="programming" data-lesson="functions" data-mode="graded" aria-live="polite"></div>
   </div>
 </main>
 
 <footer><div class="wrap"><p class="footer-note">teaching.ezznasr.dev/programming/other/functions/assignment</p></div></footer>
 
+<script type="application/json" id="assign-questions">
+{"items": [{"type": "mcq", "prompt": "is this working \t?", "options": ["Yes", "No", "maybe"], "correct": [0], "explain": "", "id": "g1"}, {"type": "truefalse", "prompt": "Sub ?", "correct": true, "explain": "", "id": "g2"}]}
+</script>
+<script src="/assets/auth.js"></script>
 <script src="/assets/assign.js"></script>
 <script>AssignEngine.mount('#assign-root');</script>
+<script>(function(){var root=document.documentElement,toggle=document.getElementById('theme-toggle'),stored;try{stored=localStorage.getItem('teaching-theme')}catch(e){}var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');function apply(theme){root.setAttribute('data-theme',theme);toggle.setAttribute('aria-pressed',theme==='dark'?'true':'false');toggle.setAttribute('aria-label',theme==='dark'?'Switch to light mode':'Switch to dark mode');toggle.querySelector('.theme-icon').textContent=theme==='dark'?'\u2600':'\u263E';try{localStorage.setItem('teaching-theme',theme)}catch(e){}}apply(initial);toggle.addEventListener('click',function(){apply(root.getAttribute('data-theme')==='dark'?'light':'dark')})})();</script>
 
 </body>
 </html>
