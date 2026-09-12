@@ -108,7 +108,6 @@
   </div>
 </footer>
 
-<script src="/assets/common.js"></script>
 <script src="/assets/auth.js"></script>
 <script>(function(){var root=document.documentElement,toggle=document.getElementById('theme-toggle'),stored;try{stored=localStorage.getItem('teaching-theme')}catch(e){}var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');function apply(theme){root.setAttribute('data-theme',theme);toggle.setAttribute('aria-pressed',theme==='dark'?'true':'false');toggle.setAttribute('aria-label',theme==='dark'?'Switch to light mode':'Switch to dark mode');toggle.querySelector('.theme-icon').textContent=theme==='dark'?'\u2600':'\u263E';try{localStorage.setItem('teaching-theme',theme)}catch(e){}}apply(initial);toggle.addEventListener('click',function(){apply(root.getAttribute('data-theme')==='dark'?'light':'dark')})})();</script>
 

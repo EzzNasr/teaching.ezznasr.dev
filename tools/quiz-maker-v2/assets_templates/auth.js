@@ -31,7 +31,19 @@
 
   var SESSION_KEY = "teaching_session";
   var DRIVE_ENDPOINT = "{{DRIVE_ENDPOINT}}";
-  var el = window.TeachingCommon.el;
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === "class") node.className = attrs[k];
+      else if (k === "html") node.innerHTML = attrs[k];
+      else node.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) {
+      if (c) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    });
+    return node;
+  }
 
   // Toggles a button between idle and "working" — working dims the button
   // (kept visible, just disabled-looking) and inserts a real progress-bar
@@ -135,8 +147,28 @@
     });
   }
 
-  function postToDrive(payload) {
-    return window.TeachingCommon.postToDrive(DRIVE_ENDPOINT, payload);
+  // Retries once if Apps Script returns an HTML page instead of JSON — a
+  // transient Google-side hiccup (seen right after redeploys, under load),
+  // not a code bug.
+  function postToDrive(payload, isRetry) {
+    if (!DRIVE_ENDPOINT) return Promise.reject(new Error("not-configured"));
+    return fetch(DRIVE_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload),
+    }).then(function (resp) {
+      return resp.text().then(function (raw) {
+        var data;
+        try {
+          data = JSON.parse(raw);
+        } catch (e) {
+          if (!isRetry) return postToDrive(payload, true);
+          throw new Error("The server sent back something unexpected. Please try again.");
+        }
+        if (!data || !data.ok) throw new Error((data && data.error) || "Drive bridge rejected the request.");
+        return data;
+      });
+    });
   }
 
   // -- Global corner widget ---------------------------------------------

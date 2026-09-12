@@ -1024,11 +1024,12 @@ def list_existing_lessons(site_root, subject_slug, group_relpath=""):
 def sync_site_assets(site_root, drive_web_app_url):
     """Write auth.js / quiz.js / assign.js / attachments.js from
     assets_templates/ into <site_root>/assets/, substituting the Drive
-    bridge endpoint.
-    Also copies common.js (shared el()/postToDrive() helpers — no
-    substitution needed, just a static copy) and the shared stylesheets
-    (base.css, forms.css) the same way, kept in step with the shipped
-    copy in assets_templates/.
+    bridge endpoint. Each engine carries its own el()/postToDrive() copy
+    (common.js was tried as a shared home for these and rolled back —
+    left in assets_templates/ unreferenced, not deleted, in case it's
+    revisited later).
+    Also copies the shared stylesheets (base.css, forms.css) the same
+    way, kept in step with the shipped copy in assets_templates/.
     Call this after (re)configuring the Drive bridge or updating the
     generator so the live site picks up the new engine code."""
     assets_dir = os.path.join(site_root, "assets")
@@ -1043,7 +1044,7 @@ def sync_site_assets(site_root, drive_web_app_url):
             f.write(content)
         written.append(out_path)
 
-    for name in ("common.js", "base.css", "forms.css"):
+    for name in ("base.css", "forms.css"):
         content = load_asset_template(name)
         out_path = os.path.join(assets_dir, name)
         with open(out_path, "w", encoding="utf-8") as f:

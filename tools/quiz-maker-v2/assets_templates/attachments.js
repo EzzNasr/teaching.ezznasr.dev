@@ -17,14 +17,25 @@
    navigations to drive.google.com and are not affected by that — if the
    inline preview ever looks broken, Open/Download are the reliable path.
 
-   Depends on common.js (el() helper) — must load before this script.
    ========================================================================== */
 
 (function () {
   "use strict";
 
   var EMBEDDABLE_TYPES = ["pdf", "png", "jpg", "jpeg", "gif", "webp"];
-  var el = window.TeachingCommon.el;
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === "class") node.className = attrs[k];
+      else if (k === "html") node.innerHTML = attrs[k];
+      else node.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) {
+      if (c) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    });
+    return node;
+  }
 
   function viewUrl(fileId) {
     return "https://drive.google.com/file/d/" + encodeURIComponent(fileId) + "/view?usp=drive_link";
