@@ -33,7 +33,7 @@
   "use strict";
 
   var SESSION_KEY = "teaching_session";
-  var DRIVE_ENDPOINT = "{{DRIVE_ENDPOINT}}";
+  var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
@@ -151,7 +151,7 @@
     });
   }
 
-  function postToDrive(payload) {
+  function postToDrive(payload, isRetry) {
     if (!DRIVE_ENDPOINT) return Promise.reject(new Error("not-configured"));
     return fetch(DRIVE_ENDPOINT, {
       method: "POST",
@@ -160,7 +160,19 @@
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload),
     }).then(function (resp) {
-      return resp.json().then(function (data) {
+      return resp.text().then(function (raw) {
+        var data;
+        try {
+          data = JSON.parse(raw);
+        } catch (e) {
+          // Apps Script Web Apps occasionally return an HTML page instead
+          // of JSON — a transient Google-side hiccup (seen right after
+          // redeploys, under load), not a login/deploy bug. One silent
+          // retry clears it almost every time; the student just sees the
+          // loading state run slightly longer, not an error.
+          if (!isRetry) return postToDrive(payload, true);
+          throw new Error("The server sent back something unexpected. Please try again.");
+        }
         if (!data || !data.ok) throw new Error((data && data.error) || "Request failed.");
         return data;
       });
