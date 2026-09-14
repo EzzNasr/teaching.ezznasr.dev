@@ -108,27 +108,84 @@ def lock_min_width_to_content(win, extra=24):
     win.minsize(new_min_w, existing_min_h)
 
 
-def enable_select_all_shortcut(win):
-    """Ctrl+A in a plain Tk Entry/Text defaults to Emacs-style 'move to
-    start of line', not 'select all' — surprising for anyone used to the
-    Windows/Mac convention. Bound once on the toplevel; only fires when
-    focus is actually in an Entry/Text/Combobox, so it never interferes
-    with other Ctrl+A uses (there aren't any elsewhere in this app)."""
-    def _select_all(event):
-        widget = event.widget
-        if isinstance(widget, (tk.Entry, ttk.Entry, ttk.Combobox)):
-            widget.selection_range(0, "end")
-            widget.icursor("end")
-            return "break"
+def enable_clipboard_shortcuts(win):
+    """Make Ctrl+A/C/X/V/Z/Y (select-all / copy / cut / paste / undo /
+    redo) work reliably in every Entry, ttk.Combobox, and Text widget in
+    the app — regardless of the active keyboard language/layout.
+
+    Why this is needed: Tk's built-in clipboard bindings (and the old
+    version of this function, which bound the literal "<Control-a>")
+    match on the *keysym* a keypress produces. On some keyboard layouts
+    — Arabic being the one reported here — holding Ctrl and pressing the
+    physical A/C/X/V/Z/Y key does not produce the plain ASCII keysym Tk
+    expects, so Tk's built-in Ctrl+C/Ctrl+V/Ctrl+X *and* this app's own
+    Ctrl+A binding silently never fire, even though the right physical
+    key is being pressed.
+
+    Fix: bind the general "a key was pressed while Control is held"
+    pattern instead of a specific letter, then identify *which* key it
+    was using the numeric keycode — the physical key position, which
+    stays the same no matter what character the active layout types
+    there — falling back to the keysym only if the keycode is missing.
+
+    Bound at the Tk *class* level (Entry/TCombobox/Text), so this is
+    interpreter-wide: call it once, anywhere, after the root window
+    exists (each tab's __init__ does this defensively, so it's covered
+    no matter which tab loads first — calling it more than once is
+    harmless, the later call just replaces the same class binding).
+    """
+    # Windows virtual-key codes / X11 keycodes for the physical A/C/X/V/Z/Y
+    # keys. These identify the physical key, not the character the active
+    # layout produces there, so Arabic (or any other) layout doesn't matter.
+    KEYCODE_ACTIONS = {65: "selectall", 67: "copy", 88: "cut", 86: "paste", 90: "undo", 89: "redo"}
+    KEYSYM_ACTIONS = {"a": "selectall", "c": "copy", "x": "cut", "v": "paste", "z": "undo", "y": "redo"}
+
+    def _select_all(widget):
         if isinstance(widget, tk.Text):
             widget.tag_add("sel", "1.0", "end-1c")
             widget.mark_set("insert", "end-1c")
+            return True
+        if isinstance(widget, (tk.Entry, ttk.Entry)):  # ttk.Combobox is a ttk.Entry subclass
+            widget.selection_range(0, "end")
+            widget.icursor("end")
+            return True
+        return False
+
+    def _on_ctrl_key(event):
+        action = KEYCODE_ACTIONS.get(event.keycode) or KEYSYM_ACTIONS.get(event.keysym.lower())
+        if action is None:
+            return None  # not one of ours — let normal Ctrl+<key> handling continue
+        if action == "selectall":
+            return "break" if _select_all(event.widget) else None
+        if action in ("copy", "cut", "paste"):
+            event.widget.event_generate("<<{}>>".format(action.capitalize()))
+            return "break"
+        if action in ("undo", "redo"):
+            try:
+                event.widget.event_generate("<<{}>>".format(action.capitalize()))
+            except tk.TclError:
+                pass  # widget wasn't created with undo=True — nothing to do
             return "break"
         return None
-    win.bind_class("Entry", "<Control-a>", _select_all)
-    win.bind_class("TEntry", "<Control-a>", _select_all)
-    win.bind_class("TCombobox", "<Control-a>", _select_all)
-    win.bind_class("Text", "<Control-a>", _select_all)
+
+    def _on_ctrl_shift_key(event):
+        # Ctrl+Shift+Z is the common alternate chord for "redo".
+        if event.keycode == 90 or event.keysym.lower() == "z":
+            try:
+                event.widget.event_generate("<<Redo>>")
+            except tk.TclError:
+                pass
+            return "break"
+        return None
+
+    for widget_class in ("Entry", "TEntry", "TCombobox", "Text"):
+        win.bind_class(widget_class, "<Control-KeyPress>", _on_ctrl_key)
+        win.bind_class(widget_class, "<Control-Shift-KeyPress>", _on_ctrl_shift_key)
+
+
+# Old name, kept so any existing call sites (or a main app.py not shown
+# here) keep working unchanged.
+enable_select_all_shortcut = enable_clipboard_shortcuts
 
 
 class ScrollableFrame(tk.Frame):

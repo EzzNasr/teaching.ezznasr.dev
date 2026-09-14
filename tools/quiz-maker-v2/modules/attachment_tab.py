@@ -29,6 +29,7 @@ class AttachmentTab(ttk.Frame):
         self.site_root_var = site_root_var
         self.status_var = status_var
         self.selected_file_path = tk.StringVar(value="")
+        common.enable_clipboard_shortcuts(self)
         self._build_form()
 
     def _build_form(self):
@@ -44,15 +45,7 @@ class AttachmentTab(ttk.Frame):
         subject_combo = ttk.Combobox(row1, textvariable=self.subject_var, state="readonly",
                                       values=[label for _, label in common.SUBJECTS])
         subject_combo.pack(side="left", fill="x", expand=True)
-        subject_combo.bind("<<ComboboxSelected>>", lambda e: self._refresh_groups())
-
-        row1b = tk.Frame(pick_frame)
-        row1b.pack(fill="x", padx=8, pady=4)
-        tk.Label(row1b, text="Group:", width=14, anchor="w").pack(side="left")
-        self.group_var = tk.StringVar()
-        self.group_combo = ttk.Combobox(row1b, textvariable=self.group_var, state="readonly", values=[])
-        self.group_combo.pack(side="left", fill="x", expand=True)
-        self.group_combo.bind("<<ComboboxSelected>>", lambda e: self._refresh_lessons())
+        subject_combo.bind("<<ComboboxSelected>>", lambda e: self._refresh_lessons())
 
         row2 = tk.Frame(pick_frame)
         row2.pack(fill="x", padx=8, pady=4)
@@ -101,8 +94,7 @@ class AttachmentTab(ttk.Frame):
         tk.Button(list_frame, text="Remove selected (from this lesson's list only)",
                   command=self._remove_selected).pack(anchor="w", padx=8, pady=(0, 8))
 
-        self._group_map = {}
-        self._refresh_groups()
+        self._refresh_lessons()
 
     # -- helpers ----------------------------------------------------------
 
@@ -113,42 +105,22 @@ class AttachmentTab(ttk.Frame):
                 return slug
         return common.slugify(label)
 
-    def _group_relpath(self):
-        return self._group_map.get(self.group_var.get(), "")
-
     def _lesson_dir(self):
         site_root = self.site_root_var.get().strip()
         subject_slug = self._subject_slug()
-        group_relpath = self._group_relpath()
         lesson_slug = self.lesson_var.get().strip()
         if not (site_root and lesson_slug):
             return None
-        return os.path.join(common.group_dir(site_root, subject_slug, group_relpath), lesson_slug)
+        return os.path.join(site_root, subject_slug, lesson_slug)
 
     def _attachments_path(self):
         lesson_dir = self._lesson_dir()
         return os.path.join(lesson_dir, "attachments.json") if lesson_dir else None
 
-    def _refresh_groups(self):
-        site_root = self.site_root_var.get().strip()
-        subject_slug = self._subject_slug()
-        relpaths = common.list_lesson_groups(site_root, subject_slug) if site_root else []
-        if not relpaths:
-            relpaths = [""]
-        self._group_map = {common.group_display_name(rp): rp for rp in relpaths}
-        display_values = list(self._group_map.keys())
-        self.group_combo["values"] = display_values
-        if display_values and self.group_var.get() not in display_values:
-            self.group_var.set(display_values[0])
-        elif not display_values:
-            self.group_var.set("")
-        self._refresh_lessons()
-
     def _refresh_lessons(self):
         site_root = self.site_root_var.get().strip()
         subject_slug = self._subject_slug()
-        group_relpath = self._group_relpath()
-        lessons = common.list_existing_lessons(site_root, subject_slug, group_relpath) if site_root else []
+        lessons = common.list_existing_lessons(site_root, subject_slug) if site_root else []
         self.lesson_combo["values"] = lessons
         if lessons and self.lesson_var.get() not in lessons:
             self.lesson_var.set(lessons[0])

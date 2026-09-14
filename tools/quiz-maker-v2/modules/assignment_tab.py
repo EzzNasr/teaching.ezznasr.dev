@@ -36,6 +36,7 @@ class AssignmentTab(ttk.Frame):
         self.site_root_var = site_root_var
         self.status_var = status_var
         self._group_map = {}
+        common.enable_clipboard_shortcuts(self)
         self._build_form()
 
     def _build_form(self):

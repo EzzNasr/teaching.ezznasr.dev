@@ -180,6 +180,7 @@ class QuizTab(ttk.Frame):
         # "this happens to reuse an existing folder name". Cleared by
         # _new_lesson() or whenever the form no longer matches it.
         self._editing = None
+        common.enable_clipboard_shortcuts(self)
         self._build_form()
         self._bind_undo_redo()
 
