@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 1  — Development of information Technology and Social Transformation Quiz — Ezz Nasr : Teaching</title>
+<meta name="description" content="A quiz on Lesson 1  — Development of information Technology and Social Transformation.">
+<link rel="canonical" href="https://teaching.ezznasr.dev/programming/baccalaureate/grade-2-secondary/lesson-1-development-of-information-technology-and-social-transformation/quiz.html">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./base.css">
+<link rel="stylesheet" href="./forms.css">
+<style>
+  :root{ --maxw:720px; }
+  main{ padding:24px 0 64px; }
+
+  /* ---- quiz engine styling ---- */
+  .qz-progress{ font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); letter-spacing:0.04em; margin-bottom:12px; }
+  .qz-question{ font-size:17px; margin:0 0 18px; color:var(--ink); }
+  .qz-question code{ font-family:var(--mono); background:var(--panel-soft); padding:0.1em 0.4em; font-size:0.9em; border:1px solid var(--line); border-radius:4px; }
+  .qz-options{ display:flex; flex-direction:column; gap:9px; }
+  .qz-option{
+    display:flex; align-items:flex-start; gap:10px; text-align:left; width:100%;
+    padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel-soft); color:var(--ink);
+    cursor:pointer; font-size:14.5px; transition:border-color .15s ease, transform .1s ease;
+  }
+  .qz-option:hover:not(:disabled){ border-color:var(--accent); }
+  .qz-option:active:not(:disabled){ transform:scale(0.995); }
+  .qz-option__tag{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); flex-shrink:0; padding-top:2px; }
+  .qz-option:disabled{ cursor:default; }
+  .qz-option--correct{ border-color:var(--status-shipped); }
+  .qz-option--correct .qz-option__tag{ color:var(--status-shipped); }
+  .qz-option--incorrect{ border-color:var(--status-fail); }
+  .qz-option--incorrect .qz-option__tag{ color:var(--status-fail); }
+  .qz-verdict{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); font-family:var(--mono); font-size:13px; }
+  .qz-verdict__tag{ display:inline-block; letter-spacing:0.06em; text-transform:uppercase; font-size:11px; padding:3px 8px; border:1px solid currentColor; border-radius:5px; margin-bottom:8px; }
+  .qz-verdict__tag--pass{ color:var(--status-shipped); }
+  .qz-verdict__tag--fail{ color:var(--status-fail); }
+  .qz-verdict__explain{ display:block; color:var(--ink-dim); font-family:var(--sans); font-size:14.5px; margin-top:4px; }
+  .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--accent-strong); margin-bottom:6px; }
+  .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); border-radius:9px; color:var(--ink-dim); padding:9px 16px; cursor:pointer; transition:border-color .15s ease, color .15s ease; }
+  .qz-retry:hover{ border-color:var(--accent); color:var(--accent-strong); }
+</style>
+</head>
+<body class="track-two">
+
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR <span aria-hidden="true">&middot;</span> TEACHING</a>
+    <nav>
+      <a href="/programming/baccalaureate/grade-2-secondary/lesson-1-development-of-information-technology-and-social-transformation/" class="back">Back to Lesson 1  — Development of information Technology and Social Transformation</a>
+      <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">&#9789;</span><span class="theme-label"></span></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>Lesson 1  — Development of information Technology and Social Transformation — quiz</h1>
+    <p class="lede">15 questions. Instant feedback.</p>
+  </div>
+
+  <div class="wrap">
+    <div id="quiz-root" aria-live="polite"></div>
+  </div>
+</main>
+
+<footer><div class="wrap"><p class="footer-note">teaching.ezznasr.dev/programming/baccalaureate/grade-2-secondary/lesson-1-development-of-information-technology-and-social-transformation/quiz</p></div></footer>
+
+<script type="application/json" id="quiz-data">
+{
+  "title": "Lesson 1  \u2014 Development of information Technology and Social Transformation",
+  "subject": "programming",
+  "lesson": "lesson-1-development-of-information-technology-and-social-transformation",
+  "questions": [
+    {
+      "id": "g1",
+      "type": "match",
+      "prompt": "Match each event to the decade when it happened",
+      "rows": [
+        {
+          "label": "Birth of the computer",
+          "correct": "1940s-60s"
+        },
+        {
+          "label": "Spread of personal computers",
+          "correct": "1970s-80s"
+        },
+        {
+          "label": "Commercialization of the Internet",
+          "correct": "1990s"
+        },
+        {
+          "label": "Rise of smartphones",
+          "correct": "2000s"
+        },
+        {
+          "label": "Spread of cloud computing",
+          "correct": "2010s onward"
+        }
+      ],
+      "options": [
+        "1940s-60s",
+        "1970s-80s",
+        "1990s",
+        "2000s",
+        "2010s onward"
+      ],
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g2",
+      "type": "truefalse",
+      "prompt": "Moore's Law describes a historical tendency for transistor counts on an integrated circuit to double about every two years and is based on Quantum mechanics.",
+      "correct": false,
+      "explain": "Moore's Law is an empirical observation based on historical data, not on quantum mechanics.",
+      "chapter": 1
+    },
+    {
+      "id": "g3",
+      "type": "truefalse",
+      "prompt": "Quantum tunneling effect and leakage current are physical limits that make further miniaturization more difficult.",
+      "correct": true,
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g4",
+      "type": "truefalse",
+      "prompt": "SNS is ineffective at spreading information rapidly because users cannot share posts.",
+      "correct": false,
+      "explain": "SNS spreads information rapidly precisely because many users can publish and forward content.",
+      "chapter": 1
+    },
+    {
+      "id": "g5",
+      "type": "truefalse",
+      "prompt": "Buying a notebook from a physical shop with cash is an example of e-commerce.",
+      "correct": false,
+      "explain": "E-commerce requires an Internet-based transaction \u2014 this is not e-commerce.",
+      "chapter": 1
+    },
+    {
+      "id": "g6",
+      "type": "truefalse",
+      "prompt": "Autonomous driving can use edge computing because immediate onboard processing reduces dangerous delay.",
+      "correct": true,
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g7",
+      "type": "truefalse",
+      "prompt": "VR overlays a few digital labels on the real world while leaving the physical scene mostly visible.",
+      "correct": false,
+      "explain": "That description is AR, not VR. VR replaces the real environment with an immersive, computer-generated space.",
+      "chapter": 1
+    },
+    {
+      "id": "g8",
+      "type": "truefalse",
+      "prompt": "A classical bit can be 0 or 1, while a qubit can use superposition.",
+      "correct": true,
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g9",
+      "type": "match",
+      "prompt": "Match each description to its scientific term",
+      "rows": [
+        {
+          "label": "A system that processes information close to the device that produced it.",
+          "correct": "Edge computing"
+        },
+        {
+          "label": "A technology that immerses a user in a computer-generated space.",
+          "correct": "VR"
+        },
+        {
+          "label": "A technology that uses sensors and software to control a vehicle without continuous human operation.",
+          "correct": "Autonomous driving"
+        },
+        {
+          "label": "A technology that adds digital information to a real-world view.",
+          "correct": "AR"
+        },
+        {
+          "label": "A technology based on quantum mechanics, including qubits and superposition.",
+          "correct": "Quantum computing"
+        },
+        {
+          "label": "Enables massive parallel processing for certain problems.",
+          "correct": "Superposition"
+        }
+      ],
+      "options": [
+        "AR",
+        "Autonomous driving",
+        "Edge computing",
+        "Quantum computing",
+        "Superposition",
+        "VR"
+      ],
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g10",
+      "type": "mcq",
+      "prompt": "Moore's Law is best described as the historical tendency for:",
+      "options": [
+        "Internet users to double every year",
+        "transistor counts on an integrated circuit to double about every two years",
+        "smartphone prices to halve every two years",
+        "cloud storage to disappear after two years"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g11",
+      "type": "mcq",
+      "prompt": "Which pair names physical limits that affect further transistor miniaturization?",
+      "options": [
+        "e-mail and Web pages",
+        "quantum tunneling effect and leakage current",
+        "AR and VR",
+        "debit cards and mobile apps"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g12",
+      "type": "mcq",
+      "prompt": "Which statement correctly distinguishes AR from VR?",
+      "options": [
+        "AR replaces the real world; VR adds a small label to it.",
+        "AR keeps the real scene visible with digital additions; VR immerses the user in a virtual space.",
+        "Both terms mean cashless payment.",
+        "VR is a type of personal computer."
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g13",
+      "type": "mcq",
+      "prompt": "Why is edge computing useful in autonomous driving?",
+      "options": [
+        "It removes the need for sensors.",
+        "It processes urgent data close to the vehicle and reduces delay.",
+        "It sends every decision to a distant cloud before acting.",
+        "It turns a vehicle into a smartphone."
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g14",
+      "type": "mcq",
+      "prompt": "What is the key distinction between a classical bit and a qubit?",
+      "options": [
+        "A bit is always online; a qubit is always office.",
+        "A bit uses 0 or 1 at a time; a qubit can use superposition.",
+        "A bit is a vehicle; a qubit is a payment card.",
+        "A bit is AR; a qubit is VR."
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g15",
+      "type": "mcq",
+      "prompt": "Which description best matches cloud computing in the 2010s onward stage?",
+      "options": [
+        "IT resources are delivered as services over the Internet.",
+        "Computers are used only for military work.",
+        "No data can be stored remotely.",
+        "Mobile phones stop using networks."
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "",
+      "chapter": 1
+    }
+  ]
+}
+</script>
+<script src="/assets/auth.js"></script>
+<script src="/assets/quiz.js"></script>
+<script>QuizEngine.mount('#quiz-root', '#quiz-data');</script>
+<script>(function(){var root=document.documentElement,toggle=document.getElementById('theme-toggle'),stored;try{stored=localStorage.getItem('teaching-theme')}catch(e){}var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');function apply(theme){root.setAttribute('data-theme',theme);toggle.setAttribute('aria-pressed',theme==='dark'?'true':'false');toggle.setAttribute('aria-label',theme==='dark'?'Switch to light mode':'Switch to dark mode');toggle.querySelector('.theme-icon').textContent=theme==='dark'?'\u2600':'\u263E';try{localStorage.setItem('teaching-theme',theme)}catch(e){}}apply(initial);toggle.addEventListener('click',function(){apply(root.getAttribute('data-theme')==='dark'?'light':'dark')})})();</script>
+
+</body>
+</html>
