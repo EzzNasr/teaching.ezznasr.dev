@@ -460,6 +460,26 @@
   // "Senior 2" — flip this map if that's backwards.
   var FOLDER_TO_YEAR = { "grade-1-secondary": "Senior 1", "grade-2-secondary": "Senior 2" };
 
+  // A catalog entry with no year folder (English, Math, and any
+  // ungrouped Programming lesson) used to just render as "both years" —
+  // true, but useless as a tag, since it told you nothing about WHICH
+  // subject that was and merged all three into one indistinct bucket.
+  // This gives every such entry its own subject-based tag instead:
+  // "English" / "Math" / "Other Programming" (the "Other" distinguishes
+  // it from a grade-split Programming lesson, which already gets a real
+  // "Senior 1"/"Senior 2" tag from FOLDER_TO_YEAR above). A year-tagged
+  // entry keeps showing its year exactly as before — this only changes
+  // the year-less fallback.
+  var SUBJECT_TAG_LABELS = { programming: "Other Programming", english: "English", math: "Math" };
+  function catalogTag(c) {
+    if (c.year) return c.year;
+    if (SUBJECT_TAG_LABELS[c.subject]) return SUBJECT_TAG_LABELS[c.subject];
+    // Any future subject added to common.SUBJECTS that isn't in the map
+    // above yet still gets a readable tag instead of silently falling
+    // through to "both years" again.
+    return c.subject ? (c.subject.charAt(0).toUpperCase() + c.subject.slice(1)) : "Unspecified";
+  }
+
   function fetchAssignmentCatalog() {
     var branches = ["main", "master"];
     function tryBranch(i) {
@@ -640,7 +660,7 @@
       el("h2", {}, ["Assignment completion"]),
       el("div", { class: "dash-section-note" }, [
         "Programming lessons under a grade-N-secondary folder count only toward that year; " +
-        "everything else (English, Math, and any ungrouped Programming lesson) counts toward both. " +
+        "everything else is tagged by subject instead (English, Math, or Other Programming). " +
         "Catalog is read live from GitHub, so a lesson with zero submissions still shows up."
       ]),
     ]);
@@ -675,7 +695,7 @@
         section.appendChild(el("div", { class: "dash-row" }, [
           el("div", { class: "dash-row-main" }, [
             el("div", { class: "dash-row-title" }, [a.lesson]),
-            el("div", { class: "dash-row-sub" }, [a.subject + (a.year ? " \u00b7 " + a.year : " \u00b7 both years")]),
+            el("div", { class: "dash-row-sub" }, [a.year ? (a.subject + " \u00b7 " + a.year) : catalogTag(a)]),
           ]),
           el("div", { class: "dash-score " + (a.submitted ? "is-good" : "is-low") }, [a.submitted ? ("Submitted" + (a.date ? " \u00b7 " + a.date : "")) : "Not yet"]),
         ]));
@@ -698,7 +718,7 @@
       section.appendChild(el("div", { class: "dash-chapter" }, [
         el("div", { class: "dash-chapter-top" }, [
           el("b", {}, [a.lesson]),
-          document.createTextNode(a.subject + (a.year ? " \u00b7 " + a.year : " \u00b7 both years") + " \u00b7 " + a.submitted + "/" + a.pool),
+          document.createTextNode((a.year ? (a.subject + " \u00b7 " + a.year) : catalogTag(a)) + " \u00b7 " + a.submitted + "/" + a.pool),
         ]),
         el("div", { class: "dash-bar" }, [
           el("div", { class: "dash-bar-fill " + barClass, style: "width:" + Math.max(3, Math.round(pct * 100)) + "%" }),
