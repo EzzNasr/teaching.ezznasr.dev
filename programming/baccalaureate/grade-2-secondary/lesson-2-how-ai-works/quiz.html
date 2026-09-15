@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 2 - How Ai works Quiz — Ezz Nasr : Teaching</title>
+<meta name="description" content="A quiz on Lesson 2 - How Ai works.">
+<link rel="canonical" href="https://teaching.ezznasr.dev/programming/baccalaureate/grade-2-secondary/lesson-2-how-ai-works/quiz.html">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./base.css">
+<link rel="stylesheet" href="./forms.css">
+<style>
+  :root{ --maxw:720px; }
+  main{ padding:24px 0 64px; }
+
+  /* ---- quiz engine styling ---- */
+  .qz-progress{ font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); letter-spacing:0.04em; margin-bottom:12px; }
+  .qz-question{ font-size:17px; margin:0 0 18px; color:var(--ink); }
+  .qz-question code{ font-family:var(--mono); background:var(--panel-soft); padding:0.1em 0.4em; font-size:0.9em; border:1px solid var(--line); border-radius:4px; }
+  .qz-options{ display:flex; flex-direction:column; gap:9px; }
+  .qz-option{
+    display:flex; align-items:flex-start; gap:10px; text-align:left; width:100%;
+    padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel-soft); color:var(--ink);
+    cursor:pointer; font-size:14.5px; transition:border-color .15s ease, transform .1s ease;
+  }
+  .qz-option:hover:not(:disabled){ border-color:var(--accent); }
+  .qz-option:active:not(:disabled){ transform:scale(0.995); }
+  .qz-option__tag{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); flex-shrink:0; padding-top:2px; }
+  .qz-option:disabled{ cursor:default; }
+  .qz-option--correct{ border-color:var(--status-shipped); }
+  .qz-option--correct .qz-option__tag{ color:var(--status-shipped); }
+  .qz-option--incorrect{ border-color:var(--status-fail); }
+  .qz-option--incorrect .qz-option__tag{ color:var(--status-fail); }
+  .qz-verdict{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); font-family:var(--mono); font-size:13px; }
+  .qz-verdict__tag{ display:inline-block; letter-spacing:0.06em; text-transform:uppercase; font-size:11px; padding:3px 8px; border:1px solid currentColor; border-radius:5px; margin-bottom:8px; }
+  .qz-verdict__tag--pass{ color:var(--status-shipped); }
+  .qz-verdict__tag--fail{ color:var(--status-fail); }
+  .qz-verdict__explain{ display:block; color:var(--ink-dim); font-family:var(--sans); font-size:14.5px; margin-top:4px; }
+  .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--accent-strong); margin-bottom:6px; }
+  .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); border-radius:9px; color:var(--ink-dim); padding:9px 16px; cursor:pointer; transition:border-color .15s ease, color .15s ease; }
+  .qz-retry:hover{ border-color:var(--accent); color:var(--accent-strong); }
+</style>
+</head>
+<body class="track-two">
+
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR <span aria-hidden="true">&middot;</span> TEACHING</a>
+    <nav>
+      <a href="/programming/baccalaureate/grade-2-secondary/lesson-2-how-ai-works/" class="back">Back to Lesson 2 - How Ai works</a>
+      <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">&#9789;</span><span class="theme-label"></span></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>Lesson 2 - How Ai works — quiz</h1>
+    <p class="lede">13 questions. Instant feedback.</p>
+  </div>
+
+  <div class="wrap">
+    <div id="quiz-root" aria-live="polite"></div>
+  </div>
+</main>
+
+<footer><div class="wrap"><p class="footer-note">teaching.ezznasr.dev/programming/baccalaureate/grade-2-secondary/lesson-2-how-ai-works/quiz</p></div></footer>
+
+<script type="application/json" id="quiz-data">
+{
+  "title": "Lesson 2 - How Ai works",
+  "subject": "programming",
+  "lesson": "lesson-2-how-ai-works",
+  "questions": [
+    {
+      "id": "g1",
+      "type": "match",
+      "prompt": "Match each term to its correct definition",
+      "rows": [
+        {
+          "label": "Artificial Intelligence (AI)",
+          "correct": "The broad field of technologies that reproduce or perform intelligent human behavior on a computer"
+        },
+        {
+          "label": "Machine Learning",
+          "correct": "A technology that learns patterns from data to make predictions and judgments"
+        },
+        {
+          "label": "Deep Learning",
+          "correct": "An advanced form of machine learning that uses neural networks to learn complex patterns from large-scale data"
+        },
+        {
+          "label": "Generative AI",
+          "correct": "A deep-learning technology that generates new text, images, audio, or programs"
+        },
+        {
+          "label": "Neural Network",
+          "correct": "A system modeled after the nerve cells (neurons) of the human brain, made of many connected components"
+        }
+      ],
+      "options": [
+        "A deep-learning technology that generates new text, images, audio, or programs",
+        "A system modeled after the nerve cells (neurons) of the human brain, made of many connected components",
+        "A technology that learns patterns from data to make predictions and judgments",
+        "An advanced form of machine learning that uses neural networks to learn complex patterns from large-scale data",
+        "The broad field of technologies that reproduce or perform intelligent human behavior on a computer"
+      ],
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g2",
+      "type": "truefalse",
+      "prompt": "AI is the broad field that includes machine learning.",
+      "correct": true,
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g3",
+      "type": "truefalse",
+      "prompt": "Machine learning, deep learning, and generative AI are four parallel technologies with no nesting relationship.",
+      "correct": false,
+      "explain": "They are nested categories \u2014 AI contains machine learning, which contains deep learning, which contains generative AI.",
+      "chapter": 1
+    },
+    {
+      "id": "g4",
+      "type": "truefalse",
+      "prompt": "Neural networks are modeled after the nerve cells (neurons) of the human brain.",
+      "correct": true,
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g5",
+      "type": "truefalse",
+      "prompt": "Neural networks, as a technology, came into use before deep learning.",
+      "correct": true,
+      "explain": "Deep learning uses neural networks, which means neural networks existed as a concept before deep learning was built on top of them.",
+      "chapter": 1
+    },
+    {
+      "id": "g6",
+      "type": "truefalse",
+      "prompt": "A fluent generative-AI answer must always be factually correct.",
+      "correct": false,
+      "explain": "Generative AI can sound confident and plausible while still producing factually incorrect output \u2014 this is called hallucination.",
+      "chapter": 1
+    },
+    {
+      "id": "g7",
+      "type": "truefalse",
+      "prompt": "Generative AI creates new data rather than only classifying or recommending existing data.",
+      "correct": true,
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g8",
+      "type": "mcq",
+      "prompt": "Which sequence shows the nested relationship from broadest to most specialized?",
+      "options": [
+        "Generative AI \u2192 Deep Learning \u2192 Machine Learning \u2192 AI",
+        "AI \u2192 Machine Learning \u2192 Deep Learning \u2192 Generative AI",
+        "Machine Learning \u2192 AI \u2192 Deep Learning \u2192 Generative AI",
+        "AI \u2192 Deep Learning \u2192 Machine Learning \u2192 Generative AI"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g9",
+      "type": "mcq",
+      "prompt": "Which option is NOT an appropriate example of Generative AI?",
+      "options": [
+        "ChatGPT creating a paragraph",
+        "An image-generation AI making a picture from a prompt",
+        "An audio-generation AI producing a voice",
+        "A spam filter sorting unwanted messages"
+      ],
+      "correct": [
+        3
+      ],
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g10",
+      "type": "mcq",
+      "prompt": "Why can a generative-AI answer require checking?",
+      "options": [
+        "It may sound plausible while containing factual errors.",
+        "It cannot produce text.",
+        "It always refuses to answer.",
+        "It only works without data."
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g11",
+      "type": "mcq",
+      "prompt": "Which statement best distinguishes Machine Learning from Deep Learning?",
+      "options": [
+        "Machine Learning typically uses neural networks; Deep Learning does not.",
+        "Machine Learning often relies on supervised learning with labeled data, while Deep Learning uses neural networks and can learn from unlabeled data.",
+        "Deep Learning is less advanced than Machine Learning.",
+        "Machine Learning and Deep Learning always use the exact same techniques."
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g12",
+      "type": "mcq",
+      "prompt": "What does a Generative AI system use to produce new output such as text, images, or audio?",
+      "options": [
+        "A fixed rule with no data",
+        "A prompt or other input given to the system",
+        "A physical shop for buying computers",
+        "A cable used only to connect phones"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "",
+      "chapter": 1
+    },
+    {
+      "id": "g13",
+      "type": "match",
+      "prompt": "Classify each example as Machine Learning (ML), Deep Learning (DL), or Generative AI (Gen AI)",
+      "rows": [
+        {
+          "label": "A voice assistant recognizes the intent of a spoken command",
+          "correct": "ML"
+        },
+        {
+          "label": "A car analyses camera images to recognize pedestrians",
+          "correct": "DL"
+        },
+        {
+          "label": "A chatbot creates a paragraph from a student's prompt",
+          "correct": "Gen AI"
+        },
+        {
+          "label": "An image-generation app creates a landscape from a written description",
+          "correct": "Gen AI"
+        },
+        {
+          "label": "A shopping app recommends products based on purchase history",
+          "correct": "ML"
+        },
+        {
+          "label": "A speech-synthesis system produces a spoken voice from written text",
+          "correct": "DL"
+        }
+      ],
+      "options": [
+        "DL",
+        "Gen AI",
+        "ML"
+      ],
+      "explain": "",
+      "chapter": 1
+    }
+  ]
+}
+</script>
+<script src="/assets/auth.js"></script>
+<script src="/assets/quiz.js"></script>
+<script>QuizEngine.mount('#quiz-root', '#quiz-data');</script>
+<script>(function(){var root=document.documentElement,toggle=document.getElementById('theme-toggle'),stored;try{stored=localStorage.getItem('teaching-theme')}catch(e){}var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');function apply(theme){root.setAttribute('data-theme',theme);toggle.setAttribute('aria-pressed',theme==='dark'?'true':'false');toggle.setAttribute('aria-label',theme==='dark'?'Switch to light mode':'Switch to dark mode');toggle.querySelector('.theme-icon').textContent=theme==='dark'?'\u2600':'\u263E';try{localStorage.setItem('teaching-theme',theme)}catch(e){}}apply(initial);toggle.addEventListener('click',function(){apply(root.getAttribute('data-theme')==='dark'?'light':'dark')})})();</script>
+
+</body>
+</html>

@@ -1,0 +1,91 @@
+/* ==========================================================================
+   forms.css — shared .qz-* card/input/button system, used by quiz.html
+   and assignment.html (quiz.js and assign.js both render into these
+   classes — class names unchanged from v2, only the look is new).
+   Synced from assets_templates/forms.css by sync_site_assets(), same as
+   base.css.
+
+   Quiz-only rules (progress bar, options, verdict, retry button, score
+   display) and assignment-only rules (mode toggle) stay inline in their
+   own templates — they're not shared, so extracting them here would just
+   move duplication around instead of removing it.
+   ========================================================================== */
+
+.qz-card{ padding:24px; }
+.qz-field{ margin-bottom:12px; }
+.qz-input, .qz-textarea, .qz-select{
+  width:100%; background:var(--panel-soft); border:1px solid var(--line-strong); color:var(--ink);
+  font-family:var(--sans); font-size:15px; padding:11px 13px; border-radius:9px;
+  transition:border-color .15s ease;
+}
+.qz-input:focus, .qz-textarea:focus, .qz-select:focus{ outline:none; border-color:var(--accent); }
+.qz-textarea{ resize:vertical; font-family:var(--mono); font-size:13.5px; line-height:1.5; }
+.qz-error{ color:var(--status-fail); font-family:var(--mono); font-size:12px; margin-bottom:8px; min-height:1em; }
+.qz-actions{ display:flex; justify-content:flex-end; margin-top:16px; }
+.qz-next{
+  font:600 12px var(--mono); letter-spacing:0.06em; text-transform:uppercase;
+  background:var(--accent); color:#fff; border:none; padding:11px 18px; border-radius:9px; cursor:pointer;
+  transition:transform .2s ease, background .2s ease;
+}
+.qz-next:hover:not(:disabled){ transform:translateY(-2px); background:var(--accent-strong); }
+.qz-next:disabled{ opacity:.55; cursor:default; transform:none; }
+.qz-next.is-loading:disabled{ opacity:1; }
+.qz-summary{ padding:36px 24px; text-align:center; }
+.qz-summary__label{ color:var(--ink-dim); font-family:var(--mono); font-size:13.5px; letter-spacing:0.04em; }
+
+/* ---- graded assignments (assign.js "graded" mode) ---- */
+.qz-graded-item{ margin-bottom:18px; padding-bottom:16px; border-bottom:1px dashed var(--line); }
+.qz-graded-item:last-child{ border-bottom:none; margin-bottom:0; padding-bottom:0; }
+.qz-graded-row{ display:flex; align-items:center; gap:10px; margin-top:6px; }
+.qz-graded-row__label{ flex:1; font-size:14.5px; color:var(--ink); }
+.qz-graded-row .qz-select{ width:auto; min-width:180px; }
+.qz-graded-check{ display:flex; align-items:center; gap:8px; font-size:14.5px; color:var(--ink); cursor:pointer; }
+.qz-graded-check input{ width:16px; height:16px; accent-color:var(--accent-strong); cursor:pointer; }
+.qz-graded-check--correct{ color:var(--status-shipped); font-weight:600; }
+.qz-graded-check--incorrect{ color:var(--status-fail); font-weight:600; text-decoration:line-through; }
+.qz-graded-row--correct{ border-left:3px solid var(--status-shipped); padding-left:8px; }
+.qz-graded-row--incorrect{ border-left:3px solid var(--status-fail); padding-left:8px; }
+
+/* ---- sign-in success (checkmark draw-in) ---- */
+.qz-success{ padding:36px 24px; text-align:center; }
+.qz-success__badge{ width:64px; height:64px; margin:0 auto 14px; }
+.qz-success__check{ width:100%; height:100%; }
+.qz-success__check circle{ stroke:var(--status-shipped); stroke-width:2; fill:none; stroke-dasharray:151; stroke-dashoffset:151; animation:qz-circle .5s ease-out forwards; }
+.qz-success__check path{ stroke:var(--status-shipped); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; fill:none; stroke-dasharray:36; stroke-dashoffset:36; animation:qz-check .3s .5s ease-out forwards; }
+.qz-success__msg{ font-family:var(--mono); font-size:14px; color:var(--ink); margin:0; opacity:0; animation:qz-fadeup .35s .75s ease-out forwards; }
+@keyframes qz-circle{ to{ stroke-dashoffset:0; } }
+@keyframes qz-check{ to{ stroke-dashoffset:0; } }
+@keyframes qz-fadeup{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+
+/* ---- auth.js (login/register gate) ---- */
+.qz-actions-row{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:16px; }
+.qz-authswitch{
+  background:none; border:none; color:var(--ink-dim); font-family:var(--mono); font-size:12px;
+  cursor:pointer; padding:0; transition:color .15s ease;
+}
+.qz-authswitch:hover{ color:var(--accent-strong); }
+.qz-subtle{ color:var(--ink-dim); font-family:var(--mono); font-size:12.5px; margin:-4px 0 12px; }
+.qz-pwfield{ position:relative; }
+.qz-pwfield .qz-input{ padding-right:56px; }
+.qz-pwtoggle{
+  position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none;
+  color:var(--ink-dim); font-family:var(--mono); font-size:11px; cursor:pointer; padding:4px 6px;
+}
+.qz-pwtoggle:hover{ color:var(--accent-strong); }
+
+/* Loading indicator — a real block-level bar inserted right after the
+   button (see setBusy() in auth.js), NOT a positioned ::after ring. The
+   ::after ring approach depended on the button having a reliable
+   containing block; when that broke (stale CSS, a button class that
+   never got position:relative, etc.) the ring rendered as a giant
+   rotating line across the whole page instead of wrapping the button.
+   A normal sibling element in document flow can't do that — it has no
+   position/inset to get wrong. */
+.is-loading{ opacity:.7; pointer-events:none; }
+.qz-loadbar{ margin-top:8px; height:4px; width:100%; background:var(--line); border-radius:999px; overflow:hidden; }
+.qz-loadbar__fill{ height:100%; width:40%; background:var(--accent-strong); border-radius:999px; animation:qz-loadbar-slide 1.1s ease-in-out infinite; }
+@keyframes qz-loadbar-slide{
+  0%{ transform:translateX(-100%); }
+  50%{ transform:translateX(75%); }
+  100%{ transform:translateX(220%); }
+}
