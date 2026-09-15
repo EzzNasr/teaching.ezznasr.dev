@@ -430,6 +430,14 @@
       renderNeedsRelogin();
       return;
     }
+    // The admin account has its own dashboard — send it there instead of
+    // rendering this one. This is a convenience redirect, not the actual
+    // security boundary: master.html re-checks is_admin server-side on
+    // every request regardless of how someone got there.
+    if (session.is_admin) {
+      location.href = "master.html";
+      return;
+    }
     renderLoading();
     window.AuthEngine.getMyResults(session)
       .then(function (data) { renderDashboard(session, data); })

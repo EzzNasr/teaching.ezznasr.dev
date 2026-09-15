@@ -7,12 +7,19 @@
    SHA-256 hash of it does (crypto.subtle.digest). The server just compares
    hashes; it never sees the plaintext.
 
-   Session — { student_id, student_name, session_token } — is cached in
-   localStorage under "teaching_session" so a returning student on the
-   same device/browser skips straight past this gate on their next
-   quiz/assignment. session_token is what proves a "give me my data" call
-   (dashboards) actually came from that student having logged in, since
-   student_id alone is just their phone number's digits — not a secret.
+   Session — { student_id, student_name, session_token, year,
+   parent_phone, is_admin } — is cached in localStorage under
+   "teaching_session" so a returning student on the same device/browser
+   skips straight past this gate on their next quiz/assignment.
+   session_token is what proves a "give me my data" call (dashboards)
+   actually came from that student having logged in, since student_id
+   alone is just their phone number's digits — not a secret. is_admin is
+   server-reported only (set by hand on one Sheet row, never writable
+   through any action here) — student.html/master.html use it to decide
+   which dashboard a signed-in account should land on, but it is NOT
+   itself a security boundary: Code.gs's admin_get_all re-checks
+   is_admin server-side on every call regardless of what the client
+   thinks it knows.
 
    Two independent things happen here:
 
@@ -33,7 +40,8 @@
   "use strict";
 
   var SESSION_KEY = "teaching_session";
-  var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
+  var DRIVE_ENDPOINT =
+    "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
@@ -44,7 +52,10 @@
       else node.setAttribute(k, attrs[k]);
     });
     (children || []).forEach(function (c) {
-      if (c) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+      if (c)
+        node.appendChild(
+          typeof c === "string" ? document.createTextNode(c) : c,
+        );
     });
     return node;
   }
@@ -59,7 +70,9 @@
     if (busy) {
       btn.classList.add("is-loading");
       if (!btn._qzLoadbar) {
-        var bar = el("div", { class: "qz-loadbar" }, [el("div", { class: "qz-loadbar__fill" })]);
+        var bar = el("div", { class: "qz-loadbar" }, [
+          el("div", { class: "qz-loadbar__fill" }),
+        ]);
         btn.insertAdjacentElement("afterend", bar);
         btn._qzLoadbar = bar;
       }
@@ -82,13 +95,16 @@
   // and the floating modal so the animation/timing feels identical.
   var SUCCESS_ANIM_MS = 1100; // must match the CSS: circle .5s + check .3s@.5s + msg .35s@.75s
   function buildSuccessContent(name) {
-    var svg = "<svg viewBox=\"0 0 52 52\" class=\"qz-success__check\" aria-hidden=\"true\">" +
-      "<circle cx=\"26\" cy=\"26\" r=\"24\"/>" +
-      "<path d=\"M14 27l7 7 16-16\"/>" +
+    var svg =
+      '<svg viewBox="0 0 52 52" class="qz-success__check" aria-hidden="true">' +
+      '<circle cx="26" cy="26" r="24"/>' +
+      '<path d="M14 27l7 7 16-16"/>' +
       "</svg>";
     return [
       el("div", { class: "qz-success__badge", html: svg }),
-      el("p", { class: "qz-success__msg" }, [name ? ("Welcome, " + name + "!") : "You're signed in!"]),
+      el("p", { class: "qz-success__msg" }, [
+        name ? "Welcome, " + name + "!" : "You're signed in!",
+      ]),
     ];
   }
 
@@ -103,10 +119,17 @@
   // input" instead); toggleClass picks which button skin to use.
   function passwordField(placeholder, inputClass, toggleClass) {
     var input = el("input", {
-      class: inputClass || "", type: "password", placeholder: placeholder, required: "required",
+      class: inputClass || "",
+      type: "password",
+      placeholder: placeholder,
+      required: "required",
       autocomplete: "current-password",
     });
-    var toggle = el("button", { class: toggleClass, type: "button", tabindex: "-1" }, ["Show"]);
+    var toggle = el(
+      "button",
+      { class: toggleClass, type: "button", tabindex: "-1" },
+      ["Show"],
+    );
     toggle.addEventListener("click", function () {
       var show = input.type === "password";
       input.type = show ? "text" : "password";
@@ -120,7 +143,7 @@
     try {
       var raw = localStorage.getItem(SESSION_KEY);
       var parsed = raw ? JSON.parse(raw) : null;
-      return (parsed && parsed.student_id) ? parsed : null;
+      return parsed && parsed.student_id ? parsed : null;
     } catch (e) {
       return null;
     }
@@ -146,7 +169,9 @@
     var enc = new TextEncoder().encode(text);
     return crypto.subtle.digest("SHA-256", enc).then(function (buf) {
       return Array.prototype.map
-        .call(new Uint8Array(buf), function (b) { return ("0" + b.toString(16)).slice(-2); })
+        .call(new Uint8Array(buf), function (b) {
+          return ("0" + b.toString(16)).slice(-2);
+        })
         .join("");
     });
   }
@@ -171,9 +196,12 @@
           // retry clears it almost every time; the student just sees the
           // loading state run slightly longer, not an error.
           if (!isRetry) return postToDrive(payload, true);
-          throw new Error("The server sent back something unexpected. Please try again.");
+          throw new Error(
+            "The server sent back something unexpected. Please try again.",
+          );
         }
-        if (!data || !data.ok) throw new Error((data && data.error) || "Request failed.");
+        if (!data || !data.ok)
+          throw new Error((data && data.error) || "Request failed.");
         return data;
       });
     });
@@ -217,19 +245,45 @@
   var WIDGET_ID = "auth-engine-widget";
   var WIDGET_STYLE_ID = "auth-engine-widget-style";
   var WIDGET_CSS =
-    "#" + WIDGET_ID + "{position:fixed;top:var(--aew-top,64px);right:16px;z-index:9999;font-family:var(--mono,monospace);}" +
-    "#" + WIDGET_ID + " .aew-toggle{display:flex;align-items:center;gap:8px;background:var(--panel-soft,#f2f2f2);border:1px solid var(--line,#ddd);border-radius:999px;padding:7px 14px 7px 7px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.14);color:var(--ink,#111);font-size:12.5px;font-family:inherit;}" +
-    "#" + WIDGET_ID + " .aew-toggle:hover{border-color:var(--accent,#7c5cff);}" +
-    "#" + WIDGET_ID + " .aew-avatar{width:24px;height:24px;border-radius:50%;background:var(--accent,#7c5cff);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;flex-shrink:0;}" +
-    "#" + WIDGET_ID + " .aew-name{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
-    "#" + WIDGET_ID + " .aew-menu{position:absolute;right:0;top:calc(100% + 8px);min-width:200px;background:var(--panel-soft,#fff);border:1px solid var(--line,#ddd);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;display:none;}" +
-    "#" + WIDGET_ID + " .aew-menu.open{display:block;}" +
-    "#" + WIDGET_ID + " .aew-menu-item{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:none;border:none;padding:11px 14px;font-family:inherit;font-size:12.5px;color:var(--ink,#111);cursor:pointer;}" +
-    "#" + WIDGET_ID + " .aew-menu-item:hover:not(:disabled){background:var(--line,#eee);}" +
-    "#" + WIDGET_ID + " .aew-menu-item:disabled{color:var(--ink-dim,#888);cursor:default;}" +
-    "#" + WIDGET_ID + " .aew-menu-item+.aew-menu-item{border-top:1px solid var(--line,#eee);}" +
-    "#" + WIDGET_ID + " .aew-soon{font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-dim,#888);border:1px solid var(--line,#ddd);border-radius:5px;padding:2px 5px;flex-shrink:0;}" +
-    "#" + WIDGET_ID + " .aew-logout{color:var(--status-fail,#c1443b);}" +
+    "#" +
+    WIDGET_ID +
+    "{position:fixed;top:var(--aew-top,64px);right:16px;z-index:9999;font-family:var(--mono,monospace);}" +
+    "#" +
+    WIDGET_ID +
+    " .aew-toggle{display:flex;align-items:center;gap:8px;background:var(--panel-soft,#f2f2f2);border:1px solid var(--line,#ddd);border-radius:999px;padding:7px 14px 7px 7px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.14);color:var(--ink,#111);font-size:12.5px;font-family:inherit;}" +
+    "#" +
+    WIDGET_ID +
+    " .aew-toggle:hover{border-color:var(--accent,#7c5cff);}" +
+    "#" +
+    WIDGET_ID +
+    " .aew-avatar{width:24px;height:24px;border-radius:50%;background:var(--accent,#7c5cff);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;flex-shrink:0;}" +
+    "#" +
+    WIDGET_ID +
+    " .aew-name{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+    "#" +
+    WIDGET_ID +
+    " .aew-menu{position:absolute;right:0;top:calc(100% + 8px);min-width:200px;background:var(--panel-soft,#fff);border:1px solid var(--line,#ddd);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;display:none;}" +
+    "#" +
+    WIDGET_ID +
+    " .aew-menu.open{display:block;}" +
+    "#" +
+    WIDGET_ID +
+    " .aew-menu-item{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:none;border:none;padding:11px 14px;font-family:inherit;font-size:12.5px;color:var(--ink,#111);cursor:pointer;}" +
+    "#" +
+    WIDGET_ID +
+    " .aew-menu-item:hover:not(:disabled){background:var(--line,#eee);}" +
+    "#" +
+    WIDGET_ID +
+    " .aew-menu-item:disabled{color:var(--ink-dim,#888);cursor:default;}" +
+    "#" +
+    WIDGET_ID +
+    " .aew-menu-item+.aew-menu-item{border-top:1px solid var(--line,#eee);}" +
+    "#" +
+    WIDGET_ID +
+    " .aew-soon{font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-dim,#888);border:1px solid var(--line,#ddd);border-radius:5px;padding:2px 5px;flex-shrink:0;}" +
+    "#" +
+    WIDGET_ID +
+    " .aew-logout{color:var(--status-fail,#c1443b);}" +
     ".aew-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;}" +
     ".aew-modal{background:var(--panel-soft,#fff);border:1px solid var(--line,#ddd);border-radius:16px;padding:28px 26px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.28);font-family:var(--sans,sans-serif);position:relative;box-sizing:border-box;}" +
     ".aew-modal h3{margin:0 0 4px;font-size:16px;color:var(--ink,#111);font-family:var(--sans,sans-serif);}" +
@@ -272,7 +326,7 @@
     // the styled fields around it. This can't restyle the native open
     // popup list (that's OS chrome, no CSS reaches it), only the closed
     // control — but that's the part that actually looked out of place.
-    ".qz-select,.aew-modal select{appearance:none;-webkit-appearance:none;-moz-appearance:none;cursor:pointer;background-repeat:no-repeat;background-position:right 14px center;background-size:11px 7px;padding-right:38px !important;background-image:url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 12 8\"><path d=\"M1 1l5 5 5-5\" stroke=\"%23888a99\" stroke-width=\"2\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>');}" +
+    '.qz-select,.aew-modal select{appearance:none;-webkit-appearance:none;-moz-appearance:none;cursor:pointer;background-repeat:no-repeat;background-position:right 14px center;background-size:11px 7px;padding-right:38px !important;background-image:url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 8"><path d="M1 1l5 5 5-5" stroke="%23888a99" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>\');}' +
     ".aew-modal select{width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid var(--line,#ddd);border-radius:9px;background-color:var(--panel,#fff);color:var(--ink,#111);font-size:14px;font-family:inherit;}" +
     ".aew-modal select:focus{outline:none;border-color:var(--accent,#7c5cff);}" +
     ".qz-select:invalid,.aew-modal select:invalid{color:var(--ink-dim,#888);}" +
@@ -292,7 +346,9 @@
   }
 
   function initials(name) {
-    var parts = String(name || "?").trim().split(/\s+/);
+    var parts = String(name || "?")
+      .trim()
+      .split(/\s+/);
     var a = parts[0] ? parts[0][0] : "?";
     var b = parts.length > 1 ? parts[parts.length - 1][0] : "";
     return (a + b).toUpperCase();
@@ -305,7 +361,9 @@
       // Script tag ran before <body> existed (e.g. placed in <head>
       // without defer). Try again once the DOM is actually ready instead
       // of silently giving up.
-      document.addEventListener("DOMContentLoaded", mountGlobalWidget, { once: true });
+      document.addEventListener("DOMContentLoaded", mountGlobalWidget, {
+        once: true,
+      });
       return;
     }
 
@@ -315,20 +373,35 @@
     var widget;
 
     if (session) {
-      var dashboardBtn = el("button", { class: "aew-menu-item", type: "button" }, ["My dashboard"]);
+      var dashboardBtn = el(
+        "button",
+        { class: "aew-menu-item", type: "button" },
+        ["My dashboard"],
+      );
       dashboardBtn.addEventListener("click", function () {
         location.href = "/dashboard/student.html";
       });
 
       var menu = el("div", { class: "aew-menu" }, [
         dashboardBtn,
-        el("button", { class: "aew-menu-item aew-logout", type: "button" }, ["Log out"]),
+        el("button", { class: "aew-menu-item aew-logout", type: "button" }, [
+          "Log out",
+        ]),
       ]);
 
-      var toggleBtn = el("button", { class: "aew-toggle", type: "button", "aria-haspopup": "true", "aria-expanded": "false" }, [
-        el("span", { class: "aew-avatar" }, [initials(session.student_name)]),
-        el("span", { class: "aew-name" }, [session.student_name]),
-      ]);
+      var toggleBtn = el(
+        "button",
+        {
+          class: "aew-toggle",
+          type: "button",
+          "aria-haspopup": "true",
+          "aria-expanded": "false",
+        },
+        [
+          el("span", { class: "aew-avatar" }, [initials(session.student_name)]),
+          el("span", { class: "aew-name" }, [session.student_name]),
+        ],
+      );
 
       widget = el("div", { id: WIDGET_ID }, [toggleBtn, menu]);
 
@@ -341,18 +414,24 @@
       menu.querySelector(".aew-logout").addEventListener("click", function () {
         clearSession();
         widget.innerHTML = "";
-        widget.appendChild(el("div", { class: "aew-toggle aew-signedout" }, [
-          el("span", { class: "aew-avatar" }, ["\u2713"]),
-          el("span", { class: "aew-name" }, ["Signed out"]),
-        ]));
-        setTimeout(function () { location.reload(); }, 700);
+        widget.appendChild(
+          el("div", { class: "aew-toggle aew-signedout" }, [
+            el("span", { class: "aew-avatar" }, ["\u2713"]),
+            el("span", { class: "aew-name" }, ["Signed out"]),
+          ]),
+        );
+        setTimeout(function () {
+          location.reload();
+        }, 700);
       });
 
       document.addEventListener("click", function (e) {
         if (!widget.contains(e.target)) menu.classList.remove("open");
       });
     } else {
-      var signInBtn = el("button", { class: "aew-toggle", type: "button" }, ["Sign in"]);
+      var signInBtn = el("button", { class: "aew-toggle", type: "button" }, [
+        "Sign in",
+      ]);
       signInBtn.addEventListener("click", function (e) {
         e.stopPropagation();
         openSignInModal(signInBtn);
@@ -379,20 +458,36 @@
     var busy = false; // guards against a double-fire (Enter + click racing the disabled flag)
     var previouslyFocused = triggerEl || document.activeElement;
 
-    var modal = el("div", { class: "aew-modal", role: "dialog", "aria-modal": "true", "aria-label": "Sign in" });
-    var closeBtn = el("button", { class: "aew-close", type: "button", "aria-label": "Close" }, ["\u00d7"]);
-    var overlay = el("div", { id: "aew-overlay", class: "aew-overlay" }, [modal]);
+    var modal = el("div", {
+      class: "aew-modal",
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-label": "Sign in",
+    });
+    var closeBtn = el(
+      "button",
+      { class: "aew-close", type: "button", "aria-label": "Close" },
+      ["\u00d7"],
+    );
+    var overlay = el("div", { id: "aew-overlay", class: "aew-overlay" }, [
+      modal,
+    ]);
 
     function closeModal() {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       document.removeEventListener("keydown", onKeydown);
-      if (previouslyFocused && typeof previouslyFocused.focus === "function") previouslyFocused.focus();
+      if (previouslyFocused && typeof previouslyFocused.focus === "function")
+        previouslyFocused.focus();
     }
-    function onKeydown(e) { if (e.key === "Escape") closeModal(); }
+    function onKeydown(e) {
+      if (e.key === "Escape") closeModal();
+    }
     document.addEventListener("keydown", onKeydown);
 
     closeBtn.addEventListener("click", closeModal);
-    overlay.addEventListener("click", function (e) { if (e.target === overlay) closeModal(); });
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) closeModal();
+    });
 
     function renderStep() {
       modal.innerHTML = "";
@@ -405,13 +500,22 @@
     function showModalSuccess(name) {
       modal.innerHTML = "";
       modal.appendChild(closeBtn);
-      modal.appendChild(el("div", { class: "qz-success" }, buildSuccessContent(name)));
+      modal.appendChild(
+        el("div", { class: "qz-success" }, buildSuccessContent(name)),
+      );
     }
 
     function renderPhoneStep() {
-      var input = el("input", { type: "tel", inputmode: "tel", placeholder: "Phone number", autocomplete: "tel" });
+      var input = el("input", {
+        type: "tel",
+        inputmode: "tel",
+        placeholder: "Phone number",
+        autocomplete: "tel",
+      });
       var error = el("div", { class: "aew-error" });
-      var btn = el("button", { class: "aew-primary", type: "button" }, ["Continue \u2192"]);
+      var btn = el("button", { class: "aew-primary", type: "button" }, [
+        "Continue \u2192",
+      ]);
 
       function submit() {
         if (busy) return;
@@ -434,14 +538,17 @@
           .catch(function (err) {
             busy = false;
             setBusy(btn, false);
-            error.textContent = (err.message === "not-configured")
-              ? "Login isn't set up yet \u2014 let your instructor know."
-              : (err.message || "Couldn't reach the server. Try again.");
+            error.textContent =
+              err.message === "not-configured"
+                ? "Login isn't set up yet \u2014 let your instructor know."
+                : err.message || "Couldn't reach the server. Try again.";
           });
       }
 
       btn.addEventListener("click", submit);
-      input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
 
       modal.appendChild(el("h3", {}, ["Sign in"]));
       modal.appendChild(el("div", { class: "aew-field" }, [input]));
@@ -453,11 +560,17 @@
     function renderLoginStep() {
       var pw = passwordField("Password", "", "aew-pwtoggle");
       var error = el("div", { class: "aew-error" });
-      var btn = el("button", { class: "aew-primary", type: "button" }, ["Log in \u2192"]);
-      var back = el("button", { class: "aew-link", type: "button" },
-        [knownName ? "\u2190 Not " + knownName + "?" : "\u2190 Wrong number?"]);
+      var btn = el("button", { class: "aew-primary", type: "button" }, [
+        "Log in \u2192",
+      ]);
+      var back = el("button", { class: "aew-link", type: "button" }, [
+        knownName ? "\u2190 Not " + knownName + "?" : "\u2190 Wrong number?",
+      ]);
 
-      back.addEventListener("click", function () { step = "phone"; renderStep(); });
+      back.addEventListener("click", function () {
+        step = "phone";
+        renderStep();
+      });
 
       function submit() {
         if (busy) return;
@@ -470,11 +583,26 @@
         busy = true;
         setBusy(btn, true);
         sha256Hex(val)
-          .then(function (hash) { return postToDrive({ action: "login_student", phone: phone, password_hash: hash }); })
+          .then(function (hash) {
+            return postToDrive({
+              action: "login_student",
+              phone: phone,
+              password_hash: hash,
+            });
+          })
           .then(function (data) {
-            saveSession({ student_id: data.student_id, student_name: data.student_name, session_token: data.session_token, year: data.year || "", parent_phone: data.parent_phone || "" });
+            saveSession({
+              student_id: data.student_id,
+              student_name: data.student_name,
+              session_token: data.session_token,
+              year: data.year || "",
+              parent_phone: data.parent_phone || "",
+              is_admin: !!data.is_admin,
+            });
             showModalSuccess(data.student_name);
-            setTimeout(function () { location.reload(); }, SUCCESS_ANIM_MS);
+            setTimeout(function () {
+              location.reload();
+            }, SUCCESS_ANIM_MS);
           })
           .catch(function (err) {
             busy = false;
@@ -484,9 +612,15 @@
       }
 
       btn.addEventListener("click", submit);
-      pw.input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+      pw.input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
 
-      modal.appendChild(el("h3", {}, [knownName ? "Welcome back, " + knownName : "Welcome back"]));
+      modal.appendChild(
+        el("h3", {}, [
+          knownName ? "Welcome back, " + knownName : "Welcome back",
+        ]),
+      );
       modal.appendChild(el("p", { class: "aew-sub" }, [maskPhone(phone)]));
       modal.appendChild(el("div", { class: "aew-field" }, [pw.wrap]));
       modal.appendChild(error);
@@ -496,19 +630,39 @@
     }
 
     function renderRegisterStep() {
-      var nameInput = el("input", { type: "text", placeholder: "Your name", autocomplete: "name" });
+      var nameInput = el("input", {
+        type: "text",
+        placeholder: "Your name",
+        autocomplete: "name",
+      });
       var yearSelect = el("select", { class: "qz-select" }, [
-        el("option", { value: "", disabled: "disabled", selected: "selected" }, ["Which year are you in?"]),
+        el(
+          "option",
+          { value: "", disabled: "disabled", selected: "selected" },
+          ["Which year are you in?"],
+        ),
         el("option", { value: "Senior 1" }, ["Senior 1"]),
         el("option", { value: "Senior 2" }, ["Senior 2"]),
       ]);
-      var parentPhoneInput = el("input", { type: "tel", inputmode: "tel", placeholder: "Parent's phone number", autocomplete: "tel" });
+      var parentPhoneInput = el("input", {
+        type: "tel",
+        inputmode: "tel",
+        placeholder: "Parent's phone number",
+        autocomplete: "tel",
+      });
       var pw = passwordField("Set a password", "", "aew-pwtoggle");
       var error = el("div", { class: "aew-error" });
-      var btn = el("button", { class: "aew-primary", type: "button" }, ["Create account \u2192"]);
-      var back = el("button", { class: "aew-link", type: "button" }, ["\u2190 Wrong number?"]);
+      var btn = el("button", { class: "aew-primary", type: "button" }, [
+        "Create account \u2192",
+      ]);
+      var back = el("button", { class: "aew-link", type: "button" }, [
+        "\u2190 Wrong number?",
+      ]);
 
-      back.addEventListener("click", function () { step = "phone"; renderStep(); });
+      back.addEventListener("click", function () {
+        step = "phone";
+        renderStep();
+      });
 
       function submit() {
         if (busy) return;
@@ -540,12 +694,28 @@
         setBusy(btn, true);
         sha256Hex(val)
           .then(function (hash) {
-            return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name, year: year, parent_phone: parentPhone });
+            return postToDrive({
+              action: "register_student",
+              phone: phone,
+              password_hash: hash,
+              display_name: name,
+              year: year,
+              parent_phone: parentPhone,
+            });
           })
           .then(function (data) {
-            saveSession({ student_id: data.student_id, student_name: data.student_name, session_token: data.session_token, year: data.year || "", parent_phone: data.parent_phone || "" });
+            saveSession({
+              student_id: data.student_id,
+              student_name: data.student_name,
+              session_token: data.session_token,
+              year: data.year || "",
+              parent_phone: data.parent_phone || "",
+              is_admin: !!data.is_admin,
+            });
             showModalSuccess(data.student_name);
-            setTimeout(function () { location.reload(); }, SUCCESS_ANIM_MS);
+            setTimeout(function () {
+              location.reload();
+            }, SUCCESS_ANIM_MS);
           })
           .catch(function (err) {
             busy = false;
@@ -555,7 +725,9 @@
       }
 
       btn.addEventListener("click", submit);
-      pw.input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+      pw.input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
 
       modal.appendChild(el("h3", {}, ["First time here"]));
       modal.appendChild(el("p", { class: "aew-sub" }, [maskPhone(phone)]));
@@ -615,12 +787,18 @@
 
     function renderSuccessThenReady(session) {
       root.innerHTML = "";
-      var card = el("div", { class: "qz-card frame qz-success" }, [
-        el("span", { class: "tick-br" }),
-        el("span", { class: "tick-bl" }),
-      ].concat(buildSuccessContent(session.student_name)));
+      var card = el(
+        "div",
+        { class: "qz-card frame qz-success" },
+        [
+          el("span", { class: "tick-br" }),
+          el("span", { class: "tick-bl" }),
+        ].concat(buildSuccessContent(session.student_name)),
+      );
       root.appendChild(card);
-      setTimeout(function () { onReady(session); }, SUCCESS_ANIM_MS);
+      setTimeout(function () {
+        onReady(session);
+      }, SUCCESS_ANIM_MS);
     }
 
     // Shared by both the login and register submit handlers: saves the
@@ -629,8 +807,12 @@
     // account — routes to completeProfile before onReady ever fires.
     function proceedAfterAuth(data) {
       var session = {
-        student_id: data.student_id, student_name: data.student_name, session_token: data.session_token,
-        year: data.year || "", parent_phone: data.parent_phone || "",
+        student_id: data.student_id,
+        student_name: data.student_name,
+        session_token: data.session_token,
+        year: data.year || "",
+        parent_phone: data.parent_phone || "",
+        is_admin: !!data.is_admin,
       };
       saveSession(session);
       mountGlobalWidget();
@@ -647,26 +829,37 @@
 
     function render() {
       root.innerHTML = "";
-      if (step === "completeProfile") renderCompleteProfileStep(sessionForProfile);
+      if (step === "completeProfile")
+        renderCompleteProfileStep(sessionForProfile);
       else if (step === "login") renderLoginStep();
       else if (step === "register") renderRegisterStep();
       else renderPhoneStep();
     }
 
     function renderCompleteProfileStep(session) {
-      var yearSelect = el("select", { class: "qz-input qz-select", required: "required" }, [
-        el("option", { value: "" }, ["Which year are you in?"]),
-        el("option", { value: "Senior 1" }, ["Senior 1"]),
-        el("option", { value: "Senior 2" }, ["Senior 2"]),
-      ]);
+      var yearSelect = el(
+        "select",
+        { class: "qz-input qz-select", required: "required" },
+        [
+          el("option", { value: "" }, ["Which year are you in?"]),
+          el("option", { value: "Senior 1" }, ["Senior 1"]),
+          el("option", { value: "Senior 2" }, ["Senior 2"]),
+        ],
+      );
       if (session.year) yearSelect.value = session.year;
       var parentPhoneInput = el("input", {
-        class: "qz-input", type: "tel", inputmode: "tel", autocomplete: "tel",
-        placeholder: "Parent's phone number", required: "required",
+        class: "qz-input",
+        type: "tel",
+        inputmode: "tel",
+        autocomplete: "tel",
+        placeholder: "Parent's phone number",
+        required: "required",
       });
       if (session.parent_phone) parentPhoneInput.value = session.parent_phone;
       var errorMsg = el("div", { class: "qz-error" });
-      var submitBtn = el("button", { class: "qz-next", type: "button" }, ["Save & continue \u2192"]);
+      var submitBtn = el("button", { class: "qz-next", type: "button" }, [
+        "Save & continue \u2192",
+      ]);
 
       function submit() {
         if (busy) return;
@@ -684,7 +877,13 @@
         }
         busy = true;
         setBusy(submitBtn, true);
-        postToDrive({ action: "update_profile", student_id: session.student_id, session_token: session.session_token, year: year, parent_phone: parentPhone })
+        postToDrive({
+          action: "update_profile",
+          student_id: session.student_id,
+          session_token: session.session_token,
+          year: year,
+          parent_phone: parentPhone,
+        })
           .then(function () {
             session.year = year;
             session.parent_phone = parentPhone;
@@ -694,7 +893,8 @@
           .catch(function (err) {
             busy = false;
             setBusy(submitBtn, false);
-            errorMsg.textContent = err.message || "Couldn't save \u2014 try again.";
+            errorMsg.textContent =
+              err.message || "Couldn't save \u2014 try again.";
           });
       }
 
@@ -703,8 +903,12 @@
       var card = el("div", { class: "qz-card frame" }, [
         el("span", { class: "tick-br" }),
         el("span", { class: "tick-bl" }),
-        el("p", { class: "qz-question" }, ["A couple of details we still need"]),
-        el("p", { class: "qz-subtle" }, ["Signed in as " + session.student_name]),
+        el("p", { class: "qz-question" }, [
+          "A couple of details we still need",
+        ]),
+        el("p", { class: "qz-subtle" }, [
+          "Signed in as " + session.student_name,
+        ]),
         el("div", { class: "qz-field" }, [yearSelect]),
         el("div", { class: "qz-field" }, [parentPhoneInput]),
         errorMsg,
@@ -715,11 +919,17 @@
 
     function renderPhoneStep() {
       var phoneInput = el("input", {
-        class: "qz-input", type: "tel", inputmode: "tel", autocomplete: "tel",
-        placeholder: "Phone number", required: "required",
+        class: "qz-input",
+        type: "tel",
+        inputmode: "tel",
+        autocomplete: "tel",
+        placeholder: "Phone number",
+        required: "required",
       });
       var errorMsg = el("div", { class: "qz-error" });
-      var nextBtn = el("button", { class: "qz-next", type: "button" }, ["Continue \u2192"]);
+      var nextBtn = el("button", { class: "qz-next", type: "button" }, [
+        "Continue \u2192",
+      ]);
 
       function submit() {
         if (busy) return;
@@ -742,14 +952,17 @@
           .catch(function (err) {
             busy = false;
             setBusy(nextBtn, false);
-            errorMsg.textContent = (err.message === "not-configured")
-              ? "Login isn't set up on this page yet \u2014 let your instructor know."
-              : (err.message || "Couldn't reach the server. Try again.");
+            errorMsg.textContent =
+              err.message === "not-configured"
+                ? "Login isn't set up on this page yet \u2014 let your instructor know."
+                : err.message || "Couldn't reach the server. Try again.";
           });
       }
 
       nextBtn.addEventListener("click", submit);
-      phoneInput.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+      phoneInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
 
       var card = el("div", { class: "qz-card frame" }, [
         el("span", { class: "tick-br" }),
@@ -765,11 +978,17 @@
     function renderLoginStep() {
       var pw = passwordField("Password", "qz-input", "qz-pwtoggle");
       var errorMsg = el("div", { class: "qz-error" });
-      var backBtn = el("button", { class: "qz-authswitch", type: "button" },
-        [knownName ? "\u2190 Not " + knownName + "?" : "\u2190 Wrong number?"]);
-      var loginBtn = el("button", { class: "qz-next", type: "button" }, ["Log in \u2192"]);
+      var backBtn = el("button", { class: "qz-authswitch", type: "button" }, [
+        knownName ? "\u2190 Not " + knownName + "?" : "\u2190 Wrong number?",
+      ]);
+      var loginBtn = el("button", { class: "qz-next", type: "button" }, [
+        "Log in \u2192",
+      ]);
 
-      backBtn.addEventListener("click", function () { step = "phone"; render(); });
+      backBtn.addEventListener("click", function () {
+        step = "phone";
+        render();
+      });
 
       function submit() {
         if (busy) return;
@@ -783,7 +1002,11 @@
         setBusy(loginBtn, true);
         sha256Hex(val)
           .then(function (hash) {
-            return postToDrive({ action: "login_student", phone: phone, password_hash: hash });
+            return postToDrive({
+              action: "login_student",
+              phone: phone,
+              password_hash: hash,
+            });
           })
           .then(function (data) {
             proceedAfterAuth(data);
@@ -796,12 +1019,16 @@
       }
 
       loginBtn.addEventListener("click", submit);
-      pw.input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+      pw.input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
 
       var card = el("div", { class: "qz-card frame" }, [
         el("span", { class: "tick-br" }),
         el("span", { class: "tick-bl" }),
-        el("p", { class: "qz-question" }, [knownName ? "Welcome back, " + knownName : "Welcome back"]),
+        el("p", { class: "qz-question" }, [
+          knownName ? "Welcome back, " + knownName : "Welcome back",
+        ]),
         el("p", { class: "qz-subtle" }, [maskPhone(phone)]),
         el("div", { class: "qz-field" }, [pw.wrap]),
         errorMsg,
@@ -811,19 +1038,47 @@
     }
 
     function renderRegisterStep() {
-      var nameInput = el("input", { class: "qz-input", type: "text", placeholder: "Your name", required: "required", autocomplete: "name" });
-      var yearSelect = el("select", { class: "qz-input qz-select", required: "required" }, [
-        el("option", { value: "", disabled: "disabled", selected: "selected" }, ["Which year are you in?"]),
-        el("option", { value: "Senior 1" }, ["Senior 1"]),
-        el("option", { value: "Senior 2" }, ["Senior 2"]),
-      ]);
-      var parentPhoneInput = el("input", { class: "qz-input", type: "tel", inputmode: "tel", placeholder: "Parent's phone number", required: "required", autocomplete: "tel" });
+      var nameInput = el("input", {
+        class: "qz-input",
+        type: "text",
+        placeholder: "Your name",
+        required: "required",
+        autocomplete: "name",
+      });
+      var yearSelect = el(
+        "select",
+        { class: "qz-input qz-select", required: "required" },
+        [
+          el(
+            "option",
+            { value: "", disabled: "disabled", selected: "selected" },
+            ["Which year are you in?"],
+          ),
+          el("option", { value: "Senior 1" }, ["Senior 1"]),
+          el("option", { value: "Senior 2" }, ["Senior 2"]),
+        ],
+      );
+      var parentPhoneInput = el("input", {
+        class: "qz-input",
+        type: "tel",
+        inputmode: "tel",
+        placeholder: "Parent's phone number",
+        required: "required",
+        autocomplete: "tel",
+      });
       var pw = passwordField("Set a password", "qz-input", "qz-pwtoggle");
       var errorMsg = el("div", { class: "qz-error" });
-      var backBtn = el("button", { class: "qz-authswitch", type: "button" }, ["\u2190 Wrong number?"]);
-      var registerBtn = el("button", { class: "qz-next", type: "button" }, ["Create account \u2192"]);
+      var backBtn = el("button", { class: "qz-authswitch", type: "button" }, [
+        "\u2190 Wrong number?",
+      ]);
+      var registerBtn = el("button", { class: "qz-next", type: "button" }, [
+        "Create account \u2192",
+      ]);
 
-      backBtn.addEventListener("click", function () { step = "phone"; render(); });
+      backBtn.addEventListener("click", function () {
+        step = "phone";
+        render();
+      });
 
       function submit() {
         if (busy) return;
@@ -855,7 +1110,14 @@
         setBusy(registerBtn, true);
         sha256Hex(val)
           .then(function (hash) {
-            return postToDrive({ action: "register_student", phone: phone, password_hash: hash, display_name: name, year: year, parent_phone: parentPhone });
+            return postToDrive({
+              action: "register_student",
+              phone: phone,
+              password_hash: hash,
+              display_name: name,
+              year: year,
+              parent_phone: parentPhone,
+            });
           })
           .then(function (data) {
             proceedAfterAuth(data);
@@ -863,17 +1125,22 @@
           .catch(function (err) {
             busy = false;
             setBusy(registerBtn, false);
-            errorMsg.textContent = err.message || "Couldn't create your account.";
+            errorMsg.textContent =
+              err.message || "Couldn't create your account.";
           });
       }
 
       registerBtn.addEventListener("click", submit);
-      pw.input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+      pw.input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
 
       var card = el("div", { class: "qz-card frame" }, [
         el("span", { class: "tick-br" }),
         el("span", { class: "tick-bl" }),
-        el("p", { class: "qz-question" }, ["First time here \u2014 set up your account"]),
+        el("p", { class: "qz-question" }, [
+          "First time here \u2014 set up your account",
+        ]),
         el("p", { class: "qz-subtle" }, [maskPhone(phone)]),
         el("div", { class: "qz-field" }, [nameInput]),
         el("div", { class: "qz-field" }, [yearSelect]),

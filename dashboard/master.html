@@ -306,6 +306,23 @@
     return String(s || "").replace(/[^0-9]/g, "");
   }
 
+  // Mirrors Code.gs's _phonesMatch exactly (see that file for the full
+  // rationale). Needed here too, independently — this page never asks
+  // the server "does this row belong to this student," it does that join
+  // itself against the raw quiz_results/submissions/students arrays
+  // admin_get_all hands back, so a strict-equality mismatch here (a
+  // leading-zero drop, a country-code prefix, a hand-corrected phone)
+  // shows up as exactly what a "0 quizzes" roster row despite real
+  // recorded attempts looks like.
+  function phonesMatch(a, b) {
+    var da = normalizePhone(a), db = normalizePhone(b);
+    if (!da || !db) return false;
+    if (da === db) return true;
+    var shorter = da.length <= db.length ? da : db;
+    var longer = da.length <= db.length ? db : da;
+    return shorter.length >= 7 && longer.slice(-shorter.length) === shorter;
+  }
+
   function newestFirst(rows) {
     return (rows || []).slice().reverse();
   }
@@ -369,8 +386,8 @@
   function buildRoster(students, quizRows, subRows) {
     return (students || []).map(function (s) {
       var digits = normalizePhone(s.phone);
-      var sq = quizRows.filter(function (r) { return normalizePhone(r.student_id) === digits; });
-      var ss = subRows.filter(function (r) { return normalizePhone(r.student_id) === digits; });
+      var sq = quizRows.filter(function (r) { return phonesMatch(r.student_id, digits); });
+      var ss = subRows.filter(function (r) { return phonesMatch(r.student_id, digits); });
       var totalScore = 0, totalMax = 0;
       sq.forEach(function (r) { totalScore += Number(r.score) || 0; totalMax += Number(r.total) || 0; });
       return {
@@ -393,7 +410,7 @@
   // generates, so this is an exact string match, not fuzzy.
   function assignmentStatusForStudent(rosterEntry, catalog, subRows) {
     var applicable = catalog.filter(function (c) { return !c.year || c.year === rosterEntry.year; });
-    var mySubs = subRows.filter(function (r) { return normalizePhone(r.student_id) === rosterEntry.digits; });
+    var mySubs = subRows.filter(function (r) { return phonesMatch(r.student_id, rosterEntry.digits); });
     return applicable.map(function (c) {
       var match = mySubs.filter(function (r) { return r.subject === c.subject && r.lesson === c.lesson; });
       match.sort(function (a, b) { return String(a.submitted_time || "").localeCompare(String(b.submitted_time || "")); });
@@ -496,18 +513,22 @@
     return String(text || "").toLowerCase().indexOf(STATE.search.toLowerCase()) !== -1;
   }
 
-  var _yearByDigits = null;
+  // Was a straight object-map keyed by exact normalized phone — replaced
+  // with a tolerant scan for the same reason as everywhere else on this
+  // page: a strict-key lookup silently returns "" (no year) for any
+  // student whose QuizResults student_id digits don't exactly match
+  // their current Students-sheet phone digits, which is exactly the
+  // mismatch phonesMatch exists to tolerate.
   function studentYearByDigits(digits) {
-    if (!_yearByDigits) {
-      _yearByDigits = {};
-      STATE.students.forEach(function (s) { _yearByDigits[normalizePhone(s.phone)] = s.year || ""; });
+    for (var i = 0; i < STATE.students.length; i++) {
+      if (phonesMatch(STATE.students[i].phone, digits)) return STATE.students[i].year || "";
     }
-    return _yearByDigits[digits] || "";
+    return "";
   }
 
   function getFilteredQuiz() {
     return STATE.quizRows.filter(function (r) {
-      if (STATE.filterPhone && normalizePhone(r.student_id) !== STATE.filterPhone) return false;
+      if (STATE.filterPhone && !phonesMatch(r.student_id, STATE.filterPhone)) return false;
       if (STATE.filterSubject && r.subject !== STATE.filterSubject) return false;
       if (STATE.filterYear && studentYearByDigits(normalizePhone(r.student_id)) !== STATE.filterYear) return false;
       if (STATE.search && !(matchesSearch(r.quiz_title) || matchesSearch(r.lesson) || matchesSearch(r.name))) return false;
@@ -517,7 +538,7 @@
 
   function getFilteredSubs() {
     return STATE.subRows.filter(function (r) {
-      if (STATE.filterPhone && normalizePhone(r.student_id) !== STATE.filterPhone) return false;
+      if (STATE.filterPhone && !phonesMatch(r.student_id, STATE.filterPhone)) return false;
       if (STATE.filterSubject && r.subject !== STATE.filterSubject) return false;
       if (STATE.filterYear && studentYearByDigits(normalizePhone(r.student_id)) !== STATE.filterYear) return false;
       if (STATE.search && !(matchesSearch(r.lesson) || matchesSearch(r.name) || matchesSearch(r.text))) return false;
@@ -880,6 +901,22 @@
     document.getElementById("authgate").remove();
     if (!session.session_token) {
       renderNeedsRelogin();
+      return;
+    }
+    // Client-side convenience gate, not the real security boundary — sends
+    // a non-admin straight to their own dashboard instead of flashing this
+    // page's shell at them. Checks strictly for `=== false` (a fresh,
+    // server-confirmed "not admin"), not just falsy — a cached session
+    // from before this field existed has is_admin === undefined, and
+    // should fall through to the normal load-then-let-the-server-decide
+    // path below rather than being wrongly redirected. The actual
+    // boundary is server-side regardless: Code.gs's admin_get_all
+    // re-checks is_admin on every call no matter what this check decides,
+    // so even a stale/forged is_admin in a cached session can't get real
+    // data past it (see the catch below, kept as a defense-in-depth
+    // fallback for exactly that case).
+    if (session.is_admin === false) {
+      location.href = "student.html";
       return;
     }
     renderLoading();

@@ -194,6 +194,28 @@ function _normalizePhone(s) {
   return String(s || "").replace(/[^0-9]/g, "");
 }
 
+// Two phone-derived digit strings are considered the same number if
+// they're identical, OR if the shorter is a trailing suffix of the
+// longer (7+ digits shared) — this is what actually makes a lookup
+// survive a leading-zero drop (a known Sheets auto-formatting bug, see
+// _students() below), a country-code prefix ("+20..." vs "0..."), or a
+// phone number hand-corrected in the Sheet after some QuizResults/
+// Submissions rows were already written with the old digits baked in.
+// Comparing with strict equality (the old behavior) meant any of those
+// permanently orphaned a student's own historical rows from every
+// lookup that mattered — their own dashboard, the roster's per-student
+// counts, everything. The 7-digit floor keeps this from ever matching
+// two genuinely different, unrelated numbers on a short coincidental
+// trailing fragment.
+function _phonesMatch(a, b) {
+  var da = _normalizePhone(a), db = _normalizePhone(b);
+  if (!da || !db) return false;
+  if (da === db) return true;
+  var shorter = da.length <= db.length ? da : db;
+  var longer = da.length <= db.length ? db : da;
+  return shorter.length >= 7 && longer.slice(-shorter.length) === shorter;
+}
+
 // Returns {row, phone, password_hash, display_name, created_at,
 // session_token, is_admin} for the first matching row (1-indexed, header
 // is row 1), or null.
@@ -202,7 +224,7 @@ function _findStudentRow(sheet, phone) {
   if (!target) return null;
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
-    if (_normalizePhone(values[i][0]) === target) {
+    if (_phonesMatch(values[i][0], target)) {
       return {
         row: i + 1,
         phone: values[i][0],
@@ -231,7 +253,7 @@ function _requireStudentSession(payload) {
   var values = _students().getDataRange().getValues();
   var target = _normalizePhone(payload.student_id);
   for (var i = 1; i < values.length; i++) {
-    if (_normalizePhone(values[i][0]) === target) {
+    if (_phonesMatch(values[i][0], target)) {
       if (String(values[i][4]) === String(payload.session_token)) return true;
       throw new Error("Session expired or invalid — please log in again.");
     }
@@ -244,7 +266,7 @@ function _requireAdminSession(payload) {
   var values = _students().getDataRange().getValues();
   var target = _normalizePhone(payload.student_id);
   for (var i = 1; i < values.length; i++) {
-    if (_normalizePhone(values[i][0]) === target) {
+    if (_phonesMatch(values[i][0], target)) {
       var isAdmin = values[i][5] === true || String(values[i][5]).toUpperCase() === "TRUE";
       if (String(values[i][4]) === String(payload.session_token) && isAdmin) return true;
       throw new Error("Not authorized.");
@@ -277,7 +299,10 @@ function handleRegisterStudent(payload) {
   var year = payload.year || "";
   var parentPhone = payload.parent_phone || "";
   sheet.appendRow([phone, payload.password_hash, displayName, createdAt, token, "", year, parentPhone]);
-  return { ok: true, student_id: _normalizePhone(phone), student_name: displayName, session_token: token, year: year, parent_phone: parentPhone };
+  // is_admin is always false on a fresh registration — the flag can only
+  // ever be set by hand, directly in the Sheet (see the setup comment at
+  // the top of this file), never through any web-facing action.
+  return { ok: true, student_id: _normalizePhone(phone), student_name: displayName, session_token: token, year: year, parent_phone: parentPhone, is_admin: false };
 }
 
 function handleLoginStudent(payload) {
@@ -296,7 +321,7 @@ function handleLoginStudent(payload) {
     token = Utilities.getUuid();
     sheet.getRange(found.row, 5).setValue(token);
   }
-  return { ok: true, student_id: _normalizePhone(found.phone), student_name: found.display_name, session_token: token, year: found.year || "", parent_phone: found.parent_phone || "" };
+  return { ok: true, student_id: _normalizePhone(found.phone), student_name: found.display_name, session_token: token, year: found.year || "", parent_phone: found.parent_phone || "", is_admin: !!found.is_admin };
 }
 
 // Backfills year/parent_phone for accounts that predate those columns (or
@@ -542,9 +567,9 @@ function handleGetMyResults(payload) {
   var target = _normalizePhone(payload.student_id);
 
   var quizRows = _sheetValuesAsObjects(_quizResultsSheet())
-    .filter(function (r) { return _normalizePhone(r.student_id) === target; });
+    .filter(function (r) { return _phonesMatch(r.student_id, target); });
   var subRows = _sheetValuesAsObjects(_submissionsSheet())
-    .filter(function (r) { return _normalizePhone(r.student_id) === target; });
+    .filter(function (r) { return _phonesMatch(r.student_id, target); });
 
   return { ok: true, quiz_results: quizRows, submissions: subRows };
 }
