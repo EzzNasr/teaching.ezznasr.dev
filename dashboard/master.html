@@ -505,13 +505,45 @@
       var subject = segments[0];
       var lesson = segments[segments.length - 2];
       var year = null;
+      var track = null;
       for (var i = 1; i < segments.length - 2; i++) {
         var m = segments[i].match(YEAR_FOLDER_RE);
-        if (m) { year = FOLDER_TO_YEAR[segments[i].toLowerCase()] || ("Grade " + m[1]); break; }
+        if (m) {
+          year = FOLDER_TO_YEAR[segments[i].toLowerCase()] || ("Grade " + m[1]);
+        } else if (!track) {
+          // First non-year folder between subject and the lesson itself —
+          // e.g. "baccalaureate" in programming/baccalaureate/grade-2-
+          // secondary/.../assignment.html. A lesson with no such folder
+          // (subject/lesson/assignment.html directly) has no track, same
+          // as it has no year.
+          track = segments[i];
+        }
       }
-      catalog.push({ subject: subject, lesson: lesson, year: year });
+      catalog.push({ subject: subject, lesson: lesson, year: year, track: track });
     });
     return catalog;
+  }
+
+  function distinctTracks() {
+    var set = {};
+    STATE.catalog.forEach(function (c) { if (c.track) set[c.track] = true; });
+    return Object.keys(set).sort();
+  }
+
+  // Quiz/submission rows only ever carried subject+lesson, never the
+  // folder structure above them — so a Track filter can't read r.track
+  // directly off a quiz/submission row the way it can off a catalog
+  // entry. This looks it up by joining back to the catalog on
+  // subject+lesson instead. Returns "" (no match) if the catalog hasn't
+  // loaded yet, or the lesson's assignment.html has since been removed/
+  // renamed in the repo — those rows just won't match any specific track
+  // filter, same as they wouldn't match a specific year filter either.
+  function trackForLesson(subject, lesson) {
+    for (var i = 0; i < STATE.catalog.length; i++) {
+      var c = STATE.catalog[i];
+      if (c.subject === subject && c.lesson === lesson) return c.track || "";
+    }
+    return "";
   }
 
   // -- App state ------------------------------------------------------------
@@ -525,6 +557,7 @@
     filterPhone: "",     // "" = all students
     filterSubject: "",   // "" = all subjects
     filterYear: "",      // "" = all years
+    filterTrack: "",     // "" = all tracks/programmes (e.g. "baccalaureate")
     search: "",          // matched against lesson / quiz_title / question text
   };
 
@@ -551,6 +584,7 @@
       if (STATE.filterPhone && !phonesMatch(r.student_id, STATE.filterPhone)) return false;
       if (STATE.filterSubject && r.subject !== STATE.filterSubject) return false;
       if (STATE.filterYear && studentYearByDigits(normalizePhone(r.student_id)) !== STATE.filterYear) return false;
+      if (STATE.filterTrack && trackForLesson(r.subject, r.lesson) !== STATE.filterTrack) return false;
       if (STATE.search && !(matchesSearch(r.quiz_title) || matchesSearch(r.lesson) || matchesSearch(r.name))) return false;
       return true;
     });
@@ -561,6 +595,7 @@
       if (STATE.filterPhone && !phonesMatch(r.student_id, STATE.filterPhone)) return false;
       if (STATE.filterSubject && r.subject !== STATE.filterSubject) return false;
       if (STATE.filterYear && studentYearByDigits(normalizePhone(r.student_id)) !== STATE.filterYear) return false;
+      if (STATE.filterTrack && trackForLesson(r.subject, r.lesson) !== STATE.filterTrack) return false;
       if (STATE.search && !(matchesSearch(r.lesson) || matchesSearch(r.name) || matchesSearch(r.text))) return false;
       return true;
     });
@@ -608,19 +643,30 @@
     yearSelect.value = STATE.filterYear;
     yearSelect.addEventListener("change", function () { STATE.filterYear = yearSelect.value; onChange(); });
 
+    var tracks = distinctTracks();
+    var trackSelect = el("select", { class: "dash-select" }, [el("option", { value: "" }, ["All tracks"])]);
+    tracks.forEach(function (t) {
+      var label = t.charAt(0).toUpperCase() + t.slice(1);
+      var opt = el("option", { value: t }, [label]);
+      if (t === STATE.filterTrack) opt.setAttribute("selected", "selected");
+      trackSelect.appendChild(opt);
+    });
+    trackSelect.addEventListener("change", function () { STATE.filterTrack = trackSelect.value; onChange(); });
+
     var searchInput = el("input", { class: "dash-search", type: "search", placeholder: "Search lesson, quiz, question\u2026" });
     searchInput.value = STATE.search;
     searchInput.addEventListener("input", function () { STATE.search = searchInput.value; onChange(); });
 
     var clearBtn = el("button", { class: "dash-clear", type: "button" }, ["Clear filters"]);
     clearBtn.addEventListener("click", function () {
-      STATE.filterPhone = ""; STATE.filterSubject = ""; STATE.filterYear = ""; STATE.search = "";
+      STATE.filterPhone = ""; STATE.filterSubject = ""; STATE.filterYear = ""; STATE.filterTrack = ""; STATE.search = "";
       onChange();
     });
 
     return el("div", { class: "dash-filters" }, [
       el("label", {}, ["Student", studentSelect]),
       el("label", {}, ["Subject", subjectSelect]),
+      el("label", {}, ["Track", trackSelect]),
       el("label", {}, ["Year", yearSelect]),
       el("label", {}, ["Search", searchInput]),
       clearBtn,
@@ -678,7 +724,10 @@
 
     var roster = buildRoster(STATE.students, STATE.quizRows, STATE.subRows);
     var subjectFilter = STATE.filterSubject;
-    var catalog = STATE.catalog.filter(function (c) { return !subjectFilter || c.subject === subjectFilter; });
+    var trackFilter = STATE.filterTrack;
+    var catalog = STATE.catalog.filter(function (c) {
+      return (!subjectFilter || c.subject === subjectFilter) && (!trackFilter || c.track === trackFilter);
+    });
 
     if (STATE.filterPhone) {
       var rosterEntry = roster.filter(function (r) { return r.digits === STATE.filterPhone; })[0];
