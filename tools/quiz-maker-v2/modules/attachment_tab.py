@@ -106,8 +106,22 @@ class AttachmentTab(ttk.Frame):
         scrollbar = tk.Scrollbar(inner, command=self.attach_listbox.yview)
         scrollbar.pack(side="right", fill="y")
         self.attach_listbox.config(yscrollcommand=scrollbar.set)
-        tk.Button(list_frame, text="Remove selected (from this lesson's list only)",
-                  command=self._remove_selected).pack(anchor="w", padx=8, pady=(0, 8))
+
+        list_btn_row = tk.Frame(list_frame)
+        list_btn_row.pack(fill="x", padx=8, pady=(0, 4))
+        self.replace_btn = tk.Button(list_btn_row, text="Replace selected file...", command=self._replace_selected)
+        self.replace_btn.pack(side="left")
+        self.delete_btn = tk.Button(list_btn_row, text="Delete selected (Drive + list)",
+                                     command=self._delete_selected, fg="#8b1a1a")
+        self.delete_btn.pack(side="left", padx=6)
+        tk.Button(list_btn_row, text="Remove from list only (leaves file in Drive)",
+                  command=self._remove_selected).pack(side="left")
+        tk.Label(list_frame,
+                 text="\u201cReplace\u201d re-uploads a new file into the same slot (same title/position) and "
+                      "trashes the old Drive file \u2014 use this after re-syncing a changed document. "
+                      "\u201cDelete\u201d trashes the file in Drive and removes it from this lesson's list in one "
+                      "step.",
+                 fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=560).pack(anchor="w", padx=8, pady=(0, 8))
 
         self._refresh_groups()
 
@@ -208,11 +222,8 @@ class AttachmentTab(ttk.Frame):
 
         title = self.title_var.get().strip() or os.path.basename(file_path)
 
-        drive_cfg = common.get_drive_config(common.load_config())
-        if not drive_cfg["web_app_url"] or not drive_cfg["admin_token"]:
-            messagebox.showerror("Drive bridge not configured",
-                                  "Set the Drive bridge Web App URL and admin token at the top of the "
-                                  "window first (see apps_script/Code.gs for deployment steps).")
+        drive_cfg = self._drive_cfg_or_error()
+        if not drive_cfg:
             return
 
         self.upload_btn.config(state="disabled", text="Uploading...")
@@ -254,6 +265,22 @@ class AttachmentTab(ttk.Frame):
         self.status_var.set("Upload failed.")
         messagebox.showerror("Upload failed", error_message)
 
+    def _drive_cfg_or_error(self):
+        drive_cfg = common.get_drive_config(common.load_config())
+        if not drive_cfg["web_app_url"] or not drive_cfg["admin_token"]:
+            messagebox.showerror("Drive bridge not configured",
+                                  "Set the Drive bridge Web App URL and admin token at the top of the "
+                                  "window first (see apps_script/Code.gs for deployment steps).")
+            return None
+        return drive_cfg
+
+    def _set_list_buttons_busy(self, busy, label=None):
+        state = "disabled" if busy else "normal"
+        self.replace_btn.config(state=state)
+        self.delete_btn.config(state=state)
+        if busy and label:
+            self.status_var.set(label)
+
     def _remove_selected(self):
         sel = self.attach_listbox.curselection()
         if not sel:
@@ -268,3 +295,118 @@ class AttachmentTab(ttk.Frame):
             self.status_var.set("Removed \"{}\" from this lesson's list. (The file itself still exists "
                                  "in Drive — delete it there separately if you want it gone entirely.)".format(
                                      removed.get("title", "")))
+
+    def _delete_selected(self):
+        sel = self.attach_listbox.curselection()
+        if not sel:
+            messagebox.showinfo("No selection", "Select an attachment to delete.")
+            return
+        idx = sel[0]
+        items = self._load_attachments()
+        if not (0 <= idx < len(items)):
+            return
+        item = items[idx]
+        title = item.get("title", "untitled")
+        file_id = item.get("drive_file_id")
+
+        if not messagebox.askyesno("Delete attachment",
+                                    "Trash \"{}\" in Drive and remove it from this lesson? "
+                                    "This can't be undone from here.".format(title)):
+            return
+
+        drive_cfg = self._drive_cfg_or_error()
+        if not drive_cfg:
+            return
+
+        self._set_list_buttons_busy(True, "Deleting \"{}\"...".format(title))
+
+        def worker():
+            try:
+                if file_id:
+                    drive_bridge.delete_attachment(drive_cfg["web_app_url"], drive_cfg["admin_token"], file_id)
+                self.after(0, lambda: self._on_delete_done(idx, title))
+            except drive_bridge.DriveBridgeError as e:
+                self.after(0, lambda: self._on_delete_failed(str(e)))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_delete_done(self, idx, title):
+        self._set_list_buttons_busy(False)
+        items = self._load_attachments()
+        if 0 <= idx < len(items):
+            items.pop(idx)
+            self._save_attachments(items)
+        self._refresh_attachment_list()
+        self.status_var.set("Deleted \"{}\" from Drive and this lesson's list.".format(title))
+
+    def _on_delete_failed(self, error_message):
+        self._set_list_buttons_busy(False)
+        self.status_var.set("Delete failed.")
+        messagebox.showerror("Delete failed", error_message)
+
+    def _replace_selected(self):
+        sel = self.attach_listbox.curselection()
+        if not sel:
+            messagebox.showinfo("No selection", "Select an attachment to replace.")
+            return
+        idx = sel[0]
+        items = self._load_attachments()
+        if not (0 <= idx < len(items)):
+            return
+        item = items[idx]
+        title = item.get("title", "untitled")
+        old_file_id = item.get("drive_file_id")
+
+        new_path = filedialog.askopenfilename(title="Choose the updated file for \"{}\"".format(title))
+        if not new_path:
+            return
+
+        drive_cfg = self._drive_cfg_or_error()
+        if not drive_cfg:
+            return
+
+        lesson_dir = self._lesson_dir()
+        if not lesson_dir or not os.path.isdir(lesson_dir):
+            messagebox.showerror("No lesson selected", "Pick a subject and lesson first.")
+            return
+
+        subject_slug = self._subject_slug()
+        lesson_slug = self.lesson_var.get().strip()
+
+        self._set_list_buttons_busy(True, "Replacing \"{}\"...".format(title))
+
+        def worker():
+            try:
+                result = drive_bridge.upload_attachment(
+                    drive_cfg["web_app_url"], drive_cfg["admin_token"],
+                    subject_slug, lesson_slug, new_path, title)
+                # Upload first, then trash the old file — if the upload
+                # fails, the lesson keeps its working attachment instead
+                # of ending up with neither.
+                if old_file_id:
+                    try:
+                        drive_bridge.delete_attachment(drive_cfg["web_app_url"], drive_cfg["admin_token"], old_file_id)
+                    except drive_bridge.DriveBridgeError:
+                        pass  # new file is already live; a stale old one in Drive trash isn't worth failing over
+                self.after(0, lambda: self._on_replace_done(idx, result, new_path, title))
+            except drive_bridge.DriveBridgeError as e:
+                self.after(0, lambda: self._on_replace_failed(str(e)))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_replace_done(self, idx, result, new_path, title):
+        self._set_list_buttons_busy(False)
+        ext = os.path.splitext(new_path)[1].lower().lstrip(".")
+        items = self._load_attachments()
+        if 0 <= idx < len(items):
+            items[idx]["drive_file_id"] = result.get("file_id")
+            items[idx]["type"] = ext or "file"
+            self._save_attachments(items)
+        self._refresh_attachment_list()
+        self.status_var.set("Replaced \"{}\" with the new file \u2014 same slot on the lesson page.".format(title))
+        messagebox.showinfo("Replaced", "\"{}\" now points at the newly uploaded file.".format(title))
+
+    def _on_replace_failed(self, error_message):
+        self._set_list_buttons_busy(False)
+        self.status_var.set("Replace failed.")
+        messagebox.showerror("Replace failed", error_message)
