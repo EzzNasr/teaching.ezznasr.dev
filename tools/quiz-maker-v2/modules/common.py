@@ -1114,10 +1114,9 @@ def sync_site_assets(site_root, drive_web_app_url):
 # ==========================================================================
 # Graded-question editor — shared by Quiz Maker and Assignment Maker.
 # Three question types (mcq/truefalse/match), each addable one-at-a-time
-# via a dialog or in bulk via GradedBulkDialog. chapter_choices/
-# default_chapter are only passed by Quiz Maker (quizzes are chapter-
-# tagged for dashboard aggregation); Assignment Maker calls the same
-# dialogs without them and simply gets no "chapter" key back.
+# via a dialog or in bulk via GradedBulkDialog. Both tabs pass
+# chapter_choices/default_chapter now (quizzes AND graded assignments are
+# chapter-tagged for dashboard "wrong questions by chapter" aggregation).
 # ==========================================================================
 
 GRADED_BULK_HELP = """Bulk paste format for graded questions \u2014 one block per question:
@@ -1151,11 +1150,10 @@ shown to students are every row's answer, alphabetized (so position never
 gives the answer away).
 "E:" (explanation) is optional on every question type.
 
-In the Quiz Maker tab only: a "Ch: N" line on its own sets the chapter
-for every question after it, until the next "Ch:" line \u2014 same
-convention as the classic quiz bulk-paste box. Questions before the
-first "Ch:" line use the chapter selected in the dropdown above this
-box."""
+In the Quiz Maker and Assignment Maker tabs: a "Ch: N" line on its own
+sets the chapter for every question after it, until the next "Ch:"
+line \u2014 same convention in both. Questions before the first "Ch:"
+line use the chapter selected in the dropdown above this box."""
 
 
 def parse_bulk_graded_questions(text, current_chapter=None):

@@ -119,6 +119,18 @@ class AssignmentTab(ttk.Frame):
         graded_frame = tk.LabelFrame(self, text="Graded questions (only used when Submission type = Graded questions)")
         graded_frame.pack(fill="both", expand=True, **pad)
 
+        chapter_row = tk.Frame(graded_frame)
+        chapter_row.pack(fill="x", padx=8, pady=(6, 0))
+        tk.Label(chapter_row, text="Chapter:", width=14, anchor="w").pack(side="left")
+        self.chapter_var = tk.StringVar(value="1")
+        self.chapter_combo = ttk.Combobox(chapter_row, textvariable=self.chapter_var, state="readonly",
+                                           values=[str(i) for i in range(1, 21)], width=6)
+        self.chapter_combo.pack(side="left")
+        tk.Label(chapter_row,
+                 text="Applies to new questions added below (bulk paste can override per-block with \"Ch: N\"). "
+                      "Lets the student dashboard show wrong-question counts per chapter.",
+                 fg="gray30", font=("TkDefaultFont", 8)).pack(side="left", padx=8)
+
         graded_btn_row = tk.Frame(graded_frame)
         graded_btn_row.pack(fill="x", padx=8, pady=6)
         tk.Button(graded_btn_row, text="+ Multiple choice", command=self._add_mcq).pack(side="left")
@@ -162,31 +174,43 @@ class AssignmentTab(ttk.Frame):
         labels = {"mcq": "MCQ", "truefalse": "T/F", "match": "Match"}
         for i, item in enumerate(self.graded_items):
             preview = item["prompt"][:70].replace("\n", " ")
-            self.graded_listbox.insert("end", "{:>2}. [{}] {}".format(i + 1, labels.get(item["type"], "?"), preview))
+            chapter = item.get("chapter")
+            ch_label = "Ch{} ".format(chapter) if chapter is not None else ""
+            self.graded_listbox.insert("end", "{:>2}. {}[{}] {}".format(
+                i + 1, ch_label, labels.get(item["type"], "?"), preview))
+
+    def _current_chapter(self):
+        try:
+            return int(self.chapter_var.get())
+        except (AttributeError, ValueError):
+            return 1
+
+    def _chapter_choices(self):
+        return list(range(1, 21))
 
     def _add_mcq(self):
-        dlg = MCQItemDialog(self)
+        dlg = MCQItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
         self.wait_window(dlg)
         if dlg.result:
             self.graded_items.append(dlg.result)
             self._refresh_graded_listbox()
 
     def _add_truefalse(self):
-        dlg = TrueFalseItemDialog(self)
+        dlg = TrueFalseItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
         self.wait_window(dlg)
         if dlg.result:
             self.graded_items.append(dlg.result)
             self._refresh_graded_listbox()
 
     def _add_match(self):
-        dlg = MatchItemDialog(self)
+        dlg = MatchItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
         self.wait_window(dlg)
         if dlg.result:
             self.graded_items.append(dlg.result)
             self._refresh_graded_listbox()
 
     def _bulk_add_graded(self):
-        dlg = GradedBulkDialog(self)
+        dlg = GradedBulkDialog(self, current_chapter=self._current_chapter())
         self.wait_window(dlg)
         if dlg.result:
             self.graded_items.extend(dlg.result)
@@ -201,7 +225,8 @@ class AssignmentTab(ttk.Frame):
         idx = sel[0]
         item = self.graded_items[idx]
         dialog_cls = {"mcq": MCQItemDialog, "truefalse": TrueFalseItemDialog, "match": MatchItemDialog}[item["type"]]
-        dlg = dialog_cls(self, existing=item)
+        dlg = dialog_cls(self, existing=item, chapter_choices=self._chapter_choices(),
+                          default_chapter=self._current_chapter())
         self.wait_window(dlg)
         if dlg.result:
             self.graded_items[idx] = dlg.result

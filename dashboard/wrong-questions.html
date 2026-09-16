@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wrong Questions by Chapter — Ezz Nasr : Teaching</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/base.css">
+<link rel="stylesheet" href="/assets/forms.css">
+<style>
+  :root{ --maxw:860px; }
+  main{ padding:24px 0 64px; }
+
+  /* ---- chapter accordion ---- */
+  .wq-state{ font-family:var(--mono); font-size:13.5px; color:var(--ink-dim); padding:24px 0; }
+  .wq-chapter{ border:1px solid var(--line); border-radius:14px; background:var(--panel); box-shadow:var(--shadow); margin-bottom:14px; overflow:hidden; }
+  .wq-chapter > summary{
+    list-style:none; cursor:pointer; padding:16px 20px; display:flex; align-items:center;
+    justify-content:space-between; gap:12px; font-size:15.5px; color:var(--ink); user-select:none;
+  }
+  .wq-chapter > summary::-webkit-details-marker{ display:none; }
+  .wq-chapter > summary::before{
+    content:"\25B8"; display:inline-block; margin-right:10px; color:var(--ink-dim);
+    transition:transform .15s ease; transform:rotate(0deg);
+  }
+  .wq-chapter[open] > summary::before{ transform:rotate(90deg); }
+  .wq-chapter-title{ display:flex; align-items:center; }
+  .wq-count{
+    font-family:var(--mono); font-size:12px; letter-spacing:.04em; padding:4px 10px; border-radius:999px;
+    border:1px solid currentColor;
+  }
+  .wq-count.is-zero{ color:var(--status-shipped); }
+  .wq-count.is-nonzero{ color:var(--status-fail); }
+  .wq-chapter-body{ padding:0 20px 18px; border-top:1px dashed var(--line); }
+
+  .wq-origin{ border:1px solid var(--line); border-radius:11px; background:var(--panel-soft); margin-top:14px; }
+  .wq-origin > summary{
+    list-style:none; cursor:pointer; padding:11px 14px; display:flex; align-items:center;
+    justify-content:space-between; gap:10px; font:600 13px var(--mono); letter-spacing:.02em; color:var(--ink);
+    user-select:none;
+  }
+  .wq-origin > summary::-webkit-details-marker{ display:none; }
+  .wq-origin > summary::before{
+    content:"\25B8"; display:inline-block; margin-right:8px; color:var(--ink-dim); font-family:var(--sans);
+    transition:transform .15s ease;
+  }
+  .wq-origin[open] > summary::before{ transform:rotate(90deg); }
+  .wq-origin-body{ padding:4px 14px 14px; }
+
+  .wq-item{ padding:12px 0; border-top:1px dashed var(--line); }
+  .wq-item:first-child{ border-top:none; }
+  .wq-item__meta{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); letter-spacing:.03em; margin-bottom:6px; }
+  .wq-item__q{ font-size:14.5px; color:var(--ink); margin:0 0 10px; }
+  .wq-item__row{ display:flex; gap:8px; font-size:13.5px; padding:6px 10px; border-radius:8px; margin-bottom:6px; align-items:baseline; }
+  .wq-item__row-label{ font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; flex:0 0 auto; padding-top:1px; }
+  .wq-item__row--wrong{ background:color-mix(in srgb, var(--status-fail) 10%, transparent); color:var(--ink); }
+  .wq-item__row--wrong .wq-item__row-label{ color:var(--status-fail); }
+  .wq-item__row--right{ background:color-mix(in srgb, var(--status-shipped) 10%, transparent); color:var(--ink); }
+  .wq-item__row--right .wq-item__row-label{ color:var(--status-shipped); }
+
+  .wq-empty{ font-family:var(--mono); font-size:12.5px; color:var(--ink-dim); padding:8px 2px 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR <span aria-hidden="true">&middot;</span> TEACHING</a>
+    <nav>
+      <a href="/dashboard/student.html" class="back">Back to dashboard</a>
+      <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">&#9789;</span><span class="theme-label"></span></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>Wrong questions, by chapter</h1>
+    <p class="lede">Every chapter you've been quizzed or assigned on, with what you got wrong and the correct answer.</p>
+  </div>
+
+  <div class="wrap">
+    <div id="wq-root" aria-live="polite">
+      <div class="wq-state">Loading your results&hellip;</div>
+    </div>
+  </div>
+</main>
+
+<footer><div class="wrap"><p class="footer-note">teaching.ezznasr.dev/dashboard/wrong-questions</p></div></footer>
+
+<script src="/assets/auth.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var root = document.getElementById("wq-root");
+
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === "html") node.innerHTML = attrs[k];
+      else if (k in node) node[k] = attrs[k];
+      else node.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) {
+      node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    });
+    return node;
+  }
+
+  function safeParse(json) {
+    try { return JSON.parse(json || "[]"); } catch (e) { return []; }
+  }
+
+  // Normalizes a quiz attempt's questions_json into the shared shape used
+  // below. Quiz-side field names: question / your_answer / correct_answer.
+  function quizEntries(row) {
+    return safeParse(row.questions_json).map(function (q) {
+      return {
+        chapter: (q.chapter !== undefined && q.chapter !== null) ? q.chapter : null,
+        origin: "quiz",
+        context: row.quiz_title || row.lesson || row.subject,
+        question: q.question,
+        yourAnswer: q.your_answer,
+        correctAnswer: q.correct_answer,
+        isCorrect: !!q.is_correct,
+      };
+    });
+  }
+
+  // Normalizes a graded-assignment submission's answers_json. Only
+  // submission_type "graded" carries auto-marked answers; other
+  // submission types (text/url/file/both) have nothing to show here.
+  // Assignment-side field names: prompt / chosen / correct_answer.
+  function assignmentEntries(row) {
+    if (row.submission_type !== "graded") return [];
+    return safeParse(row.answers_json).map(function (a) {
+      return {
+        chapter: (a.chapter !== undefined && a.chapter !== null) ? a.chapter : null,
+        origin: "assignment",
+        context: row.lesson || row.subject,
+        question: a.prompt,
+        yourAnswer: a.chosen,
+        correctAnswer: a.correct_answer,
+        isCorrect: !!a.is_correct,
+      };
+    });
+  }
+
+  function groupByChapter(entries) {
+    var map = {};
+    entries.forEach(function (e) {
+      var key = (e.chapter === null) ? "\u2014" : String(e.chapter);
+      if (!map[key]) {
+        map[key] = { key: key, sortKey: (e.chapter === null ? Infinity : Number(e.chapter)), quiz: [], assignment: [] };
+      }
+      map[key][e.origin].push(e);
+    });
+    return Object.keys(map).map(function (k) { return map[k]; })
+      .sort(function (a, b) { return a.sortKey - b.sortKey; });
+  }
+
+  function itemCard(e) {
+    return el("div", { class: "wq-item" }, [
+      el("div", { class: "wq-item__meta" }, [e.context || ""]),
+      el("p", { class: "wq-item__q" }, [e.question || ""]),
+      el("div", { class: "wq-item__row wq-item__row--wrong" }, [
+        el("span", { class: "wq-item__row-label" }, ["Your answer"]),
+        el("span", {}, [e.yourAnswer || "\u2014"]),
+      ]),
+      el("div", { class: "wq-item__row wq-item__row--right" }, [
+        el("span", { class: "wq-item__row-label" }, ["Correct answer"]),
+        el("span", {}, [e.correctAnswer || "\u2014"]),
+      ]),
+    ]);
+  }
+
+  function originToggle(label, wrongItems) {
+    var body = el("div", { class: "wq-origin-body" });
+    if (!wrongItems.length) {
+      body.appendChild(el("div", { class: "wq-empty" }, ["No wrong " + label.toLowerCase() + " here \u2014 nice."]));
+    } else {
+      wrongItems.forEach(function (e) { body.appendChild(itemCard(e)); });
+    }
+    var summary = el("summary", {}, [label + " (" + wrongItems.length + " wrong)"]);
+    return el("details", { class: "wq-origin" }, [summary, body]);
+  }
+
+  function chapterBlock(group) {
+    var quizWrong = group.quiz.filter(function (e) { return !e.isCorrect; });
+    var assignWrong = group.assignment.filter(function (e) { return !e.isCorrect; });
+    var totalWrong = quizWrong.length + assignWrong.length;
+    var title = group.key === "\u2014" ? "Unlabeled chapter" : "Chapter " + group.key;
+
+    var countBadge = el("span", { class: "wq-count " + (totalWrong ? "is-nonzero" : "is-zero") },
+      [totalWrong + (totalWrong === 1 ? " wrong" : " wrong")]);
+
+    var summary = el("summary", {}, [
+      el("span", { class: "wq-chapter-title" }, [title]),
+      countBadge,
+    ]);
+
+    var body = el("div", { class: "wq-chapter-body" }, [
+      originToggle("Quizzes", quizWrong),
+      originToggle("Assignments", assignWrong),
+    ]);
+
+    return el("details", { class: "wq-chapter", open: totalWrong > 0 }, [summary, body]);
+  }
+
+  function render(quizResults, submissions) {
+    root.innerHTML = "";
+    var entries = [];
+    (quizResults || []).forEach(function (row) { entries = entries.concat(quizEntries(row)); });
+    (submissions || []).forEach(function (row) { entries = entries.concat(assignmentEntries(row)); });
+
+    if (!entries.length) {
+      root.appendChild(el("div", { class: "wq-state" }, ["No quiz or assignment attempts on record yet."]));
+      return;
+    }
+
+    var groups = groupByChapter(entries);
+    groups.forEach(function (g) { root.appendChild(chapterBlock(g)); });
+  }
+
+  function renderSignedOut() {
+    root.innerHTML = "";
+    root.appendChild(el("div", { class: "wq-state" },
+      ["Sign in (top corner) to see your wrong questions by chapter."]));
+  }
+
+  function renderError(message) {
+    root.innerHTML = "";
+    root.appendChild(el("div", { class: "wq-state" }, [message]));
+  }
+
+  function load() {
+    var session = window.AuthEngine && AuthEngine.getSession();
+    if (!session) { renderSignedOut(); return; }
+
+    AuthEngine.getMyResults(session).then(function (data) {
+      render(data.quiz_results, data.submissions);
+    }).catch(function (err) {
+      renderError("Couldn't load your results: " + (err && err.message ? err.message : "unknown error"));
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", load);
+  // Re-check if the student signs in after this page already loaded
+  // (auth.js's floating widget can complete a sign-in without a reload).
+  window.addEventListener("storage", function (e) {
+    if (e.key === "teaching_session") load();
+  });
+})();
+</script>
+<script>(function(){var root=document.documentElement,toggle=document.getElementById('theme-toggle'),stored;try{stored=localStorage.getItem('teaching-theme')}catch(e){}var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');function apply(theme){root.setAttribute('data-theme',theme);toggle.setAttribute('aria-pressed',theme==='dark'?'true':'false');toggle.setAttribute('aria-label',theme==='dark'?'Switch to light mode':'Switch to dark mode');toggle.querySelector('.theme-icon').textContent=theme==='dark'?'\u2600':'\u263E';try{localStorage.setItem('teaching-theme',theme)}catch(e){}}apply(initial);toggle.addEventListener('click',function(){apply(root.getAttribute('data-theme')==='dark'?'light':'dark')})})();</script>
+
+</body>
+</html>
