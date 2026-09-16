@@ -22,7 +22,15 @@
 (function () {
   "use strict";
 
-  var EMBEDDABLE_TYPES = ["pdf", "png", "jpg", "jpeg", "gif", "webp"];
+  // Google Drive's /preview endpoint isn't limited to PDFs and images —
+  // it renders Office documents too. The original list only had the six
+  // below, so a .docx/.pptx/.xlsx attachment silently fell through to
+  // Open/Download-only with no inline embed, which is the "it stopped
+  // being embedded" symptom this list update fixes.
+  var EMBEDDABLE_TYPES = [
+    "pdf", "png", "jpg", "jpeg", "gif", "webp",
+    "doc", "docx", "ppt", "pptx", "xls", "xlsx", "txt",
+  ];
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     attrs = attrs || {};
