@@ -252,6 +252,7 @@
               answers.push({
                 id: item.id + ":" + i, type: "match", prompt: item.prompt + " \u2014 " + row.label,
                 chosen: chosen, correct_answer: row.correct, is_correct: isCorrect,
+                chapter: (typeof item.chapter !== "undefined") ? item.chapter : null,
               });
             });
           } else if (item.type === "mcq" && e.checks) {
@@ -264,6 +265,7 @@
             answers.push({
               id: item.id, type: "mcq", prompt: item.prompt,
               chosen: chosenOpts.join(", "), correct_answer: correctOpts.join(", "), is_correct: isCorrect,
+              chapter: (typeof item.chapter !== "undefined") ? item.chapter : null,
             });
           } else {
             total++;
@@ -274,6 +276,7 @@
             answers.push({
               id: item.id, type: item.type, prompt: item.prompt,
               chosen: chosen, correct_answer: correctAnswer, is_correct: isCorrect,
+              chapter: (typeof item.chapter !== "undefined") ? item.chapter : null,
             });
           }
         });

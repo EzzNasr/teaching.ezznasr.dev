@@ -1114,9 +1114,11 @@ def sync_site_assets(site_root, drive_web_app_url):
 # ==========================================================================
 # Graded-question editor — shared by Quiz Maker and Assignment Maker.
 # Three question types (mcq/truefalse/match), each addable one-at-a-time
-# via a dialog or in bulk via GradedBulkDialog. Both tabs pass
-# chapter_choices/default_chapter now (quizzes AND graded assignments are
-# chapter-tagged for dashboard "wrong questions by chapter" aggregation).
+# via a dialog or in bulk via GradedBulkDialog. chapter_choices/
+# default_chapter are passed by both Quiz Maker and Assignment Maker
+# (both are chapter-tagged, so the student dashboard can group wrong
+# answers from either origin under the same chapter heading). Any
+# caller that omits them simply gets no "chapter" key back.
 # ==========================================================================
 
 GRADED_BULK_HELP = """Bulk paste format for graded questions \u2014 one block per question:
@@ -1150,10 +1152,10 @@ shown to students are every row's answer, alphabetized (so position never
 gives the answer away).
 "E:" (explanation) is optional on every question type.
 
-In the Quiz Maker and Assignment Maker tabs: a "Ch: N" line on its own
-sets the chapter for every question after it, until the next "Ch:"
-line \u2014 same convention in both. Questions before the first "Ch:"
-line use the chapter selected in the dropdown above this box."""
+In both the Quiz Maker and Assignment Maker tabs, a "Ch: N" line on its
+own sets the chapter for every question after it, until the next "Ch:"
+line \u2014 same convention in both places. Questions before the first
+"Ch:" line use the chapter selected in the dropdown above this box."""
 
 
 def parse_bulk_graded_questions(text, current_chapter=None):
@@ -1162,10 +1164,10 @@ def parse_bulk_graded_questions(text, current_chapter=None):
     quiz_tab.py's old parse_bulk_questions() structurally (same block-flush
     pattern) but supports three question shapes instead of one.
 
-    current_chapter is None for assignments (no chapter concept there —
-    items get no "chapter" key at all). Quiz Maker passes the tab's
-    currently-selected chapter; a "Ch: N" line overrides it from that
-    point on, same convention as the classic quiz bulk-paste box."""
+    current_chapter is None only if the caller omits it (items then get
+    no "chapter" key at all). Both Quiz Maker and Assignment Maker pass
+    the tab's currently-selected chapter; a "Ch: N" line overrides it
+    from that point on, same convention in both places."""
     text = text.strip()
     if not text:
         return []
@@ -1285,9 +1287,8 @@ def parse_bulk_graded_questions(text, current_chapter=None):
 
 def _add_chapter_row(dialog, chapter_choices, default_chapter, existing_chapter):
     """Shared by MCQItemDialog/TrueFalseItemDialog/MatchItemDialog — only
-    added when chapter_choices is given (Quiz Maker passes it; Assignment
-    Maker doesn't, since assignments have no chapter concept). Returns the
-    StringVar so _on_save can read it back."""
+    added when chapter_choices is given (both Quiz Maker and Assignment
+    Maker pass it). Returns the StringVar so _on_save can read it back."""
     row = tk.Frame(dialog)
     row.pack(fill="x", padx=10, pady=(6, 0))
     tk.Label(row, text="Chapter:", width=14, anchor="w").pack(side="left")

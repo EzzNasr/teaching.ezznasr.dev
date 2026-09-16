@@ -113,6 +113,22 @@
   .dash-bar-fill { height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--accent), var(--accent-2)); transition:width .5s ease; }
   .dash-bar-fill.is-low { background:var(--low); } .dash-bar-fill.is-good { background:var(--good); }
   .dash-sub-text { max-height:4.5em; overflow:hidden; margin-top:8px; color:var(--ink-dim); font:12px/1.5 var(--sans); white-space:pre-wrap; }
+  .dash-wrong-group { display:grid; gap:8px; margin-top:12px; }
+  .dash-wrong { overflow:hidden; border:1px solid var(--line); border-radius:12px; background:var(--surface-soft); }
+  .dash-wrong summary { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; color:var(--ink); font:700 12px var(--mono); list-style:none; cursor:pointer; }
+  .dash-wrong summary::-webkit-details-marker { display:none; }
+  .dash-wrong summary:before { content:'\25b8'; margin-right:8px; color:var(--ink-dim); transition:transform .2s ease; display:inline-block; }
+  .dash-wrong[open] summary:before { transform:rotate(90deg); }
+  .dash-wrong-count.is-nonzero { color:var(--low); }
+  .dash-wrong-count.is-zero { color:var(--good); }
+  .dash-wrong-body { display:grid; gap:8px; padding:0 14px 12px; }
+  .dash-wrong-item { padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface-strong); }
+  .dash-wrong-q { margin-bottom:6px; color:var(--ink); font:700 13px/1.4 var(--sans); }
+  .dash-wrong-a { font:12px/1.6 var(--mono); }
+  .dash-wrong-a.your { color:var(--low); }
+  .dash-wrong-a.correct { color:var(--good); }
+  .dash-wrong-ctx { margin-top:5px; color:var(--ink-dim); font:11px var(--mono); }
+  .dash-wrong-empty { padding:10px 14px 14px; color:var(--ink-dim); font:12px var(--mono); }
   .dash-err { padding:18px 0; color:var(--low); font:13px/1.6 var(--mono); }
   .dash-loadbar { width:100%; max-width:260px; height:5px; margin-top:16px; overflow:hidden; border-radius:999px; background:var(--line); }
   .dash-loadbar-fill { width:42%; height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--accent), var(--accent-2)); animation:dash-loadbar-slide 1.1s ease-in-out infinite; }
@@ -250,6 +266,63 @@
     }
   }
 
+  // Graded assignments store their per-question breakdown the same way
+  // quizzes do, just under a different column (answers_json, in the
+  // Submissions sheet instead of QuizResults).
+  function parseAnswers(row) {
+    try {
+      var parsed = JSON.parse(row.answers_json || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function chapterKey(chapter) {
+    return (chapter === undefined || chapter === null || chapter === "") ? "Unlabeled" : String(chapter);
+  }
+
+  function contextLabel(row) {
+    return [row.subject, row.lesson || row.quiz_title, row.date].filter(Boolean).join(" \u00b7 ");
+  }
+
+  // Every wrong answer the student has ever given, grouped by chapter and
+  // then by where it came from (quiz vs. graded assignment) — this is
+  // what powers the two sub-toggles under each chapter heading.
+  function collectWrongByChapter(quizRows, subRows) {
+    var byChapter = {};
+    function bucket(chapter) {
+      var key = chapterKey(chapter);
+      if (!byChapter[key]) byChapter[key] = { quiz: [], assignment: [] };
+      return byChapter[key];
+    }
+
+    quizRows.forEach(function (row) {
+      var ctx = contextLabel(row);
+      parseQuestions(row).forEach(function (q) {
+        var isCorrect = q.is_correct === true || String(q.is_correct).toUpperCase() === "TRUE";
+        if (isCorrect) return;
+        bucket(q.chapter).quiz.push({
+          question: q.question, your_answer: q.your_answer, correct_answer: q.correct_answer, context: ctx,
+        });
+      });
+    });
+
+    subRows.forEach(function (row) {
+      if (!row.answers_json) return; // only graded assignments carry per-question detail
+      var ctx = contextLabel(row);
+      parseAnswers(row).forEach(function (a) {
+        var isCorrect = a.is_correct === true || String(a.is_correct).toUpperCase() === "TRUE";
+        if (isCorrect) return;
+        bucket(a.chapter).assignment.push({
+          question: a.prompt, your_answer: a.chosen, correct_answer: a.correct_answer, context: ctx,
+        });
+      });
+    });
+
+    return byChapter;
+  }
+
   // Chapter aggregation across every attempt this student has ever taken.
   // Defensive about the answer-field name since the field has gone by
   // "chosen" (v1) and "your_answer" (v2 record shape) at different points.
@@ -312,25 +385,96 @@
     return section;
   }
 
-  function renderChapterSection(quizRows) {
+  function renderWrongItems(items) {
+    if (!items.length) {
+      return el("div", { class: "dash-wrong-empty" }, ["No wrong answers here \u2014 nice work."]);
+    }
+    var body = el("div", { class: "dash-wrong-body" });
+    items.forEach(function (it) {
+      var card = el("div", { class: "dash-wrong-item" }, [
+        el("div", { class: "dash-wrong-q" }, [it.question || "Question"]),
+        el("div", { class: "dash-wrong-a your" }, ["Your answer: " + (it.your_answer || "\u2014")]),
+        el("div", { class: "dash-wrong-a correct" }, ["Correct answer: " + (it.correct_answer || "\u2014")]),
+      ]);
+      if (it.context) card.appendChild(el("div", { class: "dash-wrong-ctx" }, [it.context]));
+      body.appendChild(card);
+    });
+    return body;
+  }
+
+  function renderWrongToggle(label, items) {
+    var count = items.length;
+    var attrs = { class: "dash-wrong" };
+    if (count) attrs.open = "open";
+    var details = el("details", attrs, [
+      el("summary", {}, [
+        el("span", {}, [label]),
+        el("span", { class: "dash-wrong-count " + (count ? "is-nonzero" : "is-zero") }, [count + " wrong"]),
+      ]),
+    ]);
+    details.appendChild(renderWrongItems(items));
+    return details;
+  }
+
+  // Chapter labels are usually numbers ("1", "2", ...) with "Unlabeled"
+  // as a catch-all — sort numerically and push Unlabeled to the end.
+  function sortChapterLabels(keys) {
+    return keys.slice().sort(function (a, b) {
+      var an = Number(a), bn = Number(b);
+      var aIsNum = a !== "Unlabeled" && !isNaN(an);
+      var bIsNum = b !== "Unlabeled" && !isNaN(bn);
+      if (aIsNum && bIsNum) return an - bn;
+      if (aIsNum) return -1;
+      if (bIsNum) return 1;
+      return a.localeCompare(b);
+    });
+  }
+
+  function renderChapterSection(quizRows, subRows) {
     var section = el("div", { class: "dash-section" }, [el("h2", {}, ["By chapter"])]);
     var chapters = aggregateChapters(quizRows);
+    var wrongByChapter = collectWrongByChapter(quizRows, subRows);
+
+    // Accuracy is quiz-based (unchanged), but a chapter can also show up
+    // only via a graded assignment miss — make sure it still gets a
+    // heading so those wrong answers are visible somewhere.
+    var accuracyChapters = {};
+    chapters.forEach(function (c) { accuracyChapters[c.chapter] = true; });
+    var extraChapters = sortChapterLabels(
+      Object.keys(wrongByChapter).filter(function (k) { return !accuracyChapters[k]; })
+    );
+    extraChapters.forEach(function (k) {
+      chapters.push({ chapter: k, correct: null, total: null, pct: null });
+    });
+
     if (!chapters.length) {
       section.appendChild(el("div", { class: "dash-empty" }, ["No chapter-tagged questions yet."]));
       return section;
     }
+
     chapters.forEach(function (c) {
-      var pctLabel = Math.round(c.pct * 100) + "%";
-      var barClass = c.pct >= 0.8 ? "is-good" : (c.pct < 0.5 ? "is-low" : "");
-      var wrap = el("div", { class: "dash-chapter" }, [
-        el("div", { class: "dash-chapter-top" }, [
-          el("b", {}, [c.chapter]),
-          document.createTextNode(c.correct + "/" + c.total + " \u00b7 " + pctLabel),
-        ]),
-        el("div", { class: "dash-bar" }, [
+      var top = [el("b", {}, [c.chapter])];
+      var bar = null;
+      if (c.pct !== null) {
+        var pctLabel = Math.round(c.pct * 100) + "%";
+        var barClass = c.pct >= 0.8 ? "is-good" : (c.pct < 0.5 ? "is-low" : "");
+        top.push(document.createTextNode(c.correct + "/" + c.total + " \u00b7 " + pctLabel));
+        bar = el("div", { class: "dash-bar" }, [
           el("div", { class: "dash-bar-fill " + barClass, style: "width:" + Math.max(3, Math.round(c.pct * 100)) + "%" }),
-        ]),
+        ]);
+      } else {
+        top.push(document.createTextNode("from assignments only"));
+      }
+
+      var wrongData = wrongByChapter[c.chapter] || { quiz: [], assignment: [] };
+      var wrap = el("div", { class: "dash-chapter" }, [
+        el("div", { class: "dash-chapter-top" }, top),
       ]);
+      if (bar) wrap.appendChild(bar);
+      wrap.appendChild(el("div", { class: "dash-wrong-group" }, [
+        renderWrongToggle("Quizzes", wrongData.quiz),
+        renderWrongToggle("Assignments", wrongData.assignment),
+      ]));
       section.appendChild(wrap);
     });
     return section;
@@ -377,7 +521,7 @@
 
     root.appendChild(renderStats(data.quiz_results || [], data.submissions || []));
     root.appendChild(renderQuizSection(data.quiz_results || []));
-    root.appendChild(renderChapterSection(data.quiz_results || []));
+    root.appendChild(renderChapterSection(data.quiz_results || [], data.submissions || []));
     root.appendChild(renderSubmissionsSection(data.submissions || []));
   }
 

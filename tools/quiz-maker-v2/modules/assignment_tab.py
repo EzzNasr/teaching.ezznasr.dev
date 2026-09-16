@@ -124,12 +124,13 @@ class AssignmentTab(ttk.Frame):
         tk.Label(chapter_row, text="Chapter:", width=14, anchor="w").pack(side="left")
         self.chapter_var = tk.StringVar(value="1")
         self.chapter_combo = ttk.Combobox(chapter_row, textvariable=self.chapter_var, state="readonly",
-                                           values=[str(i) for i in range(1, 21)], width=6)
+                                           values=[str(c) for c in self._chapter_choices()], width=6)
         self.chapter_combo.pack(side="left")
         tk.Label(chapter_row,
-                 text="Applies to new questions added below (bulk paste can override per-block with \"Ch: N\"). "
-                      "Lets the student dashboard show wrong-question counts per chapter.",
-                 fg="gray30", font=("TkDefaultFont", 8)).pack(side="left", padx=8)
+                 text="Tags new questions below with this chapter so a student's wrong answers on this "
+                      "assignment show up under the right chapter on their dashboard, alongside quiz misses "
+                      "for that same chapter. A \u201cCh: N\u201d line in a bulk paste overrides this per-question.",
+                 fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=560).pack(side="left", padx=(8, 0))
 
         graded_btn_row = tk.Frame(graded_frame)
         graded_btn_row.pack(fill="x", padx=8, pady=6)
@@ -169,6 +170,15 @@ class AssignmentTab(ttk.Frame):
 
     # -- graded questions list ---------------------------------------------
 
+    def _current_chapter(self):
+        try:
+            return int(self.chapter_var.get())
+        except (AttributeError, ValueError):
+            return 1
+
+    def _chapter_choices(self):
+        return list(range(1, 21))
+
     def _refresh_graded_listbox(self):
         self.graded_listbox.delete(0, "end")
         labels = {"mcq": "MCQ", "truefalse": "T/F", "match": "Match"}
@@ -178,15 +188,6 @@ class AssignmentTab(ttk.Frame):
             ch_label = "Ch{} ".format(chapter) if chapter is not None else ""
             self.graded_listbox.insert("end", "{:>2}. {}[{}] {}".format(
                 i + 1, ch_label, labels.get(item["type"], "?"), preview))
-
-    def _current_chapter(self):
-        try:
-            return int(self.chapter_var.get())
-        except (AttributeError, ValueError):
-            return 1
-
-    def _chapter_choices(self):
-        return list(range(1, 21))
 
     def _add_mcq(self):
         dlg = MCQItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
