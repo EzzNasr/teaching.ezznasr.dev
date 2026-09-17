@@ -143,7 +143,12 @@
     try {
       var raw = localStorage.getItem(SESSION_KEY);
       var parsed = raw ? JSON.parse(raw) : null;
-      return parsed && parsed.student_id ? parsed : null;
+      // A cached session from before session_token existed (or one that
+      // otherwise lost it) can't authenticate anything server-side —
+      // treat it as no session at all so the person re-logs in and gets
+      // a real token, instead of landing on completeProfile with a
+      // session that fails with "Missing session." the moment it POSTs.
+      return parsed && parsed.student_id && parsed.session_token ? parsed : null;
     } catch (e) {
       return null;
     }
