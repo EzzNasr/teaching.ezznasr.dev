@@ -59,6 +59,97 @@ SUBMIT_MODES = [
     ("graded", "Graded questions (auto-marked)"),
 ]
 
+# --------------------------------------------------------------------------
+# Shared "media-slot" video embed helpers.
+#
+# Any generated page (lesson index, assignment, quiz) can carry a single
+# <div class="media-slot">...</div> — either a placeholder box or an
+# <iframe> embed. These helpers are shared so every tab that lets someone
+# paste a video URL (lesson video, assignment solution video, quiz
+# solution video) behaves identically.
+# --------------------------------------------------------------------------
+
+MEDIA_SLOT_RE = re.compile(r'(<div class="media-slot">)(.*?)(</div>)', re.DOTALL)
+VIDEO_PLACEHOLDER = "Video placeholder &mdash; add a YouTube embed URL to replace this box."
+
+
+def normalize_video_url(url):
+    """Accept whatever a person is likely to paste — a normal watch link,
+    a youtu.be share link, a Shorts link, or an already-correct embed
+    URL — and return a proper https://www.youtube.com/embed/ID URL.
+    Anything that isn't recognizably YouTube (e.g. a Vimeo embed URL
+    someone pastes on purpose) is passed through unchanged, since the
+    iframe wrapper works with any embeddable video URL, not just
+    YouTube's."""
+    url = url.strip()
+    if not url:
+        return ""
+
+    if re.search(r"youtube\.com/embed/", url) or re.search(r"player\.vimeo\.com", url):
+        return url  # already an embed URL (or a non-YouTube embed) — leave as-is
+
+    m = re.search(r"youtu\.be/([A-Za-z0-9_-]{6,})", url)
+    if not m:
+        m = re.search(r"youtube\.com/shorts/([A-Za-z0-9_-]{6,})", url)
+    if not m:
+        m = re.search(r"[?&]v=([A-Za-z0-9_-]{6,})", url)
+    if m:
+        video_id = m.group(1)
+        return "https://www.youtube.com/embed/" + video_id
+
+    return url  # not recognized as YouTube — pass through unchanged
+
+
+def video_block_for(embed_url, title):
+    """Return the markup that belongs inside a <div class="media-slot">
+    for a given (already-normalized) embed URL — an <iframe> if there is
+    one, otherwise the standard placeholder box."""
+    if embed_url:
+        return '<iframe src="{}" title="{}" allowfullscreen></iframe>'.format(embed_url, title)
+    return VIDEO_PLACEHOLDER
+
+
+def read_media_slot_url(html_path):
+    """Return the iframe src currently sitting in html_path's media-slot,
+    or "" if the file doesn't exist, has no media-slot, or the slot is
+    just the placeholder."""
+    if not os.path.isfile(html_path):
+        return ""
+    with open(html_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    slot_match = MEDIA_SLOT_RE.search(content)
+    if not slot_match:
+        return ""
+    iframe_match = re.search(r'<iframe src="([^"]+)"', slot_match.group(2))
+    return iframe_match.group(1) if iframe_match else ""
+
+
+def update_media_slot(html_path, raw_url, title):
+    """Find the <div class="media-slot">...</div> in html_path and swap
+    its contents for an iframe embedding raw_url (normalized first), or
+    back to the placeholder if raw_url is blank. Returns the normalized
+    embed_url ("" if cleared). Raises FileNotFoundError if html_path
+    doesn't exist, or ValueError if it has no media-slot section."""
+    if not os.path.isfile(html_path):
+        raise FileNotFoundError(html_path)
+
+    with open(html_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    if not MEDIA_SLOT_RE.search(content):
+        raise ValueError("no media-slot section found in {}".format(html_path))
+
+    embed_url = normalize_video_url(raw_url)
+    video_block = video_block_for(embed_url, title)
+
+    new_content = MEDIA_SLOT_RE.sub(
+        lambda m: m.group(1) + "\n      " + video_block + "\n    " + m.group(3), content, count=1)
+
+    with open(html_path, "w", encoding="utf-8") as f:
+        f.write(new_content)
+
+    return embed_url
+
 
 def fit_geometry(win, want_w, want_h, min_w=480, min_h=360, margin=80):
     """Size + center a Tk window (or Toplevel) so it always fits on the

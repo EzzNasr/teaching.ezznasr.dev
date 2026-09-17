@@ -47,6 +47,14 @@ Stdlib only (`tkinter`, `urllib`) — no `pip install` needed.
   "Coming soon" stamp with no way to add files. Now it uploads to a
   Drive folder you control and the lesson page renders it inline via
   `attachments.js`, proxied through the same Apps Script Web App.
+- **Video embeds**: every lesson page (`index.html`, `assignment.html`,
+  `quiz.html`) has a shared `media-slot` box. Quiz Maker still controls
+  the lesson’s main intro video; Assignment Maker and Quiz Maker each
+  also have their own “Solution video” control for a walkthrough video
+  embedded directly on that lesson’s assignment/quiz page. Paste any
+  YouTube link (watch/share/Shorts/embed) and it’s normalized automatically;
+  leave the field blank and click Update to clear it back to a placeholder.
+  These are independent per page and are preserved across regeneration.
 
 ## What this *isn't*
 

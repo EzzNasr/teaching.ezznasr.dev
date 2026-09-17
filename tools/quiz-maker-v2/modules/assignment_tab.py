@@ -92,6 +92,22 @@ class AssignmentTab(ttk.Frame):
                       "assignment prompt or submission mode below.",
                  fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=560).pack(anchor="w", padx=8, pady=(0, 6))
 
+        solution_frame = tk.LabelFrame(self, text="Solution video (shown on the assignment page itself)")
+        solution_frame.pack(fill="x", **pad)
+        srow = tk.Frame(solution_frame)
+        srow.pack(fill="x", padx=8, pady=4)
+        tk.Label(srow, text="Video URL:", width=14, anchor="w").pack(side="left")
+        self.solution_video_url_var = tk.StringVar()
+        tk.Entry(srow, textvariable=self.solution_video_url_var).pack(side="left", fill="x", expand=True)
+        tk.Button(srow, text="Update solution video", command=self._update_solution_video).pack(side="left", padx=6)
+        tk.Label(solution_frame,
+                 text="A homework-solving/walkthrough video embedded directly on this lesson's assignment.html "
+                      "page \u2014 separate from the video above, which lives on the lesson's main page instead. "
+                      "Paste any YouTube link \u2014 it's converted automatically. Leave blank and click Update "
+                      "to remove it. This only touches the assignment page's video; it doesn't affect the prompt "
+                      "or submission mode below.",
+                 fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=560).pack(anchor="w", padx=8, pady=(0, 6))
+
         prompt_frame = tk.LabelFrame(self, text="Assignment description")
         prompt_frame.pack(fill="both", expand=True, **pad)
         tk.Label(prompt_frame, text="This is shown to students on the assignment page. Multiple paragraphs are fine.",
@@ -314,6 +330,7 @@ class AssignmentTab(ttk.Frame):
         if os.path.exists(assignment_path):
             with open(assignment_path, "r", encoding="utf-8") as f:
                 content = f.read()
+            self.solution_video_url_var.set(common.read_media_slot_url(assignment_path))
             prompt_match = re.search(r'<p class="lede">(.*?)</p>', content, re.DOTALL)
             if prompt_match:
                 prompt = prompt_match.group(1).strip()
@@ -343,41 +360,20 @@ class AssignmentTab(ttk.Frame):
             self.prompt_text.delete("1.0", "end")
             self.prompt_text.insert("1.0", "Paste your completed assignment below.")
             self.mode_label_var.set(common.SUBMIT_MODES[0][1])
+            self.solution_video_url_var.set("")
             self.graded_items = []
             self._refresh_graded_listbox()
             self.status_var.set("No assignment.html yet for this lesson — fill in the form and click Update.")
 
-    _MEDIA_SLOT_RE = re.compile(r'(<div class="media-slot">)(.*?)(</div>)', re.DOTALL)
-    _VIDEO_PLACEHOLDER = "Video placeholder &mdash; add a YouTube embed URL to replace this box."
-
-    @staticmethod
-    def _normalize_video_url(url):
-        """Accept whatever a person is likely to paste — a normal watch
-        link, a youtu.be share link, a Shorts link, or an already-correct
-        embed URL — and return a proper https://www.youtube.com/embed/ID
-        URL. Anything that isn't recognizably YouTube (e.g. a Vimeo embed
-        URL someone pastes on purpose) is passed through unchanged, since
-        the iframe wrapper works with any embeddable video URL, not just
-        YouTube's."""
-        url = url.strip()
-        if not url:
-            return ""
-
-        if re.search(r"youtube\.com/embed/", url) or re.search(r"player\.vimeo\.com", url):
-            return url  # already an embed URL (or a non-YouTube embed) — leave as-is
-
-        m = re.search(r"youtu\.be/([A-Za-z0-9_-]{6,})", url)
-        if not m:
-            m = re.search(r"youtube\.com/shorts/([A-Za-z0-9_-]{6,})", url)
-        if not m:
-            m = re.search(r"[?&]v=([A-Za-z0-9_-]{6,})", url)
-        if m:
-            video_id = m.group(1)
-            return "https://www.youtube.com/embed/" + video_id
-
-        return url  # not recognized as YouTube — pass through unchanged
+    # Kept as aliases for backwards compatibility (some older code paths /
+    # muscle memory may reach for these); the real implementations now
+    # live in modules/common.py, shared with the Quiz Maker tab.
+    _MEDIA_SLOT_RE = common.MEDIA_SLOT_RE
+    _VIDEO_PLACEHOLDER = common.VIDEO_PLACEHOLDER
+    _normalize_video_url = staticmethod(common.normalize_video_url)
 
     def _update_video(self):
+        """Update the video on this lesson's main page (index.html)."""
         lesson_dir = self._lesson_dir()
         if not lesson_dir or not os.path.isdir(lesson_dir):
             messagebox.showerror("No lesson selected", "Pick a subject and lesson first (generate it in the "
@@ -385,33 +381,19 @@ class AssignmentTab(ttk.Frame):
             return
 
         index_path = os.path.join(lesson_dir, "index.html")
-        if not os.path.exists(index_path):
+        lesson_title = self._lesson_title(lesson_dir)
+        raw_url = self.video_url_var.get().strip()
+
+        try:
+            embed_url = common.update_media_slot(index_path, raw_url, lesson_title)
+        except FileNotFoundError:
             messagebox.showerror("No lesson page found", "This lesson has no index.html to update.")
             return
-
-        with open(index_path, "r", encoding="utf-8") as f:
-            content = f.read()
-
-        if not self._MEDIA_SLOT_RE.search(content):
+        except ValueError:
             messagebox.showerror("Couldn't find the video area",
                                   "This lesson's index.html doesn't have the expected media-slot section — "
                                   "it may have been hand-edited or use an older template.")
             return
-
-        raw_url = self.video_url_var.get().strip()
-        embed_url = self._normalize_video_url(raw_url)
-
-        if embed_url:
-            lesson_title = self._lesson_title(lesson_dir)
-            video_block = '<iframe src="{}" title="{}" allowfullscreen></iframe>'.format(embed_url, lesson_title)
-        else:
-            video_block = self._VIDEO_PLACEHOLDER
-
-        new_content = self._MEDIA_SLOT_RE.sub(
-            lambda m: m.group(1) + "\n      " + video_block + "\n    " + m.group(3), content, count=1)
-
-        with open(index_path, "w", encoding="utf-8") as f:
-            f.write(new_content)
 
         if embed_url and embed_url != raw_url:
             self.video_url_var.set(embed_url)
@@ -419,6 +401,43 @@ class AssignmentTab(ttk.Frame):
         self.status_var.set("Updated video for {}/{}".format(self._subject_slug(), self.lesson_var.get()))
         if embed_url:
             messagebox.showinfo("Done", "Video embed updated.")
+        else:
+            messagebox.showinfo("Done", "Video removed — back to a placeholder box.")
+
+    def _update_solution_video(self):
+        """Update the solution/walkthrough video embedded directly on
+        this lesson's assignment.html page — independent of the lesson
+        page's own video above."""
+        lesson_dir = self._lesson_dir()
+        if not lesson_dir or not os.path.isdir(lesson_dir):
+            messagebox.showerror("No lesson selected", "Pick a subject and lesson first (generate it in the "
+                                                         "Quiz Maker tab if it doesn't exist yet).")
+            return
+
+        assignment_path = os.path.join(lesson_dir, "assignment.html")
+        lesson_title = self._lesson_title(lesson_dir)
+        raw_url = self.solution_video_url_var.get().strip()
+
+        try:
+            embed_url = common.update_media_slot(assignment_path, raw_url, lesson_title)
+        except FileNotFoundError:
+            messagebox.showerror("No assignment page found",
+                                  "This lesson has no assignment.html yet — click \u201cUpdate assignment page\u201d "
+                                  "below at least once first (with a submission type chosen) to create it.")
+            return
+        except ValueError:
+            messagebox.showerror("Couldn't find the video area",
+                                  "This lesson's assignment.html doesn't have the expected media-slot section — "
+                                  "it may have been hand-edited or use an older template.")
+            return
+
+        if embed_url and embed_url != raw_url:
+            self.solution_video_url_var.set(embed_url)
+
+        self.status_var.set("Updated solution video for {}/{} assignment page".format(
+            self._subject_slug(), self.lesson_var.get()))
+        if embed_url:
+            messagebox.showinfo("Done", "Assignment solution video updated.")
         else:
             messagebox.showinfo("Done", "Video removed — back to a placeholder box.")
 
@@ -481,6 +500,13 @@ class AssignmentTab(ttk.Frame):
         location_label = common.lesson_url_path(subject_slug, group_relpath, lesson_slug)
         track_class = common.track_class_for_group(subject_slug, group_relpath)
 
+        # Preserve a solution video already embedded on this assignment
+        # page (via the "Solution video" control above) across updates —
+        # editing the prompt/mode/questions shouldn't wipe it out.
+        assignment_path = os.path.join(lesson_dir, "assignment.html")
+        existing_video_url = common.read_media_slot_url(assignment_path)
+        video_block = common.video_block_for(existing_video_url, lesson_title)
+
         assignment_html = common.load_template("assignment.html")
         assignment_html = (assignment_html
                             .replace("{{SUBJECT_SLUG}}", subject_slug)
@@ -488,10 +514,11 @@ class AssignmentTab(ttk.Frame):
                             .replace("{{LESSON_TITLE}}", lesson_title)
                             .replace("{{SUBMIT_MODE}}", mode_slug)
                             .replace("{{ASSIGN_PROMPT}}", prompt)
+                            .replace("{{VIDEO_BLOCK}}", video_block)
                             .replace("{{TRACK_CLASS}}", track_class)
                             .replace("{{LESSON_URL_PATH}}", location_label)
                             .replace("{{ASSIGN_QUESTIONS_JSON}}", json.dumps({"items": graded_items_out})))
-        with open(os.path.join(lesson_dir, "assignment.html"), "w", encoding="utf-8") as f:
+        with open(assignment_path, "w", encoding="utf-8") as f:
             f.write(assignment_html)
 
         # Make sure the lesson's index.html actually links to the assignment

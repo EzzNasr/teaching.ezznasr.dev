@@ -245,6 +245,22 @@ class QuizTab(ttk.Frame):
                                      "modes, use the Assignment Maker tab after generating this lesson.",
                  fg="gray30", font=("TkDefaultFont", 8)).pack(anchor="w", padx=8, pady=(0, 6))
 
+        solution_frame = tk.LabelFrame(self, text="Solution video (shown on the quiz page itself)")
+        solution_frame.pack(fill="x", **pad)
+        row_sol = tk.Frame(solution_frame)
+        row_sol.pack(fill="x", padx=8, pady=4)
+        tk.Label(row_sol, text="Video URL:", width=14, anchor="w").pack(side="left")
+        self.quiz_solution_video_var = tk.StringVar()
+        tk.Entry(row_sol, textvariable=self.quiz_solution_video_var).pack(side="left", fill="x", expand=True)
+        tk.Button(row_sol, text="Update", command=self._update_quiz_solution_video).pack(side="left", padx=6)
+        tk.Label(solution_frame,
+                 text="A homework-solving/walkthrough video embedded directly on this lesson's quiz.html page "
+                      "(separate from the intro video above, which lives on the lesson's main page). Paste any "
+                      "YouTube link \u2014 it's converted automatically. Requires the lesson to already exist "
+                      "(Generate lesson files at least once first); leave blank and click Update to remove it. "
+                      "This only touches the quiz page's video, nothing else.",
+                 fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=640).pack(anchor="w", padx=8, pady=(0, 6))
+
         del_frame = tk.LabelFrame(self, text="Existing lessons")
         del_frame.pack(fill="x", **pad)
         row_del = tk.Frame(del_frame)
@@ -410,6 +426,42 @@ class QuizTab(ttk.Frame):
         webbrowser.open(url)
         self.status_var.set("Previewing at " + url + " (served locally so /assets/... links resolve correctly)")
 
+    def _update_quiz_solution_video(self):
+        """Embed (or clear) a video directly on this lesson's quiz.html
+        page — independent of the lesson's intro video and independent
+        of regenerating the questions. Targets whichever lesson is
+        selected in the 'Existing lessons' combo above."""
+        site_root = self.site_root_var.get().strip()
+        if not site_root or not os.path.isdir(site_root):
+            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            return
+        lesson_slug = self.delete_lesson_var.get().strip()
+        if not lesson_slug:
+            messagebox.showinfo("No lesson selected", "Pick a lesson in \u201cExisting lessons\u201d below first.")
+            return
+        subject_slug = self._subject_slug()
+        group_relpath = self._group_relpath()
+        lesson_dir = os.path.join(common.group_dir(site_root, subject_slug, group_relpath), lesson_slug)
+        quiz_path = os.path.join(lesson_dir, "quiz.html")
+
+        try:
+            embed_url = common.update_media_slot(
+                quiz_path, self.quiz_solution_video_var.get(), lesson_slug.replace("-", " ").title())
+        except FileNotFoundError:
+            messagebox.showerror("No quiz page found",
+                                  "{}/quiz.html doesn't exist yet \u2014 generate this lesson first.".format(lesson_slug))
+            return
+        except ValueError:
+            messagebox.showerror("Couldn't find the video area",
+                                  "This lesson's quiz.html doesn't have the expected media-slot section \u2014 "
+                                  "it may have been hand-edited or use an older template.")
+            return
+
+        if embed_url != self.quiz_solution_video_var.get().strip():
+            self.quiz_solution_video_var.set(embed_url)
+        self.status_var.set("Updated solution video for {}/{} quiz page".format(subject_slug, lesson_slug))
+        messagebox.showinfo("Done", "Quiz solution video updated." if embed_url else "Quiz solution video cleared.")
+
     def _load_lesson_for_edit(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
@@ -475,6 +527,9 @@ class QuizTab(ttk.Frame):
                 if iframe_match:
                     video_url = iframe_match.group(1)
 
+        # -- solution video already on quiz.html itself, if any -----------
+        quiz_solution_video_url = common.read_media_slot_url(quiz_path)
+
         # -- assignment prompt + whether one exists, from assignment.html --
         # (submission mode itself is left alone here — see _generate(),
         # which preserves it automatically when this lesson is saved)
@@ -493,6 +548,7 @@ class QuizTab(ttk.Frame):
         self.lesson_name_var.set(quiz_json.get("title") or lesson_slug.replace("-", " ").title())
         self.lesson_desc_var.set(lesson_desc)
         self.video_url_var.set(video_url)
+        self.quiz_solution_video_var.set(quiz_solution_video_url)
         self.include_assignment_var.set(include_assignment)
         self.assign_prompt_var.set(assign_prompt)
         self.questions = copy.deepcopy(questions)
@@ -517,6 +573,7 @@ class QuizTab(ttk.Frame):
         self.lesson_name_var.set("")
         self.lesson_desc_var.set("")
         self.video_url_var.set("")
+        self.quiz_solution_video_var.set("")
         self.include_assignment_var.set(True)
         self.assign_prompt_var.set("Paste your completed assignment below.")
         self.questions = []
@@ -831,6 +888,13 @@ class QuizTab(ttk.Frame):
         }
         track_class = common.track_class_for_group(subject_slug, group_relpath)
 
+        # Preserve a solution video already set on this quiz page (via the
+        # standalone "Solution video" control below) across regeneration —
+        # regenerating the questions shouldn't wipe it out.
+        quiz_path = os.path.join(lesson_dir, "quiz.html")
+        quiz_video_url = common.read_media_slot_url(quiz_path)
+        quiz_video_block = common.video_block_for(quiz_video_url, lesson_name)
+
         quiz_html = common.load_template("quiz.html")
         quiz_html = (quiz_html
                      .replace("{{SUBJECT_SLUG}}", subject_slug)
@@ -838,9 +902,10 @@ class QuizTab(ttk.Frame):
                      .replace("{{LESSON_TITLE}}", lesson_name)
                      .replace("{{QUESTION_COUNT}}", str(len(self.questions)))
                      .replace("{{QUIZ_JSON}}", json.dumps(quiz_json, indent=2))
+                     .replace("{{VIDEO_BLOCK}}", quiz_video_block)
                      .replace("{{TRACK_CLASS}}", track_class)
                      .replace("{{LESSON_URL_PATH}}", location_label))
-        with open(os.path.join(lesson_dir, "quiz.html"), "w", encoding="utf-8") as f:
+        with open(quiz_path, "w", encoding="utf-8") as f:
             f.write(quiz_html)
 
         # ---- assignment.html — preserve an already-configured submission
@@ -849,6 +914,12 @@ class QuizTab(ttk.Frame):
         #      Brand-new lessons still default to "text" (submit_mode
         #      computed above, next to include_assignment).
         if include_assignment:
+            # Preserve a solution video already set on this assignment page
+            # (via the Assignment Maker tab's "Solution video" control)
+            # across regeneration, same as submit_mode above.
+            assign_video_url = common.read_media_slot_url(assignment_path)
+            assign_video_block = common.video_block_for(assign_video_url, lesson_name)
+
             assignment_html = common.load_template("assignment.html")
             assignment_html = (assignment_html
                                 .replace("{{SUBJECT_SLUG}}", subject_slug)
@@ -857,9 +928,10 @@ class QuizTab(ttk.Frame):
                                 .replace("{{SUBMIT_MODE}}", submit_mode)
                                 .replace("{{ASSIGN_PROMPT}}", self.assign_prompt_var.get().strip() or
                                          "Paste your completed assignment below.")
+                                .replace("{{VIDEO_BLOCK}}", assign_video_block)
                                 .replace("{{TRACK_CLASS}}", track_class)
                      .replace("{{LESSON_URL_PATH}}", location_label))
-            with open(os.path.join(lesson_dir, "assignment.html"), "w", encoding="utf-8") as f:
+            with open(assignment_path, "w", encoding="utf-8") as f:
                 f.write(assignment_html)
 
         # ---- lesson index.html ----
