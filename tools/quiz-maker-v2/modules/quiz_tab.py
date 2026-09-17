@@ -870,6 +870,12 @@ class QuizTab(ttk.Frame):
         # Determined once, used both when (re)writing assignment.html below
         # and for the lesson-card link's description text further down.
         submit_mode = "text"
+        # Preserve any graded questions already embedded on assignment.html
+        # (set via the Assignment Maker tab) across regeneration here —
+        # this tab has no knowledge of graded items, so without this the
+        # {{ASSIGN_QUESTIONS_JSON}} placeholder would get written out
+        # unreplaced, silently wiping the assignment's questions.
+        existing_assign_questions_json = json.dumps({"items": []})
         if include_assignment:
             assignment_path = os.path.join(lesson_dir, "assignment.html")
             if os.path.isfile(assignment_path):
@@ -878,6 +884,10 @@ class QuizTab(ttk.Frame):
                 mode_match = re.search(r'data-mode="([a-z]+)"', existing_assignment)
                 if mode_match:
                     submit_mode = mode_match.group(1)
+                q_match = re.search(r'id="assign-questions">\s*(\{.*?\})\s*</script>',
+                                     existing_assignment, re.DOTALL)
+                if q_match:
+                    existing_assign_questions_json = q_match.group(1)
 
         # ---- quiz.html ----
         quiz_json = {
@@ -930,7 +940,8 @@ class QuizTab(ttk.Frame):
                                          "Paste your completed assignment below.")
                                 .replace("{{VIDEO_BLOCK}}", assign_video_block)
                                 .replace("{{TRACK_CLASS}}", track_class)
-                     .replace("{{LESSON_URL_PATH}}", location_label))
+                     .replace("{{LESSON_URL_PATH}}", location_label)
+                     .replace("{{ASSIGN_QUESTIONS_JSON}}", existing_assign_questions_json))
             with open(assignment_path, "w", encoding="utf-8") as f:
                 f.write(assignment_html)
 
