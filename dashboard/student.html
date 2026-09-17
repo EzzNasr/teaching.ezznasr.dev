@@ -121,6 +121,8 @@
   .dash-wrong[open] summary:before { transform:rotate(90deg); }
   .dash-wrong-count.is-nonzero { color:var(--low); }
   .dash-wrong-count.is-zero { color:var(--good); }
+  .dash-wrong-count.is-correct { color:var(--good); }
+  .dash-wrong-counts { display:flex; gap:8px; }
   .dash-wrong-body { display:grid; gap:8px; padding:0 14px 12px; }
   .dash-wrong-item { padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface-strong); }
   .dash-wrong-q { margin-bottom:6px; color:var(--ink); font:700 13px/1.4 var(--sans); }
@@ -293,16 +295,18 @@
     var byChapter = {};
     function bucket(chapter) {
       var key = chapterKey(chapter);
-      if (!byChapter[key]) byChapter[key] = { quiz: [], assignment: [] };
+      if (!byChapter[key]) byChapter[key] = { quiz: [], assignment: [], quizTotal: 0, assignmentTotal: 0 };
       return byChapter[key];
     }
 
     quizRows.forEach(function (row) {
       var ctx = contextLabel(row);
       parseQuestions(row).forEach(function (q) {
+        var b = bucket(q.chapter);
+        b.quizTotal += 1;
         var isCorrect = q.is_correct === true || String(q.is_correct).toUpperCase() === "TRUE";
         if (isCorrect) return;
-        bucket(q.chapter).quiz.push({
+        b.quiz.push({
           question: q.question, your_answer: q.your_answer, correct_answer: q.correct_answer, context: ctx,
         });
       });
@@ -312,9 +316,11 @@
       if (!row.answers_json) return; // only graded assignments carry per-question detail
       var ctx = contextLabel(row);
       parseAnswers(row).forEach(function (a) {
+        var b = bucket(a.chapter);
+        b.assignmentTotal += 1;
         var isCorrect = a.is_correct === true || String(a.is_correct).toUpperCase() === "TRUE";
         if (isCorrect) return;
-        bucket(a.chapter).assignment.push({
+        b.assignment.push({
           question: a.prompt, your_answer: a.chosen, correct_answer: a.correct_answer, context: ctx,
         });
       });
@@ -402,14 +408,18 @@
     return body;
   }
 
-  function renderWrongToggle(label, items) {
+  function renderWrongToggle(label, items, total) {
     var count = items.length;
+    var correctCount = Math.max(0, (total || 0) - count);
     var attrs = { class: "dash-wrong" };
     if (count) attrs.open = "open";
     var details = el("details", attrs, [
       el("summary", {}, [
         el("span", {}, [label]),
-        el("span", { class: "dash-wrong-count " + (count ? "is-nonzero" : "is-zero") }, [count + " wrong"]),
+        el("span", { class: "dash-wrong-counts" }, [
+          el("span", { class: "dash-wrong-count is-correct" }, [correctCount + " correct"]),
+          el("span", { class: "dash-wrong-count " + (count ? "is-nonzero" : "is-zero") }, [count + " wrong"]),
+        ]),
       ]),
     ]);
     details.appendChild(renderWrongItems(items));
@@ -466,14 +476,14 @@
         top.push(document.createTextNode("from assignments only"));
       }
 
-      var wrongData = wrongByChapter[c.chapter] || { quiz: [], assignment: [] };
+      var wrongData = wrongByChapter[c.chapter] || { quiz: [], assignment: [], quizTotal: 0, assignmentTotal: 0 };
       var wrap = el("div", { class: "dash-chapter" }, [
         el("div", { class: "dash-chapter-top" }, top),
       ]);
       if (bar) wrap.appendChild(bar);
       wrap.appendChild(el("div", { class: "dash-wrong-group" }, [
-        renderWrongToggle("Quizzes", wrongData.quiz),
-        renderWrongToggle("Assignments", wrongData.assignment),
+        renderWrongToggle("Quizzes", wrongData.quiz, wrongData.quizTotal),
+        renderWrongToggle("Assignments", wrongData.assignment, wrongData.assignmentTotal),
       ]));
       section.appendChild(wrap);
     });
