@@ -30,7 +30,8 @@
  *    the first call to _students() writes the Students header row itself,
  *    and _sheetByName() below creates the QuizResults and Submissions
  *    tabs automatically the first time each is needed. No separate
- *    spreadsheets or extra Script Properties required for those.
+ *    spreadsheets or extra Script Properties required for those — though
+ *    see the optional DATA_SHEET_ID note below once that data grows.
  *
  * 2. In script.google.com, create a new project, paste this file in as
  *    Code.gs, then go to Project Settings → Script Properties and add:
@@ -39,6 +40,20 @@
  *      QUIZ_RESULTS_FOLDER_ID  = <folder id from step 1>
  *      STUDENTS_SHEET_ID       = <sheet id from step 1b>
  *      ADMIN_TOKEN             = <any long random string you make up>
+ *
+ * 2b. Optional, once QuizResults/Submissions have grown a lot — every
+ *    action opens the whole Students spreadsheet (SpreadsheetApp.openById
+ *    loads the entire workbook), so once those two tabs pile up rows with
+ *    large questions_json/answers_json blobs, even a plain login gets
+ *    slower. To split them out:
+ *      - Create a second Google Sheet (e.g. "Teaching / Quiz Data").
+ *      - Right-click the QuizResults tab in the Students spreadsheet →
+ *        Copy to → Existing spreadsheet → pick the new one. Same for
+ *        Submissions. Then delete both tabs from the Students spreadsheet
+ *        (Students keeps just its own one tab).
+ *      - Add Script Property DATA_SHEET_ID = <new sheet's id>.
+ *    Skipping this is fine — QuizResults/Submissions just stay in the
+ *    Students spreadsheet, same as today.
  *
  * 3. Deploy → New deployment → type "Web app".
  *      Execute as:      Me
@@ -102,9 +117,26 @@ function _ss() {
   return SpreadsheetApp.openById(id);
 }
 
+// QuizResults/Submissions grow every time a student takes a quiz or
+// submits homework — each row can carry a sizeable questions_json/
+// answers_json blob. SpreadsheetApp.openById() has to load the whole
+// workbook, so once that data piles up, EVERY action gets slower —
+// including a plain login/check_student that only ever touches the
+// Students tab. DATA_SHEET_ID lets those two tabs live in their own
+// spreadsheet instead, so opening the (small, fast) Students file for
+// login never drags the (large, ever-growing) quiz data along with it.
+//
+// This is optional and backward-compatible: if DATA_SHEET_ID isn't set
+// in Script Properties, QuizResults/Submissions just stay in the
+// Students spreadsheet, exactly like before — nothing breaks if you
+// don't migrate. See DEPLOY.md for the one-time migration steps.
+function _dataSs() {
+  var id = _props().getProperty("DATA_SHEET_ID");
+  return id ? SpreadsheetApp.openById(id) : _ss();
+}
+
 // Creates the tab (with header row) on first use if it doesn't exist yet.
-function _sheetByName(name, headers) {
-  var ss = _ss();
+function _sheetByName(ss, name, headers) {
   var sheet = ss.getSheetByName(name);
   if (!sheet) sheet = ss.insertSheet(name);
   if (sheet.getLastRow() === 0) sheet.appendRow(headers);
@@ -112,14 +144,14 @@ function _sheetByName(name, headers) {
 }
 
 function _quizResultsSheet() {
-  return _sheetByName("QuizResults", [
+  return _sheetByName(_dataSs(), "QuizResults", [
     "student_id", "name", "subject", "lesson", "quiz_title",
     "date", "start_time", "end_time", "score", "total", "questions_json",
   ]);
 }
 
 function _submissionsSheet() {
-  var sheet = _sheetByName("Submissions", [
+  var sheet = _sheetByName(_dataSs(), "Submissions", [
     "student_id", "name", "subject", "lesson", "submission_type",
     "text", "text_truncated", "url", "note", "file_id", "file_name",
     "date", "submitted_time", "score", "total", "answers_json",
