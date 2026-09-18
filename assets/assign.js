@@ -38,6 +38,11 @@
   "use strict";
 
   var QUEUE_KEY = "teaching_pending_submissions";
+  // Mirrors quiz.js's "last attempt" memory — lets other code on the page
+  // (the video-lock script in assignment.html) know this lesson's
+  // assignment has been submitted at least once, without re-deriving it
+  // from the transient upload queue (which gets drained once synced).
+  var LAST_SUBMISSION_PREFIX = "teaching_last_submission:";
   var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
   var MAX_FILE_BYTES = 15 * 1024 * 1024; // 15MB — keep well under Apps Script's request-size ceiling
   function el(tag, attrs, children) {
@@ -66,6 +71,15 @@
       return true;
     } catch (e) {
       return false;
+    }
+  }
+
+  function saveLastSubmission(subject, lesson, record) {
+    try {
+      localStorage.setItem(LAST_SUBMISSION_PREFIX + (subject || "?") + ":" + (lesson || "?"),
+                            JSON.stringify(record));
+    } catch (e) {
+      /* localStorage unavailable — nothing to recover here */
     }
   }
 
@@ -303,6 +317,7 @@
         };
 
         queueSubmission(record);
+        saveLastSubmission(subject, lesson, record);
         state.syncStatus = "pending";
         render();
 
@@ -468,6 +483,7 @@
             var record = Object.assign({}, base, extra);
 
             queueSubmission(record);
+            saveLastSubmission(subject, lesson, record);
 
             if (extra.submission_type === "text") {
               renderConfirmation(true, false);
