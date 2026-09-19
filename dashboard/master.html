@@ -178,6 +178,7 @@
   .dash-q { padding:10px 0; border-top:1px solid var(--line); }
   .dash-detail-h + .dash-q { border-top:0; }
   .dash-q-text { color:var(--ink); font:600 13px/1.45 var(--sans); }
+  .dash-q-group { margin:12px 0 2px; color:var(--ink-dim); font:600 11px/1.5 var(--mono); }
   .dash-q-ch { margin-left:6px; color:var(--ink-dim); font:600 10px var(--mono); }
   .dash-q-a { margin-top:5px; font:12px/1.5 var(--mono); white-space:pre-wrap; }
   .dash-q-a.your { color:var(--low); }
@@ -458,7 +459,17 @@
       ok: q.is_correct !== undefined ? isTruthyFlag(q.is_correct) : false,
       chapter: (q.chapter === undefined || q.chapter === null || q.chapter === "") ? "" : String(q.chapter),
       type: q.type || "",
+      group: "", label: "",
     };
+  }
+
+  // A matching row is saved as "<instruction> \u2014 <the item>". Split it so the
+  // item is what's shown, with the shared instruction printed once above.
+  function splitMatch(n) {
+    if (n.type !== "match") return n;
+    var i = n.question.lastIndexOf(" \u2014 ");
+    if (i > 0) { n.group = n.question.slice(0, i); n.label = n.question.slice(i + 3); }
+    return n;
   }
 
   function parseJsonList(str) {
@@ -475,12 +486,28 @@
       var t = (v === undefined || v === null || v === "") ? "\u2014" : String(v);
       return q.type === "match" ? t.split("; ").join("\n") : t;
     }
+    var isMatch = !!q.label;
     var box = el("div", { class: "dash-q" }, [
-      el("div", { class: "dash-q-text" }, [q.question, q.chapter ? el("span", { class: "dash-q-ch" }, ["Ch " + q.chapter]) : null]),
+      el("div", { class: "dash-q-text" }, [isMatch ? q.label : q.question, q.chapter ? el("span", { class: "dash-q-ch" }, ["Ch " + q.chapter]) : null]),
     ]);
-    if (!q.ok) box.appendChild(el("div", { class: "dash-q-a your" }, ["Answered: " + ans(q.chosen)]));
-    box.appendChild(el("div", { class: "dash-q-a correct" }, [(q.ok ? "Answered (correct): " : "Correct answer: ") + ans(q.ok ? q.chosen : q.correct)]));
+    if (!q.ok) {
+      box.appendChild(el("div", { class: "dash-q-a your" }, [(isMatch ? "Matched to: " : "Answered: ") + ans(q.chosen)]));
+      box.appendChild(el("div", { class: "dash-q-a correct" }, [(isMatch ? "Should be matched to: " : "Correct answer: ") + ans(q.correct)]));
+    } else {
+      box.appendChild(el("div", { class: "dash-q-a correct" }, [(isMatch ? "Matched to (correct): " : "Answered (correct): ") + ans(q.chosen)]));
+    }
     return box;
+  }
+
+  // Appends items, printing a matching question's shared instruction once
+  // above its rows instead of repeating it on every row.
+  function appendItems(container, list) {
+    var lastGroup = null;
+    list.forEach(function (q) {
+      if (q.label && q.group !== lastGroup) container.appendChild(el("div", { class: "dash-q-group" }, [q.group]));
+      lastGroup = q.label ? q.group : null;
+      container.appendChild(questionItem(q));
+    });
   }
 
   function buildDetail(items, total) {
@@ -493,10 +520,10 @@
     var right = items.filter(function (q) { return q.ok; });
     var of = total || items.length;
     box.appendChild(el("div", { class: "dash-detail-h" }, [wrong.length ? (wrong.length + " wrong of " + of) : ("All " + of + " correct")]));
-    wrong.forEach(function (q) { box.appendChild(questionItem(q)); });
+    appendItems(box, wrong);
     if (right.length) {
       var okList = el("details", { class: "dash-ok-list" }, [el("summary", {}, ["Show " + right.length + " correct"])]);
-      right.forEach(function (q) { okList.appendChild(questionItem(q)); });
+      appendItems(okList, right);
       box.appendChild(okList);
     }
     return box;
@@ -519,7 +546,7 @@
     var detail = null;
     row.addEventListener("click", function () {
       if (!detail) {
-        detail = buildDetail(o.items().map(normQ), o.total);
+        detail = buildDetail(o.items().map(normQ).map(splitMatch), o.total);
         wrap.appendChild(detail);
       } else {
         detail.hidden = !detail.hidden;
