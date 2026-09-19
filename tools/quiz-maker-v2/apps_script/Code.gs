@@ -83,7 +83,15 @@
  * - Clean up rows that were duplicated BEFORE this fix: in the Apps Script
  *   editor pick previewDuplicates (logs only) or removeDuplicates
  *   (makes a Drive backup copy of the data spreadsheet first) from the
- *   function dropdown and press Run.
+ *   function dropdown and press Run. cleanEverything = removeDuplicates +
+ *   tidySheets (converts old date cells to text, restores dropped leading
+ *   zeros on phone numbers, freezes/bolds the header, clips the big JSON
+ *   columns, hides dedupe_key, trims empty rows).
+ * - Lost rows? Quiz results and submissions are ALSO saved as JSON files in
+ *   your Drive folders. fixEverything() repairs the sheet layout, puts back
+ *   every attempt/submission that has a Drive file but no sheet row, then
+ *   removes duplicates and tidies (with a backup first). Run it twice if
+ *   the log says it stopped early.
  *
  * ---- Redeploying after editing this file --------------------------------
  * Apps Script Web Apps don't auto-update on save. After changing this
@@ -243,7 +251,7 @@ function _ensureColumns(sheet, cols) {
 function _headerIndex(sheet) {
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   var idx = {};
-  headers.forEach(function (h, i) { idx[h] = i + 1; }); // 1-based columns
+  headers.forEach(function (h, i) { if (h !== "" && !idx.hasOwnProperty(h)) idx[h] = i + 1; }); // 1-based, FIRST occurrence
   return idx;
 }
 
@@ -251,12 +259,16 @@ function _headerIndex(sheet) {
 // TEXT_COLS cells forced to Plain Text first.
 function _appendByHeader(sheet, rec) {
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var seenH = {};
   var row = headers.map(function (h) {
+    if (h === "" || seenH[h]) return "";       // a repeated header name is never filled twice
+    seenH[h] = true;
     return rec.hasOwnProperty(h) && rec[h] !== null && rec[h] !== undefined ? rec[h] : "";
   });
   var r = sheet.getLastRow() + 1;
+  var fmtSeen = {};
   headers.forEach(function (h, i) {
-    if (TEXT_COLS[h]) sheet.getRange(r, i + 1).setNumberFormat("@");
+    if (TEXT_COLS[h] && !fmtSeen[h]) { fmtSeen[h] = true; sheet.getRange(r, i + 1).setNumberFormat("@"); }
   });
   sheet.getRange(r, 1, 1, headers.length).setValues([row]);
 }
@@ -322,7 +334,11 @@ function _sheetValuesAsObjects(sheet) {
   var sheetTz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
   return values.slice(1).map(function (row) {
     var obj = {};
-    headers.forEach(function (h, i) { obj[h] = _cellOut(h, row[i], sheetTz); });
+    headers.forEach(function (h, i) {
+      if (h === "") return;
+      var v = _cellOut(h, row[i], sheetTz);
+      if (!obj.hasOwnProperty(h) || obj[h] === "" || obj[h] === null) obj[h] = v;
+    });
     return obj;
   });
 }
@@ -805,9 +821,9 @@ function handleAdminGetAll(payload) {
 function previewDuplicates() { _cleanSheets(false); }
 function removeDuplicates() { _cleanSheets(true); }
 
-function _cleanSheets(apply) {
+function _cleanSheets(apply, skipBackup) {
   var ss = _dataSs();
-  if (apply) {
+  if (apply && !skipBackup) {
     var name = "Backup before dedupe " + _fmt(new Date(), TZ, true);
     DriveApp.getFileById(ss.getId()).makeCopy(name);
     Logger.log("Backup created: " + name);
@@ -822,10 +838,20 @@ function _cleanOne(sheet, kind, apply) {
   var values = sheet.getDataRange().getValues();
   if (values.length < 2) { Logger.log(sheet.getName() + ": no data rows."); return; }
   var headers = values[0];
-  var col = {};
-  headers.forEach(function (h, i) { col[h] = i; });
+  var cols = {};   // header -> every column index carrying that name
+  headers.forEach(function (h, i) { if (h !== "") (cols[h] = cols[h] || []).push(i); });
   var sheetTz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
-  function cell(row, h) { return col.hasOwnProperty(h) ? _cellOut(h, row[col[h]], sheetTz) : ""; }
+  // First NON-EMPTY value among same-named columns, so a row is never judged
+  // "blank" just because one copy of a repeated column is empty.
+  function cell(row, h) {
+    var idxs = cols[h] || [];
+    for (var k = 0; k < idxs.length; k++) {
+      var v = _cellOut(h, row[idxs[k]], sheetTz);
+      if (v !== "" && v !== null && v !== undefined) return v;
+    }
+    return "";
+  }
+  function isEmptyRow(row) { return row.every(function (v) { return String(v).trim() === ""; }); }
 
   var seen = {};      // key -> last kept time (ms), or true
   var doomed = [];    // 1-based sheet rows to delete
@@ -834,7 +860,9 @@ function _cleanOne(sheet, kind, apply) {
   for (var i = 1; i < values.length; i++) {
     var row = values[i];
     var sid = _phoneKey(cell(row, "student_id"));
-    if (!sid && !cell(row, "lesson")) { doomed.push(i + 1); blank++; continue; }
+    if (isEmptyRow(row) || String(cell(row, "student_id")) === "student_id" || (!sid && !cell(row, "lesson"))) {
+      doomed.push(i + 1); blank++; continue;   // empty, a repeated header row, or an orphan with no student/lesson
+    }
     if (kind === "quiz" && (cell(row, "score") === "" || cell(row, "total") === "")) noScore++;
 
     if (kind === "quiz") {
@@ -872,4 +900,220 @@ function _cleanOne(sheet, kind, apply) {
     if (k < doomed.length) { runStart = doomed[k]; runLen = 1; }
   }
   Logger.log(sheet.getName() + ": deleted " + doomed.length + " rows.");
+}
+
+// -- Make the data sheets tidy to look at -----------------------------------
+function cleanEverything() { _cleanSheets(true); tidySheets(); }
+
+function tidySheets() {
+  var ss = _dataSs();
+  ["QuizResults", "Submissions"].forEach(function (n) {
+    var sh = ss.getSheetByName(n);
+    if (sh) _tidyOne(sh);
+  });
+  Logger.log("Tidy done.");
+}
+
+function _tidyOne(sheet) {
+  var last = sheet.getLastRow(), lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return;
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var sheetTz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
+
+  // 1. Old rows: Date cells -> readable Cairo text; phone numbers that lost
+  //    their leading 0 (10 digits starting with 1) get it back. Columns are
+  //    set to Plain Text so Sheets can't change them again.
+  if (last >= 2) {
+    headers.forEach(function (h, i) {
+      if (!TEXT_COLS[h] || headers.indexOf(h) !== i) return;
+      var rng = sheet.getRange(2, i + 1, last - 1, 1);
+      var vals = rng.getValues().map(function (r) {
+        var v = r[0];
+        if (h === "student_id") {
+          var d = String(v).replace(/\D/g, "");
+          return [(d.length === 10 && d.charAt(0) === "1") ? "0" + d : (v === "" ? "" : String(v))];
+        }
+        if (h === "date") {
+          if (v instanceof Date) return [_fmt(v, sheetTz, false)];
+          if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/.test(v)) return [_cairoDate(v)];
+          return [v];
+        }
+        return [_cellOut(h, v, sheetTz)];
+      });
+      rng.setNumberFormat("@");
+      rng.setValues(vals);
+    });
+  }
+
+  // 2. Look: bold frozen header, big JSON/text columns clipped to one line.
+  sheet.setFrozenRows(1);
+  sheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground("#efeafc");
+  headers.forEach(function (h, i) {
+    var c = i + 1;
+    if (h === "questions_json" || h === "answers_json" || h === "text") {
+      sheet.getRange(1, c, Math.max(last, 2), 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+      sheet.setColumnWidth(c, 170);
+    } else if (h === "dedupe_key") {
+      sheet.hideColumns(c);
+    } else {
+      sheet.autoResizeColumn(c);
+    }
+  });
+
+  // 3. Trim the empty rows below the data (keep a little room).
+  var max = sheet.getMaxRows();
+  if (max > last + 20) sheet.deleteRows(last + 21, max - last - 20);
+}
+
+// -- Repair a sheet whose header row has the same column name twice -----------
+// Symptom: QuizResults with 22 columns (student_id ... questions_json twice).
+// Rows written by appendRow only fill the FIRST copy, so anything that read
+// the second copy saw those rows as empty — they vanished from the dashboard
+// and were treated as blank by the cleanup. This folds each repeated column
+// into its first copy (moving values across where the first copy is empty)
+// and deletes the repeat. It refuses to touch a sheet where the two copies
+// disagree on a non-empty cell.
+function repairLayout() {
+  var ss = _dataSs();
+  ["QuizResults", "Submissions"].forEach(function (n) {
+    var sh = ss.getSheetByName(n);
+    if (sh) _repairOne(sh);
+  });
+}
+
+function _repairOne(sheet) {
+  var lastCol = sheet.getLastColumn(), lastRow = sheet.getLastRow();
+  var name = sheet.getName();
+  if (lastCol < 2 || lastRow < 1) return;
+  var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  var headers = values[0], first = {}, dups = [];
+  headers.forEach(function (h, j) {
+    if (h === "") return;
+    if (first.hasOwnProperty(h)) dups.push(j); else first[h] = j;
+  });
+  if (!dups.length) { Logger.log(name + ": layout OK (no repeated columns)."); return; }
+
+  var conflicts = 0, moves = [];
+  for (var r = 1; r < values.length; r++) {
+    dups.forEach(function (j) {
+      var i = first[headers[j]];
+      var L = values[r][i], R = values[r][j];
+      var Ls = String(L).trim(), Rs = String(R).trim();
+      if (Rs === "") return;
+      if (Ls === "") { moves.push([r + 1, i + 1, R]); return; }
+      if (Ls !== Rs) conflicts++;
+    });
+  }
+  if (conflicts) {
+    Logger.log(name + ": " + conflicts + " cells differ between repeated columns — NOT changed. Check the backup and tell Claude.");
+    return;
+  }
+  moves.forEach(function (m) { sheet.getRange(m[0], m[1]).setValue(m[2]); });
+  dups.slice().sort(function (a, b) { return b - a; }).forEach(function (j) { sheet.deleteColumn(j + 1); });
+  Logger.log(name + ": folded " + dups.length + " repeated columns (" + moves.length + " values moved into the first copy).");
+}
+
+// -- Put back rows that exist as Drive JSON files but not in the sheet --------
+// Every quiz attempt and submission is saved to Drive BEFORE the sheet row is
+// written, so Drive is the source of truth. Safe to run repeatedly: a row is
+// only added when no matching row is already in the sheet.
+function restoreAllFromDrive() { _restoreFromDrive(0); }
+function restoreLast30Days() { _restoreFromDrive(30); }
+
+function _restoreFromDrive(days) {
+  var started = Date.now();
+  var LIMIT = 4.5 * 60 * 1000;   // Apps Script stops at 6 minutes
+  var since = days ? Utilities.formatDate(new Date(Date.now() - days * 86400000), "UTC", "yyyy-MM-dd'T'HH:mm:ss") : "";
+  var timedOut = false;
+
+  var qSheet = _quizResultsSheet();
+  var sSheet = _submissionsSheet();
+
+  // What the sheet already has.
+  var haveQ = {};
+  _sheetValuesAsObjects(qSheet).forEach(function (r) {
+    haveQ[[_phoneKey(r.student_id), r.subject, r.lesson, _cairoTime(r.start_time)].join("|")] = true;
+  });
+  var haveS = {};   // key -> [ms, ...]
+  _sheetValuesAsObjects(sSheet).forEach(function (r) {
+    var k = [_phoneKey(r.student_id), r.subject, r.lesson, r.submission_type, _md5(_subContent(r.submission_type, r.answers_json, r.url, r.file_name, r.text))].join("|");
+    (haveS[k] = haveS[k] || []).push(_msOf(r.submitted_time));
+  });
+
+  var addedQ = 0, addedS = 0, scanned = 0;
+
+  function eachFile(folderProp, suffix, fn) {
+    var folder = _folder(folderProp);
+    var it = since ? folder.searchFiles('modifiedDate > "' + since + '"') : folder.getFiles();
+    while (it.hasNext()) {
+      if (Date.now() - started > LIMIT) { timedOut = true; return; }
+      var f = it.next();
+      if (f.getName().slice(-suffix.length) !== suffix) continue;
+      scanned++;
+      var data;
+      try { data = JSON.parse(f.getBlob().getDataAsString()); } catch (e) { continue; }
+      fn(data);
+    }
+  }
+
+  eachFile("QUIZ_RESULTS_FOLDER_ID", "--quiz-result.json", function (d) {
+    if (!d.student_id) return;
+    var start = _cairoTime(d.start_time);
+    var key = [_phoneKey(d.student_id), d.subject, d.lesson, start].join("|");
+    if (haveQ[key]) return;
+    _appendByHeader(qSheet, {
+      student_id: d.student_id, name: d.name, subject: d.subject, lesson: d.lesson, quiz_title: d.quiz_title,
+      date: _cairoDate(start) || d.date, start_time: start, end_time: _cairoTime(d.end_time),
+      score: d.score, total: d.total,
+      questions_json: JSON.stringify(d.questions || d.wrong_questions || []),
+      dedupe_key: "q:" + key,
+    });
+    haveQ[key] = true; addedQ++;
+  });
+
+  eachFile("SUBMISSIONS_FOLDER_ID", "--meta.json", function (d) {
+    if (!d.student_id) return;
+    var when = _cairoTime(d.submitted_time), ms = _msOf(when);
+    var content = _subContent(d.submission_type, JSON.stringify(d.answers || []), d.url, d.file_name, d.text);
+    var key = [_phoneKey(d.student_id), d.subject, d.lesson, d.submission_type, _md5(content)].join("|");
+    var seen = haveS[key] || [];
+    if (seen.some(function (t) { return !isNaN(ms) && !isNaN(t) && Math.abs(t - ms) <= 120000; })) return;
+    var fullText = d.text || "", truncated = fullText.length > TEXT_CELL_LIMIT;
+    _appendByHeader(sSheet, {
+      student_id: d.student_id, name: d.name, subject: d.subject, lesson: d.lesson,
+      submission_type: d.submission_type, text: truncated ? fullText.slice(0, TEXT_CELL_LIMIT) : fullText,
+      text_truncated: truncated, url: d.url, note: d.note, file_id: d.file_id, file_name: d.file_name,
+      date: _cairoDate(when) || d.date, submitted_time: when, score: d.score, total: d.total,
+      answers_json: JSON.stringify(d.answers || []), dedupe_key: "r:" + key + "|" + ms,
+    });
+    (haveS[key] = haveS[key] || []).push(ms); addedS++;
+  });
+
+  Logger.log("Restore: scanned " + scanned + " Drive files | added " + addedQ + " quiz rows, " + addedS + " submissions" +
+    (timedOut ? " | STOPPED EARLY (time limit) — run it again to continue" : " | finished"));
+}
+
+function _subContent(type, answersJson, url, fileName, text) {
+  return type === "graded" ? String(answersJson || "[]")
+    : type === "url" ? String(url || "")
+    : type === "file" ? String(fileName || "")
+    : String(text || "");
+}
+
+function _msOf(v) {
+  var t = String(v || "");
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(t) ? Date.parse(t.replace(" ", "T") + "Z") : NaN;
+}
+
+// One button: backup -> repair layout -> restore from Drive -> remove
+// duplicates -> tidy.
+function fixEverything() {
+  var ss = _dataSs();
+  var name = "Backup before fixEverything " + _fmt(new Date(), TZ, true);
+  DriveApp.getFileById(ss.getId()).makeCopy(name);
+  Logger.log("Backup created: " + name);
+  repairLayout();
+  restoreLast30Days();
+  _cleanSheets(true, true);
+  tidySheets();
 }

@@ -399,6 +399,17 @@
     return p ? Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s) : NaN;
   }
 
+  // "8m 03s" between a quiz's start and end time; "" if either is missing.
+  function durationLabel(start, end) {
+    var a = whenMs(start), b = whenMs(end);
+    if (isNaN(a) || isNaN(b) || b < a) return "";
+    var sec = Math.round((b - a) / 1000);
+    if (sec >= 86400) return "";
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), r = sec % 60;
+    if (h) return h + "h " + (m < 10 ? "0" : "") + m + "m";
+    return m + "m " + (r < 10 ? "0" : "") + r + "s";
+  }
+
   // -- Duplicate / blank row handling ---------------------------------------
   // Belt and braces alongside Code.gs's server-side check: rows that were
   // saved twice BEFORE that fix (double-click, or a re-send after a dropped
@@ -1161,7 +1172,8 @@
       var score = Number(r.score) || 0, total = Number(r.total) || 0;
       return attemptRow({
         title: (r.name || "Unknown") + " \u2014 " + (r.quiz_title || r.lesson || "Quiz"),
-        sub: (r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.start_time || r.date ? " \u00b7 " + fmtWhen(r.start_time || r.date) : ""),
+        sub: (r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.start_time || r.date ? " \u00b7 " + fmtWhen(r.start_time || r.date) : "") +
+          (durationLabel(r.start_time, r.end_time) ? " \u00b7 took " + durationLabel(r.start_time, r.end_time) : ""),
         score: score, total: total,
         items: function () { return parseQuestions(r); },
       });

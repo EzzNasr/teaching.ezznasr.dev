@@ -131,6 +131,22 @@
   .dash-wrong-a.correct { color:var(--good); }
   .dash-wrong-ctx { margin-top:5px; color:var(--ink-dim); font:11px var(--mono); }
   .dash-wrong-empty { padding:10px 14px 14px; color:var(--ink-dim); font:12px var(--mono); }
+  .dash-attempt { border-bottom:1px solid var(--line); }
+  .dash-attempt:last-child { border-bottom:0; }
+  .dash-attempt > .dash-row { border-bottom:0; cursor:pointer; }
+  .dash-toggle { flex-shrink:0; color:var(--accent); font:600 11px var(--mono); white-space:nowrap; }
+  .dash-detail { margin:0 0 14px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--surface-soft); }
+  .dash-detail-h { margin:0 0 6px; color:var(--ink-dim); font:600 11px var(--mono); }
+  .dash-q { padding:10px 0; border-top:1px solid var(--line); }
+  .dash-detail-h + .dash-q { border-top:0; }
+  .dash-q-text { color:var(--ink); font:600 13px/1.45 var(--sans); }
+  .dash-q-ch { margin-left:6px; color:var(--ink-dim); font:600 10px var(--mono); }
+  .dash-q-a { margin-top:5px; font:12px/1.5 var(--mono); white-space:pre-wrap; }
+  .dash-q-a.your { color:var(--low); }
+  .dash-q-a.correct { color:var(--good); }
+  .dash-q-group { margin:12px 0 2px; color:var(--ink-dim); font:600 11px/1.5 var(--mono); }
+  .dash-ok-list { margin-top:10px; }
+  .dash-ok-list summary { cursor:pointer; color:var(--ink-dim); font:600 11px var(--mono); }
   .dash-err { padding:18px 0; color:var(--low); font:13px/1.6 var(--mono); }
   .dash-loadbar { width:100%; max-width:260px; height:5px; margin-top:16px; overflow:hidden; border-radius:999px; background:var(--line); }
   .dash-loadbar-fill { width:42%; height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--accent), var(--accent-2)); animation:dash-loadbar-slide 1.1s ease-in-out infinite; }
@@ -253,10 +269,270 @@
     return v === true || String(v).toUpperCase() === "TRUE";
   }
 
+  // Lessons left out of every number on this page (same list as the master dashboard).
+  var EXCLUDED_LESSONS = ["introductory-session"];
+  function isExcluded(lesson) { return EXCLUDED_LESSONS.indexOf(String(lesson || "")) !== -1; }
+
+  // -- Time display ---------------------------------------------------------
+  // Timestamps reach this page in three shapes: "yyyy-MM-dd HH:mm:ss" (Cairo
+  // wall-clock text — what Code.gs writes now), a full ISO string ending in
+  // Z (older rows, or before Code.gs is redeployed), or a bare date. All
+  // three are shown as Cairo time, e.g. "18 Sep 2026 \u00b7 12:41 AM".
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var CAIRO_FMT = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Cairo", year: "numeric", month: "numeric", day: "numeric",
+    hour: "numeric", minute: "numeric", hourCycle: "h23",
+  });
+  var TIME_RE = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(Z)?$/;
+  var DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+  // -> { y, mo, d, h, mi, s, hasTime } in Cairo wall-clock, or null.
+  function whenParts(v) {
+    if (v === null || v === undefined || v === "") return null;
+    var s = String(v).trim();
+    var m = s.match(TIME_RE);
+    if (m) {
+      if (m[7]) {
+        var dt = new Date(s);
+        if (isNaN(dt.getTime())) return null;
+        var o = {};
+        CAIRO_FMT.formatToParts(dt).forEach(function (p) { o[p.type] = p.value; });
+        return { y: +o.year, mo: +o.month, d: +o.day, h: +o.hour % 24, mi: +o.minute, s: dt.getUTCSeconds(), hasTime: true };
+      }
+      return { y: +m[1], mo: +m[2], d: +m[3], h: +m[4], mi: +m[5], s: +(m[6] || 0), hasTime: true };
+    }
+    m = s.match(DATE_RE);
+    if (m) return { y: +m[1], mo: +m[2], d: +m[3], h: 0, mi: 0, s: 0, hasTime: false };
+    return null;
+  }
+
+  function fmtWhen(v) {
+    var p = whenParts(v);
+    if (!p) return v === null || v === undefined ? "" : String(v);
+    var out = p.d + " " + MONTHS[p.mo - 1] + " " + p.y;
+    if (p.hasTime) {
+      var h12 = p.h % 12 || 12;
+      out += " \u00b7 " + h12 + ":" + (p.mi < 10 ? "0" : "") + p.mi + " " + (p.h < 12 ? "AM" : "PM");
+    }
+    return out;
+  }
+
+  // Cairo wall-clock as a comparable number (NaN if unparseable). Only ever
+  // used for ordering and "within 2 minutes" checks, never displayed.
+  function whenMs(v) {
+    var p = whenParts(v);
+    return p ? Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s) : NaN;
+  }
+
+  // "8m 03s" between a quiz's start and end time; "" if either is missing.
+  function durationLabel(start, end) {
+    var a = whenMs(start), b = whenMs(end);
+    if (isNaN(a) || isNaN(b) || b < a) return "";
+    var sec = Math.round((b - a) / 1000);
+    if (sec >= 86400) return "";
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), r = sec % 60;
+    if (h) return h + "h " + (m < 10 ? "0" : "") + m + "m";
+    return m + "m " + (r < 10 ? "0" : "") + r + "s";
+  }
+
+  // "8m 03s" between a quiz's start and end time; "" if either is missing.
+  function durationLabel(start, end) {
+    var a = whenMs(start), b = whenMs(end);
+    if (isNaN(a) || isNaN(b) || b < a) return "";
+    var sec = Math.round((b - a) / 1000);
+    if (sec >= 86400) return "";
+    var h = Math.floor(sec / 3600), mi = Math.floor((sec % 3600) / 60), r = sec % 60;
+    if (h) return h + "h " + (mi < 10 ? "0" : "") + mi + "m";
+    return mi + "m " + (r < 10 ? "0" : "") + r + "s";
+  }
+
+  // -- Duplicate / blank row handling ---------------------------------------
+  function phoneKey(s) { return normalizePhone(s).slice(-10); }
+  function isBlankRow(r) { return !normalizePhone(r.student_id) && !r.lesson; }
+  function normalizePhone(s) { return String(s || "").replace(/[^0-9]/g, ""); }
+
+  function dedupeQuiz(rows) {
+    var seen = {}, out = [], dup = 0, blank = 0;
+    (rows || []).forEach(function (r) {
+      if (isBlankRow(r)) { blank++; return; }
+      var t = whenMs(r.start_time);
+      if (!isNaN(t)) {
+        var k = [phoneKey(r.student_id), r.subject, r.lesson, t].join("|");
+        if (seen[k]) { dup++; return; }
+        seen[k] = true;
+      }
+      out.push(r);
+    });
+    return { rows: out, dup: dup, blank: blank };
+  }
+
+  function submissionContent(r) {
+    var t = r.submission_type;
+    return t === "graded" ? String(r.answers_json || "")
+      : t === "url" ? String(r.url || "")
+      : t === "file" ? String(r.file_name || "")
+      : String(r.text || "");
+  }
+
+  function dedupeSubs(rows) {
+    var last = {}, out = [], dup = 0, blank = 0;
+    (rows || []).forEach(function (r) {
+      if (isBlankRow(r)) { blank++; return; }
+      var t = whenMs(r.submitted_time);
+      if (!isNaN(t)) {
+        var k = [phoneKey(r.student_id), r.subject, r.lesson, r.submission_type, submissionContent(r)].join("|");
+        if (last[k] !== undefined && Math.abs(t - last[k]) <= 120000) { dup++; return; }
+        last[k] = t;
+      }
+      out.push(r);
+    });
+    return { rows: out, dup: dup, blank: blank };
+  }
+
+
   // Sheet rows come back oldest-first (appendRow order) — newest attempt
   // first is more useful for a student glancing at their own history.
   function newestFirst(rows) {
     return (rows || []).slice().reverse();
+  }
+
+  // -- Per-question detail ---------------------------------------------------
+  // Quizzes store {question, your_answer, correct_answer, is_correct,
+  // chapter}; graded assignments store {prompt, chosen, correct_answer,
+  // is_correct, chapter}. One shape for both. A row saved by the very old
+  // wrong-only format has no is_correct at all — every entry in it is a miss.
+  function normQ(q) {
+    return {
+      question: q.question || q.prompt || "(untitled question)",
+      chosen: q.your_answer !== undefined ? q.your_answer : q.chosen,
+      correct: q.correct_answer,
+      ok: q.is_correct !== undefined ? isTruthyFlag(q.is_correct) : false,
+      chapter: (q.chapter === undefined || q.chapter === null || q.chapter === "") ? "" : String(q.chapter),
+      type: q.type || "",
+      group: "", label: "",
+    };
+  }
+
+  // A matching row is saved as "<instruction> \u2014 <the item>". Split it so the
+  // item is what's shown, with the shared instruction printed once above.
+  function splitMatch(n) {
+    if (n.type !== "match") return n;
+    var i = n.question.lastIndexOf(" \u2014 ");
+    if (i > 0) { n.group = n.question.slice(0, i); n.label = n.question.slice(i + 3); }
+    return n;
+  }
+
+  function parseJsonList(str) {
+    try {
+      var parsed = JSON.parse(str || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function questionItem(q, showCorrect) {
+    function ans(v) {
+      var t = (v === undefined || v === null || v === "") ? "\u2014" : String(v);
+      return q.type === "match" ? t.split("; ").join("\n") : t;
+    }
+    var isMatch = !!q.label;
+    var box = el("div", { class: "dash-q" }, [
+      el("div", { class: "dash-q-text" }, [isMatch ? q.label : q.question, q.chapter ? el("span", { class: "dash-q-ch" }, ["Ch " + q.chapter]) : null]),
+    ]);
+    if (!q.ok) {
+      box.appendChild(el("div", { class: "dash-q-a your" }, [(isMatch ? "Matched to: " : "Answered: ") + ans(q.chosen)]));
+      box.appendChild(el("div", { class: "dash-q-a correct" }, [(isMatch ? "Should be matched to: " : "Correct answer: ") + ans(q.correct)]));
+    } else {
+      box.appendChild(el("div", { class: "dash-q-a correct" }, [(isMatch ? "Matched to (correct): " : "Answered (correct): ") + ans(q.chosen)]));
+    }
+    return box;
+  }
+
+  // Appends items, printing a matching question's shared instruction once
+  // above its rows instead of repeating it on every row.
+  function appendItems(container, list) {
+    var lastGroup = null;
+    list.forEach(function (q) {
+      if (q.label && q.group !== lastGroup) container.appendChild(el("div", { class: "dash-q-group" }, [q.group]));
+      lastGroup = q.label ? q.group : null;
+      container.appendChild(questionItem(q));
+    });
+  }
+
+  function buildDetail(items, total) {
+    var box = el("div", { class: "dash-detail" });
+    if (!items.length) {
+      box.appendChild(el("div", { class: "dash-detail-h" }, ["No per-question detail was saved for this attempt."]));
+      return box;
+    }
+    var wrong = items.filter(function (q) { return !q.ok; });
+    var right = items.filter(function (q) { return q.ok; });
+    var of = total || items.length;
+    box.appendChild(el("div", { class: "dash-detail-h" }, [wrong.length ? (wrong.length + " wrong of " + of) : ("All " + of + " correct")]));
+    appendItems(box, wrong);
+    if (right.length) {
+      var okList = el("details", { class: "dash-ok-list" }, [el("summary", {}, ["Show " + right.length + " correct"])]);
+      appendItems(okList, right);
+      box.appendChild(okList);
+    }
+    return box;
+  }
+
+  // One quiz attempt / graded submission: the row itself plus a detail panel
+  // (built on first open, so hundreds of rows stay cheap).
+  function attemptRow(o) {
+    var wrongCount = o.total ? Math.max(0, o.total - o.score) : 0;
+    var toggle = el("div", { class: "dash-toggle" }, [(o.total ? (wrongCount ? wrongCount + " wrong" : "all correct") + " " : "") + "\u25BE"]);
+    var row = el("div", { class: "dash-row is-clickable" }, [
+      el("div", { class: "dash-row-main" }, [
+        el("div", { class: "dash-row-title" }, [o.title]),
+        el("div", { class: "dash-row-sub" }, [o.sub]),
+      ]),
+      el("div", { class: "dash-score " + scoreClass(o.score, o.total) }, [o.score + "/" + o.total + " (" + fmtPct(o.score, o.total) + ")"]),
+      toggle,
+    ]);
+    var wrap = el("div", { class: "dash-attempt" }, [row]);
+    var detail = null;
+    row.addEventListener("click", function () {
+      if (!detail) {
+        detail = buildDetail(o.items().map(normQ).map(splitMatch), o.total);
+        wrap.appendChild(detail);
+      } else {
+        detail.hidden = !detail.hidden;
+      }
+      var base = toggle.textContent.replace(/\s*[\u25BE\u25B4]$/, "");
+      toggle.textContent = base + (base ? " " : "") + (detail.hidden ? "\u25BE" : "\u25B4");
+    });
+    return wrap;
+  }
+
+  // One quiz attempt / graded submission: the row itself plus a detail panel
+  // (built on first open, so hundreds of rows stay cheap).
+  function attemptRow(o) {
+    var wrongCount = o.total ? Math.max(0, o.total - o.score) : 0;
+    var toggle = el("div", { class: "dash-toggle" }, [(o.total ? (wrongCount ? wrongCount + " wrong" : "all correct") + " " : "") + "\u25BE"]);
+    var row = el("div", { class: "dash-row is-clickable" }, [
+      el("div", { class: "dash-row-main" }, [
+        el("div", { class: "dash-row-title" }, [o.title]),
+        el("div", { class: "dash-row-sub" }, [o.sub]),
+      ]),
+      el("div", { class: "dash-score " + scoreClass(o.score, o.total) }, [o.score + "/" + o.total + " (" + fmtPct(o.score, o.total) + ")"]),
+      toggle,
+    ]);
+    var wrap = el("div", { class: "dash-attempt" }, [row]);
+    var detail = null;
+    row.addEventListener("click", function () {
+      if (!detail) {
+        detail = buildDetail(o.items().map(normQ).map(splitMatch), o.total);
+        wrap.appendChild(detail);
+      } else {
+        detail.hidden = !detail.hidden;
+      }
+      var base = toggle.textContent.replace(/\s*[\u25BE\u25B4]$/, "");
+      toggle.textContent = base + (base ? " " : "") + (detail.hidden ? "\u25BE" : "\u25B4");
+    });
+    return wrap;
   }
 
   function parseQuestions(row) {
@@ -285,7 +561,7 @@
   }
 
   function contextLabel(row) {
-    return [row.subject, row.lesson || row.quiz_title, row.date].filter(Boolean).join(" \u00b7 ");
+    return [row.subject, row.lesson || row.quiz_title, fmtWhen(row.start_time || row.submitted_time || row.date)].filter(Boolean).join(" \u00b7 ");
   }
 
   // Every wrong answer the student has ever given, grouped by chapter and
@@ -307,7 +583,7 @@
         var isCorrect = q.is_correct === true || String(q.is_correct).toUpperCase() === "TRUE";
         if (isCorrect) return;
         b.quiz.push({
-          question: q.question, your_answer: q.your_answer, correct_answer: q.correct_answer, context: ctx,
+          question: q.question, your_answer: q.your_answer, correct_answer: q.correct_answer, context: ctx, type: q.type,
         });
       });
     });
@@ -321,7 +597,7 @@
         var isCorrect = a.is_correct === true || String(a.is_correct).toUpperCase() === "TRUE";
         if (isCorrect) return;
         b.assignment.push({
-          question: a.prompt, your_answer: a.chosen, correct_answer: a.correct_answer, context: ctx,
+          question: a.prompt, your_answer: a.chosen, correct_answer: a.correct_answer, context: ctx, type: a.type,
         });
       });
     });
@@ -379,14 +655,13 @@
     }
     newestFirst(quizRows).forEach(function (r) {
       var score = Number(r.score) || 0, total = Number(r.total) || 0;
-      var row = el("div", { class: "dash-row" }, [
-        el("div", { class: "dash-row-main" }, [
-          el("div", { class: "dash-row-title" }, [r.quiz_title || r.lesson || "Quiz"]),
-          el("div", { class: "dash-row-sub" }, [(r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.date ? " \u00b7 " + r.date : "")]),
-        ]),
-        el("div", { class: "dash-score " + scoreClass(score, total) }, [score + "/" + total + " (" + fmtPct(score, total) + ")"]),
-      ]);
-      section.appendChild(row);
+      var took = durationLabel(r.start_time, r.end_time);
+      section.appendChild(attemptRow({
+        title: r.quiz_title || r.lesson || "Quiz",
+        sub: (r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.start_time || r.date ? " \u00b7 " + fmtWhen(r.start_time || r.date) : "") + (took ? " \u00b7 took " + took : ""),
+        score: score, total: total,
+        items: function () { return parseQuestions(r); },
+      }));
     });
     return section;
   }
@@ -396,11 +671,16 @@
       return el("div", { class: "dash-wrong-empty" }, ["No wrong answers here \u2014 nice work."]);
     }
     var body = el("div", { class: "dash-wrong-body" });
+    var lastGroup = null;
     items.forEach(function (it) {
+      var n = splitMatch({ question: it.question || "Question", type: it.type || "" });
+      var isMatch = !!n.label;
+      if (isMatch && n.group !== lastGroup) body.appendChild(el("div", { class: "dash-q-group" }, [n.group]));
+      lastGroup = isMatch ? n.group : null;
       var card = el("div", { class: "dash-wrong-item" }, [
-        el("div", { class: "dash-wrong-q" }, [it.question || "Question"]),
-        el("div", { class: "dash-wrong-a your" }, ["Your answer: " + (it.your_answer || "\u2014")]),
-        el("div", { class: "dash-wrong-a correct" }, ["Correct answer: " + (it.correct_answer || "\u2014")]),
+        el("div", { class: "dash-wrong-q" }, [isMatch ? n.label : (it.question || "Question")]),
+        el("div", { class: "dash-wrong-a your" }, [(isMatch ? "Matched to: " : "Your answer: ") + (it.your_answer || "\u2014")]),
+        el("div", { class: "dash-wrong-a correct" }, [(isMatch ? "Should be matched to: " : "Correct answer: ") + (it.correct_answer || "\u2014")]),
       ]);
       if (it.context) card.appendChild(el("div", { class: "dash-wrong-ctx" }, [it.context]));
       body.appendChild(card);
@@ -497,9 +777,19 @@
       return section;
     }
     newestFirst(subRows).forEach(function (r) {
+      var when = fmtWhen(r.submitted_time || r.date);
+      if (r.submission_type === "graded" && Number(r.total) > 0) {
+        section.appendChild(attemptRow({
+          title: r.lesson || "Assignment",
+          sub: (r.subject || "") + (when ? " \u00b7 " + when : ""),
+          score: Number(r.score) || 0, total: Number(r.total),
+          items: function () { return parseAnswers(r); },
+        }));
+        return;
+      }
       var main = el("div", { class: "dash-row-main" }, [
         el("div", { class: "dash-row-title" }, [(r.lesson || "Assignment")]),
-        el("div", { class: "dash-row-sub" }, [(r.subject || "") + (r.date ? " \u00b7 " + r.date : "")]),
+        el("div", { class: "dash-row-sub" }, [(r.subject || "") + (when ? " \u00b7 " + when : "")]),
       ]);
       if (r.submission_type === "text" && r.text) {
         var truncNote = isTruthyFlag(r.text_truncated) ? " (preview only \u2014 full text saved)" : "";
@@ -517,7 +807,13 @@
     return section;
   }
 
-  function renderDashboard(session, data) {
+  function renderDashboard(session, rawData) {
+    // Same cleanup as the master dashboard: collapse re-sent duplicates and
+    // leave excluded lessons out of every number.
+    var data = {
+      quiz_results: dedupeQuiz(rawData.quiz_results).rows.filter(function (r) { return !isExcluded(r.lesson); }),
+      submissions: dedupeSubs(rawData.submissions).rows.filter(function (r) { return !isExcluded(r.lesson); }),
+    };
     var root = document.getElementById("dashboard");
     root.innerHTML = "";
     root.hidden = false;
