@@ -163,6 +163,30 @@
   .dash-missed-q { overflow:hidden; color:var(--ink); font:600 13px/1.4 var(--sans); text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
 
 
+  .dash-tabs { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 18px; }
+  .dash-tab { border:1px solid var(--line-strong); border-radius:999px; padding:8px 14px; color:var(--ink-dim); background:var(--surface); font:700 12px var(--mono); cursor:pointer; transition:all .15s ease; }
+  .dash-tab:hover { color:var(--accent); border-color:var(--accent); }
+  .dash-tab.is-active { color:#fff; background:var(--accent); border-color:var(--accent); }
+  .dash-tab small { margin-left:6px; opacity:.75; font:600 11px var(--mono); }
+  .dash-note { margin:-14px 0 22px; color:var(--ink-dim); font:11px/1.6 var(--mono); }
+  .dash-attempt { border-bottom:1px solid var(--line); }
+  .dash-attempt:last-child { border-bottom:0; }
+  .dash-attempt > .dash-row { border-bottom:0; }
+  .dash-toggle { flex-shrink:0; color:var(--accent); font:600 11px var(--mono); white-space:nowrap; }
+  .dash-detail { margin:0 0 14px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--surface-soft); }
+  .dash-detail-h { margin:0 0 6px; color:var(--ink-dim); font:600 11px var(--mono); }
+  .dash-q { padding:10px 0; border-top:1px solid var(--line); }
+  .dash-detail-h + .dash-q { border-top:0; }
+  .dash-q-text { color:var(--ink); font:600 13px/1.45 var(--sans); }
+  .dash-q-ch { margin-left:6px; color:var(--ink-dim); font:600 10px var(--mono); }
+  .dash-q-a { margin-top:5px; font:12px/1.5 var(--mono); white-space:pre-wrap; }
+  .dash-q-a.your { color:var(--low); }
+  .dash-q-a.correct { color:var(--good); }
+  .dash-ok-list { margin-top:10px; }
+  .dash-ok-list summary { cursor:pointer; color:var(--ink-dim); font:600 11px var(--mono); }
+  .dash-more { display:block; margin:14px auto 0; border:1px solid var(--line-strong); border-radius:9px; padding:9px 16px; color:var(--accent); background:var(--surface-soft); font:700 11px var(--mono); cursor:pointer; }
+  .dash-more[hidden] { display:none; }
+
   /* Light-only visual polish: colorful, information-dense master view. */
   html:not([data-theme="dark"]) .dash-stat,
   html:not([data-theme="dark"]) .dash-filters,
@@ -323,6 +347,206 @@
     return shorter.length >= 7 && longer.slice(-shorter.length) === shorter;
   }
 
+  // -- Time display ---------------------------------------------------------
+  // Timestamps reach this page in three shapes: "yyyy-MM-dd HH:mm:ss" (Cairo
+  // wall-clock text — what Code.gs writes now), a full ISO string ending in
+  // Z (older rows, or before Code.gs is redeployed), or a bare date. All
+  // three are shown as Cairo time, e.g. "18 Sep 2026 \u00b7 12:41 AM".
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var CAIRO_FMT = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Cairo", year: "numeric", month: "numeric", day: "numeric",
+    hour: "numeric", minute: "numeric", hourCycle: "h23",
+  });
+  var TIME_RE = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(Z)?$/;
+  var DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+  // -> { y, mo, d, h, mi, s, hasTime } in Cairo wall-clock, or null.
+  function whenParts(v) {
+    if (v === null || v === undefined || v === "") return null;
+    var s = String(v).trim();
+    var m = s.match(TIME_RE);
+    if (m) {
+      if (m[7]) {
+        var dt = new Date(s);
+        if (isNaN(dt.getTime())) return null;
+        var o = {};
+        CAIRO_FMT.formatToParts(dt).forEach(function (p) { o[p.type] = p.value; });
+        return { y: +o.year, mo: +o.month, d: +o.day, h: +o.hour % 24, mi: +o.minute, s: dt.getUTCSeconds(), hasTime: true };
+      }
+      return { y: +m[1], mo: +m[2], d: +m[3], h: +m[4], mi: +m[5], s: +(m[6] || 0), hasTime: true };
+    }
+    m = s.match(DATE_RE);
+    if (m) return { y: +m[1], mo: +m[2], d: +m[3], h: 0, mi: 0, s: 0, hasTime: false };
+    return null;
+  }
+
+  function fmtWhen(v) {
+    var p = whenParts(v);
+    if (!p) return v === null || v === undefined ? "" : String(v);
+    var out = p.d + " " + MONTHS[p.mo - 1] + " " + p.y;
+    if (p.hasTime) {
+      var h12 = p.h % 12 || 12;
+      out += " \u00b7 " + h12 + ":" + (p.mi < 10 ? "0" : "") + p.mi + " " + (p.h < 12 ? "AM" : "PM");
+    }
+    return out;
+  }
+
+  // Cairo wall-clock as a comparable number (NaN if unparseable). Only ever
+  // used for ordering and "within 2 minutes" checks, never displayed.
+  function whenMs(v) {
+    var p = whenParts(v);
+    return p ? Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s) : NaN;
+  }
+
+  // -- Duplicate / blank row handling ---------------------------------------
+  // Belt and braces alongside Code.gs's server-side check: rows that were
+  // saved twice BEFORE that fix (double-click, or a re-send after a dropped
+  // connection) are collapsed here so every count and average is per real
+  // attempt. First copy wins. removeDuplicates() in Apps Script deletes
+  // them from the sheet itself.
+  function phoneKey(s) { return normalizePhone(s).slice(-10); }
+  function isBlankRow(r) { return !normalizePhone(r.student_id) && !r.lesson; }
+
+  function dedupeQuiz(rows) {
+    var seen = {}, out = [], dup = 0, blank = 0;
+    (rows || []).forEach(function (r) {
+      if (isBlankRow(r)) { blank++; return; }
+      var t = whenMs(r.start_time);
+      if (!isNaN(t)) {
+        var k = [phoneKey(r.student_id), r.subject, r.lesson, t].join("|");
+        if (seen[k]) { dup++; return; }
+        seen[k] = true;
+      }
+      out.push(r);
+    });
+    return { rows: out, dup: dup, blank: blank };
+  }
+
+  function submissionContent(r) {
+    var t = r.submission_type;
+    return t === "graded" ? String(r.answers_json || "")
+      : t === "url" ? String(r.url || "")
+      : t === "file" ? String(r.file_name || "")
+      : String(r.text || "");
+  }
+
+  function dedupeSubs(rows) {
+    var last = {}, out = [], dup = 0, blank = 0;
+    (rows || []).forEach(function (r) {
+      if (isBlankRow(r)) { blank++; return; }
+      var t = whenMs(r.submitted_time);
+      if (!isNaN(t)) {
+        var k = [phoneKey(r.student_id), r.subject, r.lesson, r.submission_type, submissionContent(r)].join("|");
+        if (last[k] !== undefined && Math.abs(t - last[k]) <= 120000) { dup++; return; }
+        last[k] = t;
+      }
+      out.push(r);
+    });
+    return { rows: out, dup: dup, blank: blank };
+  }
+
+  // -- Per-question detail ---------------------------------------------------
+  // Quizzes store {question, your_answer, correct_answer, is_correct,
+  // chapter}; graded assignments store {prompt, chosen, correct_answer,
+  // is_correct, chapter}. One shape for both. A row saved by the very old
+  // wrong-only format has no is_correct at all — every entry in it is a miss.
+  function normQ(q) {
+    return {
+      question: q.question || q.prompt || "(untitled question)",
+      chosen: q.your_answer !== undefined ? q.your_answer : q.chosen,
+      correct: q.correct_answer,
+      ok: q.is_correct !== undefined ? isTruthyFlag(q.is_correct) : false,
+      chapter: (q.chapter === undefined || q.chapter === null || q.chapter === "") ? "" : String(q.chapter),
+      type: q.type || "",
+    };
+  }
+
+  function parseJsonList(str) {
+    try {
+      var parsed = JSON.parse(str || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function questionItem(q, showCorrect) {
+    function ans(v) {
+      var t = (v === undefined || v === null || v === "") ? "\u2014" : String(v);
+      return q.type === "match" ? t.split("; ").join("\n") : t;
+    }
+    var box = el("div", { class: "dash-q" }, [
+      el("div", { class: "dash-q-text" }, [q.question, q.chapter ? el("span", { class: "dash-q-ch" }, ["Ch " + q.chapter]) : null]),
+    ]);
+    if (!q.ok) box.appendChild(el("div", { class: "dash-q-a your" }, ["Answered: " + ans(q.chosen)]));
+    box.appendChild(el("div", { class: "dash-q-a correct" }, [(q.ok ? "Answered (correct): " : "Correct answer: ") + ans(q.ok ? q.chosen : q.correct)]));
+    return box;
+  }
+
+  function buildDetail(items, total) {
+    var box = el("div", { class: "dash-detail" });
+    if (!items.length) {
+      box.appendChild(el("div", { class: "dash-detail-h" }, ["No per-question detail was saved for this attempt."]));
+      return box;
+    }
+    var wrong = items.filter(function (q) { return !q.ok; });
+    var right = items.filter(function (q) { return q.ok; });
+    var of = total || items.length;
+    box.appendChild(el("div", { class: "dash-detail-h" }, [wrong.length ? (wrong.length + " wrong of " + of) : ("All " + of + " correct")]));
+    wrong.forEach(function (q) { box.appendChild(questionItem(q)); });
+    if (right.length) {
+      var okList = el("details", { class: "dash-ok-list" }, [el("summary", {}, ["Show " + right.length + " correct"])]);
+      right.forEach(function (q) { okList.appendChild(questionItem(q)); });
+      box.appendChild(okList);
+    }
+    return box;
+  }
+
+  // One quiz attempt / graded submission: the row itself plus a detail panel
+  // (built on first open, so hundreds of rows stay cheap).
+  function attemptRow(o) {
+    var wrongCount = o.total ? Math.max(0, o.total - o.score) : 0;
+    var toggle = el("div", { class: "dash-toggle" }, [(o.total ? (wrongCount ? wrongCount + " wrong" : "all correct") + " " : "") + "\u25BE"]);
+    var row = el("div", { class: "dash-row is-clickable" }, [
+      el("div", { class: "dash-row-main" }, [
+        el("div", { class: "dash-row-title" }, [o.title]),
+        el("div", { class: "dash-row-sub" }, [o.sub]),
+      ]),
+      el("div", { class: "dash-score " + scoreClass(o.score, o.total) }, [o.score + "/" + o.total + " (" + fmtPct(o.score, o.total) + ")"]),
+      toggle,
+    ]);
+    var wrap = el("div", { class: "dash-attempt" }, [row]);
+    var detail = null;
+    row.addEventListener("click", function () {
+      if (!detail) {
+        detail = buildDetail(o.items().map(normQ), o.total);
+        wrap.appendChild(detail);
+      } else {
+        detail.hidden = !detail.hidden;
+      }
+      var base = toggle.textContent.replace(/\s*[\u25BE\u25B4]$/, "");
+      toggle.textContent = base + (base ? " " : "") + (detail.hidden ? "\u25BE" : "\u25B4");
+    });
+    return wrap;
+  }
+
+  var PAGE_SIZE = 40;
+  function appendPaged(section, rows, buildRow) {
+    var shown = 0;
+    var holder = el("div", {});
+    var more = el("button", { class: "dash-more", type: "button" });
+    function showMore() {
+      rows.slice(shown, shown + PAGE_SIZE).forEach(function (r) { holder.appendChild(buildRow(r)); });
+      shown = Math.min(rows.length, shown + PAGE_SIZE);
+      more.hidden = shown >= rows.length;
+      more.textContent = "Show more (" + (rows.length - shown) + " left)";
+    }
+    more.addEventListener("click", showMore);
+    section.appendChild(holder);
+    section.appendChild(more);
+    showMore();
+  }
+
   function newestFirst(rows) {
     return (rows || []).slice().reverse();
   }
@@ -413,9 +637,16 @@
     var mySubs = subRows.filter(function (r) { return phonesMatch(r.student_id, rosterEntry.digits); });
     return applicable.map(function (c) {
       var match = mySubs.filter(function (r) { return r.subject === c.subject && r.lesson === c.lesson; });
-      match.sort(function (a, b) { return String(a.submitted_time || "").localeCompare(String(b.submitted_time || "")); });
+      match.sort(function (a, b) { return (whenMs(a.submitted_time) || 0) - (whenMs(b.submitted_time) || 0); });
       var latest = match.length ? match[match.length - 1] : null;
-      return { subject: c.subject, lesson: c.lesson, year: c.year, submitted: !!latest, date: latest ? latest.date : null };
+      var graded = latest && Number(latest.total) > 0;
+      return {
+        subject: c.subject, lesson: c.lesson, year: c.year, submitted: !!latest,
+        when: latest ? (latest.submitted_time || latest.date) : null,
+        score: graded ? Number(latest.score) || 0 : null,
+        total: graded ? Number(latest.total) : null,
+        attempts: match.length,
+      };
     }).sort(function (a, b) {
       if (a.submitted !== b.submitted) return a.submitted ? 1 : -1; // not-yet-submitted first
       return (a.subject + a.lesson).localeCompare(b.subject + b.lesson);
@@ -554,12 +785,21 @@
     subRows: [],
     catalog: [],        // assignment catalog from GitHub, [] until (if ever) it loads
     catalogError: null,
+    dupQuiz: 0, dupSubs: 0, blankRows: 0,   // rows hidden by dedupeQuiz/dedupeSubs
     filterPhone: "",     // "" = all students
     filterSubject: "",   // "" = all subjects
-    filterYear: "",      // "" = all years
+    filterYear: "",      // "" = all years | "Senior 1" | "Senior 2" | NO_YEAR
     filterTrack: "",     // "" = all tracks/programmes (e.g. "baccalaureate")
     search: "",          // matched against lesson / quiz_title / question text
   };
+
+  var NO_YEAR = "__none__";
+
+  function yearMatches(year) {
+    if (!STATE.filterYear) return true;
+    if (STATE.filterYear === NO_YEAR) return !year;
+    return year === STATE.filterYear;
+  }
 
   function matchesSearch(text) {
     if (!STATE.search) return true;
@@ -579,11 +819,27 @@
     return "";
   }
 
+  // The year tabs at the top scope EVERYTHING below them — roster, stats and
+  // every list — so these three are the base the other filters narrow further.
+  function yearScopedStudents() {
+    return STATE.students.filter(function (s) { return yearMatches(s.year || ""); });
+  }
+  function yearScopedQuiz() {
+    return STATE.quizRows.filter(function (r) { return yearMatches(studentYearByDigits(normalizePhone(r.student_id))); });
+  }
+  function yearScopedSubs() {
+    return STATE.subRows.filter(function (r) { return yearMatches(studentYearByDigits(normalizePhone(r.student_id))); });
+  }
+  function lessonInYearScope(c) {
+    if (!STATE.filterYear || !c.year) return true;   // year-agnostic lessons apply to everyone
+    return c.year === STATE.filterYear;
+  }
+
   function getFilteredQuiz() {
     return STATE.quizRows.filter(function (r) {
       if (STATE.filterPhone && !phonesMatch(r.student_id, STATE.filterPhone)) return false;
       if (STATE.filterSubject && r.subject !== STATE.filterSubject) return false;
-      if (STATE.filterYear && studentYearByDigits(normalizePhone(r.student_id)) !== STATE.filterYear) return false;
+      if (!yearMatches(studentYearByDigits(normalizePhone(r.student_id)))) return false;
       if (STATE.filterTrack && trackForLesson(r.subject, r.lesson) !== STATE.filterTrack) return false;
       if (STATE.search && !(matchesSearch(r.quiz_title) || matchesSearch(r.lesson) || matchesSearch(r.name))) return false;
       return true;
@@ -594,7 +850,7 @@
     return STATE.subRows.filter(function (r) {
       if (STATE.filterPhone && !phonesMatch(r.student_id, STATE.filterPhone)) return false;
       if (STATE.filterSubject && r.subject !== STATE.filterSubject) return false;
-      if (STATE.filterYear && studentYearByDigits(normalizePhone(r.student_id)) !== STATE.filterYear) return false;
+      if (!yearMatches(studentYearByDigits(normalizePhone(r.student_id)))) return false;
       if (STATE.filterTrack && trackForLesson(r.subject, r.lesson) !== STATE.filterTrack) return false;
       if (STATE.search && !(matchesSearch(r.lesson) || matchesSearch(r.name) || matchesSearch(r.text))) return false;
       return true;
@@ -604,19 +860,54 @@
   // -- Rendering ------------------------------------------------------------
 
   function renderOverviewStats() {
+    var quiz = yearScopedQuiz();
     var totalScore = 0, totalMax = 0;
-    STATE.quizRows.forEach(function (r) { totalScore += Number(r.score) || 0; totalMax += Number(r.total) || 0; });
+    quiz.forEach(function (r) { totalScore += Number(r.score) || 0; totalMax += Number(r.total) || 0; });
     var avgPct = totalMax ? Math.round((totalScore / totalMax) * 100) + "%" : "\u2014";
     return el("div", { class: "dash-stats" }, [
-      el("div", { class: "dash-stat" }, [el("b", {}, [String(STATE.students.length)]), el("span", {}, ["Students"])]),
-      el("div", { class: "dash-stat" }, [el("b", {}, [String(STATE.quizRows.length)]), el("span", {}, ["Quiz attempts (all-time)"])]),
+      el("div", { class: "dash-stat" }, [el("b", {}, [String(yearScopedStudents().length)]), el("span", {}, ["Students"])]),
+      el("div", { class: "dash-stat" }, [el("b", {}, [String(quiz.length)]), el("span", {}, ["Quiz attempts (all-time)"])]),
       el("div", { class: "dash-stat" }, [el("b", {}, [avgPct]), el("span", {}, ["Average score (all-time)"])]),
-      el("div", { class: "dash-stat" }, [el("b", {}, [String(STATE.subRows.length)]), el("span", {}, ["Submissions (all-time)"])]),
+      el("div", { class: "dash-stat" }, [el("b", {}, [String(yearScopedSubs().length)]), el("span", {}, ["Submissions (all-time)"])]),
     ]);
   }
 
-  function renderFilters(onChange) {
-    var roster = buildRoster(STATE.students, STATE.quizRows, STATE.subRows);
+  function renderYearTabs(onChange) {
+    var counts = { "": STATE.students.length, "Senior 1": 0, "Senior 2": 0 };
+    counts[NO_YEAR] = 0;
+    STATE.students.forEach(function (s) {
+      if (s.year === "Senior 1" || s.year === "Senior 2") counts[s.year]++; else counts[NO_YEAR]++;
+    });
+    var tabs = [["", "All years"], ["Senior 1", "Senior 1"], ["Senior 2", "Senior 2"]];
+    if (counts[NO_YEAR]) tabs.push([NO_YEAR, "No year on file"]);
+    return el("div", { class: "dash-tabs", role: "tablist" }, tabs.map(function (t) {
+      var btn = el("button", { class: "dash-tab" + (STATE.filterYear === t[0] ? " is-active" : ""), type: "button", role: "tab" }, [
+        t[1], el("small", {}, [String(counts[t[0]])]),
+      ]);
+      btn.addEventListener("click", function () {
+        STATE.filterYear = t[0];
+        // A student picked before switching year may not belong to the new one.
+        if (STATE.filterPhone && !yearMatches(studentYearByDigits(STATE.filterPhone))) STATE.filterPhone = "";
+        onChange();
+      });
+      return btn;
+    }));
+  }
+
+  function renderDataNote() {
+    var parts = [];
+    if (STATE.dupQuiz) parts.push(STATE.dupQuiz + " duplicate quiz row" + (STATE.dupQuiz === 1 ? "" : "s"));
+    if (STATE.dupSubs) parts.push(STATE.dupSubs + " duplicate submission" + (STATE.dupSubs === 1 ? "" : "s"));
+    if (STATE.blankRows) parts.push(STATE.blankRows + " blank row" + (STATE.blankRows === 1 ? "" : "s"));
+    if (!parts.length) return null;
+    return el("div", { class: "dash-note" }, [
+      "Left out of every count on this page: " + parts.join(", ") + ". " +
+      "To delete them from the sheet itself, run removeDuplicates in the Apps Script editor.",
+    ]);
+  }
+
+  function renderFilters(onChange, onReset) {
+    var roster = buildRoster(yearScopedStudents(), STATE.quizRows, STATE.subRows);
     var subjects = distinctSubjects(STATE.quizRows, STATE.subRows);
 
     var studentSelect = el("select", { class: "dash-select" }, [el("option", { value: "" }, ["All students"])]);
@@ -635,14 +926,6 @@
     });
     subjectSelect.addEventListener("change", function () { STATE.filterSubject = subjectSelect.value; onChange(); });
 
-    var yearSelect = el("select", { class: "dash-select" }, [
-      el("option", { value: "" }, ["All years"]),
-      el("option", { value: "Senior 1" }, ["Senior 1"]),
-      el("option", { value: "Senior 2" }, ["Senior 2"]),
-    ]);
-    yearSelect.value = STATE.filterYear;
-    yearSelect.addEventListener("change", function () { STATE.filterYear = yearSelect.value; onChange(); });
-
     var tracks = distinctTracks();
     var trackSelect = el("select", { class: "dash-select" }, [el("option", { value: "" }, ["All tracks"])]);
     tracks.forEach(function (t) {
@@ -659,22 +942,21 @@
 
     var clearBtn = el("button", { class: "dash-clear", type: "button" }, ["Clear filters"]);
     clearBtn.addEventListener("click", function () {
-      STATE.filterPhone = ""; STATE.filterSubject = ""; STATE.filterYear = ""; STATE.filterTrack = ""; STATE.search = "";
-      onChange();
+      STATE.filterPhone = ""; STATE.filterSubject = ""; STATE.filterTrack = ""; STATE.search = "";
+      onReset();
     });
 
     return el("div", { class: "dash-filters" }, [
       el("label", {}, ["Student", studentSelect]),
       el("label", {}, ["Subject", subjectSelect]),
       el("label", {}, ["Track", trackSelect]),
-      el("label", {}, ["Year", yearSelect]),
       el("label", {}, ["Search", searchInput]),
       clearBtn,
     ]);
   }
 
   function renderRoster(onChange) {
-    var roster = buildRoster(STATE.students, STATE.quizRows, STATE.subRows);
+    var roster = buildRoster(yearScopedStudents(), STATE.quizRows, STATE.subRows);
     var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Roster"])]);
     if (!roster.length) {
       section.appendChild(el("div", { class: "dash-empty" }, ["No registered students yet."]));
@@ -722,7 +1004,7 @@
       return section;
     }
 
-    var roster = buildRoster(STATE.students, STATE.quizRows, STATE.subRows);
+    var roster = buildRoster(yearScopedStudents(), STATE.quizRows, STATE.subRows);
     var subjectFilter = STATE.filterSubject;
     var trackFilter = STATE.filterTrack;
     var catalog = STATE.catalog.filter(function (c) {
@@ -741,13 +1023,17 @@
         return section;
       }
       perStudent.forEach(function (a) {
-        section.appendChild(el("div", { class: "dash-row" }, [
-          el("div", { class: "dash-row-main" }, [
-            el("div", { class: "dash-row-title" }, [a.lesson]),
-            el("div", { class: "dash-row-sub" }, [a.year ? (a.subject + " \u00b7 " + a.year) : catalogTag(a)]),
-          ]),
-          el("div", { class: "dash-score " + (a.submitted ? "is-good" : "is-low") }, [a.submitted ? ("Submitted" + (a.date ? " \u00b7 " + a.date : "")) : "Not yet"]),
-        ]));
+        var main = [
+          el("div", { class: "dash-row-title" }, [a.lesson]),
+          el("div", { class: "dash-row-sub" }, [a.year ? (a.subject + " \u00b7 " + a.year) : catalogTag(a)]),
+        ];
+        if (a.submitted && a.when) {
+          main.push(el("div", { class: "dash-row-sub" }, ["Submitted " + fmtWhen(a.when) + (a.attempts > 1 ? " \u00b7 " + a.attempts + " attempts" : "")]));
+        }
+        var right = !a.submitted ? el("div", { class: "dash-score is-low" }, ["Not yet"])
+          : a.total ? el("div", { class: "dash-score " + scoreClass(a.score, a.total) }, [a.score + "/" + a.total + " (" + fmtPct(a.score, a.total) + ")"])
+          : el("div", { class: "dash-score is-good" }, ["Submitted"]);
+        section.appendChild(el("div", { class: "dash-row" }, [el("div", { class: "dash-row-main" }, main), right]));
       });
       return section;
     }
@@ -756,7 +1042,7 @@
     // which lessons are shown, not to change the roster pool per lesson
     // (that's still each lesson's own applicable-year pool).
     var aggregate = assignmentStatusAggregate(roster, catalog, STATE.subRows)
-      .filter(function (a) { return !STATE.filterYear || !a.year || a.year === STATE.filterYear; });
+      .filter(lessonInYearScope);
     if (!aggregate.length) {
       section.appendChild(el("div", { class: "dash-empty" }, ["No applicable assignments found for this filter."]));
       return section;
@@ -827,34 +1113,43 @@
   }
 
   function renderQuizSection(quizRows) {
-    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Quiz attempts"])]);
+    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Quiz attempts (" + quizRows.length + ")"])]);
+    section.appendChild(el("div", { class: "dash-section-note" }, ["Tap an attempt to see exactly what the student got wrong."]));
     if (!quizRows.length) {
       section.appendChild(el("div", { class: "dash-empty" }, ["No quiz attempts match the current filters."]));
       return section;
     }
-    newestFirst(quizRows).forEach(function (r) {
+    appendPaged(section, newestFirst(quizRows), function (r) {
       var score = Number(r.score) || 0, total = Number(r.total) || 0;
-      section.appendChild(el("div", { class: "dash-row" }, [
-        el("div", { class: "dash-row-main" }, [
-          el("div", { class: "dash-row-title" }, [(r.name || "Unknown") + " \u2014 " + (r.quiz_title || r.lesson || "Quiz")]),
-          el("div", { class: "dash-row-sub" }, [(r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.date ? " \u00b7 " + r.date : "")]),
-        ]),
-        el("div", { class: "dash-score " + scoreClass(score, total) }, [score + "/" + total + " (" + fmtPct(score, total) + ")"]),
-      ]));
+      return attemptRow({
+        title: (r.name || "Unknown") + " \u2014 " + (r.quiz_title || r.lesson || "Quiz"),
+        sub: (r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.start_time || r.date ? " \u00b7 " + fmtWhen(r.start_time || r.date) : ""),
+        score: score, total: total,
+        items: function () { return parseQuestions(r); },
+      });
     });
     return section;
   }
 
   function renderSubmissionsSection(subRows) {
-    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Submissions"])]);
+    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Submissions (" + subRows.length + ")"])]);
     if (!subRows.length) {
       section.appendChild(el("div", { class: "dash-empty" }, ["No submissions match the current filters."]));
       return section;
     }
-    newestFirst(subRows).forEach(function (r) {
+    appendPaged(section, newestFirst(subRows), function (r) {
+      var when = fmtWhen(r.submitted_time || r.date);
+      if (r.submission_type === "graded" && Number(r.total) > 0) {
+        return attemptRow({
+          title: (r.name || "Unknown") + " \u2014 " + (r.lesson || "Assignment"),
+          sub: (r.subject || "") + (when ? " \u00b7 " + when : ""),
+          score: Number(r.score) || 0, total: Number(r.total),
+          items: function () { return parseJsonList(r.answers_json); },
+        });
+      }
       var main = el("div", { class: "dash-row-main" }, [
         el("div", { class: "dash-row-title" }, [(r.name || "Unknown") + " \u2014 " + (r.lesson || "Assignment")]),
-        el("div", { class: "dash-row-sub" }, [(r.subject || "") + (r.date ? " \u00b7 " + r.date : "")]),
+        el("div", { class: "dash-row-sub" }, [(r.subject || "") + (when ? " \u00b7 " + when : "")]),
       ]);
       if (r.submission_type === "text" && r.text) {
         var truncNote = isTruthyFlag(r.text_truncated) ? " (preview only \u2014 full text saved)" : "";
@@ -867,7 +1162,7 @@
       if (r.submission_type === "file" && r.file_id) {
         row.insertBefore(el("a", { class: "dash-link", href: "https://drive.google.com/file/d/" + r.file_id + "/view", target: "_blank", rel: "noopener" }, ["Open file"]), row.lastChild);
       }
-      section.appendChild(row);
+      return row;
     });
     return section;
   }
@@ -884,11 +1179,11 @@
       ]),
     ]));
 
-    root.appendChild(renderOverviewStats());
-
+    var tabsSlot = el("div", {});
+    var statsSlot = el("div", {});
+    var filtersSlot = el("div", {});
     var below = el("div", {}, []);
-    root.appendChild(el("div", { id: "dash-filters-slot" }, []));
-    root.appendChild(below);
+    [tabsSlot, statsSlot, filtersSlot, below].forEach(function (n) { root.appendChild(n); });
 
     function rerenderFiltered() {
       var filteredQuiz = getFilteredQuiz();
@@ -901,11 +1196,18 @@
       below.appendChild(renderSubmissionsSection(filteredSubs));
     }
 
+    // Anything that changes the roster/stats/filter controls themselves
+    // (year tab, roster click, Clear filters) rebuilds from the top.
     function rerenderAll() {
-      var slot = document.getElementById("dash-filters-slot");
-      slot.innerHTML = "";
-      slot.appendChild(renderRoster(rerenderAll));
-      slot.appendChild(renderFilters(rerenderFiltered));
+      tabsSlot.innerHTML = "";
+      tabsSlot.appendChild(renderYearTabs(rerenderAll));
+      statsSlot.innerHTML = "";
+      statsSlot.appendChild(renderOverviewStats());
+      var note = renderDataNote();
+      if (note) statsSlot.appendChild(note);
+      filtersSlot.innerHTML = "";
+      filtersSlot.appendChild(renderRoster(rerenderAll));
+      filtersSlot.appendChild(renderFilters(rerenderFiltered, rerenderAll));
       rerenderFiltered();
     }
 
@@ -996,8 +1298,13 @@
       .then(function (results) {
         var data = results[0];
         STATE.students = data.students || [];
-        STATE.quizRows = data.quiz_results || [];
-        STATE.subRows = data.submissions || [];
+        var q = dedupeQuiz(data.quiz_results);
+        var sb = dedupeSubs(data.submissions);
+        STATE.quizRows = q.rows;
+        STATE.subRows = sb.rows;
+        STATE.dupQuiz = q.dup;
+        STATE.dupSubs = sb.dup;
+        STATE.blankRows = q.blank + sb.blank;
         STATE.catalog = results[1];
         renderDashboard(session);
       })

@@ -97,28 +97,45 @@
     });
   }
 
-  // Retries once if Apps Script returns an HTML page instead of JSON — a
-  // transient Google-side hiccup (seen right after redeploys, under load),
-  // not a code bug.
-  function postToDrive(payload, isRetry) {
+  // Unique id per submission. The server refuses a second row with the same
+  // client_id, so re-sending the same record (auto-retry below, the
+  // "Retry sending" button, or a double-click) can never create a duplicate.
+  function newId() {
+    try { if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID(); } catch (e) { /* fall through */ }
+    return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+  }
+
+  // Retries (same payload, same client_id) when the request never got a
+  // usable answer: network drop / timeout, or Apps Script returning an
+  // HTML page instead of JSON. Safe because the server dedupes on
+  // client_id. A real server-side rejection ({ok:false}) is NOT retried.
+  var RETRY_DELAYS = [1500, 4000];
+  function postToDrive(payload, attempt) {
+    attempt = attempt || 0;
     if (!DRIVE_ENDPOINT) return Promise.reject(new Error("not-configured"));
+    function again(reason) {
+      if (attempt >= RETRY_DELAYS.length) throw reason;
+      return new Promise(function (resolve) { setTimeout(resolve, RETRY_DELAYS[attempt]); })
+        .then(function () { return postToDrive(payload, attempt + 1); });
+    }
     return fetch(DRIVE_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload),
-    }).then(function (resp) {
-      return resp.text().then(function (raw) {
+    })
+      .then(function (resp) { return resp.text(); })
+      .then(function (raw) { return { raw: raw }; }, function () { return { netFail: true }; })
+      .then(function (r) {
+        if (r.netFail) return again(new Error("Couldn't reach the server."));
         var data;
         try {
-          data = JSON.parse(raw);
+          data = JSON.parse(r.raw);
         } catch (e) {
-          if (!isRetry) return postToDrive(payload, true);
-          throw new Error("The server sent back something unexpected. Please try again.");
+          return again(new Error("The server sent back something unexpected. Please try again."));
         }
         if (!data || !data.ok) throw new Error((data && data.error) || "Drive bridge rejected the request.");
         return data;
       });
-    });
   }
 
   function loadGradedQuestions() {
@@ -170,7 +187,7 @@
         return;
       }
 
-      var state = { submitted: false, score: 0, total: 0, answers: [], syncStatus: null };
+      var state = { submitted: false, score: 0, total: 0, answers: [], record: null, syncStatus: null };
       render();
 
       function render() {
@@ -303,6 +320,7 @@
         var now = new Date();
         var record = {
           type: "assignment",
+          client_id: newId(),
           subject: subject,
           lesson: lesson,
           student_id: session.student_id,
@@ -318,10 +336,16 @@
 
         queueSubmission(record);
         saveLastSubmission(subject, lesson, record);
+        state.record = record;
+        sendRecord();
+      }
+
+      // Posts state.record. Safe to call again (retry button): same
+      // client_id, so the server ignores it if the first try landed.
+      function sendRecord() {
         state.syncStatus = "pending";
         render();
-
-        postToDrive(Object.assign({ action: "upload_submission" }, record))
+        postToDrive(Object.assign({ action: "upload_submission" }, state.record))
           .then(function () { state.syncStatus = "ok"; render(); })
           .catch(function (err) {
             state.syncStatus = (err && err.message === "not-configured") ? "not-configured" : "failed";
@@ -346,10 +370,18 @@
             "Saved on this device, but couldn't reach the server just now. It'll still be here if you check back \u2014 consider letting your instructor know just in case.",
           ]));
         }
+        if (state.syncStatus === "pending") {
+          children.push(el("div", { class: "qz-progress" }, ["Saving your submission\u2026"]));
+        }
+        if (state.syncStatus === "failed") {
+          var resendBtn = el("button", { class: "qz-next", type: "button" }, ["Retry sending"]);
+          resendBtn.addEventListener("click", function () { sendRecord(); });
+          children.push(resendBtn);
+        }
         // Each attempt is its own new row on the Submissions sheet (Code.gs
-        // always appendRow()s, never overwrites) — retaking isn't blocked,
-        // so this is just giving that an actual button instead of forcing
-        // a page reload to get back to a blank form.
+        // appends a row per new client_id, never overwrites) — retaking isn't
+        // blocked, so this is just giving that an actual button instead of
+        // forcing a page reload to get back to a blank form.
         children.push(el("button", { class: "qz-retry", type: "button" }, ["Submit another attempt"]));
 
         var summary = el("div", { class: "qz-summary frame" }, children);
@@ -358,6 +390,7 @@
           state.score = 0;
           state.total = 0;
           state.answers = [];
+          state.record = null;
           state.syncStatus = null;
           render();
         });
@@ -367,6 +400,7 @@
 
     function startAssignment(session) {
       var uiMode = mode === "both" ? "url" : mode; // for "both", start on the link tab
+      var submitting = false; // blocks a second click/tap while one is in flight
 
       render();
 
@@ -420,6 +454,7 @@
         submitBtn.addEventListener("click", function () { onSubmit(submitBtn); });
 
         function onSubmit(btn) {
+          if (submitting) return;
           if (uiMode === "text") {
             var text = textArea.value.trim();
             if (!text) {
@@ -469,9 +504,13 @@
           }
 
           function submitRecord(extra) {
+            submitting = true;
+            btn.disabled = true;
+            btn.textContent = "Submitting\u2026";
             var now = new Date();
             var base = {
               type: "assignment",
+              client_id: newId(),
               subject: subject,
               lesson: lesson,
               student_id: session.student_id,
@@ -484,18 +523,7 @@
 
             queueSubmission(record);
             saveLastSubmission(subject, lesson, record);
-
-            if (extra.submission_type === "text") {
-              renderConfirmation(true, false);
-              return;
-            }
-
-            postToDrive(Object.assign({ action: "upload_submission" }, record))
-              .then(function () { renderConfirmation(true, true); })
-              .catch(function (err) {
-                var configured = err.message !== "not-configured";
-                renderConfirmation(true, false, configured);
-              });
+            sendPlain(record);
           }
         }
 
@@ -514,7 +542,19 @@
         root.appendChild(card);
       }
 
-      function renderConfirmation(ok, synced, driveAttempted) {
+      // Posts a text/url/file record. Re-callable for the same record (retry
+      // button) — the server drops it if the first try already landed.
+      function sendPlain(record) {
+        postToDrive(Object.assign({ action: "upload_submission" }, record))
+          .then(function () { submitting = false; renderConfirmation(true, true, true, record); })
+          .catch(function (err) {
+            submitting = false;
+            var configured = err.message !== "not-configured";
+            renderConfirmation(true, false, configured, record);
+          });
+      }
+
+      function renderConfirmation(ok, synced, driveAttempted, record) {
         root.innerHTML = "";
         var label;
         if (!ok) {
@@ -526,16 +566,27 @@
         } else {
           label = "Saved on this device, but couldn't reach the server just now. It'll still be here if you check back \u2014 consider letting your instructor know just in case.";
         }
-        var summary = el("div", { class: "qz-summary frame" }, [
+        var summaryChildren = [
           el("span", { class: "tick-br" }),
           el("span", { class: "tick-bl" }),
           el("div", { class: "qz-summary__label" }, [label]),
-          el("button", { class: "qz-retry", type: "button" }, ["Submit another"]),
-        ]);
+        ];
+        if (!synced && driveAttempted !== false && record) {
+          var resendBtn = el("button", { class: "qz-next", type: "button" }, ["Retry sending"]);
+          resendBtn.addEventListener("click", function () {
+            resendBtn.disabled = true;
+            resendBtn.textContent = "Sending\u2026";
+            submitting = true;
+            sendPlain(record);
+          });
+          summaryChildren.push(resendBtn);
+        }
+        summaryChildren.push(el("button", { class: "qz-retry", type: "button" }, ["Submit another"]));
+        var summary = el("div", { class: "qz-summary frame" }, summaryChildren);
         // Same "each attempt is a new row" story as the graded flow above —
-        // Code.gs appendRow()s every submission, so resubmitting (a new
-        // text paste, a corrected link, a replacement file) just adds
-        // another record rather than overwriting the first one.
+        // every new submission (new client_id) adds a row, so resubmitting
+        // (a new text paste, a corrected link, a replacement file) never
+        // overwrites the first one.
         summary.querySelector(".qz-retry").addEventListener("click", render);
         root.appendChild(summary);
       }

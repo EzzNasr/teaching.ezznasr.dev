@@ -38,28 +38,45 @@
     return node;
   }
 
-  // Retries once if Apps Script returns an HTML page instead of JSON — a
-  // transient Google-side hiccup (seen right after redeploys, under load),
-  // not a code bug.
-  function postToDrive(payload, isRetry) {
+  // Unique id per attempt. The server refuses a second row with the same
+  // client_id, so re-sending the same record (auto-retry below, or the
+  // "Retry sending" button) can never create a duplicate.
+  function newId() {
+    try { if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID(); } catch (e) { /* fall through */ }
+    return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+  }
+
+  // Retries (same payload, same client_id) when the request never got a
+  // usable answer: network drop / timeout, or Apps Script returning an
+  // HTML page instead of JSON. Safe because the server dedupes on
+  // client_id. A real server-side rejection ({ok:false}) is NOT retried.
+  var RETRY_DELAYS = [1500, 4000];
+  function postToDrive(payload, attempt) {
+    attempt = attempt || 0;
     if (!DRIVE_ENDPOINT) return Promise.reject(new Error("not-configured"));
+    function again(reason) {
+      if (attempt >= RETRY_DELAYS.length) throw reason;
+      return new Promise(function (resolve) { setTimeout(resolve, RETRY_DELAYS[attempt]); })
+        .then(function () { return postToDrive(payload, attempt + 1); });
+    }
     return fetch(DRIVE_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload),
-    }).then(function (resp) {
-      return resp.text().then(function (raw) {
+    })
+      .then(function (resp) { return resp.text(); })
+      .then(function (raw) { return { raw: raw }; }, function () { return { netFail: true }; })
+      .then(function (r) {
+        if (r.netFail) return again(new Error("Couldn't reach the server."));
         var data;
         try {
-          data = JSON.parse(raw);
+          data = JSON.parse(r.raw);
         } catch (e) {
-          if (!isRetry) return postToDrive(payload, true);
-          throw new Error("The server sent back something unexpected. Please try again.");
+          return again(new Error("The server sent back something unexpected. Please try again."));
         }
         if (!data || !data.ok) throw new Error((data && data.error) || "Drive bridge rejected the request.");
         return data;
       });
-    });
   }
 
   function isoDate(d) {
@@ -173,6 +190,8 @@
         startTime: null,
         endTime: null,
         answers: [], // { question, chosen, correct_answer, is_correct, chapter }
+        clientId: null, // one id per attempt — lets the server drop re-sent copies
+        record: null,   // the finished attempt, kept so it can be re-sent
         syncStatus: null, // null | "pending" | "ok" | "failed" | "not-configured"
       };
 
@@ -191,6 +210,7 @@
         var beginBtn = el("button", { class: "qz-next", type: "button" }, ["Begin quiz \u2192"]);
         beginBtn.addEventListener("click", function () {
           state.startTime = new Date().toISOString();
+          state.clientId = newId();
           state.started = true;
           render();
         });
@@ -396,6 +416,19 @@
         root.appendChild(card);
       }
 
+      // Posts state.record. Safe to call again for the same attempt (retry
+      // button): same client_id, so the server ignores it if the first try
+      // actually landed.
+      function sendResult() {
+        state.syncStatus = "pending";
+        postToDrive(Object.assign({ action: "upload_quiz_result" }, state.record))
+          .then(function () { state.syncStatus = "ok"; render(); })
+          .catch(function (err) {
+            state.syncStatus = (err && err.message === "not-configured") ? "not-configured" : "failed";
+            render();
+          });
+      }
+
       function renderSummary() {
         if (!state.finished) {
           state.finished = true;
@@ -423,6 +456,7 @@
 
           var record = {
             type: "quiz",
+            client_id: state.clientId,
             subject: quiz.subject || null,
             lesson: quiz.lesson || null,
             quiz_title: quiz.title || null,
@@ -440,19 +474,8 @@
 
           queueSubmission(record);
           saveLastAttempt(quiz, record);
-
-          // Was a silent no-op catch before — the student had no way to
-          // know a result never reached the server. state.syncStatus
-          // drives the note rendered below; render() gets called again
-          // once the promise settles (safe — the `!state.finished` guard
-          // above means this whole block won't run a second time).
-          state.syncStatus = "pending";
-          postToDrive(Object.assign({ action: "upload_quiz_result" }, record))
-            .then(function () { state.syncStatus = "ok"; render(); })
-            .catch(function (err) {
-              state.syncStatus = (err && err.message === "not-configured") ? "not-configured" : "failed";
-              render();
-            });
+          state.record = record;
+          sendResult();
         }
 
         var total = quiz.questions.length;
@@ -475,6 +498,14 @@
             "Saved on this device, but couldn't reach the server just now. It'll still be here if you check back \u2014 consider letting your instructor know just in case.",
           ]));
         }
+        if (state.syncStatus === "pending") {
+          summaryChildren.push(el("div", { class: "qz-progress" }, ["Saving your result\u2026"]));
+        }
+        if (state.syncStatus === "failed") {
+          var resendBtn = el("button", { class: "qz-next", type: "button" }, ["Retry sending"]);
+          resendBtn.addEventListener("click", function () { sendResult(); render(); });
+          summaryChildren.push(resendBtn);
+        }
         summaryChildren.push(el("button", { class: "qz-retry", type: "button" }, ["Try again"]));
 
         var summary = el("div", { class: "qz-summary frame" }, summaryChildren);
@@ -486,6 +517,8 @@
           state.startTime = null;
           state.endTime = null;
           state.answers = [];
+          state.clientId = null;
+          state.record = null;
           state.syncStatus = null;
           render();
         });
@@ -495,4 +528,4 @@
   }
 
   window.QuizEngine = { mount: mount };
-})();
+})();

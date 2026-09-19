@@ -69,6 +69,22 @@
  *    tab, find your own row, put TRUE in the is_admin column. Nothing
  *    web-facing ever writes that column — it's a manual, one-time step.
  *
+ * ---- Duplicates & timestamps (added) -----------------------------------
+ * - Every quiz attempt / submission now carries a client_id from the
+ *   browser. A second POST with the same id (double-click, auto-retry
+ *   after a dropped connection, "Retry sending") is acknowledged but NOT
+ *   written again. Stored in a new "dedupe_key" column (added
+ *   automatically to QuizResults and Submissions).
+ * - Times are written as plain Cairo text ("2026-09-17 21:42:10") and the
+ *   time columns are forced to Plain Text so Sheets can't turn them into
+ *   Date cells any more (that's what produced 2026-09-17T21:00:00.000Z).
+ *   Old rows that were already converted are formatted back to Cairo
+ *   text on the way out.
+ * - Clean up rows that were duplicated BEFORE this fix: in the Apps Script
+ *   editor pick previewDuplicates (logs only) or removeDuplicates
+ *   (makes a Drive backup copy of the data spreadsheet first) from the
+ *   function dropdown and press Run.
+ *
  * ---- Redeploying after editing this file --------------------------------
  * Apps Script Web Apps don't auto-update on save. After changing this
  * file: Deploy → Manage deployments → pencil (edit) → Version: "New
@@ -102,6 +118,55 @@ function _folder(propName) {
 // whether a text submission fits inline in the Submissions sheet or needs
 // a truncated preview (full text always still lives in the Drive JSON).
 var TEXT_CELL_LIMIT = 49000;
+
+var TZ = "Africa/Cairo";
+
+// Columns written as Plain Text so Sheets never reinterprets them
+// (dates -> Date cells, phone digits -> numbers with the leading 0 lost).
+var TEXT_COLS = { student_id: 1, date: 1, start_time: 1, end_time: 1, submitted_time: 1 };
+var TIME_COLS = { start_time: 1, end_time: 1, submitted_time: 1 };
+
+function _fmt(d, tz, withTime) {
+  return Utilities.formatDate(d, tz, withTime ? "yyyy-MM-dd HH:mm:ss" : "yyyy-MM-dd");
+}
+
+// Any timestamp (browser ISO string, Date cell, or already-formatted text)
+// -> "yyyy-MM-dd HH:mm:ss" in Cairo time. Anything unparseable is returned
+// as-is rather than guessed at.
+function _cairoTime(v) {
+  if (v === null || v === undefined || v === "") return "";
+  if (v instanceof Date) return _fmt(v, TZ, true);
+  var s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+    var d = new Date(s);
+    if (!isNaN(d.getTime())) return _fmt(d, TZ, true);
+  }
+  return s;
+}
+
+function _cairoDate(v) {
+  var t = _cairoTime(v);
+  return /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10) : "";
+}
+
+// Last 10 digits — survives a dropped leading 0 or a +20 prefix, so the same
+// student always lands on the same duplicate key.
+function _phoneKey(s) {
+  return _normalizePhone(s).slice(-10);
+}
+
+function _md5(s) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, String(s), Utilities.Charset.UTF_8);
+  return bytes.map(function (b) { return ((b & 0xff) + 0x100).toString(16).slice(1); }).join("");
+}
+
+// Serialises the check-then-write so two near-simultaneous requests for the
+// same attempt can't both pass the duplicate check.
+function _withLock(fn) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try { return fn(); } finally { lock.releaseLock(); }
+}
 
 // -- Students / QuizResults / Submissions sheets -----------------------------
 // One spreadsheet (STUDENTS_SHEET_ID) holds three tabs: the original
@@ -144,32 +209,108 @@ function _sheetByName(ss, name, headers) {
 }
 
 function _quizResultsSheet() {
-  return _sheetByName(_dataSs(), "QuizResults", [
+  var sheet = _sheetByName(_dataSs(), "QuizResults", [
     "student_id", "name", "subject", "lesson", "quiz_title",
     "date", "start_time", "end_time", "score", "total", "questions_json",
+    "dedupe_key",
   ]);
+  _ensureColumns(sheet, ["dedupe_key"]);
+  return sheet;
 }
 
 function _submissionsSheet() {
   var sheet = _sheetByName(_dataSs(), "Submissions", [
     "student_id", "name", "subject", "lesson", "submission_type",
     "text", "text_truncated", "url", "note", "file_id", "file_name",
-    "date", "submitted_time", "score", "total", "answers_json",
+    "date", "submitted_time", "score", "total", "answers_json", "dedupe_key",
   ]);
-  _ensureSubmissionsColumns(sheet);
+  _ensureColumns(sheet, ["score", "total", "answers_json", "dedupe_key"]);
   return sheet;
 }
 
-// Adds score/total/answers_json headers (graded assignments) to a
-// Submissions sheet that predates them, without touching already-written
-// rows — same additive pattern as _ensureStudentColumns.
-function _ensureSubmissionsColumns(sheet) {
+// Appends any missing header to a sheet that predates it, without touching
+// already-written rows — same additive pattern as _ensureStudentColumns.
+function _ensureColumns(sheet, cols) {
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  ["score", "total", "answers_json"].forEach(function (col) {
+  cols.forEach(function (col) {
     if (headers.indexOf(col) === -1) {
       sheet.getRange(1, sheet.getLastColumn() + 1).setValue(col);
+      headers.push(col);
     }
   });
+}
+
+function _headerIndex(sheet) {
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var idx = {};
+  headers.forEach(function (h, i) { idx[h] = i + 1; }); // 1-based columns
+  return idx;
+}
+
+// Writes one row by header NAME (so column order never matters), with the
+// TEXT_COLS cells forced to Plain Text first.
+function _appendByHeader(sheet, rec) {
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var row = headers.map(function (h) {
+    return rec.hasOwnProperty(h) && rec[h] !== null && rec[h] !== undefined ? rec[h] : "";
+  });
+  var r = sheet.getLastRow() + 1;
+  headers.forEach(function (h, i) {
+    if (TEXT_COLS[h]) sheet.getRange(r, i + 1).setNumberFormat("@");
+  });
+  sheet.getRange(r, 1, 1, headers.length).setValues([row]);
+}
+
+// Keys already stored in the sheet's dedupe_key column, as a lookup set.
+function _existingKeys(sheet) {
+  var col = _headerIndex(sheet)["dedupe_key"];
+  var last = sheet.getLastRow();
+  var set = {};
+  if (!col || last < 2) return set;
+  sheet.getRange(2, col, last - 1, 1).getValues().forEach(function (r) {
+    if (r[0]) set[String(r[0])] = true;
+  });
+  return set;
+}
+
+// Candidate keys for "have we already stored this?". The FIRST one is what
+// gets stored. With a client_id it's exact. Without one (a page still
+// running the old cached JS) a quiz falls back to student+lesson+start time
+// (identical on any re-send of the same attempt), and a submission to
+// student+lesson+type+content hash inside a ~2-4 minute window.
+function _quizKeys(p) {
+  if (p.client_id) return ["c:" + String(p.client_id).slice(0, 100)];
+  return ["q:" + [_phoneKey(p.student_id), p.subject, p.lesson, p.start_time].join("|")];
+}
+
+function _submissionKeys(p) {
+  if (p.client_id) return ["c:" + String(p.client_id).slice(0, 100)];
+  var content = p.submission_type === "graded" ? JSON.stringify(p.answers || [])
+    : p.submission_type === "url" ? (p.url || "")
+    : p.submission_type === "file" ? ((p.filename || "") + ":" + String((p.data_base64 || "").length))
+    : (p.text || "");
+  var base = ["s", _phoneKey(p.student_id), p.subject, p.lesson, p.submission_type, _md5(content)].join("|");
+  var t = new Date(p.submitted_time).getTime();
+  if (isNaN(t)) return [base];
+  var bucket = Math.floor(t / 120000);
+  return [base + "|" + bucket, base + "|" + (bucket - 1)];
+}
+
+function _anySeen(seen, keys) {
+  return keys.some(function (k) { return seen[k]; });
+}
+
+// One cell coming OUT to the dashboards. Date cells (Sheets auto-converted
+// them at some point) become readable Cairo text instead of a JSON ISO
+// timestamp; ISO strings in time columns get the same treatment.
+function _cellOut(header, v, sheetTz) {
+  if (v instanceof Date) {
+    if (header === "date") return _fmt(v, sheetTz, false);
+    if (header === "created_at") return _fmt(v, sheetTz, true);
+    return _fmt(v, TZ, true);
+  }
+  if (typeof v === "string" && TIME_COLS[header]) return _cairoTime(v);
+  return v;
 }
 
 // Shared by both dashboard-facing actions: turns a sheet's rows into
@@ -178,9 +319,10 @@ function _sheetValuesAsObjects(sheet) {
   var values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
   var headers = values[0];
+  var sheetTz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
   return values.slice(1).map(function (row) {
     var obj = {};
-    headers.forEach(function (h, i) { obj[h] = row[i]; });
+    headers.forEach(function (h, i) { obj[h] = _cellOut(h, row[i], sheetTz); });
     return obj;
   });
 }
@@ -483,64 +625,80 @@ function handleUploadSubmission(payload) {
   // login rollout) — rejecting outright here beats silently accepting an
   // orphaned row nothing can ever match back to a student.
   if (!payload.student_id) throw new Error("Missing student_id — please sign in and try again.");
-  var folder = _folder("SUBMISSIONS_FOLDER_ID");
-  var timestamp = Utilities.formatDate(new Date(), "UTC", "yyyyMMdd'T'HHmmss'Z'");
-  // subject/lesson/name first so Drive's own alphabetical listing groups
-  // one lesson's submissions together, then by student, then chronologically
-  // for repeats — timestamp-first was fighting Drive's "date modified"
-  // column, which already sorts by time for free.
-  var stem = _safeName(payload.subject) + "--" + _safeName(payload.lesson) + "--" +
-    _slugName(payload.name) + "--" + timestamp;
 
-  var fileId = null;
-  if (payload.submission_type === "file") {
-    if (!payload.data_base64 || !payload.filename) throw new Error("Missing file data.");
-    var bytes = Utilities.base64Decode(payload.data_base64);
-    var blob = Utilities.newBlob(bytes, payload.mime_type || "application/octet-stream", payload.filename);
-    blob.setName(stem + "--" + payload.filename);
-    var file = folder.createFile(blob);
-    fileId = file.getId();
-  }
+  return _withLock(function () {
+    var sheet = _submissionsSheet();
+    var keys = _submissionKeys(payload);
+    // Checked BEFORE any Drive file is created, so a re-sent copy leaves
+    // no orphan files behind either.
+    if (_anySeen(_existingKeys(sheet), keys)) return { ok: true, duplicate: true };
 
-  var meta = {
-    subject: payload.subject || null,
-    lesson: payload.lesson || null,
-    // student_id (v2 login) — required, checked above.
-    student_id: payload.student_id,
-    name: payload.name || null,
-    email: payload.email || null,
-    date: payload.date || null,
-    submitted_time: payload.submitted_time || null,
-    submission_type: payload.submission_type || null,
-    text: payload.text || null,
-    url: payload.url || null,
-    note: payload.note || null,
-    file_id: fileId,
-    file_name: payload.filename || null,
-    // Graded assignments (submission_type: "graded") only — deterministic
-    // score computed client-side in assign.js at submit time.
-    score: typeof payload.score === "number" ? payload.score : null,
-    total: typeof payload.total === "number" ? payload.total : null,
-    answers: Array.isArray(payload.answers) ? payload.answers : null,
-  };
-  var metaBlob = Utilities.newBlob(JSON.stringify(meta, null, 2), "application/json", stem + "--meta.json");
-  folder.createFile(metaBlob);
+    var folder = _folder("SUBMISSIONS_FOLDER_ID");
+    var now = new Date();
+    var timestamp = Utilities.formatDate(now, "UTC", "yyyyMMdd'T'HHmmss'Z'");
+    // subject/lesson/name first so Drive's own alphabetical listing groups
+    // one lesson's submissions together, then by student, then chronologically
+    // for repeats — timestamp-first was fighting Drive's "date modified"
+    // column, which already sorts by time for free.
+    var stem = _safeName(payload.subject) + "--" + _safeName(payload.lesson) + "--" +
+      _slugName(payload.name) + "--" + timestamp;
 
-  // Mirror into the Submissions sheet — this is what the dashboards
-  // actually query. The Drive JSON above stays as the durable per-attempt
-  // record with the full, untruncated text.
-  var fullText = meta.text || "";
-  var truncated = fullText.length > TEXT_CELL_LIMIT;
-  var cellText = truncated ? fullText.slice(0, TEXT_CELL_LIMIT) : fullText;
+    var fileId = null;
+    if (payload.submission_type === "file") {
+      if (!payload.data_base64 || !payload.filename) throw new Error("Missing file data.");
+      var bytes = Utilities.base64Decode(payload.data_base64);
+      var blob = Utilities.newBlob(bytes, payload.mime_type || "application/octet-stream", payload.filename);
+      blob.setName(stem + "--" + payload.filename);
+      var file = folder.createFile(blob);
+      fileId = file.getId();
+    }
 
-  _submissionsSheet().appendRow([
-    meta.student_id, meta.name, meta.subject, meta.lesson, meta.submission_type,
-    cellText, truncated, meta.url, meta.note, meta.file_id, meta.file_name,
-    meta.date, meta.submitted_time, meta.score, meta.total,
-    JSON.stringify(meta.answers || []),
-  ]);
+    // Cairo wall-clock text. Falls back to "now" if the browser sent no
+    // usable time.
+    var submittedAt = _cairoTime(payload.submitted_time) || _fmt(now, TZ, true);
+    var dateStr = _cairoDate(submittedAt) || _fmt(now, TZ, false);
 
-  return { ok: true, file_id: fileId };
+    var meta = {
+      subject: payload.subject || null,
+      lesson: payload.lesson || null,
+      // student_id (v2 login) — required, checked above.
+      student_id: payload.student_id,
+      name: payload.name || null,
+      email: payload.email || null,
+      date: dateStr,
+      submitted_time: submittedAt,
+      submission_type: payload.submission_type || null,
+      text: payload.text || null,
+      url: payload.url || null,
+      note: payload.note || null,
+      file_id: fileId,
+      file_name: payload.filename || null,
+      // Graded assignments (submission_type: "graded") only — deterministic
+      // score computed client-side in assign.js at submit time.
+      score: typeof payload.score === "number" ? payload.score : null,
+      total: typeof payload.total === "number" ? payload.total : null,
+      answers: Array.isArray(payload.answers) ? payload.answers : null,
+    };
+    var metaBlob = Utilities.newBlob(JSON.stringify(meta, null, 2), "application/json", stem + "--meta.json");
+    folder.createFile(metaBlob);
+
+    // Mirror into the Submissions sheet — this is what the dashboards
+    // actually query. The Drive JSON above stays as the durable per-attempt
+    // record with the full, untruncated text.
+    var fullText = meta.text || "";
+    var truncated = fullText.length > TEXT_CELL_LIMIT;
+    var cellText = truncated ? fullText.slice(0, TEXT_CELL_LIMIT) : fullText;
+
+    _appendByHeader(sheet, {
+      student_id: meta.student_id, name: meta.name, subject: meta.subject, lesson: meta.lesson,
+      submission_type: meta.submission_type, text: cellText, text_truncated: truncated,
+      url: meta.url, note: meta.note, file_id: meta.file_id, file_name: meta.file_name,
+      date: meta.date, submitted_time: meta.submitted_time, score: meta.score, total: meta.total,
+      answers_json: JSON.stringify(meta.answers || []), dedupe_key: keys[0],
+    });
+
+    return { ok: true, file_id: fileId };
+  });
 }
 
 function handleUploadQuizResult(payload) {
@@ -549,47 +707,59 @@ function handleUploadQuizResult(payload) {
   // IS required though (confirmed quiz.js always sends it as of the login
   // rollout) — same reasoning as handleUploadSubmission above.
   if (!payload.student_id) throw new Error("Missing student_id — please sign in and try again.");
-  var folder = _folder("QUIZ_RESULTS_FOLDER_ID");
-  var timestamp = Utilities.formatDate(new Date(), "UTC", "yyyyMMdd'T'HHmmss'Z'");
-  var stem = _safeName(payload.subject) + "--" + _safeName(payload.lesson) + "--" +
-    _slugName(payload.name) + "--" + timestamp;
 
-  var record = {
-    subject: payload.subject || null,
-    lesson: payload.lesson || null,
-    quiz_title: payload.quiz_title || null,
-    // student_id (v2 login) — required, checked above.
-    student_id: payload.student_id,
-    name: payload.name || null,
-    email: payload.email || null,
-    date: payload.date || null,
-    start_time: payload.start_time || null,
-    end_time: payload.end_time || null,
-    score: typeof payload.score === "number" ? payload.score : null,
-    total: typeof payload.total === "number" ? payload.total : null,
-    // v2 record shape: every question answered (with per-question
-    // "chapter"), not just the misses — lets grading aggregate by chapter.
-    // Falls back to the old wrong-only array if an un-migrated quiz.js is
-    // still live somewhere mid-rollout.
-    questions: Array.isArray(payload.questions) ? payload.questions : null,
-    // Kept for backward compatibility with pre-v2 quiz.js during rollout;
-    // not populated going forward once every page is on the new engine.
-    wrong_questions: Array.isArray(payload.wrong_questions) ? payload.wrong_questions : [],
-  };
+  return _withLock(function () {
+    var sheet = _quizResultsSheet();
+    var keys = _quizKeys(payload);
+    if (_anySeen(_existingKeys(sheet), keys)) return { ok: true, duplicate: true };
 
-  var blob = Utilities.newBlob(JSON.stringify(record, null, 2), "application/json", stem + "--quiz-result.json");
-  folder.createFile(blob);
+    var folder = _folder("QUIZ_RESULTS_FOLDER_ID");
+    var now = new Date();
+    var timestamp = Utilities.formatDate(now, "UTC", "yyyyMMdd'T'HHmmss'Z'");
+    var stem = _safeName(payload.subject) + "--" + _safeName(payload.lesson) + "--" +
+      _slugName(payload.name) + "--" + timestamp;
 
-  // Mirror into the QuizResults sheet — this is what the dashboards
-  // actually query; the Drive JSON above stays as the durable per-attempt
-  // record, unchanged.
-  _quizResultsSheet().appendRow([
-    record.student_id, record.name, record.subject, record.lesson, record.quiz_title,
-    record.date, record.start_time, record.end_time, record.score, record.total,
-    JSON.stringify(record.questions || record.wrong_questions || []),
-  ]);
+    var startAt = _cairoTime(payload.start_time);
+    var endAt = _cairoTime(payload.end_time);
 
-  return { ok: true };
+    var record = {
+      subject: payload.subject || null,
+      lesson: payload.lesson || null,
+      quiz_title: payload.quiz_title || null,
+      // student_id (v2 login) — required, checked above.
+      student_id: payload.student_id,
+      name: payload.name || null,
+      email: payload.email || null,
+      date: _cairoDate(startAt) || payload.date || _fmt(now, TZ, false),
+      start_time: startAt || null,
+      end_time: endAt || null,
+      score: typeof payload.score === "number" ? payload.score : null,
+      total: typeof payload.total === "number" ? payload.total : null,
+      // v2 record shape: every question answered (with per-question
+      // "chapter"), not just the misses — lets grading aggregate by chapter.
+      // Falls back to the old wrong-only array if an un-migrated quiz.js is
+      // still live somewhere mid-rollout.
+      questions: Array.isArray(payload.questions) ? payload.questions : null,
+      // Kept for backward compatibility with pre-v2 quiz.js during rollout;
+      // not populated going forward once every page is on the new engine.
+      wrong_questions: Array.isArray(payload.wrong_questions) ? payload.wrong_questions : [],
+    };
+
+    var blob = Utilities.newBlob(JSON.stringify(record, null, 2), "application/json", stem + "--quiz-result.json");
+    folder.createFile(blob);
+
+    // Mirror into the QuizResults sheet — this is what the dashboards
+    // query; the Drive JSON above stays as the durable per-attempt record.
+    _appendByHeader(sheet, {
+      student_id: record.student_id, name: record.name, subject: record.subject, lesson: record.lesson,
+      quiz_title: record.quiz_title, date: record.date, start_time: record.start_time, end_time: record.end_time,
+      score: record.score, total: record.total,
+      questions_json: JSON.stringify(record.questions || record.wrong_questions || []),
+      dedupe_key: keys[0],
+    });
+
+    return { ok: true };
+  });
 }
 
 // -- Dashboards ---------------------------------------------------------
@@ -619,4 +789,87 @@ function handleAdminGetAll(payload) {
     quiz_results: _sheetValuesAsObjects(_quizResultsSheet()),
     submissions: _sheetValuesAsObjects(_submissionsSheet()),
   };
+}
+
+// -- One-off cleanup of duplicates written BEFORE the fix -------------------
+// Run from the Apps Script editor (function dropdown -> Run), then read
+// View -> Logs / Execution log.
+//   previewDuplicates()  — only reports; changes nothing.
+//   removeDuplicates()   — copies the data spreadsheet in Drive first, then
+//                          deletes duplicate + blank rows (keeps the first
+//                          of each). Drive files are left alone.
+// A quiz duplicate = same student + subject + lesson + start_time (one
+// attempt saved twice). A submission duplicate = same student + lesson +
+// type + identical content within 2 minutes of the kept one.
+
+function previewDuplicates() { _cleanSheets(false); }
+function removeDuplicates() { _cleanSheets(true); }
+
+function _cleanSheets(apply) {
+  var ss = _dataSs();
+  if (apply) {
+    var name = "Backup before dedupe " + _fmt(new Date(), TZ, true);
+    DriveApp.getFileById(ss.getId()).makeCopy(name);
+    Logger.log("Backup created: " + name);
+  }
+  var q = ss.getSheetByName("QuizResults");
+  var s = ss.getSheetByName("Submissions");
+  if (q) _cleanOne(q, "quiz", apply);
+  if (s) _cleanOne(s, "submission", apply);
+}
+
+function _cleanOne(sheet, kind, apply) {
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) { Logger.log(sheet.getName() + ": no data rows."); return; }
+  var headers = values[0];
+  var col = {};
+  headers.forEach(function (h, i) { col[h] = i; });
+  var sheetTz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
+  function cell(row, h) { return col.hasOwnProperty(h) ? _cellOut(h, row[col[h]], sheetTz) : ""; }
+
+  var seen = {};      // key -> last kept time (ms), or true
+  var doomed = [];    // 1-based sheet rows to delete
+  var blank = 0, dup = 0, noScore = 0;
+
+  for (var i = 1; i < values.length; i++) {
+    var row = values[i];
+    var sid = _phoneKey(cell(row, "student_id"));
+    if (!sid && !cell(row, "lesson")) { doomed.push(i + 1); blank++; continue; }
+    if (kind === "quiz" && (cell(row, "score") === "" || cell(row, "total") === "")) noScore++;
+
+    if (kind === "quiz") {
+      var st = String(cell(row, "start_time"));
+      if (!st) continue; // nothing reliable to compare — keep
+      var qk = [sid, cell(row, "subject"), cell(row, "lesson"), st].join("|");
+      if (seen[qk]) { doomed.push(i + 1); dup++; } else seen[qk] = true;
+    } else {
+      var type = cell(row, "submission_type");
+      var sig = type === "graded" ? cell(row, "answers_json")
+        : type === "url" ? cell(row, "url")
+        : type === "file" ? cell(row, "file_name")
+        : cell(row, "text");
+      var sk = [sid, cell(row, "subject"), cell(row, "lesson"), type, _md5(sig)].join("|");
+      var tt = String(cell(row, "submitted_time"));
+      var ms = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(tt) ? Date.parse(tt.replace(" ", "T") + "Z") : NaN;
+      if (isNaN(ms)) continue; // no usable time — keep
+      if (seen[sk] !== undefined && Math.abs(ms - seen[sk]) <= 120000) { doomed.push(i + 1); dup++; }
+      else seen[sk] = ms;
+    }
+  }
+
+  Logger.log(sheet.getName() + ": " + (values.length - 1) + " data rows | " + dup + " duplicates | " +
+    blank + " blank rows | " + (kind === "quiz" ? noScore + " rows without a score | " : "") +
+    "would keep " + (values.length - 1 - doomed.length));
+
+  if (!apply || !doomed.length) return;
+
+  // Delete bottom-up in contiguous runs (deleteRows is slow one row at a time).
+  doomed.sort(function (a, b) { return b - a; });
+  var runStart = doomed[0], runLen = 1;
+  for (var k = 1; k <= doomed.length; k++) {
+    if (k < doomed.length && doomed[k] === runStart - 1) { runStart = doomed[k]; runLen++; continue; }
+    sheet.deleteRows(runStart, runLen);
+    if (k < doomed.length) { runStart = doomed[k]; runLen = 1; }
+  }
+  Logger.log(sheet.getName() + ": deleted " + doomed.length + " rows.");
 }
