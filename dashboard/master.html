@@ -348,6 +348,20 @@
     return shorter.length >= 7 && longer.slice(-shorter.length) === shorter;
   }
 
+  // -- Student contact info ---------------------------------------------------
+  // Same tolerant phone match as everywhere else on this page.
+  function studentFor(sid) {
+    for (var i = 0; i < STATE.students.length; i++) {
+      if (phonesMatch(STATE.students[i].phone, sid)) return STATE.students[i];
+    }
+    return null;
+  }
+
+  function contactText(s) {
+    if (!s) return "";
+    return "Phone " + (s.phone || "\u2014") + " \u00b7 Parent " + (s.parent_phone || "not on file");
+  }
+
   // -- Time display ---------------------------------------------------------
   // Timestamps reach this page in three shapes: "yyyy-MM-dd HH:mm:ss" (Cairo
   // wall-clock text — what Code.gs writes now), a full ISO string ending in
@@ -538,6 +552,7 @@
       el("div", { class: "dash-row-main" }, [
         el("div", { class: "dash-row-title" }, [o.title]),
         el("div", { class: "dash-row-sub" }, [o.sub]),
+        o.contact ? el("div", { class: "dash-row-sub" }, [o.contact]) : null,
       ]),
       el("div", { class: "dash-score " + scoreClass(o.score, o.total) }, [o.score + "/" + o.total + " (" + fmtPct(o.score, o.total) + ")"]),
       toggle,
@@ -645,6 +660,7 @@
         phone: s.phone,
         digits: digits,
         display_name: s.display_name || digits,
+        parent_phone: s.parent_phone || "",
         created_at: s.created_at,
         year: s.year || "",
         quizzes: sq.length,
@@ -994,7 +1010,7 @@
       var row = el("div", { class: rowClass }, [
         el("div", { class: "dash-row-main" }, [
           el("div", { class: "dash-row-title" }, [r.display_name]),
-          el("div", { class: "dash-row-sub" }, [maskPhone(r.phone) + (r.created_at ? " \u00b7 joined " + r.created_at : "")]),
+          el("div", { class: "dash-row-sub" }, [contactText(r) + (r.created_at ? " \u00b7 joined " + r.created_at : "")]),
         ]),
         el("div", { class: "dash-badge" }, [r.year || "no year on file"]),
         el("div", { class: "dash-badge" }, [r.quizzes + " quiz" + (r.quizzes === 1 ? "" : "zes")]),
@@ -1152,6 +1168,7 @@
         title: (r.name || "Unknown") + " \u2014 " + (r.quiz_title || r.lesson || "Quiz"),
         sub: (r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.start_time || r.date ? " \u00b7 " + fmtWhen(r.start_time || r.date) : ""),
         score: score, total: total,
+        contact: contactText(studentFor(r.student_id)),
         items: function () { return parseQuestions(r); },
       });
     });
@@ -1171,12 +1188,14 @@
           title: (r.name || "Unknown") + " \u2014 " + (r.lesson || "Assignment"),
           sub: (r.subject || "") + (when ? " \u00b7 " + when : ""),
           score: Number(r.score) || 0, total: Number(r.total),
+          contact: contactText(studentFor(r.student_id)),
           items: function () { return parseJsonList(r.answers_json); },
         });
       }
       var main = el("div", { class: "dash-row-main" }, [
         el("div", { class: "dash-row-title" }, [(r.name || "Unknown") + " \u2014 " + (r.lesson || "Assignment")]),
         el("div", { class: "dash-row-sub" }, [(r.subject || "") + (when ? " \u00b7 " + when : "")]),
+        el("div", { class: "dash-row-sub" }, [contactText(studentFor(r.student_id))]),
       ]);
       if (r.submission_type === "text" && r.text) {
         var truncNote = isTruthyFlag(r.text_truncated) ? " (preview only \u2014 full text saved)" : "";
