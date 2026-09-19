@@ -348,20 +348,6 @@
     return shorter.length >= 7 && longer.slice(-shorter.length) === shorter;
   }
 
-  // -- Student contact info ---------------------------------------------------
-  // Same tolerant phone match as everywhere else on this page.
-  function studentFor(sid) {
-    for (var i = 0; i < STATE.students.length; i++) {
-      if (phonesMatch(STATE.students[i].phone, sid)) return STATE.students[i];
-    }
-    return null;
-  }
-
-  function contactText(s) {
-    if (!s) return "";
-    return "Phone " + (s.phone || "\u2014") + " \u00b7 Parent " + (s.parent_phone || "not on file");
-  }
-
   // -- Time display ---------------------------------------------------------
   // Timestamps reach this page in three shapes: "yyyy-MM-dd HH:mm:ss" (Cairo
   // wall-clock text — what Code.gs writes now), a full ISO string ending in
@@ -552,7 +538,6 @@
       el("div", { class: "dash-row-main" }, [
         el("div", { class: "dash-row-title" }, [o.title]),
         el("div", { class: "dash-row-sub" }, [o.sub]),
-        o.contact ? el("div", { class: "dash-row-sub" }, [o.contact]) : null,
       ]),
       el("div", { class: "dash-score " + scoreClass(o.score, o.total) }, [o.score + "/" + o.total + " (" + fmtPct(o.score, o.total) + ")"]),
       toggle,
@@ -728,6 +713,12 @@
   // Math, and any Programming lesson outside the year split) applies to
   // both years. This is read straight from the live repo tree, so it's
   // always current with zero manifest to maintain.
+  // Lessons left out of EVERY number on this page (quiz attempts, submissions,
+  // averages, chapters, most-missed, assignment completion, roster counts).
+  // Add a lesson's folder name here to exclude another one.
+  var EXCLUDED_LESSONS = ["introductory-session"];
+  function isExcluded(lesson) { return EXCLUDED_LESSONS.indexOf(String(lesson || "")) !== -1; }
+
   var GITHUB_REPO = "EzzNasr/teaching.ezznasr.dev";
   var YEAR_FOLDER_RE = /^grade-(\d+)-secondary$/i;
   // NOTE: assumes grade-1-secondary = "Senior 1", grade-2-secondary =
@@ -778,6 +769,7 @@
       if (segments.length < 3) return; // need at least subject/lesson/assignment.html
       var subject = segments[0];
       var lesson = segments[segments.length - 2];
+      if (isExcluded(lesson)) return;
       var year = null;
       var track = null;
       for (var i = 1; i < segments.length - 2; i++) {
@@ -828,7 +820,7 @@
     subRows: [],
     catalog: [],        // assignment catalog from GitHub, [] until (if ever) it loads
     catalogError: null,
-    dupQuiz: 0, dupSubs: 0, blankRows: 0,   // rows hidden by dedupeQuiz/dedupeSubs
+    dupQuiz: 0, dupSubs: 0, blankRows: 0, excludedRows: 0,   // rows hidden by dedupeQuiz/dedupeSubs
     filterPhone: "",     // "" = all students
     filterSubject: "",   // "" = all subjects
     filterYear: "",      // "" = all years | "Senior 1" | "Senior 2" | NO_YEAR
@@ -942,11 +934,14 @@
     if (STATE.dupQuiz) parts.push(STATE.dupQuiz + " duplicate quiz row" + (STATE.dupQuiz === 1 ? "" : "s"));
     if (STATE.dupSubs) parts.push(STATE.dupSubs + " duplicate submission" + (STATE.dupSubs === 1 ? "" : "s"));
     if (STATE.blankRows) parts.push(STATE.blankRows + " blank row" + (STATE.blankRows === 1 ? "" : "s"));
-    if (!parts.length) return null;
-    return el("div", { class: "dash-note" }, [
-      "Left out of every count on this page: " + parts.join(", ") + ". " +
-      "To delete them from the sheet itself, run removeDuplicates in the Apps Script editor.",
-    ]);
+    var out = [];
+    if (parts.length) {
+      out.push("Left out of every count on this page: " + parts.join(", ") + ". " +
+        "To delete them from the sheet itself, run removeDuplicates in the Apps Script editor.");
+    }
+    if (STATE.excludedRows) out.push(STATE.excludedRows + " row" + (STATE.excludedRows === 1 ? "" : "s") + " from excluded lessons (" + EXCLUDED_LESSONS.join(", ") + ") " + (STATE.excludedRows === 1 ? "is" : "are") + " also left out.");
+    if (!out.length) return null;
+    return el("div", { class: "dash-note" }, [out.join(" ")]);
   }
 
   function renderFilters(onChange, onReset) {
@@ -1010,7 +1005,7 @@
       var row = el("div", { class: rowClass }, [
         el("div", { class: "dash-row-main" }, [
           el("div", { class: "dash-row-title" }, [r.display_name]),
-          el("div", { class: "dash-row-sub" }, [contactText(r) + (r.created_at ? " \u00b7 joined " + r.created_at : "")]),
+          el("div", { class: "dash-row-sub" }, [maskPhone(r.phone) + (r.created_at ? " \u00b7 joined " + r.created_at : "")]),
         ]),
         el("div", { class: "dash-badge" }, [r.year || "no year on file"]),
         el("div", { class: "dash-badge" }, [r.quizzes + " quiz" + (r.quizzes === 1 ? "" : "zes")]),
@@ -1168,7 +1163,6 @@
         title: (r.name || "Unknown") + " \u2014 " + (r.quiz_title || r.lesson || "Quiz"),
         sub: (r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.start_time || r.date ? " \u00b7 " + fmtWhen(r.start_time || r.date) : ""),
         score: score, total: total,
-        contact: contactText(studentFor(r.student_id)),
         items: function () { return parseQuestions(r); },
       });
     });
@@ -1188,14 +1182,12 @@
           title: (r.name || "Unknown") + " \u2014 " + (r.lesson || "Assignment"),
           sub: (r.subject || "") + (when ? " \u00b7 " + when : ""),
           score: Number(r.score) || 0, total: Number(r.total),
-          contact: contactText(studentFor(r.student_id)),
           items: function () { return parseJsonList(r.answers_json); },
         });
       }
       var main = el("div", { class: "dash-row-main" }, [
         el("div", { class: "dash-row-title" }, [(r.name || "Unknown") + " \u2014 " + (r.lesson || "Assignment")]),
         el("div", { class: "dash-row-sub" }, [(r.subject || "") + (when ? " \u00b7 " + when : "")]),
-        el("div", { class: "dash-row-sub" }, [contactText(studentFor(r.student_id))]),
       ]);
       if (r.submission_type === "text" && r.text) {
         var truncNote = isTruthyFlag(r.text_truncated) ? " (preview only \u2014 full text saved)" : "";
@@ -1209,6 +1201,37 @@
         row.insertBefore(el("a", { class: "dash-link", href: "https://drive.google.com/file/d/" + r.file_id + "/view", target: "_blank", rel: "noopener" }, ["Open file"]), row.lastChild);
       }
       return row;
+    });
+    return section;
+  }
+
+  // Student data: contact details plus per-student totals, at the bottom.
+  // Follows the year tabs, the Student picker and the search box.
+  function renderStudentsSection() {
+    var roster = buildRoster(yearScopedStudents(), STATE.quizRows, STATE.subRows).filter(function (r) {
+      if (STATE.filterPhone && r.digits !== STATE.filterPhone) return false;
+      if (STATE.search && !(matchesSearch(r.display_name) || matchesSearch(r.phone) || matchesSearch(r.parent_phone))) return false;
+      return true;
+    });
+    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Students (" + roster.length + ")"])]);
+    section.appendChild(el("div", { class: "dash-section-note" }, ["Contact details and totals for each registered student."]));
+    if (!roster.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, ["No students match the current filters."]));
+      return section;
+    }
+    roster.forEach(function (r) {
+      section.appendChild(el("div", { class: "dash-row" }, [
+        el("div", { class: "dash-row-main" }, [
+          el("div", { class: "dash-row-title" }, [r.display_name]),
+          el("div", { class: "dash-row-sub" }, ["Phone " + (r.phone || "\u2014")]),
+          el("div", { class: "dash-row-sub" }, ["Parent " + (r.parent_phone || "not on file")]),
+          r.created_at ? el("div", { class: "dash-row-sub" }, ["Joined " + fmtWhen(r.created_at)]) : null,
+        ]),
+        el("div", { class: "dash-badge" }, [r.year || "no year on file"]),
+        el("div", { class: "dash-badge" }, [r.quizzes + " quiz" + (r.quizzes === 1 ? "" : "zes")]),
+        el("div", { class: "dash-score" }, [r.avgPct]),
+        el("div", { class: "dash-badge" }, [r.submissions + " sub" + (r.submissions === 1 ? "" : "s")]),
+      ]));
     });
     return section;
   }
@@ -1240,6 +1263,7 @@
       below.appendChild(renderChapterSection(filteredQuiz));
       below.appendChild(renderQuizSection(filteredQuiz));
       below.appendChild(renderSubmissionsSection(filteredSubs));
+      below.appendChild(renderStudentsSection());
     }
 
     // Anything that changes the roster/stats/filter controls themselves
@@ -1346,8 +1370,11 @@
         STATE.students = data.students || [];
         var q = dedupeQuiz(data.quiz_results);
         var sb = dedupeSubs(data.submissions);
-        STATE.quizRows = q.rows;
-        STATE.subRows = sb.rows;
+        var keepQ = q.rows.filter(function (r) { return !isExcluded(r.lesson); });
+        var keepS = sb.rows.filter(function (r) { return !isExcluded(r.lesson); });
+        STATE.excludedRows = (q.rows.length - keepQ.length) + (sb.rows.length - keepS.length);
+        STATE.quizRows = keepQ;
+        STATE.subRows = keepS;
         STATE.dupQuiz = q.dup;
         STATE.dupSubs = sb.dup;
         STATE.blankRows = q.blank + sb.blank;
