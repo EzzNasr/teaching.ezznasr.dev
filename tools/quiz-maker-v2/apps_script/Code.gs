@@ -5,7 +5,8 @@
  *   1. Admin attachment uploads    (action: "upload_attachment", token required)
  *   2. Student assignment uploads  (action: "upload_submission", no token)
  *   3. Student quiz results        (action: "upload_quiz_result", no token)
- *   4. Student login/register      (check_student / register_student / login_student)
+ *   4. Student login/register      (check_student / register_student / login_student
+ *                                   / reset_password)
  *   5. Dashboards                  (get_my_results / admin_get_all)
  *
  * Files are no longer served back out through this script. Uploaded
@@ -92,6 +93,20 @@
  *   every attempt/submission that has a Drive file but no sheet row, then
  *   removes duplicates and tidies (with a backup first). Run it twice if
  *   the log says it stopped early.
+ *
+ * ---- Password reset (added) ---------------------------------------------
+ * - "Forgot password?" on the login step calls action "reset_password" with
+ *   the student's phone, their parent's phone number, and the NEW password's
+ *   hash. If the parent number matches the one on file (last 10 digits), the
+ *   password_hash cell is replaced — that and the session_token (rotated, so
+ *   old sessions are signed out) are the only cells touched. QuizResults,
+ *   Submissions, name, year, parent_phone, everything else stays as it was.
+ * - 5 wrong parent numbers per student locks resets for that student for an
+ *   hour (CacheService), so the number can't be guessed by trial and error.
+ * - Never available for is_admin accounts (fix those by hand in the Sheet),
+ *   and not for accounts with no parent_phone on file, or one that's the
+ *   student's own number — type the parent's number into the parent_phone
+ *   column of that row and the link works for them.
  *
  * ---- Redeploying after editing this file --------------------------------
  * Apps Script Web Apps don't auto-update on save. After changing this
@@ -530,6 +545,60 @@ function handleUpdateProfile(payload) {
   return { ok: true, year: payload.year, parent_phone: payload.parent_phone };
 }
 
+// -- Password reset, verified by the parent's phone number -------------------
+// Interim "forgot password" flow (no email/SMS to pay for): the student
+// re-types the parent number they registered with, plus a new password
+// (hashed in the browser, same as register/login). Changes ONLY the
+// password_hash cell (col 2) and rotates session_token (col 5) so any old
+// signed-in session is dropped. Nothing else on the row, and nothing in
+// QuizResults/Submissions, is touched.
+var RESET_MAX_FAILS = 5;        // wrong parent numbers allowed per student...
+var RESET_LOCK_SECONDS = 3600;  // ...before resets for that student pause for an hour
+
+function handleResetPassword(payload) {
+  if (!payload.phone || !payload.parent_phone || !payload.new_password_hash) {
+    throw new Error("Missing phone, parent phone, or new password.");
+  }
+  if (_normalizePhone(payload.parent_phone).length < 10) {
+    throw new Error("Enter the full parent phone number.");
+  }
+
+  return _withLock(function () {
+    var cache = CacheService.getScriptCache();
+    var cacheKey = "rp:" + _phoneKey(payload.phone);
+    var fails = parseInt(cache.get(cacheKey) || "0", 10);
+    if (fails >= RESET_MAX_FAILS) {
+      throw new Error("Too many attempts. Try again in an hour, or ask your teacher.");
+    }
+
+    var sheet = _students();
+    var found = _findStudentRow(sheet, payload.phone);
+
+    // Admin accounts are never resettable this way: the dashboard exposes
+    // every student's data, so it needs a stronger check than a phone number.
+    if (found && found.is_admin) throw new Error("This account can't be reset here.");
+
+    var stored = found ? _phoneKey(found.parent_phone) : "";
+    var hasParent = stored.length === 10 && stored !== _phoneKey(found.phone);
+    if (found && !hasParent) {
+      throw new Error("No parent number on file for this account — ask your teacher to reset it.");
+    }
+
+    if (!found || stored !== _phoneKey(payload.parent_phone)) {
+      cache.put(cacheKey, String(fails + 1), RESET_LOCK_SECONDS);
+      throw new Error("Phone number and parent number don't match.");
+    }
+
+    sheet.getRange(found.row, 2).setNumberFormat("@").setValue(String(payload.new_password_hash));
+    var token = Utilities.getUuid();                 // signs out any old sessions
+    sheet.getRange(found.row, 5).setValue(token);
+    cache.remove(cacheKey);
+
+    return { ok: true, student_id: _normalizePhone(found.phone), student_name: found.display_name,
+             session_token: token, year: found.year || "", parent_phone: found.parent_phone || "", is_admin: false };
+  });
+}
+
 function _safeName(s) {
   return String(s || "").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80);
 }
@@ -591,6 +660,9 @@ function doPost(e) {
 
       case "login_student":
         return _json(handleLoginStudent(payload));
+
+      case "reset_password":
+        return _json(handleResetPassword(payload));
 
       case "update_profile":
         return _json(handleUpdateProfile(payload));

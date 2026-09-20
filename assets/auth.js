@@ -2,8 +2,8 @@
    auth.js — phone+password student identity for teaching.ezznasr.dev
 
    Backed by Code.gs's "check_student" / "register_student" / "login_student"
-   actions and a Students Google Sheet (phone | password_hash | display_name
-   | created_at). The password itself never leaves the browser — only a
+   / "reset_password" actions and a Students Google Sheet (phone |
+   password_hash | display_name | created_at). The password itself never leaves the browser — only a
    SHA-256 hash of it does (crypto.subtle.digest). The server just compares
    hashes; it never sees the plaintext.
 
@@ -20,6 +20,12 @@
    itself a security boundary: Code.gs's admin_get_all re-checks
    is_admin server-side on every call regardless of what the client
    thinks it knows.
+
+   Forgot password — the login step has a "Forgot password?" link. The
+   student re-types the parent phone number they registered with plus a new
+   password; Code.gs's reset_password checks the parent number and, if it
+   matches, replaces ONLY the password hash (nothing else on their account
+   or in their quiz/assignment history changes) and signs them in.
 
    Two independent things happen here:
 
@@ -112,18 +118,30 @@
     return String(value || "").replace(/[^0-9]/g, "").length >= 6;
   }
 
+  // Password reset compares the parent number on its last 10 digits
+  // (Code.gs handleResetPassword), so it needs the full number — the 6-digit
+  // "looks like a phone" check above is too loose for that.
+  function looksLikeFullPhone(value) {
+    return String(value || "").replace(/[^0-9]/g, "").length >= 10;
+  }
+
   // A password <input> plus a "Show"/"Hide" toggle, wrapped together so
   // the toggle can be positioned inside the field. inputClass is applied
   // to the <input> itself (callers use different class names: "qz-input"
   // inline vs. none in the floating modal, which styles via ".aew-modal
   // input" instead); toggleClass picks which button skin to use.
-  function passwordField(placeholder, inputClass, toggleClass) {
+  function passwordField(
+    placeholder,
+    inputClass,
+    toggleClass,
+    autocompleteValue,
+  ) {
     var input = el("input", {
       class: inputClass || "",
       type: "password",
       placeholder: placeholder,
       required: "required",
-      autocomplete: "current-password",
+      autocomplete: autocompleteValue || "current-password",
     });
     var toggle = el(
       "button",
@@ -208,6 +226,21 @@
         if (!data || !data.ok)
           throw new Error((data && data.error) || "Request failed.");
         return data;
+      });
+    });
+  }
+
+  // Hashes the new password in the browser (same SHA-256 as register/login)
+  // and asks Code.gs to swap it in, verified by the parent's phone number.
+  // Resolves with the same shape as login_student, so callers can sign the
+  // student straight in.
+  function resetPasswordRequest(phone, parentPhone, newPassword) {
+    return sha256Hex(newPassword).then(function (hash) {
+      return postToDrive({
+        action: "reset_password",
+        phone: phone,
+        parent_phone: parentPhone,
+        new_password_hash: hash,
       });
     });
   }
@@ -499,6 +532,7 @@
       modal.appendChild(closeBtn);
       if (step === "login") renderLoginStep();
       else if (step === "register") renderRegisterStep();
+      else if (step === "reset") renderResetStep();
       else renderPhoneStep();
     }
 
@@ -629,9 +663,104 @@
       modal.appendChild(el("p", { class: "aew-sub" }, [maskPhone(phone)]));
       modal.appendChild(el("div", { class: "aew-field" }, [pw.wrap]));
       modal.appendChild(error);
+      var forgot = el("button", { class: "aew-link", type: "button" }, [
+        "Forgot password?",
+      ]);
+      forgot.addEventListener("click", function () {
+        step = "reset";
+        renderStep();
+      });
+
       modal.appendChild(btn);
+      modal.appendChild(forgot);
       modal.appendChild(back);
       pw.input.focus();
+    }
+
+    function renderResetStep() {
+      var parentInput = el("input", {
+        type: "tel",
+        inputmode: "tel",
+        placeholder: "Parent's phone number",
+        autocomplete: "off",
+      });
+      var pw = passwordField(
+        "New password",
+        "",
+        "aew-pwtoggle",
+        "new-password",
+      );
+      var error = el("div", { class: "aew-error" });
+      var btn = el("button", { class: "aew-primary", type: "button" }, [
+        "Reset password \u2192",
+      ]);
+      var back = el("button", { class: "aew-link", type: "button" }, [
+        "\u2190 Back to login",
+      ]);
+
+      back.addEventListener("click", function () {
+        step = "login";
+        renderStep();
+      });
+
+      function submit() {
+        if (busy) return;
+        var parentPhone = parentInput.value.trim();
+        var val = pw.input.value;
+        if (!looksLikeFullPhone(parentPhone)) {
+          error.textContent = "Enter your parent's full phone number.";
+          parentInput.focus();
+          return;
+        }
+        if (!val || val.length < 4) {
+          error.textContent = "Choose a password (4+ characters).";
+          pw.input.focus();
+          return;
+        }
+        busy = true;
+        setBusy(btn, true);
+        resetPasswordRequest(phone, parentPhone, val)
+          .then(function (data) {
+            saveSession({
+              student_id: data.student_id,
+              student_name: data.student_name,
+              session_token: data.session_token,
+              year: data.year || "",
+              parent_phone: data.parent_phone || "",
+              is_admin: !!data.is_admin,
+            });
+            showModalSuccess(data.student_name);
+            setTimeout(function () {
+              location.reload();
+            }, SUCCESS_ANIM_MS);
+          })
+          .catch(function (err) {
+            busy = false;
+            setBusy(btn, false);
+            error.textContent = err.message || "Couldn't reset your password.";
+          });
+      }
+
+      btn.addEventListener("click", submit);
+      parentInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
+      pw.input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
+
+      modal.appendChild(el("h3", {}, ["Reset password"]));
+      modal.appendChild(
+        el("p", { class: "aew-sub" }, [
+          maskPhone(phone) + " \u2014 confirm with your parent's number",
+        ]),
+      );
+      modal.appendChild(el("div", { class: "aew-field" }, [parentInput]));
+      modal.appendChild(el("div", { class: "aew-field" }, [pw.wrap]));
+      modal.appendChild(error);
+      modal.appendChild(btn);
+      modal.appendChild(back);
+      parentInput.focus();
     }
 
     function renderRegisterStep() {
@@ -838,6 +967,7 @@
         renderCompleteProfileStep(sessionForProfile);
       else if (step === "login") renderLoginStep();
       else if (step === "register") renderRegisterStep();
+      else if (step === "reset") renderResetStep();
       else renderPhoneStep();
     }
 
@@ -1023,6 +1153,14 @@
           });
       }
 
+      var forgotBtn = el("button", { class: "qz-authswitch", type: "button" }, [
+        "Forgot password?",
+      ]);
+      forgotBtn.addEventListener("click", function () {
+        step = "reset";
+        render();
+      });
+
       loginBtn.addEventListener("click", submit);
       pw.input.addEventListener("keydown", function (e) {
         if (e.key === "Enter") submit();
@@ -1038,6 +1176,85 @@
         el("div", { class: "qz-field" }, [pw.wrap]),
         errorMsg,
         el("div", { class: "qz-actions-row" }, [backBtn, loginBtn]),
+        el("div", { class: "qz-field" }, [forgotBtn]),
+      ]);
+      root.appendChild(card);
+    }
+
+    function renderResetStep() {
+      var parentInput = el("input", {
+        class: "qz-input",
+        type: "tel",
+        inputmode: "tel",
+        autocomplete: "off",
+        placeholder: "Parent's phone number",
+        required: "required",
+      });
+      var pw = passwordField(
+        "New password",
+        "qz-input",
+        "qz-pwtoggle",
+        "new-password",
+      );
+      var errorMsg = el("div", { class: "qz-error" });
+      var backBtn = el("button", { class: "qz-authswitch", type: "button" }, [
+        "\u2190 Back to login",
+      ]);
+      var resetBtn = el("button", { class: "qz-next", type: "button" }, [
+        "Reset password \u2192",
+      ]);
+
+      backBtn.addEventListener("click", function () {
+        step = "login";
+        render();
+      });
+
+      function submit() {
+        if (busy) return;
+        var parentPhone = parentInput.value.trim();
+        var val = pw.input.value;
+        if (!looksLikeFullPhone(parentPhone)) {
+          errorMsg.textContent = "Enter your parent's full phone number.";
+          parentInput.focus();
+          return;
+        }
+        if (!val || val.length < 4) {
+          errorMsg.textContent = "Choose a password (4+ characters).";
+          pw.input.focus();
+          return;
+        }
+        busy = true;
+        setBusy(resetBtn, true);
+        resetPasswordRequest(phone, parentPhone, val)
+          .then(function (data) {
+            proceedAfterAuth(data);
+          })
+          .catch(function (err) {
+            busy = false;
+            setBusy(resetBtn, false);
+            errorMsg.textContent = err.message || "Couldn't reset your password.";
+          });
+      }
+
+      resetBtn.addEventListener("click", submit);
+      parentInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
+      pw.input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
+
+      var card = el("div", { class: "qz-card frame" }, [
+        el("span", { class: "tick-br" }),
+        el("span", { class: "tick-bl" }),
+        el("p", { class: "qz-question" }, ["Reset your password"]),
+        el("p", { class: "qz-subtle" }, [
+          maskPhone(phone) + " \u2014 confirm with your parent's number",
+        ]),
+        el("div", { class: "qz-field" }, [parentInput]),
+        el("div", { class: "qz-field" }, [pw.wrap]),
+        errorMsg,
+        el("div", { class: "qz-actions-row" }, [backBtn, resetBtn]),
       ]);
       root.appendChild(card);
     }
