@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 1 Lesson 2 | information Ethics Quiz — Ezz Nasr : Teaching</title>
+<meta name="description" content="A quiz on Chapter 1 Lesson 2 | information Ethics.">
+<link rel="canonical" href="https://teaching.ezznasr.dev/programming/baccalaureate/grade-1-secondary/chapter-1-lesson-2-information-ethics/quiz.html">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./base.css">
+<link rel="stylesheet" href="./forms.css">
+<style>
+  :root{ --maxw:720px; }
+  main{ padding:24px 0 64px; }
+
+  /* ---- quiz engine styling ---- */
+  .qz-progress{ font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); letter-spacing:0.04em; margin-bottom:12px; }
+  .qz-question{ font-size:17px; margin:0 0 18px; color:var(--ink); }
+  .qz-question code{ font-family:var(--mono); background:var(--panel-soft); padding:0.1em 0.4em; font-size:0.9em; border:1px solid var(--line); border-radius:4px; }
+  .qz-options{ display:flex; flex-direction:column; gap:9px; }
+  .qz-option{
+    display:flex; align-items:flex-start; gap:10px; text-align:left; width:100%;
+    padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel-soft); color:var(--ink);
+    cursor:pointer; font-size:14.5px; transition:border-color .15s ease, transform .1s ease;
+  }
+  .qz-option:hover:not(:disabled){ border-color:var(--accent); }
+  .qz-option:active:not(:disabled){ transform:scale(0.995); }
+  .qz-option__tag{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); flex-shrink:0; padding-top:2px; }
+  .qz-option:disabled{ cursor:default; }
+  .qz-option--correct{ border-color:var(--status-shipped); }
+  .qz-option--correct .qz-option__tag{ color:var(--status-shipped); }
+  .qz-option--incorrect{ border-color:var(--status-fail); }
+  .qz-option--incorrect .qz-option__tag{ color:var(--status-fail); }
+  .qz-verdict{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); font-family:var(--mono); font-size:13px; }
+  .qz-verdict__tag{ display:inline-block; letter-spacing:0.06em; text-transform:uppercase; font-size:11px; padding:3px 8px; border:1px solid currentColor; border-radius:5px; margin-bottom:8px; }
+  .qz-verdict__tag--pass{ color:var(--status-shipped); }
+  .qz-verdict__tag--fail{ color:var(--status-fail); }
+  .qz-verdict__explain{ display:block; color:var(--ink-dim); font-family:var(--sans); font-size:14.5px; margin-top:4px; }
+  .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--accent-strong); margin-bottom:6px; }
+  .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); border-radius:9px; color:var(--ink-dim); padding:9px 16px; cursor:pointer; transition:border-color .15s ease, color .15s ease; }
+  .qz-retry:hover{ border-color:var(--accent); color:var(--accent-strong); }
+</style>
+</head>
+<body class="track-one">
+
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR <span aria-hidden="true">&middot;</span> TEACHING</a>
+    <nav>
+      <a href="/programming/baccalaureate/grade-1-secondary/chapter-1-lesson-2-information-ethics/" class="back">Back to Chapter 1 Lesson 2 | information Ethics</a>
+      <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">&#9789;</span><span class="theme-label"></span></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>Chapter 1 Lesson 2 | information Ethics — quiz</h1>
+    <p class="lede">12 questions. Instant feedback.</p>
+  </div>
+
+  <div class="wrap">
+    <div class="media-slot">
+      Video placeholder &mdash; add a YouTube embed URL to replace this box.
+    </div>
+
+    <div id="quiz-root" aria-live="polite"></div>
+  </div>
+</main>
+
+<footer><div class="wrap"><p class="footer-note">teaching.ezznasr.dev/programming/baccalaureate/grade-1-secondary/chapter-1-lesson-2-information-ethics/quiz</p></div></footer>
+
+<script type="application/json" id="quiz-data">
+{
+  "title": "Chapter 1 Lesson 2 | information Ethics",
+  "subject": "programming",
+  "lesson": "chapter-1-lesson-2-information-ethics",
+  "questions": [
+    {
+      "id": "g1",
+      "type": "mcq",
+      "prompt": "Which statement best describes information ethics?",
+      "options": [
+        "Laws that punish the misuse of the internet",
+        "Concepts and attitudes for proper activity in the information society, whether or not a law exists",
+        "Technical methods for protecting data from hackers",
+        "Rules that apply only to companies and websites"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "Information ethics is the set of concepts and attitudes needed to act properly in the information society, whether or not a law exists.",
+      "chapter": 1
+    },
+    {
+      "id": "g2",
+      "type": "mcq",
+      "prompt": "What is a geotag?",
+      "options": [
+        "A password saved inside a smartphone",
+        "A filter added to photos on social media",
+        "Latitude and longitude information embedded in smartphone photos or videos",
+        "A label used to report false information"
+      ],
+      "correct": [
+        2
+      ],
+      "explain": "A geotag is latitude/longitude data embedded in a smartphone photo or video.",
+      "chapter": 1
+    },
+    {
+      "id": "g3",
+      "type": "mcq",
+      "prompt": "Why can posting a geotagged photo publicly be risky?",
+      "options": [
+        "The photo will be deleted by the network",
+        "Your home address or other location could be identified",
+        "The photo's copyright transfers automatically to others",
+        "Your phone will be infected with a virus"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "Geotag data can allow a home or other location to be identified.",
+      "chapter": 1
+    },
+    {
+      "id": "g4",
+      "type": "mcq",
+      "prompt": "What is the term for false information that is deliberately spread, or for baseless rumors?",
+      "options": [
+        "Disinformation and rumors",
+        "Identity theft",
+        "Cybercrime",
+        "Social media"
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "Disinformation and rumors = false information deliberately spread, or baseless rumors.",
+      "chapter": 1
+    },
+    {
+      "id": "g5",
+      "type": "mcq",
+      "prompt": "A third party pretends to be someone else in order to steal IDs or passwords. This is called:",
+      "options": [
+        "Cybercrime",
+        "Internet addiction",
+        "Leakage of personal information",
+        "Identity theft"
+      ],
+      "correct": [
+        3
+      ],
+      "explain": "Identity theft = pretending to be another person to steal IDs or passwords.",
+      "chapter": 1
+    },
+    {
+      "id": "g6",
+      "type": "mcq",
+      "prompt": "Which of the following is NOT one of the four things you must not do when sharing information?",
+      "options": [
+        "Sharing another person's copyrighted image or video without permission",
+        "Leaking another person's personal information",
+        "Sharing information with consideration for how others will feel",
+        "Posting slander, defamation, or online bullying"
+      ],
+      "correct": [
+        2
+      ],
+      "explain": "The four prohibited actions are: sharing copyrighted images/videos without permission, leaking personal information, infringing privacy, and slander/defamation/online bullying. Considerate sharing is the goal, not a prohibition.",
+      "chapter": 1
+    },
+    {
+      "id": "g7",
+      "type": "mcq",
+      "prompt": "Which of the following is NOT listed as a smartphone and social-media problem?",
+      "options": [
+        "Internet addiction",
+        "Smartphone use while walking",
+        "Leakage of personal information",
+        "Faster photo uploads"
+      ],
+      "correct": [
+        3
+      ],
+      "explain": "The five listed problems are internet addiction, smartphone use while walking, cybercrime, identity theft, and leakage of personal information.",
+      "chapter": 1
+    },
+    {
+      "id": "g8",
+      "type": "mcq",
+      "prompt": "Excessive internet use that interferes with daily life is called:",
+      "options": [
+        "Internet addiction",
+        "Cybercrime",
+        "Social media",
+        "Disinformation"
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "Internet addiction = excessive internet use that interferes with daily life.",
+      "chapter": 1
+    },
+    {
+      "id": "g9",
+      "type": "mcq",
+      "prompt": "What does \u201cleakage of personal information\u201d mean?",
+      "options": [
+        "Losing access to your own account after forgetting a password",
+        "Confidential personal information being disclosed to a third party",
+        "Sharing your hobbies with friends online",
+        "Turning off location services on a phone"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "Leakage of personal information = confidential personal information disclosed to a third party.",
+      "chapter": 1
+    },
+    {
+      "id": "g10",
+      "type": "mcq",
+      "prompt": "Which of the following describes cybercrime?",
+      "options": [
+        "Spending too many hours online each day",
+        "Taking photos that include location data",
+        "Crime involving the misuse of computers or networks",
+        "Websites that provide platforms for people to connect"
+      ],
+      "correct": [
+        2
+      ],
+      "explain": "Cybercrime = crime involving the misuse of computers or networks.",
+      "chapter": 1
+    },
+    {
+      "id": "g11",
+      "type": "mcq",
+      "prompt": "Which statement expresses the core concept of information ethics?",
+      "options": [
+        "Anything that is not against the law is acceptable online",
+        "Anonymous posts cannot be traced, so they are harmless",
+        "Social media is a dangerous tool that should be avoided",
+        "Remember that real people are on the other side of the internet and share with consideration for their perspective"
+      ],
+      "correct": [
+        3
+      ],
+      "explain": "The core concept is to be mindful that there are real people on the other side of the internet and to share information with consideration for their perspective.",
+      "chapter": 1
+    },
+    {
+      "id": "g12",
+      "type": "mcq",
+      "prompt": "Sara reposts a photographer's image on her page without asking permission. Which rule of sharing information does this break?",
+      "options": [
+        "Do not share another person's copyrighted image or video without permission",
+        "Do not leak another person's personal information",
+        "Do not post slander or defamation",
+        "Do not use a smartphone while walking"
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "Sharing another person's copyrighted image or video without permission is one of the four things you must not do.",
+      "chapter": 1
+    }
+  ]
+}
+</script>
+<script src="/assets/auth.js"></script>
+<script src="/assets/quiz.js"></script>
+<script>QuizEngine.mount('#quiz-root', '#quiz-data');</script>
+<script>(function(){var slot=document.querySelector('.media-slot');if(!slot)return;var frame=slot.querySelector('iframe');if(!frame)return;var dataEl=document.getElementById('quiz-data');var quiz={};try{quiz=JSON.parse((dataEl&&dataEl.textContent)||'{}');}catch(e){}var key='teaching_last_attempt:'+(quiz.subject||'?')+':'+(quiz.lesson||'?');function done(){try{return !!localStorage.getItem(key);}catch(e){return false;}}var overlay=document.createElement('div');overlay.className='video-lock';overlay.innerHTML='<span class="video-lock__icon" aria-hidden="true">\uD83D\uDD12</span><span class="video-lock__msg">Finish the quiz below to unlock this video.</span>';function lock(){if(slot.contains(overlay))return;slot.classList.add('is-locked');slot.appendChild(overlay);}function unlock(){slot.classList.remove('is-locked');if(slot.contains(overlay))slot.removeChild(overlay);}function sync(){if(done())unlock();else lock();}sync();overlay.addEventListener('click',function(){overlay.classList.add('is-tapped');overlay.classList.remove('shake');void overlay.offsetWidth;overlay.classList.add('shake');});var root=document.getElementById('quiz-root');if(root)new MutationObserver(sync).observe(root,{childList:true,subtree:true});})();</script>
+<script>(function(){var root=document.documentElement,toggle=document.getElementById('theme-toggle'),stored;try{stored=localStorage.getItem('teaching-theme')}catch(e){}var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');function apply(theme){root.setAttribute('data-theme',theme);toggle.setAttribute('aria-pressed',theme==='dark'?'true':'false');toggle.setAttribute('aria-label',theme==='dark'?'Switch to light mode':'Switch to dark mode');toggle.querySelector('.theme-icon').textContent=theme==='dark'?'\u2600':'\u263E';try{localStorage.setItem('teaching-theme',theme)}catch(e){}}apply(initial);toggle.addEventListener('click',function(){apply(root.getAttribute('data-theme')==='dark'?'light':'dark')})})();</script>
+
+</body>
+</html>
