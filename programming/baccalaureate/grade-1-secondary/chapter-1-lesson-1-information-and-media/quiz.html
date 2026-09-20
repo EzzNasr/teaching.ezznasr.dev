@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 1 Lesson 1 | information and  media Quiz — Ezz Nasr : Teaching</title>
+<meta name="description" content="A quiz on Chapter 1 Lesson 1 | information and  media.">
+<link rel="canonical" href="https://teaching.ezznasr.dev/programming/baccalaureate/grade-1-secondary/chapter-1-lesson-1-information-and-media/quiz.html">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./base.css">
+<link rel="stylesheet" href="./forms.css">
+<style>
+  :root{ --maxw:720px; }
+  main{ padding:24px 0 64px; }
+
+  /* ---- quiz engine styling ---- */
+  .qz-progress{ font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); letter-spacing:0.04em; margin-bottom:12px; }
+  .qz-question{ font-size:17px; margin:0 0 18px; color:var(--ink); }
+  .qz-question code{ font-family:var(--mono); background:var(--panel-soft); padding:0.1em 0.4em; font-size:0.9em; border:1px solid var(--line); border-radius:4px; }
+  .qz-options{ display:flex; flex-direction:column; gap:9px; }
+  .qz-option{
+    display:flex; align-items:flex-start; gap:10px; text-align:left; width:100%;
+    padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel-soft); color:var(--ink);
+    cursor:pointer; font-size:14.5px; transition:border-color .15s ease, transform .1s ease;
+  }
+  .qz-option:hover:not(:disabled){ border-color:var(--accent); }
+  .qz-option:active:not(:disabled){ transform:scale(0.995); }
+  .qz-option__tag{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); flex-shrink:0; padding-top:2px; }
+  .qz-option:disabled{ cursor:default; }
+  .qz-option--correct{ border-color:var(--status-shipped); }
+  .qz-option--correct .qz-option__tag{ color:var(--status-shipped); }
+  .qz-option--incorrect{ border-color:var(--status-fail); }
+  .qz-option--incorrect .qz-option__tag{ color:var(--status-fail); }
+  .qz-verdict{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); font-family:var(--mono); font-size:13px; }
+  .qz-verdict__tag{ display:inline-block; letter-spacing:0.06em; text-transform:uppercase; font-size:11px; padding:3px 8px; border:1px solid currentColor; border-radius:5px; margin-bottom:8px; }
+  .qz-verdict__tag--pass{ color:var(--status-shipped); }
+  .qz-verdict__tag--fail{ color:var(--status-fail); }
+  .qz-verdict__explain{ display:block; color:var(--ink-dim); font-family:var(--sans); font-size:14.5px; margin-top:4px; }
+  .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--accent-strong); margin-bottom:6px; }
+  .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); border-radius:9px; color:var(--ink-dim); padding:9px 16px; cursor:pointer; transition:border-color .15s ease, color .15s ease; }
+  .qz-retry:hover{ border-color:var(--accent); color:var(--accent-strong); }
+</style>
+</head>
+<body class="track-one">
+
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR <span aria-hidden="true">&middot;</span> TEACHING</a>
+    <nav>
+      <a href="/programming/baccalaureate/grade-1-secondary/chapter-1-lesson-1-information-and-media/" class="back">Back to Chapter 1 Lesson 1 | information and  media</a>
+      <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">&#9789;</span><span class="theme-label"></span></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>Chapter 1 Lesson 1 | information and  media — quiz</h1>
+    <p class="lede">12 questions. Instant feedback.</p>
+  </div>
+
+  <div class="wrap">
+    <div class="media-slot">
+      Video placeholder &mdash; add a YouTube embed URL to replace this box.
+    </div>
+
+    <div id="quiz-root" aria-live="polite"></div>
+  </div>
+</main>
+
+<footer><div class="wrap"><p class="footer-note">teaching.ezznasr.dev/programming/baccalaureate/grade-1-secondary/chapter-1-lesson-1-information-and-media/quiz</p></div></footer>
+
+<script type="application/json" id="quiz-data">
+{
+  "title": "Chapter 1 Lesson 1 | information and  media",
+  "subject": "programming",
+  "lesson": "chapter-1-lesson-1-information-and-media",
+  "questions": [
+    {
+      "id": "g1",
+      "type": "mcq",
+      "prompt": "Which term refers to facts or matters represented using numbers, characters, or symbols?",
+      "options": [
+        "Data",
+        "Information",
+        "Knowledge",
+        "Media"
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "Data is facts or matters represented using numbers, characters, or symbols.",
+      "chapter": 1
+    },
+    {
+      "id": "g2",
+      "type": "mcq",
+      "prompt": "Which of the following is an example of Data?",
+      "options": [
+        "A five-year sales trend report",
+        "A weather forecast",
+        "A store's daily sales figures",
+        "An assessment of admission chances"
+      ],
+      "correct": [
+        2
+      ],
+      "explain": "Daily sales figures are raw facts, so they are Data. The other options come after analysis.",
+      "chapter": 1
+    },
+    {
+      "id": "g3",
+      "type": "mcq",
+      "prompt": "A five-year sales trend report compiled from daily sales figures is a form of:",
+      "options": [
+        "Data",
+        "Media",
+        "Knowledge",
+        "Information"
+      ],
+      "correct": [
+        3
+      ],
+      "explain": "Compiling raw figures into a trend gives them meaning, so it is Information. Using it to project a forecast for decisions would be Knowledge.",
+      "chapter": 1
+    },
+    {
+      "id": "g4",
+      "type": "mcq",
+      "prompt": "Analyzed and systematized information used for problem-solving is called:",
+      "options": [
+        "Data",
+        "Knowledge",
+        "Media",
+        "Cross-checking"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "Knowledge is analyzed and systematized information used for problem-solving.",
+      "chapter": 1
+    },
+    {
+      "id": "g5",
+      "type": "mcq",
+      "prompt": "Which of the following is NOT a characteristic of information?",
+      "options": [
+        "It has a form just like an object.",
+        "It cannot be completely erased.",
+        "It can be copied in large quantities.",
+        "It can be conveyed and spread easily."
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "Information has no form of its own; that is what separates it from a physical object. The other three describe persistence, reproducibility, and propagation.",
+      "chapter": 1
+    },
+    {
+      "id": "g6",
+      "type": "mcq",
+      "prompt": "False rumors about a person keep resurfacing online years later and can never be completely erased. Which characteristic of information is this?",
+      "options": [
+        "Propagation",
+        "Reproducibility",
+        "Media literacy",
+        "Persistence"
+      ],
+      "correct": [
+        3
+      ],
+      "explain": "Information that has spread cannot be completely erased. That is persistence.",
+      "chapter": 1
+    },
+    {
+      "id": "g7",
+      "type": "mcq",
+      "prompt": "Information obtained through your own experience, research, survey, or experiment is called:",
+      "options": [
+        "Secondary information",
+        "Primary information",
+        "Cross-checking",
+        "Data"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "Primary information is first-hand: you collected it yourself.",
+      "chapter": 1
+    },
+    {
+      "id": "g8",
+      "type": "mcq",
+      "prompt": "A student learns about a new phone only from a friend's social-media post. This information is:",
+      "options": [
+        "Primary information",
+        "Data",
+        "Secondary information",
+        "Knowledge"
+      ],
+      "correct": [
+        2
+      ],
+      "explain": "Information obtained through a third party, such as someone else's experience or social media, is secondary information.",
+      "chapter": 1
+    },
+    {
+      "id": "g9",
+      "type": "mcq",
+      "prompt": "Which action is an example of cross-checking?",
+      "options": [
+        "Trusting the first website you find",
+        "Sharing a post with friends immediately",
+        "Saving an article to a USB drive",
+        "Comparing the same subject across multiple sources"
+      ],
+      "correct": [
+        3
+      ],
+      "explain": "Cross-checking verifies correctness by comparing the same subject across multiple sources.",
+      "chapter": 1
+    },
+    {
+      "id": "g10",
+      "type": "mcq",
+      "prompt": "Which of the following is an example of expression media?",
+      "options": [
+        "Radio",
+        "USB drive",
+        "Video",
+        "Internet"
+      ],
+      "correct": [
+        2
+      ],
+      "explain": "Text, images, audio, and video are expression media. Radio and the internet are propagation media; a USB drive is recording media.",
+      "chapter": 1
+    },
+    {
+      "id": "g11",
+      "type": "mcq",
+      "prompt": "Which of the following is an example of recording (storage) media?",
+      "options": [
+        "Cloud storage",
+        "Television",
+        "Telephone",
+        "Photograph"
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "Cloud storage records and stores information. Television and telephone are propagation media; a photograph is expression media.",
+      "chapter": 1
+    },
+    {
+      "id": "g12",
+      "type": "mcq",
+      "prompt": "Which statement about media literacy is true?",
+      "options": [
+        "It is the ability to accept information from the media without question.",
+        "It is the ability to accurately interpret information obtained through media.",
+        "It is the ability to capture content for media distribution.",
+        "It is the ability to edit information according to the sender's intent."
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "Media literacy means interpreting information from media accurately, not accepting, capturing, or editing it uncritically.",
+      "chapter": 1
+    }
+  ]
+}
+</script>
+<script src="/assets/auth.js"></script>
+<script src="/assets/quiz.js"></script>
+<script>QuizEngine.mount('#quiz-root', '#quiz-data');</script>
+<script>(function(){var slot=document.querySelector('.media-slot');if(!slot)return;var frame=slot.querySelector('iframe');if(!frame)return;var dataEl=document.getElementById('quiz-data');var quiz={};try{quiz=JSON.parse((dataEl&&dataEl.textContent)||'{}');}catch(e){}var key='teaching_last_attempt:'+(quiz.subject||'?')+':'+(quiz.lesson||'?');function done(){try{return !!localStorage.getItem(key);}catch(e){return false;}}var overlay=document.createElement('div');overlay.className='video-lock';overlay.innerHTML='<span class="video-lock__icon" aria-hidden="true">\uD83D\uDD12</span><span class="video-lock__msg">Finish the quiz below to unlock this video.</span>';function lock(){if(slot.contains(overlay))return;slot.classList.add('is-locked');slot.appendChild(overlay);}function unlock(){slot.classList.remove('is-locked');if(slot.contains(overlay))slot.removeChild(overlay);}function sync(){if(done())unlock();else lock();}sync();overlay.addEventListener('click',function(){overlay.classList.add('is-tapped');overlay.classList.remove('shake');void overlay.offsetWidth;overlay.classList.add('shake');});var root=document.getElementById('quiz-root');if(root)new MutationObserver(sync).observe(root,{childList:true,subtree:true});})();</script>
+<script>(function(){var root=document.documentElement,toggle=document.getElementById('theme-toggle'),stored;try{stored=localStorage.getItem('teaching-theme')}catch(e){}var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');function apply(theme){root.setAttribute('data-theme',theme);toggle.setAttribute('aria-pressed',theme==='dark'?'true':'false');toggle.setAttribute('aria-label',theme==='dark'?'Switch to light mode':'Switch to dark mode');toggle.querySelector('.theme-icon').textContent=theme==='dark'?'\u2600':'\u263E';try{localStorage.setItem('teaching-theme',theme)}catch(e){}}apply(initial);toggle.addEventListener('click',function(){apply(root.getAttribute('data-theme')==='dark'?'light':'dark')})})();</script>
+
+</body>
+</html>
