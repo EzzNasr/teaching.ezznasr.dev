@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 2 Lesson 1 | Personal information Quiz — Ezz Nasr : Teaching</title>
+<meta name="description" content="A quiz on Chapter 2 Lesson 1 | Personal information.">
+<link rel="canonical" href="https://teaching.ezznasr.dev/programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-personal-information/quiz.html">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./base.css">
+<link rel="stylesheet" href="./forms.css">
+<style>
+  :root{ --maxw:720px; }
+  main{ padding:24px 0 64px; }
+
+  /* ---- quiz engine styling ---- */
+  .qz-progress{ font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); letter-spacing:0.04em; margin-bottom:12px; }
+  .qz-question{ font-size:17px; margin:0 0 18px; color:var(--ink); }
+  .qz-question code{ font-family:var(--mono); background:var(--panel-soft); padding:0.1em 0.4em; font-size:0.9em; border:1px solid var(--line); border-radius:4px; }
+  .qz-options{ display:flex; flex-direction:column; gap:9px; }
+  .qz-option{
+    display:flex; align-items:flex-start; gap:10px; text-align:left; width:100%;
+    padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel-soft); color:var(--ink);
+    cursor:pointer; font-size:14.5px; transition:border-color .15s ease, transform .1s ease;
+  }
+  .qz-option:hover:not(:disabled){ border-color:var(--accent); }
+  .qz-option:active:not(:disabled){ transform:scale(0.995); }
+  .qz-option__tag{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); flex-shrink:0; padding-top:2px; }
+  .qz-option:disabled{ cursor:default; }
+  .qz-option--correct{ border-color:var(--status-shipped); }
+  .qz-option--correct .qz-option__tag{ color:var(--status-shipped); }
+  .qz-option--incorrect{ border-color:var(--status-fail); }
+  .qz-option--incorrect .qz-option__tag{ color:var(--status-fail); }
+  .qz-verdict{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); font-family:var(--mono); font-size:13px; }
+  .qz-verdict__tag{ display:inline-block; letter-spacing:0.06em; text-transform:uppercase; font-size:11px; padding:3px 8px; border:1px solid currentColor; border-radius:5px; margin-bottom:8px; }
+  .qz-verdict__tag--pass{ color:var(--status-shipped); }
+  .qz-verdict__tag--fail{ color:var(--status-fail); }
+  .qz-verdict__explain{ display:block; color:var(--ink-dim); font-family:var(--sans); font-size:14.5px; margin-top:4px; }
+  .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--accent-strong); margin-bottom:6px; }
+  .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); border-radius:9px; color:var(--ink-dim); padding:9px 16px; cursor:pointer; transition:border-color .15s ease, color .15s ease; }
+  .qz-retry:hover{ border-color:var(--accent); color:var(--accent-strong); }
+</style>
+</head>
+<body class="track-one">
+
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR <span aria-hidden="true">&middot;</span> TEACHING</a>
+    <nav>
+      <a href="/programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-personal-information/" class="back">Back to Chapter 2 Lesson 1 | Personal information</a>
+      <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">&#9789;</span><span class="theme-label"></span></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>Chapter 2 Lesson 1 | Personal information — quiz</h1>
+    <p class="lede">12 questions. Instant feedback.</p>
+  </div>
+
+  <div class="wrap">
+    <div class="media-slot">
+      Video placeholder &mdash; add a YouTube embed URL to replace this box.
+    </div>
+
+    <div id="quiz-root" aria-live="polite"></div>
+  </div>
+</main>
+
+<footer><div class="wrap"><p class="footer-note">teaching.ezznasr.dev/programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-personal-information/quiz</p></div></footer>
+
+<script type="application/json" id="quiz-data">
+{
+  "title": "Chapter 2 Lesson 1 | Personal information",
+  "subject": "programming",
+  "lesson": "chapter-2-lesson-1-personal-information",
+  "questions": [
+    {
+      "id": "g1",
+      "type": "mcq",
+      "prompt": "Which statement best defines personal information?",
+      "options": [
+        "Any data stored on a company's computers",
+        "Data related to a natural person who can be identified directly or indirectly, including by linking it with other data",
+        "Information that has already been published on the internet",
+        "Only a person's name and photograph"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "Personal information is data related to a natural (living) person who can be identified directly or indirectly, including by linking it with other data.",
+      "chapter": 2
+    },
+    {
+      "id": "g2",
+      "type": "mcq",
+      "prompt": "Which of the following is NOT one of the Four Basic Items?",
+      "options": [
+        "Name",
+        "Date of birth",
+        "Phone number",
+        "Gender"
+      ],
+      "correct": [
+        2
+      ],
+      "explain": "The Four Basic Items are name, address, date of birth, and gender. A phone number is personal information but not one of the four.",
+      "chapter": 2
+    },
+    {
+      "id": "g3",
+      "type": "mcq",
+      "prompt": "Which of the following is a personal identification code?",
+      "options": [
+        "A nickname used in an online game",
+        "A passport number",
+        "A favourite colour",
+        "The name of a school"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "Personal identification codes are the unique numbers found on a passport, driver's license, or National ID.",
+      "chapter": 2
+    },
+    {
+      "id": "g4",
+      "type": "mcq",
+      "prompt": "A driver's license number is just a sequence of digits. Why does it still count as personal information?",
+      "options": [
+        "Because it can identify an individual, including when combined with other information",
+        "Because it always contains the owner's full name",
+        "Because it is valid for only one year",
+        "Because every number is confidential"
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "Such numbers allow an individual to be identified, especially when combined with other information.",
+      "chapter": 2
+    },
+    {
+      "id": "g5",
+      "type": "mcq",
+      "prompt": "Which of the following is an example of Special Care-Required Personal Information?",
+      "options": [
+        "Name",
+        "Address",
+        "Medical history",
+        "Date of birth"
+      ],
+      "correct": [
+        2
+      ],
+      "explain": "Race, social status, medical history, and criminal record are examples of special care-required personal information.",
+      "chapter": 2
+    },
+    {
+      "id": "g6",
+      "type": "mcq",
+      "prompt": "Why must Special Care-Required Personal Information be handled with extra care?",
+      "options": [
+        "Because it is always public",
+        "Because it is expensive to store",
+        "Because only governments may use it",
+        "To prevent prejudice and other disadvantages to the person"
+      ],
+      "correct": [
+        3
+      ],
+      "explain": "It requires careful handling to prevent prejudice and other disadvantages.",
+      "chapter": 2
+    },
+    {
+      "id": "g7",
+      "type": "mcq",
+      "prompt": "According to the Act on the Protection of Personal Information, what is the general rule about giving a person's information to a third party?",
+      "options": [
+        "It cannot be provided without the individual's consent",
+        "It is allowed if the third party asks politely",
+        "It is allowed if the person is your friend",
+        "It is allowed for any reason after one year"
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "One cannot provide an individual's personal information to a third party without the individual's consent, apart from five exceptions.",
+      "chapter": 2
+    },
+    {
+      "id": "g8",
+      "type": "mcq",
+      "prompt": "Which of the following is NOT one of the five exceptions that allow provision without consent?",
+      "options": [
+        "When required by laws or regulations",
+        "When necessary to protect human life, body, or property",
+        "When cooperating with national or local governments",
+        "When a friend wants a classmate's address to send a birthday card"
+      ],
+      "correct": [
+        3
+      ],
+      "explain": "The five exceptions are: laws/regulations, national security or public interest, protecting life, body or property, public health or children's healthy development, and cooperation with governments.",
+      "chapter": 2
+    },
+    {
+      "id": "g9",
+      "type": "mcq",
+      "prompt": "Which right lets a person prevent others from photographing or using their face or appearance without permission?",
+      "options": [
+        "Publicity rights",
+        "Image rights",
+        "Copyright",
+        "Prior approval"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "Image rights are the right of an individual to prevent others from photographing or using their face or appearance.",
+      "chapter": 2
+    },
+    {
+      "id": "g10",
+      "type": "mcq",
+      "prompt": "A shop prints a famous singer's photo on T-shirts and sells them without authorization. Which right protects the singer's economic interests here?",
+      "options": [
+        "Right to privacy",
+        "Objection system",
+        "Publicity rights",
+        "Prior approval system"
+      ],
+      "correct": [
+        2
+      ],
+      "explain": "Publicity rights protect the economic interests of celebrities in their likeness.",
+      "chapter": 2
+    },
+    {
+      "id": "g11",
+      "type": "mcq",
+      "prompt": "What is a privacy policy?",
+      "options": [
+        "A policy that stipulates how companies and organizations manage personal information",
+        "A license companies obtain from the regulatory authority",
+        "The right to keep personal information secret",
+        "A system where a service continues until the user asks it to stop"
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "A privacy policy explains how an organization manages personal information.",
+      "chapter": 2
+    },
+    {
+      "id": "g12",
+      "type": "mcq",
+      "prompt": "Which statement about the right to privacy, image rights, and publicity rights is correct?",
+      "options": [
+        "They are all written as articles of the Protection Act",
+        "They apply only to celebrities",
+        "They apply only to companies",
+        "They are recognized through court precedents rather than by law"
+      ],
+      "correct": [
+        3
+      ],
+      "explain": "The lesson notes that these rights are recognized not by law but through court precedents.",
+      "chapter": 2
+    }
+  ]
+}
+</script>
+<script src="/assets/auth.js"></script>
+<script src="/assets/quiz.js"></script>
+<script>QuizEngine.mount('#quiz-root', '#quiz-data');</script>
+<script>(function(){var slot=document.querySelector('.media-slot');if(!slot)return;var frame=slot.querySelector('iframe');if(!frame)return;var dataEl=document.getElementById('quiz-data');var quiz={};try{quiz=JSON.parse((dataEl&&dataEl.textContent)||'{}');}catch(e){}var key='teaching_last_attempt:'+(quiz.subject||'?')+':'+(quiz.lesson||'?');function done(){try{return !!localStorage.getItem(key);}catch(e){return false;}}var overlay=document.createElement('div');overlay.className='video-lock';overlay.innerHTML='<span class="video-lock__icon" aria-hidden="true">\uD83D\uDD12</span><span class="video-lock__msg">Finish the quiz below to unlock this video.</span>';function lock(){if(slot.contains(overlay))return;slot.classList.add('is-locked');slot.appendChild(overlay);}function unlock(){slot.classList.remove('is-locked');if(slot.contains(overlay))slot.removeChild(overlay);}function sync(){if(done())unlock();else lock();}sync();overlay.addEventListener('click',function(){overlay.classList.add('is-tapped');overlay.classList.remove('shake');void overlay.offsetWidth;overlay.classList.add('shake');});var root=document.getElementById('quiz-root');if(root)new MutationObserver(sync).observe(root,{childList:true,subtree:true});})();</script>
+<script>(function(){var root=document.documentElement,toggle=document.getElementById('theme-toggle'),stored;try{stored=localStorage.getItem('teaching-theme')}catch(e){}var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');function apply(theme){root.setAttribute('data-theme',theme);toggle.setAttribute('aria-pressed',theme==='dark'?'true':'false');toggle.setAttribute('aria-label',theme==='dark'?'Switch to light mode':'Switch to dark mode');toggle.querySelector('.theme-icon').textContent=theme==='dark'?'\u2600':'\u263E';try{localStorage.setItem('teaching-theme',theme)}catch(e){}}apply(initial);toggle.addEventListener('click',function(){apply(root.getAttribute('data-theme')==='dark'?'light':'dark')})})();</script>
+
+</body>
+</html>
