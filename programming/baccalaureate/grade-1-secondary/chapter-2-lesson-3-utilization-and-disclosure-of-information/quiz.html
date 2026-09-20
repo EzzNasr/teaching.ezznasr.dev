@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 2 Lesson 3 | Utilization and Disclosure of Information Quiz — Ezz Nasr : Teaching</title>
+<meta name="description" content="A quiz on Chapter 2 Lesson 3 | Utilization and Disclosure of Information.">
+<link rel="canonical" href="https://teaching.ezznasr.dev/programming/baccalaureate/grade-1-secondary/chapter-2-lesson-3-utilization-and-disclosure-of-information/quiz.html">
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./base.css">
+<link rel="stylesheet" href="./forms.css">
+<style>
+  :root{ --maxw:720px; }
+  main{ padding:24px 0 64px; }
+
+  /* ---- quiz engine styling ---- */
+  .qz-progress{ font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); letter-spacing:0.04em; margin-bottom:12px; }
+  .qz-question{ font-size:17px; margin:0 0 18px; color:var(--ink); }
+  .qz-question code{ font-family:var(--mono); background:var(--panel-soft); padding:0.1em 0.4em; font-size:0.9em; border:1px solid var(--line); border-radius:4px; }
+  .qz-options{ display:flex; flex-direction:column; gap:9px; }
+  .qz-option{
+    display:flex; align-items:flex-start; gap:10px; text-align:left; width:100%;
+    padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel-soft); color:var(--ink);
+    cursor:pointer; font-size:14.5px; transition:border-color .15s ease, transform .1s ease;
+  }
+  .qz-option:hover:not(:disabled){ border-color:var(--accent); }
+  .qz-option:active:not(:disabled){ transform:scale(0.995); }
+  .qz-option__tag{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); flex-shrink:0; padding-top:2px; }
+  .qz-option:disabled{ cursor:default; }
+  .qz-option--correct{ border-color:var(--status-shipped); }
+  .qz-option--correct .qz-option__tag{ color:var(--status-shipped); }
+  .qz-option--incorrect{ border-color:var(--status-fail); }
+  .qz-option--incorrect .qz-option__tag{ color:var(--status-fail); }
+  .qz-verdict{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); font-family:var(--mono); font-size:13px; }
+  .qz-verdict__tag{ display:inline-block; letter-spacing:0.06em; text-transform:uppercase; font-size:11px; padding:3px 8px; border:1px solid currentColor; border-radius:5px; margin-bottom:8px; }
+  .qz-verdict__tag--pass{ color:var(--status-shipped); }
+  .qz-verdict__tag--fail{ color:var(--status-fail); }
+  .qz-verdict__explain{ display:block; color:var(--ink-dim); font-family:var(--sans); font-size:14.5px; margin-top:4px; }
+  .qz-summary__score{ font-family:var(--mono); font-size:2.2rem; color:var(--accent-strong); margin-bottom:6px; }
+  .qz-retry{ font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; background:transparent; border:1px solid var(--line); border-radius:9px; color:var(--ink-dim); padding:9px 16px; cursor:pointer; transition:border-color .15s ease, color .15s ease; }
+  .qz-retry:hover{ border-color:var(--accent); color:var(--accent-strong); }
+</style>
+</head>
+<body class="track-one">
+
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR <span aria-hidden="true">&middot;</span> TEACHING</a>
+    <nav>
+      <a href="/programming/baccalaureate/grade-1-secondary/chapter-2-lesson-3-utilization-and-disclosure-of-information/" class="back">Back to Chapter 2 Lesson 3 | Utilization and Disclosure of Information</a>
+      <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">&#9789;</span><span class="theme-label"></span></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>Chapter 2 Lesson 3 | Utilization and Disclosure of Information — quiz</h1>
+    <p class="lede">12 questions. Instant feedback.</p>
+  </div>
+
+  <div class="wrap">
+    <div class="media-slot">
+      Video placeholder &mdash; add a YouTube embed URL to replace this box.
+    </div>
+
+    <div id="quiz-root" aria-live="polite"></div>
+  </div>
+</main>
+
+<footer><div class="wrap"><p class="footer-note">teaching.ezznasr.dev/programming/baccalaureate/grade-1-secondary/chapter-2-lesson-3-utilization-and-disclosure-of-information/quiz</p></div></footer>
+
+<script type="application/json" id="quiz-data">
+{
+  "title": "Chapter 2 Lesson 3 | Utilization and Disclosure of Information",
+  "subject": "programming",
+  "lesson": "chapter-2-lesson-3-utilization-and-disclosure-of-information",
+  "questions": [
+    {
+      "id": "g1",
+      "type": "mcq",
+      "prompt": "What two things does copyright aim to balance?",
+      "options": [
+        "Industrial growth and trademark fees",
+        "Creators' fame and government taxes",
+        "Speed of publishing and secrecy",
+        "Fair use of copyrighted works and protection of creators' rights"
+      ],
+      "correct": [
+        3
+      ],
+      "explain": "Copyright balances the fair use of works with the protection of creators' rights, to contribute to cultural development.",
+      "chapter": 2
+    },
+    {
+      "id": "g2",
+      "type": "mcq",
+      "prompt": "Which situation is a legal exception allowing use without the creator's permission?",
+      "options": [
+        "Copying a purchased CD and giving the copies to friends",
+        "Charging admission for a band's K-pop medley",
+        "A teacher reproducing material within a school for classroom teaching",
+        "Selling copies of a freely distributed illustration"
+      ],
+      "correct": [
+        2
+      ],
+      "explain": "Reproduction within educational institutions for classroom teaching is one of the legal exceptions.",
+      "chapter": 2
+    },
+    {
+      "id": "g3",
+      "type": "mcq",
+      "prompt": "What does the private use exception cover?",
+      "options": [
+        "Reproduction for personal, non-commercial use within a limited circle",
+        "Selling copies to a few friends",
+        "Posting a work publicly on social media",
+        "Copying a whole album for a party of strangers"
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "Private use = reproduction for personal, non-commercial use within a limited circle.",
+      "chapter": 2
+    },
+    {
+      "id": "g4",
+      "type": "mcq",
+      "prompt": "Which performance falls under the non-profit exception?",
+      "options": [
+        "A concert where tickets are sold",
+        "A performance where no admission fee is charged and no profit is made",
+        "A performance streamed with paid advertising",
+        "A performance that pays the band"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "The non-profit exception covers performances where no admission fee is charged and no profit is made.",
+      "chapter": 2
+    },
+    {
+      "id": "g5",
+      "type": "mcq",
+      "prompt": "What is a quotation?",
+      "options": [
+        "Copying a whole book to save time",
+        "Rewriting another person's work in your own words",
+        "Selling a copy of another person's work with credit",
+        "Using a portion of another's copyrighted work within your own work without needing the author's permission"
+      ],
+      "correct": [
+        3
+      ],
+      "explain": "A quotation is the use of a portion of another's work within your own work, without permission, when the five rules are met.",
+      "chapter": 2
+    },
+    {
+      "id": "g6",
+      "type": "mcq",
+      "prompt": "Which of the following is NOT one of the five quotation rules?",
+      "options": [
+        "The copyright holder's permission must be obtained first",
+        "The source must be clearly specified",
+        "Quoted material must not be altered",
+        "Quoted material must be clearly identifiable, e.g. with quotation marks"
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "The five rules: your work takes precedence, necessity to quote, clearly identifiable, source specified, and not altered. Permission is not required for a valid quotation.",
+      "chapter": 2
+    },
+    {
+      "id": "g7",
+      "type": "mcq",
+      "prompt": "Ali rewrites part of a quoted paragraph so it fits his argument better. Which quotation rule does he break?",
+      "options": [
+        "Your own work must take precedence",
+        "The source must be specified",
+        "Quoted material must not be altered",
+        "There must be a necessity to quote"
+      ],
+      "correct": [
+        2
+      ],
+      "explain": "Quoted material must not be altered.",
+      "chapter": 2
+    },
+    {
+      "id": "g8",
+      "type": "mcq",
+      "prompt": "What happens when the economic rights of a work expire 50 years after the creator's death?",
+      "options": [
+        "The work is deleted",
+        "The work enters the public domain, so society can build upon it",
+        "The rights pass to the government",
+        "The creator's moral rights begin"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "The timeline ends in the public domain, which lets creators profit during the protection period while eventually allowing society to build upon the work.",
+      "chapter": 2
+    },
+    {
+      "id": "g9",
+      "type": "mcq",
+      "prompt": "What does the Creative Commons NC mark mean?",
+      "options": [
+        "Do not use the work for commercial purposes",
+        "Credit to the creator is required",
+        "Do not alter the original work",
+        "Publish adaptations under the same license"
+      ],
+      "correct": [
+        0
+      ],
+      "explain": "NC = Non-commercial: do not use the work for commercial purposes.",
+      "chapter": 2
+    },
+    {
+      "id": "g10",
+      "type": "mcq",
+      "prompt": "A photographer wants others to display her name and the title, and not to alter her photo. Which Creative Commons marks should she combine?",
+      "options": [
+        "BY + NC",
+        "ND + SA",
+        "BY + ND",
+        "NC + SA"
+      ],
+      "correct": [
+        2
+      ],
+      "explain": "Attribution (BY) requires displaying the creator's name and title; No-Derivatives (ND) forbids altering the work.",
+      "chapter": 2
+    },
+    {
+      "id": "g11",
+      "type": "mcq",
+      "prompt": "What does the Creative Commons SA mark require?",
+      "options": [
+        "Display the creator's name",
+        "Publish adaptations under the same license combination as the original",
+        "Do not alter the original work",
+        "Use for non-commercial purposes only"
+      ],
+      "correct": [
+        1
+      ],
+      "explain": "SA = Share-Alike: adaptations must be published under the same license combination as the original.",
+      "chapter": 2
+    },
+    {
+      "id": "g12",
+      "type": "mcq",
+      "prompt": "No exception applies, the quotation rules are not met, and the work has no Creative Commons license. What should you do?",
+      "options": [
+        "Use it anyway if you give credit",
+        "Use only a small part of it",
+        "Use it if you are not selling it",
+        "Obtain explicit permission from the creator"
+      ],
+      "correct": [
+        3
+      ],
+      "explain": "The lesson's recap says that otherwise you must obtain explicit permission from the creator.",
+      "chapter": 2
+    }
+  ]
+}
+</script>
+<script src="/assets/auth.js"></script>
+<script src="/assets/quiz.js"></script>
+<script>QuizEngine.mount('#quiz-root', '#quiz-data');</script>
+<script>(function(){var slot=document.querySelector('.media-slot');if(!slot)return;var frame=slot.querySelector('iframe');if(!frame)return;var dataEl=document.getElementById('quiz-data');var quiz={};try{quiz=JSON.parse((dataEl&&dataEl.textContent)||'{}');}catch(e){}var key='teaching_last_attempt:'+(quiz.subject||'?')+':'+(quiz.lesson||'?');function done(){try{return !!localStorage.getItem(key);}catch(e){return false;}}var overlay=document.createElement('div');overlay.className='video-lock';overlay.innerHTML='<span class="video-lock__icon" aria-hidden="true">\uD83D\uDD12</span><span class="video-lock__msg">Finish the quiz below to unlock this video.</span>';function lock(){if(slot.contains(overlay))return;slot.classList.add('is-locked');slot.appendChild(overlay);}function unlock(){slot.classList.remove('is-locked');if(slot.contains(overlay))slot.removeChild(overlay);}function sync(){if(done())unlock();else lock();}sync();overlay.addEventListener('click',function(){overlay.classList.add('is-tapped');overlay.classList.remove('shake');void overlay.offsetWidth;overlay.classList.add('shake');});var root=document.getElementById('quiz-root');if(root)new MutationObserver(sync).observe(root,{childList:true,subtree:true});})();</script>
+<script>(function(){var root=document.documentElement,toggle=document.getElementById('theme-toggle'),stored;try{stored=localStorage.getItem('teaching-theme')}catch(e){}var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');function apply(theme){root.setAttribute('data-theme',theme);toggle.setAttribute('aria-pressed',theme==='dark'?'true':'false');toggle.setAttribute('aria-label',theme==='dark'?'Switch to light mode':'Switch to dark mode');toggle.querySelector('.theme-icon').textContent=theme==='dark'?'\u2600':'\u263E';try{localStorage.setItem('teaching-theme',theme)}catch(e){}}apply(initial);toggle.addEventListener('click',function(){apply(root.getAttribute('data-theme')==='dark'?'light':'dark')})})();</script>
+
+</body>
+</html>
