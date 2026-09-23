@@ -9,8 +9,9 @@ sharing a site root and a Drive bridge config:
 2. **Assignment Maker** — bigger multi-line description box, and a
    submission-type dropdown: paste text / link / file upload / link-or-file.
 3. **Attachment Maker** — upload a file straight into your own Drive folder
-   and attach it to a lesson. Students see it embedded/downloadable on the
-   lesson page — never a `drive.google.com` link.
+   and attach it to a lesson. Students see it on the lesson page
+   (preview / open / download); the file is shared as "anyone with the link"
+   and the page links straight to Drive's own viewer.
 
 ## Quick start
 
@@ -49,8 +50,8 @@ Stdlib only (`tkinter`, `urllib`) — no `pip install` needed.
   locally as a fallback if the bridge is unreachable.
 - **Attachment Maker** (new tab): the old lesson page had a static
   "Coming soon" stamp with no way to add files. Now it uploads to a
-  Drive folder you control and the lesson page renders it inline via
-  `attachments.js`, proxied through the same Apps Script Web App.
+  Drive folder you control (through the Apps Script bridge) and the lesson
+  page renders it via `attachments.js`, linking to Drive's own viewer.
 - **Video embeds**: every lesson page (`index.html`, `assignment.html`,
   `quiz.html`) has a shared `media-slot` box. Quiz Maker still controls
   the lesson’s main intro video; Assignment Maker and Quiz Maker each
@@ -62,14 +63,14 @@ Stdlib only (`tkinter`, `urllib`) — no `pip install` needed.
 
 ## What this *isn't*
 
-There's still no admin dashboard to browse submissions or scores in one
-place — they land as timestamped JSON/files in your Drive Submissions
-folder (see `Code.gs`), which you can open normally, or sort/search with
-Drive's own search. If you want a real dashboard later, that's a
-separate, bigger project (e.g. the FastAPI + SQLite approach discussed
-earlier) — this Drive-bridge approach was chosen because it needs no
-server, no hosting bill, and no deployment pipeline, matching where the
-project actually is right now.
+Results live in two places: every quiz attempt and submission is saved as a
+JSON file in Drive (the durable copy) and mirrored as a row in the
+QuizResults / Submissions sheet tabs, which feed `dashboard/student.html`
+and `dashboard/master.html` (the admin view needs `is_admin = TRUE` on your
+row of the Students tab). Login is phone + password with a parent-number
+password reset — see `apps_script/DEPLOY.md`. There's no server or database;
+everything runs on Apps Script + Google Sheets/Drive, so it is sized for a
+class, not for thousands of students.
 
 ## Folder layout
 
@@ -91,5 +92,6 @@ check_asset_drift.py         compares assets_templates/ with the live assets/
 apps_script/
   Code.gs                    the Drive bridge — deploy this once
   DEPLOY.md                  step-by-step deployment
-quiz_maker_config.json       site_root + Drive bridge URL/token (local only)
+quiz_maker_config.json       site_root + Drive bridge URL/token (local only, git-ignored;
+                              copy quiz_maker_config.example.json to create it)
 ```

@@ -1,0 +1,4 @@
+# GitHub Pages builds this repo with Jekyll. Keep the desktop tool (its config,
+# Code.gs and old zips) out of the published website — none of it belongs online.
+exclude:
+  - tools

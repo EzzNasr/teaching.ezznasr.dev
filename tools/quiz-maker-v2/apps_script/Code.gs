@@ -103,6 +103,10 @@
  *   Submissions, name, year, parent_phone, everything else stays as it was.
  * - 5 wrong parent numbers per student locks resets for that student for an
  *   hour (CacheService), so the number can't be guessed by trial and error.
+ * - Login has its own limit: 10 wrong passwords for one account pauses login
+ *   for that account for 30 minutes (CacheService). "Forgot password?" still
+ *   works while login is paused. An admin account that gets locked simply
+ *   waits out the 30 minutes.
  * - Never available for is_admin accounts (fix those by hand in the Sheet),
  *   and not for accounts with no parent_phone on file, or one that's the
  *   student's own number — type the parent's number into the parent_phone
@@ -334,6 +338,10 @@ function _appendByHeader(sheet, rec) {
     return rec.hasOwnProperty(h) && rec[h] !== null && rec[h] !== undefined ? rec[h] : "";
   });
   var r = sheet.getLastRow() + 1;
+  // appendRow() used to add rows on demand; writing straight to getLastRow()+1
+  // does not — it throws once the row is past the sheet's grid (tidySheets()
+  // trims the grid to data + 20 spare rows, and a new sheet only has 1000).
+  if (r > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(), Math.max(50, r - sheet.getMaxRows()));
   _setPlainTextFormats(sheet, r, headers);
   sheet.getRange(r, 1, 1, headers.length).setValues([row]);
   return r;
@@ -687,14 +695,38 @@ function handleRegisterStudent(payload) {
   });
 }
 
+// Wrong-password limit per account. Without it anyone could script thousands of
+// guesses a minute against a phone number (passwords can be as short as 4
+// characters). The attempt is counted BEFORE the password is checked, under a
+// lock, so a burst of parallel guesses can't all slip through on the same
+// count; a correct password clears the counter. "Forgot password?" is not
+// affected, so a locked-out student can still get back in.
+var LOGIN_MAX_FAILS = 10;
+var LOGIN_LOCK_SECONDS = 1800;   // 30 minutes
+
+function _reserveLoginAttempt(phone) {
+  var cache = CacheService.getScriptCache();
+  var key = "lg:" + _phoneKey(phone);
+  _withLock(function () {
+    var fails = parseInt(cache.get(key) || "0", 10);
+    if (fails >= LOGIN_MAX_FAILS) {
+      throw new Error("Too many wrong passwords. Try again in 30 minutes, or tap \"Forgot password?\".");
+    }
+    cache.put(key, String(fails + 1), LOGIN_LOCK_SECONDS);
+  });
+  return key;
+}
+
 function handleLoginStudent(payload) {
   if (!payload.phone || !payload.password_hash) throw new Error("Missing phone or password.");
   var sheet = _students();
   var found = _findStudentRow(sheet, payload.phone);
   if (!found) throw new Error("No account found for that phone number — register first.");
+  var attemptKey = _reserveLoginAttempt(found.phone);
   if (String(found.password_hash) !== String(payload.password_hash)) {
     throw new Error("Incorrect password.");
   }
+  CacheService.getScriptCache().remove(attemptKey);
   // Accounts registered before the session_token column existed won't
   // have one yet — issue it on this login instead of forcing a
   // re-registration.
@@ -773,6 +805,7 @@ function handleResetPassword(payload) {
     var token = Utilities.getUuid();                 // signs out any old sessions
     sheet.getRange(found.row, found.cols.session_token).setValue(token);
     cache.remove(cacheKey);
+    cache.remove("lg:" + _phoneKey(found.phone));  // a successful reset also lifts a login pause
 
     return { ok: true, student_id: _normalizePhone(found.phone), student_name: String(found.display_name == null ? "" : found.display_name),
              session_token: token, year: String(found.year || ""), parent_phone: _restoreLeadingZero(found.parent_phone || ""), is_admin: false };
