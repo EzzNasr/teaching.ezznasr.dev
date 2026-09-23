@@ -305,7 +305,13 @@
       else node.setAttribute(k, attrs[k]);
     });
     (children || []).forEach(function (c) {
-      if (c) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+      // null/undefined/false are skipped; DOM nodes pass through; anything else
+      // (a number such as 0 or 123 that a Sheet cell turned into) is shown as
+      // text instead of throwing inside appendChild.
+      if (c === null || c === undefined || c === false) return;
+      node.appendChild(
+        typeof c === "object" && typeof c.nodeType === "number" ? c : document.createTextNode(String(c))
+      );
     });
     return node;
   }
@@ -327,25 +333,37 @@
     return v === true || String(v).toUpperCase() === "TRUE";
   }
 
+  // Digits only. Arabic-Indic (\u0660-\u0669) and Eastern Arabic-Indic
+  // (\u06F0-\u06F9) digits are converted first (same as Code.gs's _normalizePhone),
+  // so a phone typed on an Arabic keyboard still means the same number.
   function normalizePhone(s) {
-    return String(s || "").replace(/[^0-9]/g, "");
+    return String(s == null ? "" : s)
+      .replace(/[\u0660-\u0669]/g, function (d) { return d.charCodeAt(0) - 0x0660; })
+      .replace(/[\u06F0-\u06F9]/g, function (d) { return d.charCodeAt(0) - 0x06F0; })
+      .replace(/[^0-9]/g, "");
+  }
+
+  // A phone the Sheet stored as a number has lost its leading 0 (1012345678).
+  function displayPhone(v) {
+    var s = String(v == null ? "" : v).trim();
+    return /^1[0125]\d{8}$/.test(s) ? "0" + s : s;
   }
 
   // Mirrors Code.gs's _phonesMatch exactly (see that file for the full
   // rationale). Needed here too, independently — this page never asks
   // the server "does this row belong to this student," it does that join
   // itself against the raw quiz_results/submissions/students arrays
-  // admin_get_all hands back, so a strict-equality mismatch here (a
-  // leading-zero drop, a country-code prefix, a hand-corrected phone)
-  // shows up as exactly what a "0 quizzes" roster row despite real
-  // recorded attempts looks like.
+  // admin_get_all hands back, so a mismatch here (a leading-zero drop, a
+  // country-code prefix, a hand-corrected phone) shows up as exactly what
+  // a "0 quizzes" roster row despite real recorded attempts looks like.
+  // Same rule as the server: identical, or (for 10+ digit numbers) the same
+  // LAST 10 digits. Shorter numbers must match exactly.
   function phonesMatch(a, b) {
     var da = normalizePhone(a), db = normalizePhone(b);
     if (!da || !db) return false;
     if (da === db) return true;
-    var shorter = da.length <= db.length ? da : db;
-    var longer = da.length <= db.length ? db : da;
-    return shorter.length >= 7 && longer.slice(-shorter.length) === shorter;
+    if (da.length < 10 || db.length < 10) return false;
+    return da.slice(-10) === db.slice(-10);
   }
 
   // -- Time display ---------------------------------------------------------
@@ -849,7 +867,17 @@
 
   function matchesSearch(text) {
     if (!STATE.search) return true;
-    return String(text || "").toLowerCase().indexOf(STATE.search.toLowerCase()) !== -1;
+    return String(text == null ? "" : text).toLowerCase().indexOf(STATE.search.toLowerCase()) !== -1;
+  }
+
+  // Search box for phone fields: also matches digits typed with Arabic
+  // numerals, and a number the Sheet stored without its leading 0.
+  function matchesPhoneSearch(value) {
+    if (!STATE.search) return true;
+    if (matchesSearch(value)) return true;
+    var q = normalizePhone(STATE.search);
+    if (!q) return false;
+    return normalizePhone(displayPhone(value)).indexOf(q) !== -1;
   }
 
   // Was a straight object-map keyed by exact normalized phone — replaced
@@ -1222,7 +1250,7 @@
   function renderStudentsSection() {
     var roster = buildRoster(yearScopedStudents(), STATE.quizRows, STATE.subRows).filter(function (r) {
       if (STATE.filterPhone && r.digits !== STATE.filterPhone) return false;
-      if (STATE.search && !(matchesSearch(r.display_name) || matchesSearch(r.phone) || matchesSearch(r.parent_phone))) return false;
+      if (STATE.search && !(matchesSearch(r.display_name) || matchesPhoneSearch(r.phone) || matchesPhoneSearch(r.parent_phone))) return false;
       return true;
     });
     var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Students (" + roster.length + ")"])]);
@@ -1235,8 +1263,8 @@
       section.appendChild(el("div", { class: "dash-row" }, [
         el("div", { class: "dash-row-main" }, [
           el("div", { class: "dash-row-title" }, [r.display_name]),
-          el("div", { class: "dash-row-sub" }, ["Phone " + (r.phone || "\u2014")]),
-          el("div", { class: "dash-row-sub" }, ["Parent " + (r.parent_phone || "not on file")]),
+          el("div", { class: "dash-row-sub" }, ["Phone " + (displayPhone(r.phone) || "\u2014")]),
+          el("div", { class: "dash-row-sub" }, ["Parent " + (displayPhone(r.parent_phone) || "not on file")]),
           r.created_at ? el("div", { class: "dash-row-sub" }, ["Joined " + fmtWhen(r.created_at)]) : null,
         ]),
         el("div", { class: "dash-badge" }, [r.year || "no year on file"]),

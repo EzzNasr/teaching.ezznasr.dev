@@ -108,6 +108,42 @@
  *   student's own number — type the parent's number into the parent_phone
  *   column of that row and the link works for them.
  *
+ * ---- Sheet safety, phone numbers, weekly backup (added) -------------------
+ * - Text columns are stored EXACTLY as typed. Sheets used to reinterpret what
+ *   was written (a name "123" became a number, a parent phone lost its leading
+ *   0, a note starting with "=" became a formula). Every text-like column is
+ *   now forced to Plain Text on write (PLAIN_TEXT_HEADERS), and everything sent
+ *   back out to the site is coerced to text (_cellOut), so old rows that were
+ *   already converted still reach the pages as text.
+ * - The Students tab is found by a remembered tab id (falls back to a tab named
+ *   "Students", then the first tab) — adding or re-ordering tabs no longer
+ *   changes which tab is "Students". Its columns are found by HEADER NAME, so
+ *   inserting or re-ordering columns is safe. A missing core header gives a
+ *   readable error instead of writing into the wrong cell.
+ * - Phone numbers: Arabic-Indic digits are converted, +20 / 0020 / a missing
+ *   leading 0 all mean the same number, and two numbers are "the same person"
+ *   only when their last 10 digits are equal (was: also whenever one number
+ *   was the 7+ digit tail of another, so a short or partial number could
+ *   match a stranger). check_student now returns only the first name.
+ * - weeklyBackup() copies the spreadsheet(s) into a Drive folder and keeps the
+ *   last 4. Run installWeeklyBackupTrigger() once to schedule it.
+ *
+ *   ONE-TIME STEPS after pasting this version (editor -> function dropdown ->
+ *   Run; Apps Script will ask you to authorise the new "triggers" permission):
+ *     1. findPhoneCollisions()        read-only. Run it BEFORE deploying the new
+ *                                     version — it compares the old and new
+ *                                     phone-matching rules on your real data.
+ *     2. auditSheets()                read-only. Lists cells Sheets already
+ *                                     converted (numbers in names, formulas,
+ *                                     phones missing their 0).
+ *     3. setupSheets()                formats the text columns. Safe to re-run.
+ *     4. repairSheets()               backs the spreadsheet up first, then turns
+ *                                     numbers back into text and restores dropped
+ *                                     phone zeros. Formulas / dates are only
+ *                                     listed — fix those by hand.
+ *     5. installWeeklyBackupTrigger() schedules weeklyBackup() (Sundays, ~3am).
+ *   Then Deploy -> Manage deployments -> pencil -> New version.
+ *
  * ---- Redeploying after editing this file --------------------------------
  * Apps Script Web Apps don't auto-update on save. After changing this
  * file: Deploy → Manage deployments → pencil (edit) → Version: "New
@@ -148,6 +184,22 @@ var TZ = "Africa/Cairo";
 // (dates -> Date cells, phone digits -> numbers with the leading 0 lost).
 var TEXT_COLS = { student_id: 1, date: 1, start_time: 1, end_time: 1, submitted_time: 1 };
 var TIME_COLS = { start_time: 1, end_time: 1, submitted_time: 1 };
+
+// Every column whose content must be stored EXACTLY as typed. When a row is
+// written these cells are set to Plain Text first, so Sheets can't turn "123"
+// into a number, "01111111111" into 1111111111, "1/2" into a date, or a note
+// that starts with "=" / "+" / "-" / "@" into a formula. Numeric columns
+// (score, total) and the JSON columns are deliberately NOT listed.
+var PLAIN_TEXT_HEADERS = {
+  // Students
+  phone: 1, password_hash: 1, display_name: 1, created_at: 1, session_token: 1, year: 1, parent_phone: 1,
+  // QuizResults + Submissions
+  student_id: 1, name: 1, subject: 1, lesson: 1, quiz_title: 1, submission_type: 1,
+  text: 1, url: 1, note: 1, file_id: 1, file_name: 1,
+  date: 1, start_time: 1, end_time: 1, submitted_time: 1, dedupe_key: 1,
+};
+// Of those, the ones that hold phone numbers (a leading 0 is easily lost).
+var PHONE_HEADERS = { phone: 1, parent_phone: 1, student_id: 1 };
 
 function _fmt(d, tz, withTime) {
   return Utilities.formatDate(d, tz, withTime ? "yyyy-MM-dd HH:mm:ss" : "yyyy-MM-dd");
@@ -270,8 +322,9 @@ function _headerIndex(sheet) {
   return idx;
 }
 
-// Writes one row by header NAME (so column order never matters), with the
-// TEXT_COLS cells forced to Plain Text first.
+// Writes one row by header NAME (so column order never matters), with every
+// PLAIN_TEXT_HEADERS cell forced to Plain Text first (one API call, whatever
+// the column count). Returns the 1-based row number it wrote.
 function _appendByHeader(sheet, rec) {
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   var seenH = {};
@@ -281,11 +334,29 @@ function _appendByHeader(sheet, rec) {
     return rec.hasOwnProperty(h) && rec[h] !== null && rec[h] !== undefined ? rec[h] : "";
   });
   var r = sheet.getLastRow() + 1;
-  var fmtSeen = {};
-  headers.forEach(function (h, i) {
-    if (TEXT_COLS[h] && !fmtSeen[h]) { fmtSeen[h] = true; sheet.getRange(r, i + 1).setNumberFormat("@"); }
-  });
+  _setPlainTextFormats(sheet, r, headers);
   sheet.getRange(r, 1, 1, headers.length).setValues([row]);
+  return r;
+}
+
+// Forces the PLAIN_TEXT_HEADERS cells of one row to Plain Text ("@") in a
+// single call, BEFORE a value is written into them.
+function _setPlainTextFormats(sheet, row, headers) {
+  var cells = [], seen = {};
+  headers.forEach(function (h, i) {
+    if (PLAIN_TEXT_HEADERS[h] && !seen[h]) { seen[h] = true; cells.push(_colLetter(i + 1) + row); }
+  });
+  if (cells.length) sheet.getRangeList(cells).setNumberFormat("@");
+}
+
+function _colLetter(n) {
+  var s = "";
+  while (n > 0) {
+    var m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
 }
 
 // Keys already stored in the sheet's dedupe_key column, as a lookup set.
@@ -329,7 +400,10 @@ function _anySeen(seen, keys) {
 
 // One cell coming OUT to the dashboards. Date cells (Sheets auto-converted
 // them at some point) become readable Cairo text instead of a JSON ISO
-// timestamp; ISO strings in time columns get the same treatment.
+// timestamp; ISO strings in time columns get the same treatment. Text columns
+// always leave as TEXT, even if Sheets turned the value into a number: a name
+// typed as "123" reaches the site as "123", not the number 123 (which used to
+// crash the sign-in widget), and a phone that lost its leading 0 gets it back.
 function _cellOut(header, v, sheetTz) {
   if (v instanceof Date) {
     if (header === "date") return _fmt(v, sheetTz, false);
@@ -337,6 +411,10 @@ function _cellOut(header, v, sheetTz) {
     return _fmt(v, TZ, true);
   }
   if (typeof v === "string" && TIME_COLS[header]) return _cairoTime(v);
+  if (PLAIN_TEXT_HEADERS[header] && (typeof v === "number" || typeof v === "boolean")) {
+    return PHONE_HEADERS[header] ? _restoreLeadingZero(String(v)) : String(v);
+  }
+  if (PHONE_HEADERS[header] && typeof v === "string") return _restoreLeadingZero(v.trim());
   return v;
 }
 
@@ -358,20 +436,41 @@ function _sheetValuesAsObjects(sheet) {
   });
 }
 
+// The Students tab. Found by a remembered tab id, NOT by position, so adding or
+// re-ordering tabs in the spreadsheet can't change which tab is "Students".
+// First use pins it: the tab named "Students" if there is one, otherwise the
+// first tab (what older versions always used). If the pinned tab has been
+// deleted we stop with a clear message rather than silently guess another tab.
+function _studentsSheet() {
+  var ss = _ss();
+  var sheets = ss.getSheets();
+  var props = _props();
+  var pin = props.getProperty("STUDENTS_TAB_PIN") || "";   // "<spreadsheet id>|<tab id>"
+  var parts = pin.split("|");
+  if (parts.length === 2 && parts[0] === ss.getId()) {
+    for (var i = 0; i < sheets.length; i++) {
+      if (String(sheets[i].getSheetId()) === parts[1]) return sheets[i];
+    }
+    throw new Error("The Students tab is missing from the spreadsheet (it may have been deleted or moved). " +
+      "Restore it from a backup, or clear the STUDENTS_TAB_PIN script property to pick a tab again.");
+  }
+  var sheet = ss.getSheetByName("Students") || sheets[0];
+  props.setProperty("STUDENTS_TAB_PIN", ss.getId() + "|" + sheet.getSheetId());
+  return sheet;
+}
+
+// Reading/writing the Students tab. The header row is created on first use,
+// and any of the later-added columns are appended if the tab predates them.
+// Nothing here formats cells any more — that used to re-format the ENTIRE
+// phone column on every request. Formatting is done by setupSheets() (once)
+// and per row by _appendByHeader() when a row is written.
 function _students() {
-  var sheet = _ss().getSheets()[0];
+  var sheet = _studentsSheet();
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(["phone", "password_hash", "display_name", "created_at", "session_token", "is_admin", "year", "parent_phone"]);
   } else {
     _ensureStudentColumns(sheet);
   }
-  // Force the phone column to Plain Text. Without this, Sheets treats a
-  // typed number like "01275001758" as numeric and silently drops the
-  // leading zero, which then permanently mismatches every future
-  // check_student/login_student lookup for that student. This only
-  // prevents it going forward — a phone already stored numeric needs a
-  // one-time manual fix (reformat the column, then retype that cell).
-  sheet.getRange(1, 1, Math.max(sheet.getMaxRows(), 2), 1).setNumberFormat("@");
   return sheet;
 }
 
@@ -392,27 +491,84 @@ function _ensureStudentColumns(sheet) {
   });
 }
 
-// Lenient match key: strips everything but digits so "010 123 4567",
-// "010-123-4567", and "0101234567" all land on the same student — the
-// stored phone column keeps whatever the student actually typed.
-function _normalizePhone(s) {
-  return String(s || "").replace(/[^0-9]/g, "");
+// Header name -> 1-based column number for the Students tab, so nothing depends
+// on column ORDER (you can insert a "Notes" column, or drag columns around).
+// A missing core header is a readable error, never a silent write to the wrong cell.
+var STUDENT_CORE_COLS = ["phone", "password_hash", "display_name", "session_token"];
+
+function _studentCols(headers) {
+  var c = {};
+  headers.forEach(function (h, i) {
+    h = String(h).trim();
+    if (h !== "" && !c.hasOwnProperty(h)) c[h] = i + 1;     // first occurrence wins
+  });
+  STUDENT_CORE_COLS.forEach(function (n) {
+    if (!c[n]) {
+      throw new Error('The Students sheet is missing the "' + n + '" column (renamed or deleted?). ' +
+        "Restore it from a backup or put the header back.");
+    }
+  });
+  return c;
 }
 
-// Two phone-derived digit strings are considered the same number if
-// they're identical, OR if the shorter is a trailing suffix of the
-// longer (7+ digits shared) — this is what actually makes a lookup
-// survive a leading-zero drop (a known Sheets auto-formatting bug, see
-// _students() below), a country-code prefix ("+20..." vs "0..."), or a
-// phone number hand-corrected in the Sheet after some QuizResults/
-// Submissions rows were already written with the old digits baked in.
-// Comparing with strict equality (the old behavior) meant any of those
-// permanently orphaned a student's own historical rows from every
-// lookup that mattered — their own dashboard, the roster's per-student
-// counts, everything. The 7-digit floor keeps this from ever matching
-// two genuinely different, unrelated numbers on a short coincidental
-// trailing fragment.
+function _isTruthyFlag(v) {
+  return v === true || String(v).toUpperCase() === "TRUE";
+}
+
+// -- Phone numbers -------------------------------------------------------------
+// Digits only. Arabic-Indic (٠-٩) and Eastern Arabic-Indic (۰-۹) digits are
+// converted to 0-9 first: a student on an Arabic keyboard types the former, and
+// stripping "everything that isn't 0-9" used to leave them with no number at all.
+// The stored phone column keeps whatever the student typed, so this is only
+// the lenient match key. Mirrored by normalizeDigits() in auth.js.
+function _normalizePhone(s) {
+  return String(s == null ? "" : s)
+    .replace(/[\u0660-\u0669]/g, function (d) { return d.charCodeAt(0) - 0x0660; })
+    .replace(/[\u06F0-\u06F9]/g, function (d) { return d.charCodeAt(0) - 0x06F0; })
+    .replace(/[^0-9]/g, "");
+}
+
+// The one canonical form we STORE for an Egyptian mobile: 01XXXXXXXXX.
+// "+20 101 234 5678", "0020 1012345678", "201012345678", "+2001012345678" and
+// "1012345678" (leading 0 lost) all become "01012345678". Anything that doesn't
+// look like an Egyptian mobile (a landline, a foreign number) is returned as
+// plain digits, unchanged. Mirrored by canonicalPhone() in auth.js.
+function _canonicalPhone(s) {
+  var d = _normalizePhone(s);
+  var m = /^(?:0020|20)(0?1\d{9})$/.exec(d);
+  if (m) d = m[1];
+  if (/^1[0125]\d{8}$/.test(d)) d = "0" + d;
+  return d;
+}
+
+// An Egyptian mobile stored as a number loses its leading 0 (1012345678).
+function _restoreLeadingZero(s) {
+  var t = String(s);
+  return /^1[0125]\d{8}$/.test(t) ? "0" + t : t;
+}
+
+function _firstName(n) {
+  return String(n == null ? "" : n).trim().split(/\s+/)[0] || "";
+}
+
+// Two phone numbers are the same student when they are identical, or — for
+// numbers of 10+ digits — when their LAST 10 digits are equal. That still
+// survives the leading-0 drop ("1012345678" vs "01012345678") and a country
+// code ("+20…" vs "0…"). A short or partial number (7-9 digits) that merely
+// happens to be the tail of someone else's number is no longer treated as
+// that person (the old rule did, so a typo could open a stranger's account
+// page). Shorter numbers from older accounts must match exactly.
 function _phonesMatch(a, b) {
+  var da = _normalizePhone(a), db = _normalizePhone(b);
+  if (!da || !db) return false;
+  if (da === db) return true;
+  if (da.length < 10 || db.length < 10) return false;
+  return da.slice(-10) === db.slice(-10);
+}
+
+// The OLD rule (identical, or one number is the 7+ digit tail of the other). Kept ONLY so
+// findPhoneCollisions() can show what changes on your real data.
+function _phonesMatchLegacy(a, b) {
   var da = _normalizePhone(a), db = _normalizePhone(b);
   if (!da || !db) return false;
   if (da === db) return true;
@@ -421,25 +577,31 @@ function _phonesMatch(a, b) {
   return shorter.length >= 7 && longer.slice(-shorter.length) === shorter;
 }
 
-// Returns {row, phone, password_hash, display_name, created_at,
-// session_token, is_admin} for the first matching row (1-indexed, header
-// is row 1), or null.
+// Returns {row, cols, phone, password_hash, display_name, created_at,
+// session_token, is_admin, year, parent_phone} for the first matching row
+// (1-indexed, header is row 1), or null. `cols` is the header -> column map, so
+// callers write with found.cols.password_hash, never a hard-coded number.
 function _findStudentRow(sheet, phone) {
   var target = _normalizePhone(phone);
   if (!target) return null;
   var values = sheet.getDataRange().getValues();
+  if (!values.length) return null;
+  var c = _studentCols(values[0]);
   for (var i = 1; i < values.length; i++) {
-    if (_phonesMatch(values[i][0], target)) {
+    if (_phonesMatch(values[i][c.phone - 1], target)) {
+      var row = values[i];
+      var get = function (name) { return c[name] ? row[c[name] - 1] : ""; };
       return {
         row: i + 1,
-        phone: values[i][0],
-        password_hash: values[i][1],
-        display_name: values[i][2],
-        created_at: values[i][3],
-        session_token: values[i][4] || null,
-        is_admin: values[i][5] === true || String(values[i][5]).toUpperCase() === "TRUE",
-        year: values[i][6] || null,
-        parent_phone: values[i][7] || null,
+        cols: c,
+        phone: get("phone"),
+        password_hash: get("password_hash"),
+        display_name: get("display_name"),
+        created_at: get("created_at"),
+        session_token: get("session_token") || null,
+        is_admin: _isTruthyFlag(get("is_admin")),
+        year: get("year") || null,
+        parent_phone: get("parent_phone") || null,
       };
     }
   }
@@ -456,10 +618,11 @@ function _findStudentRow(sheet, phone) {
 function _requireStudentSession(payload) {
   if (!payload.student_id || !payload.session_token) throw new Error("Missing session.");
   var values = _students().getDataRange().getValues();
+  var c = _studentCols(values[0]);
   var target = _normalizePhone(payload.student_id);
   for (var i = 1; i < values.length; i++) {
-    if (_phonesMatch(values[i][0], target)) {
-      if (String(values[i][4]) === String(payload.session_token)) return true;
+    if (_phonesMatch(values[i][c.phone - 1], target)) {
+      if (String(values[i][c.session_token - 1]) === String(payload.session_token)) return true;
       throw new Error("Session expired or invalid — please log in again.");
     }
   }
@@ -469,45 +632,59 @@ function _requireStudentSession(payload) {
 function _requireAdminSession(payload) {
   if (!payload.student_id || !payload.session_token) throw new Error("Missing session.");
   var values = _students().getDataRange().getValues();
+  var c = _studentCols(values[0]);
   var target = _normalizePhone(payload.student_id);
   for (var i = 1; i < values.length; i++) {
-    if (_phonesMatch(values[i][0], target)) {
-      var isAdmin = values[i][5] === true || String(values[i][5]).toUpperCase() === "TRUE";
-      if (String(values[i][4]) === String(payload.session_token) && isAdmin) return true;
+    if (_phonesMatch(values[i][c.phone - 1], target)) {
+      var isAdmin = c.is_admin ? _isTruthyFlag(values[i][c.is_admin - 1]) : false;
+      if (String(values[i][c.session_token - 1]) === String(payload.session_token) && isAdmin) return true;
       throw new Error("Not authorized.");
     }
   }
   throw new Error("Not authorized.");
 }
 
+// Returns only the FIRST name: a mistyped digit that lands on a real classmate
+// then shows "Welcome back, Sara" (easy to notice: "Not you?") instead of
+// handing the full name of a stranger to anyone who types a number.
 function handleCheckStudent(payload) {
   if (!payload.phone) throw new Error("Missing phone number.");
   var sheet = _students();
   var found = _findStudentRow(sheet, payload.phone);
-  return { ok: true, known: !!found, display_name: found ? found.display_name : null };
+  return { ok: true, known: !!found, display_name: found ? _firstName(found.display_name) : null };
 }
 
 function handleRegisterStudent(payload) {
   if (!payload.phone || !payload.password_hash) throw new Error("Missing phone or password.");
-  var sheet = _students();
-  var existing = _findStudentRow(sheet, payload.phone);
-  if (existing) throw new Error("An account with that phone number already exists — log in instead.");
-  var phone = String(payload.phone).trim();
-  var displayName = String(payload.display_name || phone).trim();
-  // Cairo local time, not UTC — new Date().toISOString() is always UTC.
-  var createdAt = Utilities.formatDate(new Date(), "Africa/Cairo", "yyyy-MM-dd HH:mm:ss");
-  var token = Utilities.getUuid();
-  // year ("Senior 1" / "Senior 2") and parent_phone are both asked at
-  // registration only, never at login — neither required here so a stale
-  // cached auth.js mid-rollout can still register students, just without
-  // these on file yet.
-  var year = payload.year || "";
-  var parentPhone = payload.parent_phone || "";
-  sheet.appendRow([phone, payload.password_hash, displayName, createdAt, token, "", year, parentPhone]);
-  // is_admin is always false on a fresh registration — the flag can only
-  // ever be set by hand, directly in the Sheet (see the setup comment at
-  // the top of this file), never through any web-facing action.
-  return { ok: true, student_id: _normalizePhone(phone), student_name: displayName, session_token: token, year: year, parent_phone: parentPhone, is_admin: false };
+  // Locked: the row is written by header name at "last row + 1", so two
+  // registrations arriving together must not pick the same row (and a
+  // double-tap must not create two accounts).
+  return _withLock(function () {
+    var sheet = _students();
+    var existing = _findStudentRow(sheet, payload.phone);
+    if (existing) throw new Error("An account with that phone number already exists — log in instead.");
+    var phone = _canonicalPhone(payload.phone) || String(payload.phone).trim();
+    var displayName = String(payload.display_name || phone).trim();
+    // Cairo local time, not UTC — new Date().toISOString() is always UTC.
+    var createdAt = Utilities.formatDate(new Date(), "Africa/Cairo", "yyyy-MM-dd HH:mm:ss");
+    var token = Utilities.getUuid();
+    // year ("Senior 1" / "Senior 2") and parent_phone are both asked at
+    // registration only, never at login — neither required here so a stale
+    // cached auth.js mid-rollout can still register students, just without
+    // these on file yet.
+    var year = String(payload.year || "");
+    var parentPhone = payload.parent_phone ? (_canonicalPhone(payload.parent_phone) || String(payload.parent_phone).trim()) : "";
+    // Written by header name with text formatting applied first, so a name
+    // like "123" or a phone with a leading 0 is stored exactly as typed.
+    // is_admin is always blank on a fresh registration — the flag can only
+    // ever be set by hand, directly in the Sheet (see the setup comment at
+    // the top of this file), never through any web-facing action.
+    _appendByHeader(sheet, {
+      phone: phone, password_hash: payload.password_hash, display_name: displayName,
+      created_at: createdAt, session_token: token, is_admin: "", year: year, parent_phone: parentPhone,
+    });
+    return { ok: true, student_id: _normalizePhone(phone), student_name: displayName, session_token: token, year: year, parent_phone: parentPhone, is_admin: false };
+  });
 }
 
 function handleLoginStudent(payload) {
@@ -524,9 +701,11 @@ function handleLoginStudent(payload) {
   var token = found.session_token;
   if (!token) {
     token = Utilities.getUuid();
-    sheet.getRange(found.row, 5).setValue(token);
+    sheet.getRange(found.row, found.cols.session_token).setValue(token);
   }
-  return { ok: true, student_id: _normalizePhone(found.phone), student_name: found.display_name, session_token: token, year: found.year || "", parent_phone: found.parent_phone || "", is_admin: !!found.is_admin };
+  // student_name is ALWAYS text — a name Sheets had turned into a number
+  // ("123") used to reach the browser as a number and crash the widget.
+  return { ok: true, student_id: _normalizePhone(found.phone), student_name: String(found.display_name == null ? "" : found.display_name), session_token: token, year: String(found.year || ""), parent_phone: _restoreLeadingZero(found.parent_phone || ""), is_admin: !!found.is_admin };
 }
 
 // Backfills year/parent_phone for accounts that predate those columns (or
@@ -540,18 +719,19 @@ function handleUpdateProfile(payload) {
   var sheet = _students();
   var found = _findStudentRow(sheet, payload.student_id);
   if (!found) throw new Error("No matching student.");
-  sheet.getRange(found.row, 7).setValue(payload.year);
-  sheet.getRange(found.row, 8).setValue(payload.parent_phone);
-  return { ok: true, year: payload.year, parent_phone: payload.parent_phone };
+  var parentPhone = _canonicalPhone(payload.parent_phone) || String(payload.parent_phone).trim();
+  sheet.getRange(found.row, found.cols.year).setNumberFormat("@").setValue(String(payload.year));
+  sheet.getRange(found.row, found.cols.parent_phone).setNumberFormat("@").setValue(parentPhone);
+  return { ok: true, year: String(payload.year), parent_phone: parentPhone };
 }
 
 // -- Password reset, verified by the parent's phone number -------------------
 // Interim "forgot password" flow (no email/SMS to pay for): the student
 // re-types the parent number they registered with, plus a new password
 // (hashed in the browser, same as register/login). Changes ONLY the
-// password_hash cell (col 2) and rotates session_token (col 5) so any old
-// signed-in session is dropped. Nothing else on the row, and nothing in
-// QuizResults/Submissions, is touched.
+// password_hash cell and rotates session_token so any old signed-in session
+// is dropped. Nothing else on the row, and nothing in QuizResults/Submissions,
+// is touched.
 var RESET_MAX_FAILS = 5;        // wrong parent numbers allowed per student...
 var RESET_LOCK_SECONDS = 3600;  // ...before resets for that student pause for an hour
 
@@ -589,13 +769,13 @@ function handleResetPassword(payload) {
       throw new Error("Phone number and parent number don't match.");
     }
 
-    sheet.getRange(found.row, 2).setNumberFormat("@").setValue(String(payload.new_password_hash));
+    sheet.getRange(found.row, found.cols.password_hash).setNumberFormat("@").setValue(String(payload.new_password_hash));
     var token = Utilities.getUuid();                 // signs out any old sessions
-    sheet.getRange(found.row, 5).setValue(token);
+    sheet.getRange(found.row, found.cols.session_token).setValue(token);
     cache.remove(cacheKey);
 
-    return { ok: true, student_id: _normalizePhone(found.phone), student_name: found.display_name,
-             session_token: token, year: found.year || "", parent_phone: found.parent_phone || "", is_admin: false };
+    return { ok: true, student_id: _normalizePhone(found.phone), student_name: String(found.display_name == null ? "" : found.display_name),
+             session_token: token, year: String(found.year || ""), parent_phone: _restoreLeadingZero(found.parent_phone || ""), is_admin: false };
   });
 }
 
@@ -1188,4 +1368,212 @@ function fixEverything() {
   restoreLast30Days();
   _cleanSheets(true, true);
   tidySheets();
+}
+
+// ============================================================================
+// Sheet safety tools — run from the editor (function dropdown -> Run).
+// ============================================================================
+
+// Formats every text-like column of the three tabs as Plain Text (whole column,
+// including future rows). Safe to run again any time. Existing cell VALUES are
+// not changed — use auditSheets() then repairSheets() for those.
+function setupSheets() {
+  var done = [];
+  [["Students", _students()], ["QuizResults", _quizResultsSheet()], ["Submissions", _submissionsSheet()]].forEach(function (p) {
+    done.push(p[0] + ": " + _formatTextColumns(p[1]) + " text columns");
+  });
+  Logger.log("setupSheets: " + done.join(" | "));
+}
+
+function _formatTextColumns(sheet) {
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return 0;
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var rows = Math.max(sheet.getMaxRows() - 1, 1);
+  var n = 0, seen = {};
+  headers.forEach(function (h, i) {
+    if (PLAIN_TEXT_HEADERS[h] && !seen[h]) {
+      seen[h] = true;
+      sheet.getRange(2, i + 1, rows, 1).setNumberFormat("@");
+      n++;
+    }
+  });
+  return n;
+}
+
+// Visits every data cell of every text column that should hold plain text.
+// (Date/time columns are skipped — those legitimately hold Date cells in old
+// rows and _cellOut already turns them into text on the way out.)
+function _scanTextColumns(sheet, visit) {
+  var lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return;
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var seen = {};
+  headers.forEach(function (h, i) {
+    if (!PLAIN_TEXT_HEADERS[h] || TIME_COLS[h] || h === "date" || h === "created_at" || seen[h]) return;
+    seen[h] = true;
+    var rng = sheet.getRange(2, i + 1, lastRow - 1, 1);
+    var vals = rng.getValues(), forms = rng.getFormulas();
+    for (var r = 0; r < vals.length; r++) visit(r + 2, i + 1, h, vals[r][0], forms[r][0]);
+  });
+}
+
+// What (if anything) is wrong with one cell, and — when it can be fixed safely
+// — what text it should hold.
+function _classifyCell(header, v, formula) {
+  if (formula) return { kind: "formula", value: formula };
+  if (v instanceof Date) return { kind: "date", value: _fmt(v, TZ, true) };
+  if (typeof v === "number") {
+    var t = PHONE_HEADERS[header] ? _restoreLeadingZero(String(v)) : String(v);
+    return { kind: "number", value: v, fix: t };
+  }
+  if (PHONE_HEADERS[header] && typeof v === "string" && /^1[0125]\d{8}$/.test(v.trim())) {
+    return { kind: "phone-missing-0", value: v, fix: "0" + v.trim() };
+  }
+  return null;
+}
+
+function _auditAll() {
+  var found = [];
+  [["Students", _students()], ["QuizResults", _quizResultsSheet()], ["Submissions", _submissionsSheet()]].forEach(function (p) {
+    _scanTextColumns(p[1], function (row, col, header, v, f) {
+      var bad = _classifyCell(header, v, f);
+      if (bad) found.push({ tab: p[0], sheet: p[1], row: row, col: col, header: header, kind: bad.kind, value: bad.value, fix: bad.fix });
+    });
+  });
+  return found;
+}
+
+// READ-ONLY. Lists text cells Sheets already converted: numbers where text
+// should be (a name "123"), phones missing their leading 0, formulas (a note
+// that started with "="), dates (a name like "1/2").
+function auditSheets() {
+  var found = _auditAll();
+  var counts = {};
+  found.forEach(function (x) { counts[x.kind] = (counts[x.kind] || 0) + 1; });
+  var lines = found.slice(0, 150).map(function (x) {
+    return x.tab + " row " + x.row + " [" + x.header + "] " + x.kind + ": " + String(x.value).slice(0, 60) +
+      (x.fix !== undefined ? "   -> repairSheets() will make it \"" + x.fix + "\"" : "   -> fix by hand");
+  });
+  Logger.log("auditSheets: " + found.length + " suspicious cell(s) " + JSON.stringify(counts) + "\n" + lines.join("\n") +
+    (found.length > 150 ? "\n… and " + (found.length - 150) + " more" : ""));
+  return found.length;
+}
+
+// Copies the spreadsheet(s) to Drive first, formats the text columns, then turns
+// numbers back into text and restores dropped phone zeros. Formulas and dates
+// are NOT touched (their original text can't be recovered) — auditSheets()
+// lists them so you can retype them by hand. Note a number that lost leading
+// zeros of its own (a name "007" stored as 7) can't be recovered either.
+function repairSheets() {
+  var ids = {};
+  ids[_ss().getId()] = "Students";
+  var dataId = _props().getProperty("DATA_SHEET_ID");
+  if (dataId) ids[dataId] = "Quiz data";
+  Object.keys(ids).forEach(function (id) {
+    var name = "Backup before repairSheets - " + ids[id] + " - " + _fmt(new Date(), TZ, true);
+    DriveApp.getFileById(id).makeCopy(name);
+    Logger.log("Backup created: " + name);
+  });
+  setupSheets();
+  var fixed = 0, manual = 0;
+  _auditAll().forEach(function (x) {
+    if (x.fix === undefined) { manual++; return; }
+    x.sheet.getRange(x.row, x.col).setNumberFormat("@").setValue(x.fix);
+    fixed++;
+  });
+  Logger.log("repairSheets: repaired " + fixed + " cell(s); " + manual + " formula/date cell(s) need fixing by hand (see auditSheets).");
+}
+
+// READ-ONLY. Shows what the new phone-matching rule (same last 10 digits)
+// changes on your real data compared with the old one (any shared 7-digit
+// tail). Run it BEFORE deploying the new version:
+//   - DUPLICATE ACCOUNT      two Students rows are the same number under both rules.
+//   - SHARED TAIL ONLY       a shorter number that is the tail of another student's
+//                            number — the OLD rule treated them as one person.
+//   - WOULD BECOME ORPHANED  quiz/submission rows whose student_id matched a
+//                            student before but would match nobody now. Fix the
+//                            student_id or the Students phone by hand first.
+function findPhoneCollisions() {
+  var sheet = _students();
+  var values = sheet.getDataRange().getValues();
+  var c = _studentCols(values[0]);
+  var studs = [];
+  for (var i = 1; i < values.length; i++) {
+    var p = values[i][c.phone - 1];
+    if (_normalizePhone(p)) studs.push({ row: i + 1, phone: String(p), name: String(values[i][c.display_name - 1]) });
+  }
+  var out = [], dup = 0, tail = 0, orphan = 0, unmatched = 0;
+
+  for (var a = 0; a < studs.length; a++) {
+    for (var b = a + 1; b < studs.length; b++) {
+      var nowM = _phonesMatch(studs[a].phone, studs[b].phone);
+      var oldM = _phonesMatchLegacy(studs[a].phone, studs[b].phone);
+      if (nowM) { dup++; out.push("DUPLICATE ACCOUNT: rows " + studs[a].row + " (" + studs[a].name + ") and " + studs[b].row + " (" + studs[b].name + ") — " + studs[a].phone + " / " + studs[b].phone); }
+      else if (oldM) { tail++; out.push("SHARED TAIL ONLY: rows " + studs[a].row + " (" + studs[a].name + ") and " + studs[b].row + " (" + studs[b].name + ") — " + studs[a].phone + " / " + studs[b].phone + " (now kept apart)"); }
+    }
+  }
+
+  var ids = {};
+  _sheetValuesAsObjects(_quizResultsSheet()).forEach(function (r) { if (r.student_id) ids[String(r.student_id)] = "QuizResults"; });
+  _sheetValuesAsObjects(_submissionsSheet()).forEach(function (r) { if (r.student_id) ids[String(r.student_id)] = (ids[String(r.student_id)] ? ids[String(r.student_id)] + "+" : "") + "Submissions"; });
+  Object.keys(ids).forEach(function (id) {
+    var before = studs.filter(function (s) { return _phonesMatchLegacy(s.phone, id); });
+    var after = studs.filter(function (s) { return _phonesMatch(s.phone, id); });
+    if (before.length && !after.length) { orphan++; out.push("WOULD BECOME ORPHANED: student_id " + id + " (" + ids[id] + ") matched " + before[0].name + " (row " + before[0].row + ") before, matches nobody now"); }
+    else if (!before.length && !after.length) { unmatched++; }
+  });
+
+  Logger.log("findPhoneCollisions: " + studs.length + " students | " + dup + " duplicate account(s) | " + tail +
+    " shared-tail pair(s) | " + orphan + " would-be orphan id(s) | " + unmatched + " id(s) with no student at all (already orphaned)\n" +
+    (out.length ? out.join("\n") : "Nothing to fix — the new rule is safe for your data."));
+}
+
+// ---- Weekly backup ----------------------------------------------------------
+// weeklyBackup() copies the Students spreadsheet (and the separate quiz-data
+// spreadsheet, if DATA_SHEET_ID is set) into one Drive folder and keeps the
+// newest BACKUP_KEEP copies of each. installWeeklyBackupTrigger() schedules it.
+var BACKUP_KEEP = 4;
+
+function _backupFolder() {
+  var id = _props().getProperty("BACKUPS_FOLDER_ID");
+  if (id) {
+    try { return DriveApp.getFolderById(id); } catch (e) { /* folder was deleted — make a new one */ }
+  }
+  var folder = DriveApp.createFolder("Teaching / Backups (automatic)");
+  _props().setProperty("BACKUPS_FOLDER_ID", folder.getId());
+  return folder;
+}
+
+function weeklyBackup() {
+  var folder = _backupFolder();
+  var stamp = _fmt(new Date(), TZ, false);
+  var sources = [["Students", _props().getProperty("STUDENTS_SHEET_ID")], ["Quiz data", _props().getProperty("DATA_SHEET_ID")]];
+  sources.forEach(function (s) {
+    if (!s[1]) return;
+    var prefix = "Weekly backup - " + s[0] + " - ";
+    DriveApp.getFileById(s[1]).makeCopy(prefix + stamp, folder);
+    _pruneBackups(folder, prefix, BACKUP_KEEP);
+  });
+  Logger.log("weeklyBackup: done (" + stamp + ")");
+}
+
+// Trashes all but the newest `keep` files whose name starts with `prefix` —
+// only files THIS function makes (by name), never anything else in the folder.
+function _pruneBackups(folder, prefix, keep) {
+  var files = [], it = folder.getFiles();
+  while (it.hasNext()) {
+    var f = it.next();
+    if (f.getName().indexOf(prefix) === 0) files.push(f);
+  }
+  files.sort(function (a, b) { return b.getDateCreated().getTime() - a.getDateCreated().getTime(); });
+  files.slice(keep).forEach(function (f) { f.setTrashed(true); });
+}
+
+function installWeeklyBackupTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === "weeklyBackup") ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger("weeklyBackup").timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(3).create();
+  Logger.log("Weekly backup scheduled: Sundays around 03:00 (script time zone). Keeps the last " + BACKUP_KEEP + " copies.");
 }

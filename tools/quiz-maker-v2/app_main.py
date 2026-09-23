@@ -205,6 +205,21 @@ class App(tk.Tk):
                                         "No Web App URL set — synced assets will have URL/File submission "
                                         "and attachment embeds disabled until you configure it.\n\nSync anyway?"):
                 return
+        # Sync overwrites assets/ from assets_templates/. If a live file was
+        # edited directly (not in its template) that edit would be lost, so
+        # say which files will really change and let the user stop first.
+        changes = common.preview_site_assets_changes(site_root, drive_cfg["web_app_url"])
+        replaced = [c for c in changes if c[1] == "changed"]
+        if replaced:
+            listing = "\n".join("  {}   (+{} / -{} lines)".format(n, a, r) for n, _s, a, r in replaced)
+            if not messagebox.askyesno(
+                    "Replace live files?",
+                    "These files in assets/ differ from the versions in assets_templates/ and will be "
+                    "REPLACED by the template versions:\n\n" + listing + "\n\n"
+                    "If you edited any of them directly in assets/ instead of in assets_templates/, "
+                    "that edit will be lost. (Run  python check_asset_drift.py  to see the differences.)\n\n"
+                    "Continue?"):
+                return
         written = common.sync_site_assets(site_root, drive_cfg["web_app_url"])
         self.status_var.set("Synced: " + ", ".join(os.path.basename(p) for p in written))
         messagebox.showinfo("Synced", "Updated:\n" + "\n".join(written))

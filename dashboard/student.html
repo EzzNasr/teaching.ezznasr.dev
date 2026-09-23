@@ -260,7 +260,13 @@
       else node.setAttribute(k, attrs[k]);
     });
     (children || []).forEach(function (c) {
-      if (c) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+      // null/undefined/false are skipped; DOM nodes pass through; anything else
+      // (a number such as 0 or 123 that a Sheet cell turned into) is shown as
+      // text instead of throwing inside appendChild.
+      if (c === null || c === undefined || c === false) return;
+      node.appendChild(
+        typeof c === "object" && typeof c.nodeType === "number" ? c : document.createTextNode(String(c))
+      );
     });
     return node;
   }
@@ -349,7 +355,14 @@
   // -- Duplicate / blank row handling ---------------------------------------
   function phoneKey(s) { return normalizePhone(s).slice(-10); }
   function isBlankRow(r) { return !normalizePhone(r.student_id) && !r.lesson; }
-  function normalizePhone(s) { return String(s || "").replace(/[^0-9]/g, ""); }
+  // Digits only, Arabic-Indic / Eastern Arabic-Indic digits converted first
+  // (same as Code.gs's _normalizePhone).
+  function normalizePhone(s) {
+    return String(s == null ? "" : s)
+      .replace(/[\u0660-\u0669]/g, function (d) { return d.charCodeAt(0) - 0x0660; })
+      .replace(/[\u06F0-\u06F9]/g, function (d) { return d.charCodeAt(0) - 0x06F0; })
+      .replace(/[^0-9]/g, "");
+  }
 
   function dedupeQuiz(rows) {
     var seen = {}, out = [], dup = 0, blank = 0;

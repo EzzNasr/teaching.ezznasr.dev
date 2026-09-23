@@ -58,10 +58,15 @@
       else node.setAttribute(k, attrs[k]);
     });
     (children || []).forEach(function (c) {
-      if (c)
-        node.appendChild(
-          typeof c === "string" ? document.createTextNode(c) : c,
-        );
+      // null/undefined/false are skipped; DOM nodes pass through; anything
+      // else (a number like 0 or 123, a value the Sheet turned into a
+      // number) is shown as text instead of throwing inside appendChild.
+      if (c === null || c === undefined || c === false) return;
+      node.appendChild(
+        typeof c === "object" && typeof c.nodeType === "number"
+          ? c
+          : document.createTextNode(String(c)),
+      );
     });
     return node;
   }
@@ -92,7 +97,7 @@
   }
 
   function maskPhone(phone) {
-    var digits = String(phone || "").replace(/[^0-9]/g, "");
+    var digits = normalizeDigits(phone);
     if (digits.length <= 4) return digits;
     return "\u2022\u2022\u2022\u2022 " + digits.slice(-4);
   }
@@ -114,15 +119,94 @@
     ];
   }
 
+  // -- Phone numbers -----------------------------------------------------------
+  // These mirror Code.gs (_normalizePhone / _canonicalPhone) — keep the two in
+  // step. Digits only, with Arabic-Indic (\u0660-\u0669) and Eastern Arabic-Indic
+  // (\u06F0-\u06F9) digits converted first: a student on an Arabic keyboard
+  // types those, and stripping "everything that isn't 0-9" left them with no
+  // number at all ("Enter a valid phone number" with nothing to fix).
+  function normalizeDigits(value) {
+    return String(value == null ? "" : value)
+      .replace(/[\u0660-\u0669]/g, function (d) {
+        return d.charCodeAt(0) - 0x0660;
+      })
+      .replace(/[\u06F0-\u06F9]/g, function (d) {
+        return d.charCodeAt(0) - 0x06f0;
+      })
+      .replace(/[^0-9]/g, "");
+  }
+
+  // The one canonical form of an Egyptian mobile: 01XXXXXXXXX.
+  // "+20 101 234 5678", "0020 1012345678", "201012345678", "+2001012345678"
+  // and "1012345678" (leading 0 lost) all become "01012345678". Anything that
+  // doesn't look like an Egyptian mobile is returned as plain digits.
+  function canonicalPhone(value) {
+    var d = normalizeDigits(value);
+    var m = /^(?:0020|20)(0?1\d{9})$/.exec(d);
+    if (m) d = m[1];
+    if (/^1[0125]\d{8}$/.test(d)) d = "0" + d;
+    return d;
+  }
+
+  function isEgyptMobile(digits) {
+    return /^01[0125]\d{8}$/.test(digits);
+  }
+
+  var PHONE_HELP = "Phone numbers are 11 digits starting with 01.";
+
+  // Lenient: an existing account may have been created with an older,
+  // odder number format, so the first screen only asks for "some digits".
   function looksLikePhone(value) {
-    return String(value || "").replace(/[^0-9]/g, "").length >= 6;
+    return normalizeDigits(value).length >= 6;
   }
 
   // Password reset compares the parent number on its last 10 digits
-  // (Code.gs handleResetPassword), so it needs the full number — the 6-digit
-  // "looks like a phone" check above is too loose for that.
+  // (Code.gs handleResetPassword), so it needs the full number.
   function looksLikeFullPhone(value) {
-    return String(value || "").replace(/[^0-9]/g, "").length >= 10;
+    return normalizeDigits(value).length >= 10;
+  }
+
+  // What the student typed, in its canonical form, and whether it is good
+  // enough to REGISTER a new account with: an Egyptian mobile, or an explicit
+  // international number (starts with "+", 8-15 digits).
+  function readPhone(raw) {
+    var text = String(raw == null ? "" : raw).trim();
+    var digits = normalizeDigits(text);
+    var phone = canonicalPhone(text);
+    return {
+      ok: digits.length >= 6,
+      phone: phone,
+      registrable:
+        isEgyptMobile(phone) ||
+        (text.charAt(0) === "+" && digits.length >= 8 && digits.length <= 15),
+    };
+  }
+
+  function samePhone(a, b) {
+    var x = normalizeDigits(a),
+      y = normalizeDigits(b);
+    if (!x || !y) return false;
+    if (x === y) return true;
+    return x.length >= 10 && y.length >= 10 && x.slice(-10) === y.slice(-10);
+  }
+
+  // The parent's number, checked and canonicalised. It has to be a full
+  // number (password reset matches on it) and can't be the student's own —
+  // kids often type their own number, and then reset can never work.
+  function checkParentPhone(raw, ownPhone) {
+    if (!looksLikeFullPhone(raw)) {
+      return {
+        error:
+          "Enter your parent's full phone number (11 digits starting with 01).",
+      };
+    }
+    var parent = canonicalPhone(raw);
+    if (ownPhone && samePhone(parent, ownPhone)) {
+      return {
+        error: "That's your own number \u2014 enter your parent's phone number.",
+      };
+    }
+    return { phone: parent };
   }
 
   // A password <input> plus a "Show"/"Hide" toggle, wrapped together so
@@ -157,6 +241,21 @@
     return { wrap: wrap, input: input };
   }
 
+  // Turns a login/register/reset response (or a stored session) into the
+  // session we keep. Names and phones are ALWAYS text: a name the Sheet had
+  // turned into a number ("123") used to reach the page as a number and
+  // crash the sign-in widget on every page.
+  function sessionFromResponse(data) {
+    return {
+      student_id: String(data.student_id == null ? "" : data.student_id),
+      student_name: String(data.student_name == null ? "" : data.student_name),
+      session_token: data.session_token,
+      year: String(data.year || ""),
+      parent_phone: canonicalPhone(data.parent_phone || ""),
+      is_admin: !!data.is_admin,
+    };
+  }
+
   function getSession() {
     try {
       var raw = localStorage.getItem(SESSION_KEY);
@@ -166,7 +265,12 @@
       // treat it as no session at all so the person re-logs in and gets
       // a real token, instead of landing on completeProfile with a
       // session that fails with "Missing session." the moment it POSTs.
-      return parsed && parsed.student_id && parsed.session_token ? parsed : null;
+      if (!(parsed && parsed.student_id && parsed.session_token)) return null;
+      // A session saved before names/phones were forced to text can hold a
+      // number — repair it once, here, so nothing downstream ever sees one.
+      var clean = sessionFromResponse(parsed);
+      if (JSON.stringify(clean) !== JSON.stringify(parsed)) saveSession(clean);
+      return clean;
     } catch (e) {
       return null;
     }
@@ -238,8 +342,8 @@
     return sha256Hex(newPassword).then(function (hash) {
       return postToDrive({
         action: "reset_password",
-        phone: phone,
-        parent_phone: parentPhone,
+        phone: canonicalPhone(phone),
+        parent_phone: canonicalPhone(parentPhone),
         new_password_hash: hash,
       });
     });
@@ -558,17 +662,28 @@
 
       function submit() {
         if (busy) return;
-        var val = input.value.trim();
-        if (!looksLikePhone(val)) {
+        var entered = readPhone(input.value);
+        if (!entered.ok) {
           error.textContent = "Enter a valid phone number.";
           input.focus();
           return;
         }
-        phone = val;
+        phone = entered.phone;
         busy = true;
         setBusy(btn, true);
         postToDrive({ action: "check_student", phone: phone })
           .then(function (data) {
+            // An existing account may have any older number format, so it always
+            // gets to log in; only a NEW account has to look like a real phone
+            // number. That catches a mistyped digit before it "registers".
+            if (!data.known && !entered.registrable) {
+              busy = false;
+              setBusy(btn, false);
+              error.textContent =
+                "No account found for that number. " + PHONE_HELP;
+              input.focus();
+              return;
+            }
             knownName = data.display_name || null;
             step = data.known ? "login" : "register";
             busy = false;
@@ -630,14 +745,7 @@
             });
           })
           .then(function (data) {
-            saveSession({
-              student_id: data.student_id,
-              student_name: data.student_name,
-              session_token: data.session_token,
-              year: data.year || "",
-              parent_phone: data.parent_phone || "",
-              is_admin: !!data.is_admin,
-            });
+            saveSession(sessionFromResponse(data));
             showModalSuccess(data.student_name);
             setTimeout(function () {
               location.reload();
@@ -721,14 +829,7 @@
         setBusy(btn, true);
         resetPasswordRequest(phone, parentPhone, val)
           .then(function (data) {
-            saveSession({
-              student_id: data.student_id,
-              student_name: data.student_name,
-              session_token: data.session_token,
-              year: data.year || "",
-              parent_phone: data.parent_phone || "",
-              is_admin: !!data.is_admin,
-            });
+            saveSession(sessionFromResponse(data));
             showModalSuccess(data.student_name);
             setTimeout(function () {
               location.reload();
@@ -814,11 +915,13 @@
           yearSelect.focus();
           return;
         }
-        if (!looksLikePhone(parentPhone)) {
-          error.textContent = "Enter a valid parent's phone number.";
+        var parentCheck = checkParentPhone(parentPhoneInput.value, phone);
+        if (parentCheck.error) {
+          error.textContent = parentCheck.error;
           parentPhoneInput.focus();
           return;
         }
+        parentPhone = parentCheck.phone;
         if (!val || val.length < 4) {
           error.textContent = "Choose a password (4+ characters).";
           pw.input.focus();
@@ -838,14 +941,7 @@
             });
           })
           .then(function (data) {
-            saveSession({
-              student_id: data.student_id,
-              student_name: data.student_name,
-              session_token: data.session_token,
-              year: data.year || "",
-              parent_phone: data.parent_phone || "",
-              is_admin: !!data.is_admin,
-            });
+            saveSession(sessionFromResponse(data));
             showModalSuccess(data.student_name);
             setTimeout(function () {
               location.reload();
@@ -940,14 +1036,7 @@
     // common case), or — if year/parent_phone are still missing on this
     // account — routes to completeProfile before onReady ever fires.
     function proceedAfterAuth(data) {
-      var session = {
-        student_id: data.student_id,
-        student_name: data.student_name,
-        session_token: data.session_token,
-        year: data.year || "",
-        parent_phone: data.parent_phone || "",
-        is_admin: !!data.is_admin,
-      };
+      var session = sessionFromResponse(data);
       saveSession(session);
       mountGlobalWidget();
       if (!session.year || !session.parent_phone) {
@@ -990,7 +1079,8 @@
         placeholder: "Parent's phone number",
         required: "required",
       });
-      if (session.parent_phone) parentPhoneInput.value = session.parent_phone;
+      if (session.parent_phone)
+        parentPhoneInput.value = canonicalPhone(session.parent_phone);
       var errorMsg = el("div", { class: "qz-error" });
       var submitBtn = el("button", { class: "qz-next", type: "button" }, [
         "Save & continue \u2192",
@@ -1005,11 +1095,13 @@
           yearSelect.focus();
           return;
         }
-        if (!looksLikePhone(parentPhone)) {
-          errorMsg.textContent = "Enter a valid parent's phone number.";
+        var parentCheck = checkParentPhone(parentPhoneInput.value, session.student_id);
+        if (parentCheck.error) {
+          errorMsg.textContent = parentCheck.error;
           parentPhoneInput.focus();
           return;
         }
+        parentPhone = parentCheck.phone;
         busy = true;
         setBusy(submitBtn, true);
         postToDrive({
@@ -1068,17 +1160,28 @@
 
       function submit() {
         if (busy) return;
-        var val = phoneInput.value.trim();
-        if (!looksLikePhone(val)) {
+        var entered = readPhone(phoneInput.value);
+        if (!entered.ok) {
           errorMsg.textContent = "Enter a valid phone number.";
           phoneInput.focus();
           return;
         }
-        phone = val;
+        phone = entered.phone;
         busy = true;
         setBusy(nextBtn, true);
         postToDrive({ action: "check_student", phone: phone })
           .then(function (data) {
+            // An existing account may have any older number format, so it always
+            // gets to log in; only a NEW account has to look like a real phone
+            // number. That catches a mistyped digit before it "registers".
+            if (!data.known && !entered.registrable) {
+              busy = false;
+              setBusy(nextBtn, false);
+              errorMsg.textContent =
+                "No account found for that number. " + PHONE_HELP;
+              phoneInput.focus();
+              return;
+            }
             knownName = data.display_name || null;
             step = data.known ? "login" : "register";
             busy = false;
@@ -1318,11 +1421,13 @@
           yearSelect.focus();
           return;
         }
-        if (!looksLikePhone(parentPhone)) {
-          errorMsg.textContent = "Enter a valid parent's phone number.";
+        var parentCheck = checkParentPhone(parentPhoneInput.value, phone);
+        if (parentCheck.error) {
+          errorMsg.textContent = parentCheck.error;
           parentPhoneInput.focus();
           return;
         }
+        parentPhone = parentCheck.phone;
         if (!val || val.length < 4) {
           errorMsg.textContent = "Choose a password (4+ characters).";
           pw.input.focus();
@@ -1381,5 +1486,8 @@
     clearSession: clearSession,
     getMyResults: getMyResults,
     adminGetAll: adminGetAll,
+    // Phone helpers, exposed so other pages (and tests) use the same rules.
+    normalizeDigits: normalizeDigits,
+    canonicalPhone: canonicalPhone,
   };
 })();

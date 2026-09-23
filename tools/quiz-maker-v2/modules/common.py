@@ -10,6 +10,7 @@ used by every window in the app so windows/dialogs behave consistently
 on small or scaled-up screens.
 """
 
+import difflib
 import functools
 import http.server
 import json
@@ -1169,6 +1170,51 @@ def list_existing_lessons(site_root, subject_slug, group_relpath=""):
     return out
 
 
+def _site_asset_contents(drive_web_app_url):
+    """[(filename, content)] for every file sync_site_assets writes, exactly
+    as it writes them. Shared by sync_site_assets and
+    preview_site_assets_changes so the "what would change" check can never
+    disagree with what the sync really does."""
+    out = []
+    for name in ("auth.js", "quiz.js", "assign.js", "attachments.js"):
+        content = load_asset_template(name)
+        content = content.replace("{{DRIVE_ENDPOINT}}", drive_web_app_url.strip())
+        out.append((name, content))
+    for name in ("base.css", "forms.css"):
+        out.append((name, load_asset_template(name)))
+    return out
+
+
+def preview_site_assets_changes(site_root, drive_web_app_url):
+    """What "Sync site assets" would do to <site_root>/assets/, WITHOUT
+    writing anything: a list of (filename, "new" | "changed", lines_added,
+    lines_removed), one per file that would differ. Line endings are ignored
+    (Windows CRLF vs LF), so only real content differences show up.
+
+    The point: sync overwrites assets/ from assets_templates/. A file edited
+    directly in assets/ (instead of in its template) would be silently lost
+    by the next sync — this makes that visible first."""
+    assets_dir = os.path.join(site_root, "assets")
+    changes = []
+    for name, content in _site_asset_contents(drive_web_app_url):
+        path = os.path.join(assets_dir, name)
+        if not os.path.exists(path):
+            changes.append((name, "new", len(content.splitlines()), 0))
+            continue
+        with open(path, "r", encoding="utf-8") as f:   # universal newlines: CRLF -> LF
+            existing = f.read()
+        if existing == content:
+            continue
+        added = removed = 0
+        for line in difflib.unified_diff(existing.splitlines(), content.splitlines(), lineterm="", n=0):
+            if line.startswith("+") and not line.startswith("+++"):
+                added += 1
+            elif line.startswith("-") and not line.startswith("---"):
+                removed += 1
+        changes.append((name, "changed", added, removed))
+    return changes
+
+
 def sync_site_assets(site_root, drive_web_app_url):
     """Write auth.js / quiz.js / assign.js / attachments.js from
     assets_templates/ into <site_root>/assets/, substituting the Drive
@@ -1179,21 +1225,16 @@ def sync_site_assets(site_root, drive_web_app_url):
     Also copies the shared stylesheets (base.css, forms.css) the same
     way, kept in step with the shipped copy in assets_templates/.
     Call this after (re)configuring the Drive bridge or updating the
-    generator so the live site picks up the new engine code."""
+    generator so the live site picks up the new engine code.
+
+    assets_templates/ is the ONLY place these files are edited — anything
+    changed directly in <site_root>/assets/ is overwritten here. See
+    preview_site_assets_changes() and check_asset_drift.py."""
     assets_dir = os.path.join(site_root, "assets")
     os.makedirs(assets_dir, exist_ok=True)
     written = []
 
-    for name in ("auth.js", "quiz.js", "assign.js", "attachments.js"):
-        content = load_asset_template(name)
-        content = content.replace("{{DRIVE_ENDPOINT}}", drive_web_app_url.strip())
-        out_path = os.path.join(assets_dir, name)
-        with open(out_path, "w", encoding="utf-8") as f:
-            f.write(content)
-        written.append(out_path)
-
-    for name in ("base.css", "forms.css"):
-        content = load_asset_template(name)
+    for name, content in _site_asset_contents(drive_web_app_url):
         out_path = os.path.join(assets_dir, name)
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(content)

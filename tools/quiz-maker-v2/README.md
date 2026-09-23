@@ -28,6 +28,10 @@ Stdlib only (`tkinter`, `urllib`) — no `pip install` needed.
    next to "Drive bridge" and paste in the Web App URL + admin token.
 4. Click **Sync site assets** to write the endpoint into
    `assets/quiz.js` / `assign.js` / `attachments.js` on the live site.
+   **Edit shared scripts in `assets_templates/`, never directly in `assets/`** —
+   Sync overwrites `assets/` from the templates (it now lists any file it is
+   about to replace and asks first). `python check_asset_drift.py` shows any
+   difference without changing anything.
 5. Use **2. Assignment Maker** to set each lesson's submission mode, and
    **3. Attachment Maker** to upload files per lesson.
 
@@ -79,8 +83,11 @@ modules/
   attachment_tab.py          Tab 3
 templates/                   HTML templates (unchanged files + updated
                               assignment.html / lesson_index.html)
-assets_templates/             quiz.js / assign.js / attachments.js — synced
-                              into <site_root>/assets/ by "Sync site assets"
+assets_templates/             auth.js / quiz.js / assign.js / attachments.js +
+                              base.css / forms.css — synced into
+                              <site_root>/assets/ by "Sync site assets"
+check_asset_drift.py         compares assets_templates/ with the live assets/
+                              (read-only; exit code 1 if they differ)
 apps_script/
   Code.gs                    the Drive bridge — deploy this once
   DEPLOY.md                  step-by-step deployment

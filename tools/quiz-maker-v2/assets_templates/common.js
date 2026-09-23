@@ -21,7 +21,13 @@ window.TeachingCommon = (function () {
       else node.setAttribute(k, attrs[k]);
     });
     (children || []).forEach(function (c) {
-      if (c) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+      // null/undefined/false are skipped; DOM nodes pass through; anything else
+      // (a number such as 0 or 123 that a Sheet cell turned into) is shown as
+      // text instead of throwing inside appendChild.
+      if (c === null || c === undefined || c === false) return;
+      node.appendChild(
+        typeof c === "object" && typeof c.nodeType === "number" ? c : document.createTextNode(String(c))
+      );
     });
     return node;
   }

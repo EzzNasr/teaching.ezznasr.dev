@@ -2,8 +2,8 @@
    auth.js — phone+password student identity for teaching.ezznasr.dev
 
    Backed by Code.gs's "check_student" / "register_student" / "login_student"
-   actions and a Students Google Sheet (phone | password_hash | display_name
-   | created_at). The password itself never leaves the browser — only a
+   / "reset_password" actions and a Students Google Sheet (phone |
+   password_hash | display_name | created_at). The password itself never leaves the browser — only a
    SHA-256 hash of it does (crypto.subtle.digest). The server just compares
    hashes; it never sees the plaintext.
 
@@ -20,6 +20,12 @@
    itself a security boundary: Code.gs's admin_get_all re-checks
    is_admin server-side on every call regardless of what the client
    thinks it knows.
+
+   Forgot password — the login step has a "Forgot password?" link. The
+   student re-types the parent phone number they registered with plus a new
+   password; Code.gs's reset_password checks the parent number and, if it
+   matches, replaces ONLY the password hash (nothing else on their account
+   or in their quiz/assignment history changes) and signs them in.
 
    Two independent things happen here:
 
@@ -52,10 +58,15 @@
       else node.setAttribute(k, attrs[k]);
     });
     (children || []).forEach(function (c) {
-      if (c)
-        node.appendChild(
-          typeof c === "string" ? document.createTextNode(c) : c,
-        );
+      // null/undefined/false are skipped; DOM nodes pass through; anything
+      // else (a number like 0 or 123, a value the Sheet turned into a
+      // number) is shown as text instead of throwing inside appendChild.
+      if (c === null || c === undefined || c === false) return;
+      node.appendChild(
+        typeof c === "object" && typeof c.nodeType === "number"
+          ? c
+          : document.createTextNode(String(c)),
+      );
     });
     return node;
   }
@@ -86,7 +97,7 @@
   }
 
   function maskPhone(phone) {
-    var digits = String(phone || "").replace(/[^0-9]/g, "");
+    var digits = normalizeDigits(phone);
     if (digits.length <= 4) return digits;
     return "\u2022\u2022\u2022\u2022 " + digits.slice(-4);
   }
@@ -108,8 +119,94 @@
     ];
   }
 
+  // -- Phone numbers -----------------------------------------------------------
+  // These mirror Code.gs (_normalizePhone / _canonicalPhone) — keep the two in
+  // step. Digits only, with Arabic-Indic (\u0660-\u0669) and Eastern Arabic-Indic
+  // (\u06F0-\u06F9) digits converted first: a student on an Arabic keyboard
+  // types those, and stripping "everything that isn't 0-9" left them with no
+  // number at all ("Enter a valid phone number" with nothing to fix).
+  function normalizeDigits(value) {
+    return String(value == null ? "" : value)
+      .replace(/[\u0660-\u0669]/g, function (d) {
+        return d.charCodeAt(0) - 0x0660;
+      })
+      .replace(/[\u06F0-\u06F9]/g, function (d) {
+        return d.charCodeAt(0) - 0x06f0;
+      })
+      .replace(/[^0-9]/g, "");
+  }
+
+  // The one canonical form of an Egyptian mobile: 01XXXXXXXXX.
+  // "+20 101 234 5678", "0020 1012345678", "201012345678", "+2001012345678"
+  // and "1012345678" (leading 0 lost) all become "01012345678". Anything that
+  // doesn't look like an Egyptian mobile is returned as plain digits.
+  function canonicalPhone(value) {
+    var d = normalizeDigits(value);
+    var m = /^(?:0020|20)(0?1\d{9})$/.exec(d);
+    if (m) d = m[1];
+    if (/^1[0125]\d{8}$/.test(d)) d = "0" + d;
+    return d;
+  }
+
+  function isEgyptMobile(digits) {
+    return /^01[0125]\d{8}$/.test(digits);
+  }
+
+  var PHONE_HELP = "Phone numbers are 11 digits starting with 01.";
+
+  // Lenient: an existing account may have been created with an older,
+  // odder number format, so the first screen only asks for "some digits".
   function looksLikePhone(value) {
-    return String(value || "").replace(/[^0-9]/g, "").length >= 6;
+    return normalizeDigits(value).length >= 6;
+  }
+
+  // Password reset compares the parent number on its last 10 digits
+  // (Code.gs handleResetPassword), so it needs the full number.
+  function looksLikeFullPhone(value) {
+    return normalizeDigits(value).length >= 10;
+  }
+
+  // What the student typed, in its canonical form, and whether it is good
+  // enough to REGISTER a new account with: an Egyptian mobile, or an explicit
+  // international number (starts with "+", 8-15 digits).
+  function readPhone(raw) {
+    var text = String(raw == null ? "" : raw).trim();
+    var digits = normalizeDigits(text);
+    var phone = canonicalPhone(text);
+    return {
+      ok: digits.length >= 6,
+      phone: phone,
+      registrable:
+        isEgyptMobile(phone) ||
+        (text.charAt(0) === "+" && digits.length >= 8 && digits.length <= 15),
+    };
+  }
+
+  function samePhone(a, b) {
+    var x = normalizeDigits(a),
+      y = normalizeDigits(b);
+    if (!x || !y) return false;
+    if (x === y) return true;
+    return x.length >= 10 && y.length >= 10 && x.slice(-10) === y.slice(-10);
+  }
+
+  // The parent's number, checked and canonicalised. It has to be a full
+  // number (password reset matches on it) and can't be the student's own —
+  // kids often type their own number, and then reset can never work.
+  function checkParentPhone(raw, ownPhone) {
+    if (!looksLikeFullPhone(raw)) {
+      return {
+        error:
+          "Enter your parent's full phone number (11 digits starting with 01).",
+      };
+    }
+    var parent = canonicalPhone(raw);
+    if (ownPhone && samePhone(parent, ownPhone)) {
+      return {
+        error: "That's your own number \u2014 enter your parent's phone number.",
+      };
+    }
+    return { phone: parent };
   }
 
   // A password <input> plus a "Show"/"Hide" toggle, wrapped together so
@@ -117,13 +214,18 @@
   // to the <input> itself (callers use different class names: "qz-input"
   // inline vs. none in the floating modal, which styles via ".aew-modal
   // input" instead); toggleClass picks which button skin to use.
-  function passwordField(placeholder, inputClass, toggleClass) {
+  function passwordField(
+    placeholder,
+    inputClass,
+    toggleClass,
+    autocompleteValue,
+  ) {
     var input = el("input", {
       class: inputClass || "",
       type: "password",
       placeholder: placeholder,
       required: "required",
-      autocomplete: "current-password",
+      autocomplete: autocompleteValue || "current-password",
     });
     var toggle = el(
       "button",
@@ -139,6 +241,21 @@
     return { wrap: wrap, input: input };
   }
 
+  // Turns a login/register/reset response (or a stored session) into the
+  // session we keep. Names and phones are ALWAYS text: a name the Sheet had
+  // turned into a number ("123") used to reach the page as a number and
+  // crash the sign-in widget on every page.
+  function sessionFromResponse(data) {
+    return {
+      student_id: String(data.student_id == null ? "" : data.student_id),
+      student_name: String(data.student_name == null ? "" : data.student_name),
+      session_token: data.session_token,
+      year: String(data.year || ""),
+      parent_phone: canonicalPhone(data.parent_phone || ""),
+      is_admin: !!data.is_admin,
+    };
+  }
+
   function getSession() {
     try {
       var raw = localStorage.getItem(SESSION_KEY);
@@ -148,7 +265,12 @@
       // treat it as no session at all so the person re-logs in and gets
       // a real token, instead of landing on completeProfile with a
       // session that fails with "Missing session." the moment it POSTs.
-      return parsed && parsed.student_id && parsed.session_token ? parsed : null;
+      if (!(parsed && parsed.student_id && parsed.session_token)) return null;
+      // A session saved before names/phones were forced to text can hold a
+      // number — repair it once, here, so nothing downstream ever sees one.
+      var clean = sessionFromResponse(parsed);
+      if (JSON.stringify(clean) !== JSON.stringify(parsed)) saveSession(clean);
+      return clean;
     } catch (e) {
       return null;
     }
@@ -208,6 +330,21 @@
         if (!data || !data.ok)
           throw new Error((data && data.error) || "Request failed.");
         return data;
+      });
+    });
+  }
+
+  // Hashes the new password in the browser (same SHA-256 as register/login)
+  // and asks Code.gs to swap it in, verified by the parent's phone number.
+  // Resolves with the same shape as login_student, so callers can sign the
+  // student straight in.
+  function resetPasswordRequest(phone, parentPhone, newPassword) {
+    return sha256Hex(newPassword).then(function (hash) {
+      return postToDrive({
+        action: "reset_password",
+        phone: canonicalPhone(phone),
+        parent_phone: canonicalPhone(parentPhone),
+        new_password_hash: hash,
       });
     });
   }
@@ -499,6 +636,7 @@
       modal.appendChild(closeBtn);
       if (step === "login") renderLoginStep();
       else if (step === "register") renderRegisterStep();
+      else if (step === "reset") renderResetStep();
       else renderPhoneStep();
     }
 
@@ -524,17 +662,28 @@
 
       function submit() {
         if (busy) return;
-        var val = input.value.trim();
-        if (!looksLikePhone(val)) {
+        var entered = readPhone(input.value);
+        if (!entered.ok) {
           error.textContent = "Enter a valid phone number.";
           input.focus();
           return;
         }
-        phone = val;
+        phone = entered.phone;
         busy = true;
         setBusy(btn, true);
         postToDrive({ action: "check_student", phone: phone })
           .then(function (data) {
+            // An existing account may have any older number format, so it always
+            // gets to log in; only a NEW account has to look like a real phone
+            // number. That catches a mistyped digit before it "registers".
+            if (!data.known && !entered.registrable) {
+              busy = false;
+              setBusy(btn, false);
+              error.textContent =
+                "No account found for that number. " + PHONE_HELP;
+              input.focus();
+              return;
+            }
             knownName = data.display_name || null;
             step = data.known ? "login" : "register";
             busy = false;
@@ -596,14 +745,7 @@
             });
           })
           .then(function (data) {
-            saveSession({
-              student_id: data.student_id,
-              student_name: data.student_name,
-              session_token: data.session_token,
-              year: data.year || "",
-              parent_phone: data.parent_phone || "",
-              is_admin: !!data.is_admin,
-            });
+            saveSession(sessionFromResponse(data));
             showModalSuccess(data.student_name);
             setTimeout(function () {
               location.reload();
@@ -629,9 +771,97 @@
       modal.appendChild(el("p", { class: "aew-sub" }, [maskPhone(phone)]));
       modal.appendChild(el("div", { class: "aew-field" }, [pw.wrap]));
       modal.appendChild(error);
+      var forgot = el("button", { class: "aew-link", type: "button" }, [
+        "Forgot password?",
+      ]);
+      forgot.addEventListener("click", function () {
+        step = "reset";
+        renderStep();
+      });
+
       modal.appendChild(btn);
+      modal.appendChild(forgot);
       modal.appendChild(back);
       pw.input.focus();
+    }
+
+    function renderResetStep() {
+      var parentInput = el("input", {
+        type: "tel",
+        inputmode: "tel",
+        placeholder: "Parent's phone number",
+        autocomplete: "off",
+      });
+      var pw = passwordField(
+        "New password",
+        "",
+        "aew-pwtoggle",
+        "new-password",
+      );
+      var error = el("div", { class: "aew-error" });
+      var btn = el("button", { class: "aew-primary", type: "button" }, [
+        "Reset password \u2192",
+      ]);
+      var back = el("button", { class: "aew-link", type: "button" }, [
+        "\u2190 Back to login",
+      ]);
+
+      back.addEventListener("click", function () {
+        step = "login";
+        renderStep();
+      });
+
+      function submit() {
+        if (busy) return;
+        var parentPhone = parentInput.value.trim();
+        var val = pw.input.value;
+        if (!looksLikeFullPhone(parentPhone)) {
+          error.textContent = "Enter your parent's full phone number.";
+          parentInput.focus();
+          return;
+        }
+        if (!val || val.length < 4) {
+          error.textContent = "Choose a password (4+ characters).";
+          pw.input.focus();
+          return;
+        }
+        busy = true;
+        setBusy(btn, true);
+        resetPasswordRequest(phone, parentPhone, val)
+          .then(function (data) {
+            saveSession(sessionFromResponse(data));
+            showModalSuccess(data.student_name);
+            setTimeout(function () {
+              location.reload();
+            }, SUCCESS_ANIM_MS);
+          })
+          .catch(function (err) {
+            busy = false;
+            setBusy(btn, false);
+            error.textContent = err.message || "Couldn't reset your password.";
+          });
+      }
+
+      btn.addEventListener("click", submit);
+      parentInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
+      pw.input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
+
+      modal.appendChild(el("h3", {}, ["Reset password"]));
+      modal.appendChild(
+        el("p", { class: "aew-sub" }, [
+          maskPhone(phone) + " \u2014 confirm with your parent's number",
+        ]),
+      );
+      modal.appendChild(el("div", { class: "aew-field" }, [parentInput]));
+      modal.appendChild(el("div", { class: "aew-field" }, [pw.wrap]));
+      modal.appendChild(error);
+      modal.appendChild(btn);
+      modal.appendChild(back);
+      parentInput.focus();
     }
 
     function renderRegisterStep() {
@@ -685,11 +915,13 @@
           yearSelect.focus();
           return;
         }
-        if (!looksLikePhone(parentPhone)) {
-          error.textContent = "Enter a valid parent's phone number.";
+        var parentCheck = checkParentPhone(parentPhoneInput.value, phone);
+        if (parentCheck.error) {
+          error.textContent = parentCheck.error;
           parentPhoneInput.focus();
           return;
         }
+        parentPhone = parentCheck.phone;
         if (!val || val.length < 4) {
           error.textContent = "Choose a password (4+ characters).";
           pw.input.focus();
@@ -709,14 +941,7 @@
             });
           })
           .then(function (data) {
-            saveSession({
-              student_id: data.student_id,
-              student_name: data.student_name,
-              session_token: data.session_token,
-              year: data.year || "",
-              parent_phone: data.parent_phone || "",
-              is_admin: !!data.is_admin,
-            });
+            saveSession(sessionFromResponse(data));
             showModalSuccess(data.student_name);
             setTimeout(function () {
               location.reload();
@@ -811,14 +1036,7 @@
     // common case), or — if year/parent_phone are still missing on this
     // account — routes to completeProfile before onReady ever fires.
     function proceedAfterAuth(data) {
-      var session = {
-        student_id: data.student_id,
-        student_name: data.student_name,
-        session_token: data.session_token,
-        year: data.year || "",
-        parent_phone: data.parent_phone || "",
-        is_admin: !!data.is_admin,
-      };
+      var session = sessionFromResponse(data);
       saveSession(session);
       mountGlobalWidget();
       if (!session.year || !session.parent_phone) {
@@ -838,6 +1056,7 @@
         renderCompleteProfileStep(sessionForProfile);
       else if (step === "login") renderLoginStep();
       else if (step === "register") renderRegisterStep();
+      else if (step === "reset") renderResetStep();
       else renderPhoneStep();
     }
 
@@ -860,7 +1079,8 @@
         placeholder: "Parent's phone number",
         required: "required",
       });
-      if (session.parent_phone) parentPhoneInput.value = session.parent_phone;
+      if (session.parent_phone)
+        parentPhoneInput.value = canonicalPhone(session.parent_phone);
       var errorMsg = el("div", { class: "qz-error" });
       var submitBtn = el("button", { class: "qz-next", type: "button" }, [
         "Save & continue \u2192",
@@ -875,11 +1095,13 @@
           yearSelect.focus();
           return;
         }
-        if (!looksLikePhone(parentPhone)) {
-          errorMsg.textContent = "Enter a valid parent's phone number.";
+        var parentCheck = checkParentPhone(parentPhoneInput.value, session.student_id);
+        if (parentCheck.error) {
+          errorMsg.textContent = parentCheck.error;
           parentPhoneInput.focus();
           return;
         }
+        parentPhone = parentCheck.phone;
         busy = true;
         setBusy(submitBtn, true);
         postToDrive({
@@ -938,17 +1160,28 @@
 
       function submit() {
         if (busy) return;
-        var val = phoneInput.value.trim();
-        if (!looksLikePhone(val)) {
+        var entered = readPhone(phoneInput.value);
+        if (!entered.ok) {
           errorMsg.textContent = "Enter a valid phone number.";
           phoneInput.focus();
           return;
         }
-        phone = val;
+        phone = entered.phone;
         busy = true;
         setBusy(nextBtn, true);
         postToDrive({ action: "check_student", phone: phone })
           .then(function (data) {
+            // An existing account may have any older number format, so it always
+            // gets to log in; only a NEW account has to look like a real phone
+            // number. That catches a mistyped digit before it "registers".
+            if (!data.known && !entered.registrable) {
+              busy = false;
+              setBusy(nextBtn, false);
+              errorMsg.textContent =
+                "No account found for that number. " + PHONE_HELP;
+              phoneInput.focus();
+              return;
+            }
             knownName = data.display_name || null;
             step = data.known ? "login" : "register";
             busy = false;
@@ -1023,6 +1256,14 @@
           });
       }
 
+      var forgotBtn = el("button", { class: "qz-authswitch", type: "button" }, [
+        "Forgot password?",
+      ]);
+      forgotBtn.addEventListener("click", function () {
+        step = "reset";
+        render();
+      });
+
       loginBtn.addEventListener("click", submit);
       pw.input.addEventListener("keydown", function (e) {
         if (e.key === "Enter") submit();
@@ -1038,6 +1279,85 @@
         el("div", { class: "qz-field" }, [pw.wrap]),
         errorMsg,
         el("div", { class: "qz-actions-row" }, [backBtn, loginBtn]),
+        el("div", { class: "qz-field" }, [forgotBtn]),
+      ]);
+      root.appendChild(card);
+    }
+
+    function renderResetStep() {
+      var parentInput = el("input", {
+        class: "qz-input",
+        type: "tel",
+        inputmode: "tel",
+        autocomplete: "off",
+        placeholder: "Parent's phone number",
+        required: "required",
+      });
+      var pw = passwordField(
+        "New password",
+        "qz-input",
+        "qz-pwtoggle",
+        "new-password",
+      );
+      var errorMsg = el("div", { class: "qz-error" });
+      var backBtn = el("button", { class: "qz-authswitch", type: "button" }, [
+        "\u2190 Back to login",
+      ]);
+      var resetBtn = el("button", { class: "qz-next", type: "button" }, [
+        "Reset password \u2192",
+      ]);
+
+      backBtn.addEventListener("click", function () {
+        step = "login";
+        render();
+      });
+
+      function submit() {
+        if (busy) return;
+        var parentPhone = parentInput.value.trim();
+        var val = pw.input.value;
+        if (!looksLikeFullPhone(parentPhone)) {
+          errorMsg.textContent = "Enter your parent's full phone number.";
+          parentInput.focus();
+          return;
+        }
+        if (!val || val.length < 4) {
+          errorMsg.textContent = "Choose a password (4+ characters).";
+          pw.input.focus();
+          return;
+        }
+        busy = true;
+        setBusy(resetBtn, true);
+        resetPasswordRequest(phone, parentPhone, val)
+          .then(function (data) {
+            proceedAfterAuth(data);
+          })
+          .catch(function (err) {
+            busy = false;
+            setBusy(resetBtn, false);
+            errorMsg.textContent = err.message || "Couldn't reset your password.";
+          });
+      }
+
+      resetBtn.addEventListener("click", submit);
+      parentInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
+      pw.input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submit();
+      });
+
+      var card = el("div", { class: "qz-card frame" }, [
+        el("span", { class: "tick-br" }),
+        el("span", { class: "tick-bl" }),
+        el("p", { class: "qz-question" }, ["Reset your password"]),
+        el("p", { class: "qz-subtle" }, [
+          maskPhone(phone) + " \u2014 confirm with your parent's number",
+        ]),
+        el("div", { class: "qz-field" }, [parentInput]),
+        el("div", { class: "qz-field" }, [pw.wrap]),
+        errorMsg,
+        el("div", { class: "qz-actions-row" }, [backBtn, resetBtn]),
       ]);
       root.appendChild(card);
     }
@@ -1101,11 +1421,13 @@
           yearSelect.focus();
           return;
         }
-        if (!looksLikePhone(parentPhone)) {
-          errorMsg.textContent = "Enter a valid parent's phone number.";
+        var parentCheck = checkParentPhone(parentPhoneInput.value, phone);
+        if (parentCheck.error) {
+          errorMsg.textContent = parentCheck.error;
           parentPhoneInput.focus();
           return;
         }
+        parentPhone = parentCheck.phone;
         if (!val || val.length < 4) {
           errorMsg.textContent = "Choose a password (4+ characters).";
           pw.input.focus();
@@ -1164,5 +1486,8 @@
     clearSession: clearSession,
     getMyResults: getMyResults,
     adminGetAll: adminGetAll,
+    // Phone helpers, exposed so other pages (and tests) use the same rules.
+    normalizeDigits: normalizeDigits,
+    canonicalPhone: canonicalPhone,
   };
 })();
