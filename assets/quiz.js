@@ -55,15 +55,28 @@
   // Retries (same payload, same client_id) when the request never got a
   // usable answer: network drop / timeout, or Apps Script returning an
   // HTML page instead of JSON. Safe because the server dedupes on
-  // client_id. A real server-side rejection ({ok:false}) is NOT retried.
+  // client_id. A real server-side rejection ({ok:false}) is NOT retried —
+  // with one exception: {ok:false, retryable:true} means the server's lock
+  // was busy (a whole class saving at once). That is waited out for longer,
+  // spread randomly so students don't all retry in the same second, and
+  // onBusy() lets the page say "still saving" instead of showing an error.
   var RETRY_DELAYS = [1500, 4000];
-  function postToDrive(payload, attempt) {
-    attempt = attempt || 0;
+  var BUSY_DELAYS = [2000, 5000, 10000, 20000];
+  function postToDrive(payload, onBusy, tries) {
+    tries = tries || { net: 0, busy: 0 };
     if (!DRIVE_ENDPOINT) return Promise.reject(new Error("not-configured"));
+    function resendAfter(ms) {
+      return new Promise(function (resolve) { setTimeout(resolve, ms); })
+        .then(function () { return postToDrive(payload, onBusy, tries); });
+    }
     function again(reason) {
-      if (attempt >= RETRY_DELAYS.length) throw reason;
-      return new Promise(function (resolve) { setTimeout(resolve, RETRY_DELAYS[attempt]); })
-        .then(function () { return postToDrive(payload, attempt + 1); });
+      if (tries.net >= RETRY_DELAYS.length) throw reason;
+      return resendAfter(RETRY_DELAYS[tries.net++]);
+    }
+    function busyAgain(reason) {
+      if (tries.busy >= BUSY_DELAYS.length) throw reason;
+      if (onBusy) { try { onBusy(); } catch (e) { /* display only */ } }
+      return resendAfter(BUSY_DELAYS[tries.busy++] * (0.75 + Math.random() * 0.5));
     }
     return fetch(DRIVE_ENDPOINT, {
       method: "POST",
@@ -79,6 +92,9 @@
           data = JSON.parse(r.raw);
         } catch (e) {
           return again(new Error("The server sent back something unexpected. Please try again."));
+        }
+        if (data && data.ok === false && data.retryable) {
+          return busyAgain(new Error(data.error || "The server is busy right now. Please try again."));
         }
         if (!data || !data.ok) throw new Error((data && data.error) || "Drive bridge rejected the request.");
         return data;
@@ -427,9 +443,14 @@
       // actually landed.
       function sendResult() {
         state.syncStatus = "pending";
-        postToDrive(Object.assign({ action: "upload_quiz_result" }, state.record))
-          .then(function () { state.syncStatus = "ok"; render(); })
+        state.busy = false;
+        // The server says "busy" when many students save at once; the send is
+        // repeated automatically (same client_id, so never a duplicate) and the
+        // page just says it is still saving.
+        postToDrive(Object.assign({ action: "upload_quiz_result" }, state.record), function () { state.busy = true; render(); })
+          .then(function () { state.busy = false; state.syncStatus = "ok"; render(); })
           .catch(function (err) {
+            state.busy = false;
             state.syncStatus = (err && err.message === "not-configured") ? "not-configured" : "failed";
             render();
           });
@@ -505,7 +526,7 @@
           ]));
         }
         if (state.syncStatus === "pending") {
-          summaryChildren.push(el("div", { class: "qz-progress" }, ["Saving your result\u2026"]));
+          summaryChildren.push(el("div", { class: "qz-progress" }, [state.busy ? "Still saving \u2014 lots of results are coming in. Please keep this page open\u2026" : "Saving your result\u2026"]));
         }
         if (state.syncStatus === "failed") {
           var resendBtn = el("button", { class: "qz-next", type: "button" }, ["Retry sending"]);
@@ -534,4 +555,4 @@
   }
 
   window.QuizEngine = { mount: mount };
-})();
+})();

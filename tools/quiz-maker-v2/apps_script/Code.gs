@@ -94,6 +94,16 @@
  *   removes duplicates and tidies (with a backup first). Run it twice if
  *   the log says it stopped early.
  *
+ * ---- Class-sized bursts (added) ------------------------------------------
+ * - Quiz / submission uploads no longer hold the script lock while Drive files
+ *   are created. Order: quick duplicate look (no lock) -> create Drive files
+ *   (no lock) -> lock only to re-check and write the row. Files made by a
+ *   request that then turns out to be a duplicate, or fails, are trashed again.
+ * - If the lock can't be had within 20 s (30 s for register / reset) the answer
+ *   is {ok:false, retryable:true, error:"The server is busy right now ..."};
+ *   quiz.js / assign.js wait 2 / 5 / 10 / 20 s (randomised) and resend the SAME
+ *   record, showing "Still saving ..." instead of an error.
+ *
  * ---- Password reset (added) ---------------------------------------------
  * - "Forgot password?" on the login step calls action "reset_password" with
  *   the student's phone, their parent's phone number, and the NEW password's
@@ -240,10 +250,29 @@ function _md5(s) {
 }
 
 // Serialises the check-then-write so two near-simultaneous requests for the
-// same attempt can't both pass the duplicate check.
-function _withLock(fn) {
+// same attempt can't both pass the duplicate check. Keep whatever runs inside
+// `fn` SHORT (sheet reads/writes only — never Drive file creation), because
+// everyone else who needs the lock waits for it.
+//
+// If the lock can't be had in time the error is marked `retryable`: doPost
+// turns that into {ok:false, retryable:true}, and quiz.js / assign.js wait a
+// moment and send the SAME record again (safe — the server dedupes on
+// client_id). Errors thrown by `fn` itself are never marked retryable.
+var LOCK_WAIT_MS = 30000;
+var UPLOAD_LOCK_WAIT_MS = 20000;   // quiz/submission uploads: give up sooner so the
+                                   // request stops occupying one of Apps Script's
+                                   // ~30 concurrent execution slots, and let the
+                                   // browser retry with a short random back-off
+
+function _withLock(fn, waitMs) {
   var lock = LockService.getScriptLock();
-  lock.waitLock(30000);
+  try {
+    lock.waitLock(waitMs || LOCK_WAIT_MS);
+  } catch (e) {
+    var busy = new Error("The server is busy right now \u2014 please try again in a moment.");
+    busy.retryable = true;
+    throw busy;
+  }
   try { return fn(); } finally { lock.releaseLock(); }
 }
 
@@ -890,7 +919,9 @@ function doPost(e) {
         return _json({ ok: false, error: "Unknown action: " + payload.action });
     }
   } catch (err) {
-    return _json({ ok: false, error: String(err.message || err) });
+    var out = { ok: false, error: String(err.message || err) };
+    if (err && err.retryable) out.retryable = true;   // lock was busy — the browser may resend the same record
+    return _json(out);
   }
 }
 
@@ -920,6 +951,44 @@ function handleDeleteAttachment(payload) {
   return { ok: true };
 }
 
+// ---- Upload handlers: slow work OUTSIDE the lock ----------------------------
+// Order for both uploads (a class finishing together used to queue behind one
+// lock that also covered Drive file creation, and the last students timed out):
+//   1. quick duplicate look, NO lock  -> a re-sent copy stops here, no Drive files
+//   2. create the Drive file(s)       -> slow, many students at once, NO lock
+//   3. lock: check again, write row   -> a few sheet calls, then released
+// If step 3 finds the attempt was saved in the meantime, or fails (lock busy),
+// the Drive files just made are trashed so retries never leave stray copies.
+// Step 1 and the sheet handle are read-only: a missing tab or column is only
+// ever created inside the lock (two requests adding the same header column at
+// once is what produced the repeated-column sheets repairLayout() fixes).
+
+// The tab if it already exists — never creates or edits anything.
+function _peekSheet(name) {
+  try { return _dataSs().getSheetByName(name); } catch (e) { return null; }
+}
+
+function _seenBeforeLock(peeked, keys) {
+  try { return !!peeked && _anySeen(_existingKeys(peeked), keys); } catch (e) { return false; }
+}
+
+// Inside the lock: reuse the tab handle found earlier when it already has the
+// columns we write (saves re-opening the whole spreadsheet while everyone waits);
+// otherwise take the full path, which creates/repairs the tab.
+function _writableSheet(peeked, cols, fullFn) {
+  if (peeked) {
+    try {
+      var idx = _headerIndex(peeked);
+      if (cols.every(function (c) { return idx[c]; })) return peeked;
+    } catch (e) { /* empty tab etc. — use the full path */ }
+  }
+  return fullFn();
+}
+
+function _trashQuietly(files) {
+  files.forEach(function (f) { try { f.setTrashed(true); } catch (e) { /* best effort */ } });
+}
+
 function handleUploadSubmission(payload) {
   // No admin token required — this is the public "hand in your work" path.
   // student_id IS required (confirmed assign.js always sends it as of the
@@ -927,13 +996,14 @@ function handleUploadSubmission(payload) {
   // orphaned row nothing can ever match back to a student.
   if (!payload.student_id) throw new Error("Missing student_id — please sign in and try again.");
 
-  return _withLock(function () {
-    var sheet = _submissionsSheet();
-    var keys = _submissionKeys(payload);
-    // Checked BEFORE any Drive file is created, so a re-sent copy leaves
-    // no orphan files behind either.
-    if (_anySeen(_existingKeys(sheet), keys)) return { ok: true, duplicate: true };
+  var keys = _submissionKeys(payload);
+  var peeked = _peekSheet("Submissions");
+  // Checked BEFORE any Drive file is created, so a re-sent copy leaves
+  // no orphan files behind either.
+  if (_seenBeforeLock(peeked, keys)) return { ok: true, duplicate: true };
 
+  var made = [];   // Drive files created by THIS request (trashed again if the row isn't written)
+  try {
     var folder = _folder("SUBMISSIONS_FOLDER_ID");
     var now = new Date();
     var timestamp = Utilities.formatDate(now, "UTC", "yyyyMMdd'T'HHmmss'Z'");
@@ -951,6 +1021,7 @@ function handleUploadSubmission(payload) {
       var blob = Utilities.newBlob(bytes, payload.mime_type || "application/octet-stream", payload.filename);
       blob.setName(stem + "--" + payload.filename);
       var file = folder.createFile(blob);
+      made.push(file);
       fileId = file.getId();
     }
 
@@ -981,7 +1052,7 @@ function handleUploadSubmission(payload) {
       answers: Array.isArray(payload.answers) ? payload.answers : null,
     };
     var metaBlob = Utilities.newBlob(JSON.stringify(meta, null, 2), "application/json", stem + "--meta.json");
-    folder.createFile(metaBlob);
+    made.push(folder.createFile(metaBlob));
 
     // Mirror into the Submissions sheet — this is what the dashboards
     // actually query. The Drive JSON above stays as the durable per-attempt
@@ -990,16 +1061,25 @@ function handleUploadSubmission(payload) {
     var truncated = fullText.length > TEXT_CELL_LIMIT;
     var cellText = truncated ? fullText.slice(0, TEXT_CELL_LIMIT) : fullText;
 
-    _appendByHeader(sheet, {
-      student_id: meta.student_id, name: meta.name, subject: meta.subject, lesson: meta.lesson,
-      submission_type: meta.submission_type, text: cellText, text_truncated: truncated,
-      url: meta.url, note: meta.note, file_id: meta.file_id, file_name: meta.file_name,
-      date: meta.date, submitted_time: meta.submitted_time, score: meta.score, total: meta.total,
-      answers_json: JSON.stringify(meta.answers || []), dedupe_key: keys[0],
-    });
+    var result = _withLock(function () {
+      var sheet = _writableSheet(peeked, ["score", "total", "answers_json", "dedupe_key"], _submissionsSheet);
+      if (_anySeen(_existingKeys(sheet), keys)) return { ok: true, duplicate: true };
+      _appendByHeader(sheet, {
+        student_id: meta.student_id, name: meta.name, subject: meta.subject, lesson: meta.lesson,
+        submission_type: meta.submission_type, text: cellText, text_truncated: truncated,
+        url: meta.url, note: meta.note, file_id: meta.file_id, file_name: meta.file_name,
+        date: meta.date, submitted_time: meta.submitted_time, score: meta.score, total: meta.total,
+        answers_json: JSON.stringify(meta.answers || []), dedupe_key: keys[0],
+      });
+      return { ok: true, file_id: fileId };
+    }, UPLOAD_LOCK_WAIT_MS);
 
-    return { ok: true, file_id: fileId };
-  });
+    if (result.duplicate) _trashQuietly(made);   // saved by a parallel request while we worked
+    return result;
+  } catch (err) {
+    _trashQuietly(made);                          // no row was written — don't leave the files behind
+    throw err;
+  }
 }
 
 function handleUploadQuizResult(payload) {
@@ -1009,11 +1089,12 @@ function handleUploadQuizResult(payload) {
   // rollout) — same reasoning as handleUploadSubmission above.
   if (!payload.student_id) throw new Error("Missing student_id — please sign in and try again.");
 
-  return _withLock(function () {
-    var sheet = _quizResultsSheet();
-    var keys = _quizKeys(payload);
-    if (_anySeen(_existingKeys(sheet), keys)) return { ok: true, duplicate: true };
+  var keys = _quizKeys(payload);
+  var peeked = _peekSheet("QuizResults");
+  if (_seenBeforeLock(peeked, keys)) return { ok: true, duplicate: true };
 
+  var made = [];
+  try {
     var folder = _folder("QUIZ_RESULTS_FOLDER_ID");
     var now = new Date();
     var timestamp = Utilities.formatDate(now, "UTC", "yyyyMMdd'T'HHmmss'Z'");
@@ -1047,20 +1128,29 @@ function handleUploadQuizResult(payload) {
     };
 
     var blob = Utilities.newBlob(JSON.stringify(record, null, 2), "application/json", stem + "--quiz-result.json");
-    folder.createFile(blob);
+    made.push(folder.createFile(blob));
 
     // Mirror into the QuizResults sheet — this is what the dashboards
     // query; the Drive JSON above stays as the durable per-attempt record.
-    _appendByHeader(sheet, {
-      student_id: record.student_id, name: record.name, subject: record.subject, lesson: record.lesson,
-      quiz_title: record.quiz_title, date: record.date, start_time: record.start_time, end_time: record.end_time,
-      score: record.score, total: record.total,
-      questions_json: JSON.stringify(record.questions || record.wrong_questions || []),
-      dedupe_key: keys[0],
-    });
+    var result = _withLock(function () {
+      var sheet = _writableSheet(peeked, ["dedupe_key"], _quizResultsSheet);
+      if (_anySeen(_existingKeys(sheet), keys)) return { ok: true, duplicate: true };
+      _appendByHeader(sheet, {
+        student_id: record.student_id, name: record.name, subject: record.subject, lesson: record.lesson,
+        quiz_title: record.quiz_title, date: record.date, start_time: record.start_time, end_time: record.end_time,
+        score: record.score, total: record.total,
+        questions_json: JSON.stringify(record.questions || record.wrong_questions || []),
+        dedupe_key: keys[0],
+      });
+      return { ok: true };
+    }, UPLOAD_LOCK_WAIT_MS);
 
-    return { ok: true };
-  });
+    if (result.duplicate) _trashQuietly(made);
+    return result;
+  } catch (err) {
+    _trashQuietly(made);
+    throw err;
+  }
 }
 
 // -- Dashboards ---------------------------------------------------------
