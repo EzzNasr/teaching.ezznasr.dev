@@ -166,7 +166,8 @@
  * - get_video {lesson, slot, student_id?, session_token?} is what a page calls.
  *   Unlocked video: anyone gets embed_url. Locked video: the URL is only sent to
  *   an admin session (the teacher previewing); everyone else gets
- *   {locked:true, need:"login"|"payment"} and NO url. The lock FAILS CLOSED: only
+ *   {locked:true, need:"login"|"payment"} and NO url (a student with an active
+ *   entitlement, see "Access" below, gets it too). The lock FAILS CLOSED: only
  *   an explicit FALSE in the locked cell opens a video; blank/typo stays locked.
  * - admin_set_video {lesson, slot, video_url?, locked?} adds/updates/clears a
  *   slot (video_url "" clears it). New videos start LOCKED. admin_list_videos
@@ -175,6 +176,32 @@
  * - Looked-up rows are cached for VIDEO_CACHE_SECONDS; admin_set_video clears the
  *   cache entry at once, but flipping the locked cell by hand in the Sheet can
  *   take up to that long to show.
+ *
+ * ---- Access: who has paid for what (added) --------------------------------
+ * - "Entitlements" tab (Students spreadsheet): phone | scope | expires_at |
+ *   granted_at | source. scope is ONE lesson path (covers that lesson's three
+ *   videos), or "some/folder/*" (everything under it, e.g. a whole grade), or "*"
+ *   (everything). expires_at is a Cairo date "2026-12-31" (access lasts through
+ *   that whole day); BLANK = never expires; anything unreadable = no access.
+ *   You can add/edit/delete rows by hand in the Sheet: that is a valid way to
+ *   unlock someone (e.g. after a cash payment).
+ * - "Payments" tab: payment_id | phone | name | scope | reference | note | status |
+ *   created_at | decided_at. status: pending / approved / rejected.
+ * - request_access {student_id, session_token, lesson, reference, note?} is the
+ *   student's "I paid" button. It only adds a PENDING row (nothing unlocks yet),
+ *   is idempotent while one is pending, and a student may have at most
+ *   MAX_PENDING_REQUESTS waiting.
+ * - admin_list_payments {status?}, admin_decide_payment {payment_id, decision:
+ *   "approve"|"reject", scope?, expires_at?, days?}, admin_grant_access {phone,
+ *   scope, expires_at?, days?}: desktop token OR admin session, like the video
+ *   actions. Approving writes the entitlement; a grant NEVER shortens access the
+ *   student already has (renewals add to the later of today / current expiry).
+ * - How long a grant lasts: expires_at, else days, else the DEFAULT_ACCESS_DAYS
+ *   Script Property, else it never expires.
+ * - What the lock box tells people about paying ("Send 200 EGP to 010… then tap
+ *   I paid") is the PAY_INSTRUCTIONS Script Property (plain text, max 1000
+ *   characters). get_video returns it as pay_info with every locked answer that
+ *   has no URL, so you can change it any time without touching the site.
  *
  * ---- Redeploying after editing this file --------------------------------
  * Apps Script Web Apps don't auto-update on save. After changing this
@@ -231,6 +258,9 @@ var PLAIN_TEXT_HEADERS = {
   date: 1, start_time: 1, end_time: 1, submitted_time: 1, dedupe_key: 1,
   // Videos ("locked" is deliberately NOT here: it is a TRUE/FALSE cell)
   slot: 1, embed_url: 1, updated_at: 1,
+  // Entitlements + Payments (phone/name/scope-like text must never be reinterpreted)
+  scope: 1, expires_at: 1, granted_at: 1, source: 1,
+  payment_id: 1, reference: 1, status: 1, decided_at: 1,
 };
 // Of those, the ones that hold phone numbers (a leading 0 is easily lost).
 var PHONE_HEADERS = { phone: 1, parent_phone: 1, student_id: 1 };
@@ -944,6 +974,18 @@ function doPost(e) {
       case "admin_list_videos":
         return _json(handleAdminListVideos(payload));
 
+      case "request_access":
+        return _json(handleRequestAccess(payload));
+
+      case "admin_list_payments":
+        return _json(handleAdminListPayments(payload));
+
+      case "admin_decide_payment":
+        return _json(handleAdminDecidePayment(payload));
+
+      case "admin_grant_access":
+        return _json(handleAdminGrantAccess(payload));
+
       default:
         return _json({ ok: false, error: "Unknown action: " + payload.action });
     }
@@ -1221,11 +1263,16 @@ var VIDEO_HEADERS = ["lesson", "slot", "embed_url", "locked", "updated_at"];
 var VIDEO_CACHE_SECONDS = 60;
 
 // Same-origin key for a slot: "Programming/Other/Functions/" -> "programming/other/functions".
-function _videoKey(lesson, slot) {
-  var l = String(lesson == null ? "" : lesson).trim().toLowerCase()
+function _lessonPath(raw) {
+  var l = String(raw == null ? "" : raw).trim().toLowerCase()
     .replace(/\\/g, "/").replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, "");
-  var s = String(slot == null ? "" : slot).trim().toLowerCase();
   if (!/^[a-z0-9][a-z0-9._\/-]{0,199}$/.test(l) || l.indexOf("..") !== -1) throw new Error("Missing or invalid lesson.");
+  return l;
+}
+
+function _videoKey(lesson, slot) {
+  var l = _lessonPath(lesson);
+  var s = String(slot == null ? "" : slot).trim().toLowerCase();
   if (!VIDEO_SLOTS.hasOwnProperty(s)) throw new Error('Slot must be "lesson", "quiz" or "assignment".');
   return { lesson: l, slot: s };
 }
@@ -1256,12 +1303,18 @@ function _videoCacheKey(lesson, slot) {
   return "vid:" + _md5(lesson + "|" + slot);
 }
 
-function _videoCols(sheet) {
+// Header name -> column, or a readable error if a needed header is gone. Never
+// guesses a column: a damaged tab means "no access", not a write/read in the wrong place.
+function _needCols(sheet, tab, names) {
   var idx = _headerIndex(sheet);
-  ["lesson", "slot", "embed_url", "locked"].forEach(function (n) {
-    if (!idx[n]) throw new Error('The Videos sheet is missing the "' + n + '" column (renamed or deleted?).');
+  names.forEach(function (n) {
+    if (!idx[n]) throw new Error('The ' + tab + ' sheet is missing the "' + n + '" column (renamed or deleted?).');
   });
   return idx;
+}
+
+function _videoCols(sheet) {
+  return _needCols(sheet, "Videos", ["lesson", "slot", "embed_url", "locked"]);
 }
 
 function _findVideoRow(sheet, lesson, slot) {
@@ -1324,7 +1377,26 @@ function handleGetVideo(payload) {
   if (!rec.locked) return { ok: true, found: true, locked: false, embed_url: rec.embed_url };
   var who = _sessionState(payload);
   if (who === "admin") return { ok: true, found: true, locked: true, embed_url: rec.embed_url };
-  return { ok: true, found: true, locked: true, need: who === "student" ? "payment" : "login" };
+  var info = _payInfo();
+  if (who === "student") {
+    var ss = _ss();
+    var acc = _accessState(ss, payload.student_id, key.lesson);
+    if (acc.active) return { ok: true, found: true, locked: true, embed_url: rec.embed_url };
+    var out = { ok: true, found: true, locked: true, need: "payment" };
+    var req = _latestRequest(ss, payload.student_id, key.lesson);
+    if (req) out.request = req;                    // "pending" (waiting for you) or "rejected"
+    if (acc.expired) out.expired = acc.expired;    // their access ended on this date
+    if (info) out.pay_info = info;
+    return out;
+  }
+  var login = { ok: true, found: true, locked: true, need: "login" };
+  if (info) login.pay_info = info;
+  return login;
+}
+
+// The public "how to pay" text shown in the lock box (Script Property PAY_INSTRUCTIONS).
+function _payInfo() {
+  return String(_props().getProperty("PAY_INSTRUCTIONS") || "").trim().slice(0, 1000);
 }
 
 // video_url: a link (adds/replaces), "" (clears the slot), or leave it out.
@@ -1378,6 +1450,258 @@ function handleAdminListVideos(payload) {
                locked: _isLockedCell(r.locked), updated_at: String(r.updated_at || "") };
     }),
   };
+}
+
+// -- Access: entitlements, "I paid" requests, approvals ------------------------
+// See the "Access" note at the top of this file. Reads never create a tab; tabs
+// and columns are only created inside the lock of an action that writes.
+
+var ENT_HEADERS = ["phone", "scope", "expires_at", "granted_at", "source"];
+var PAYMENT_HEADERS = ["payment_id", "phone", "name", "scope", "reference", "note", "status", "created_at", "decided_at"];
+var MAX_PENDING_REQUESTS = 5;
+
+// One lesson path, "some/folder/*" (everything under it), or "*" (everything).
+function _normalizeScope(raw) {
+  var s = String(raw == null ? "" : raw).trim().toLowerCase()
+    .replace(/\\/g, "/").replace(/\/{2,}/g, "/").replace(/^\/+/, "");
+  if (s === "*") return "*";
+  if (/\/\*$/.test(s)) return _lessonPath(s.replace(/\/\*$/, "")) + "/*";
+  return _lessonPath(s);
+}
+
+// Does a stored scope cover this lesson? "a/b/*" covers "a/b/x" but NOT "a/bx" or "a/b" itself.
+function _scopeCovers(scope, lesson) {
+  if (!scope) return false;
+  if (scope === "*") return true;
+  if (scope === lesson) return true;
+  if (scope.slice(-2) === "/*") return lesson.indexOf(scope.slice(0, -1)) === 0;
+  return false;
+}
+
+function _todayCairo() { return _fmt(new Date(), TZ, false); }
+
+// Pure string/UTC arithmetic on "yyyy-MM-dd" — no time-zone surprises.
+function _addDays(ymd, n) {
+  var p = ymd.split("-");
+  var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + n));
+  return d.getUTCFullYear() + "-" + ("0" + (d.getUTCMonth() + 1)).slice(-2) + "-" + ("0" + d.getUTCDate()).slice(-2);
+}
+
+function _cleanYmd(v) {
+  var s = String(v == null ? "" : v).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || _addDays(s, 0) !== s) throw new Error('Dates must look like 2026-12-31.');
+  return s;
+}
+
+// A sheet cell -> "yyyy-MM-dd", "" (blank), or null (unreadable). Sheets turns a date typed
+// by hand into a Date cell, so both are understood.
+function _ymdOf(v, tz) {
+  if (v instanceof Date) return _fmt(v, tz || TZ, false);
+  var s = String(v == null ? "" : v).trim();
+  if (s === "") return "";
+  var m = /^(\d{4}-\d{2}-\d{2})(?:[ T].*)?$/.exec(s);
+  return m ? m[1] : null;
+}
+
+// days from the request, else the DEFAULT_ACCESS_DAYS Script Property, else 0 (= never expires).
+function _accessDays(payload) {
+  if (payload.days !== undefined && payload.days !== null && payload.days !== "") {
+    var n = Number(payload.days);
+    if (!isFinite(n) || n !== Math.floor(n) || n < 1 || n > 3650) throw new Error("days must be a whole number from 1 to 3650.");
+    return n;
+  }
+  var d = parseInt(_props().getProperty("DEFAULT_ACCESS_DAYS") || "", 10);
+  return d > 0 ? d : 0;
+}
+
+// {active, expired}: does this phone hold a current entitlement covering the lesson?
+// `expired` = the latest end date among covering entitlements that have run out.
+function _accessState(ss, phone, lesson) {
+  var out = { active: false, expired: null };
+  var sheet = ss.getSheetByName("Entitlements");
+  if (!sheet || sheet.getLastRow() < 2) return out;
+  var c = _needCols(sheet, "Entitlements", ["phone", "scope", "expires_at"]);
+  var tz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
+  var today = _todayCairo();
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (!_phonesMatch(values[i][c.phone - 1], phone)) continue;
+    if (!_scopeCovers(String(values[i][c.scope - 1]).trim().toLowerCase(), lesson)) continue;
+    var ymd = _ymdOf(values[i][c.expires_at - 1], tz);
+    if (ymd === null) continue;                       // unreadable date: fail closed
+    if (ymd === "" || today <= ymd) { out.active = true; return out; }
+    if (!out.expired || ymd > out.expired) out.expired = ymd;
+  }
+  return out;
+}
+
+// "pending" / "rejected" for this student's most recent request for exactly this lesson.
+function _latestRequest(ss, phone, lesson) {
+  var sheet = ss.getSheetByName("Payments");
+  if (!sheet || sheet.getLastRow() < 2) return null;
+  var c = _needCols(sheet, "Payments", ["phone", "scope", "status"]);
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  for (var i = values.length - 1; i >= 0; i--) {
+    if (!_phonesMatch(values[i][c.phone - 1], phone)) continue;
+    if (String(values[i][c.scope - 1]).trim().toLowerCase() !== lesson) continue;
+    var st = String(values[i][c.status - 1]).trim().toLowerCase();
+    return st === "pending" || st === "rejected" ? st : null;
+  }
+  return null;
+}
+
+// INSIDE the lock. Adds or extends one (phone, scope) entitlement and NEVER shortens it.
+// explicitYmd wins; else `days` counts from the later of today / the current end date;
+// else it never expires. Returns {scope, expires_at, extended}.
+function _grantRaw(ss, phone, scope, explicitYmd, days, source) {
+  var sheet = _sheetByName(ss, "Entitlements", ENT_HEADERS);
+  _ensureColumns(sheet, ENT_HEADERS);
+  var c = _needCols(sheet, "Entitlements", ENT_HEADERS);
+  var tz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
+  var today = _todayCairo();
+  var now = _fmt(new Date(), TZ, true);
+
+  var found = null;
+  if (sheet.getLastRow() >= 2) {
+    var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+    for (var i = 0; i < values.length; i++) {
+      if (_phonesMatch(values[i][c.phone - 1], phone) && String(values[i][c.scope - 1]).trim().toLowerCase() === scope) {
+        found = { row: i + 2, ymd: _ymdOf(values[i][c.expires_at - 1], tz) };   // null = unreadable
+        break;
+      }
+    }
+  }
+  var existing = found ? found.ymd : null;
+
+  var target;
+  if (explicitYmd) target = explicitYmd;
+  else if (days) target = _addDays(existing && existing > today ? existing : today, days);
+  else target = "";
+  if (found && existing === "") target = "";                                  // already forever: keep it
+  else if (found && existing && target !== "" && existing > target) target = existing;   // never shorten
+
+  if (found) {
+    sheet.getRange(found.row, c.expires_at).setNumberFormat("@").setValue(target);
+    sheet.getRange(found.row, c.granted_at).setNumberFormat("@").setValue(now);
+    sheet.getRange(found.row, c.source).setNumberFormat("@").setValue(source);
+  } else {
+    _appendByHeader(sheet, { phone: phone, scope: scope, expires_at: target, granted_at: now, source: source });
+  }
+  return { scope: scope, expires_at: target, extended: !!found };
+}
+
+// The student's "I paid" button. Adds a PENDING row only — nothing unlocks until
+// an admin approves it.
+function handleRequestAccess(payload) {
+  _requireStudentSession(payload);
+  var lesson = _lessonPath(payload.lesson);
+  var reference = String(payload.reference == null ? "" : payload.reference).trim().slice(0, 200);
+  if (!reference) throw new Error("Enter the payment reference (or the phone number you paid from).");
+  var note = String(payload.note == null ? "" : payload.note).trim().slice(0, 500);
+  var found = _findStudentRow(_students(), payload.student_id);
+  if (!found) throw new Error("No matching student.");
+  var phone = _canonicalPhone(found.phone) || String(found.phone);
+
+  var ss = _ss();
+  if (_accessState(ss, phone, lesson).active) return { ok: true, status: "active" };
+
+  return _withLock(function () {
+    var sheet = _sheetByName(ss, "Payments", PAYMENT_HEADERS);
+    _ensureColumns(sheet, PAYMENT_HEADERS);
+    var pending = 0, dup = null;
+    if (sheet.getLastRow() >= 2) {
+      var c = _needCols(sheet, "Payments", PAYMENT_HEADERS);
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
+        if (String(r[c.status - 1]).trim().toLowerCase() !== "pending" || !_phonesMatch(r[c.phone - 1], phone)) return;
+        pending++;
+        if (!dup && String(r[c.scope - 1]).trim().toLowerCase() === lesson) dup = String(r[c.payment_id - 1]);
+      });
+    }
+    if (dup) return { ok: true, status: "pending", duplicate: true, payment_id: dup };   // double-tap / resend
+    if (pending >= MAX_PENDING_REQUESTS) {
+      throw new Error("You already have " + pending + " requests waiting for approval — please wait until they are reviewed.");
+    }
+    var id = "p" + Utilities.getUuid().replace(/-/g, "").slice(0, 8);
+    _appendByHeader(sheet, {
+      payment_id: id, phone: phone, name: String(found.display_name == null ? "" : found.display_name),
+      scope: lesson, reference: reference, note: note, status: "pending",
+      created_at: _fmt(new Date(), TZ, true), decided_at: "",
+    });
+    return { ok: true, status: "pending", payment_id: id };
+  });
+}
+
+// status: pending (default) | approved | rejected | all. Newest first, at most 300.
+function handleAdminListPayments(payload) {
+  _requireAdminAny(payload);
+  var want = String(payload.status || "pending").trim().toLowerCase();
+  if (["pending", "approved", "rejected", "all"].indexOf(want) === -1) {
+    throw new Error('status must be "pending", "approved", "rejected" or "all".');
+  }
+  var sheet = _ss().getSheetByName("Payments");
+  var rows = sheet && sheet.getLastRow() >= 2 ? _sheetValuesAsObjects(sheet) : [];
+  var list = rows.map(function (r) {
+    return { payment_id: String(r.payment_id || ""), phone: String(r.phone || ""), name: String(r.name || ""),
+             scope: String(r.scope || ""), reference: String(r.reference || ""), note: String(r.note || ""),
+             status: String(r.status || "").trim().toLowerCase(), created_at: String(r.created_at || ""),
+             decided_at: String(r.decided_at || "") };
+  }).filter(function (p) { return want === "all" || p.status === want; }).reverse();
+  return { ok: true, payments: list.slice(0, 300) };
+}
+
+// Approve (writes the entitlement) or reject a PENDING request. scope may widen what
+// the student asked for (e.g. their whole grade); expires_at / days / DEFAULT_ACCESS_DAYS
+// set how long it lasts.
+function handleAdminDecidePayment(payload) {
+  _requireAdminAny(payload);
+  var id = String(payload.payment_id == null ? "" : payload.payment_id).trim();
+  var decision = String(payload.decision == null ? "" : payload.decision).trim().toLowerCase();
+  if (!id) throw new Error("Missing payment_id.");
+  if (decision !== "approve" && decision !== "reject") throw new Error('decision must be "approve" or "reject".');
+  var scopeOverride = payload.scope ? _normalizeScope(payload.scope) : "";
+  var explicit = payload.expires_at ? _cleanYmd(payload.expires_at) : "";
+  var days = decision === "approve" && !explicit ? _accessDays(payload) : 0;
+
+  return _withLock(function () {
+    var ss = _ss();
+    var sheet = ss.getSheetByName("Payments");
+    if (!sheet || sheet.getLastRow() < 2) throw new Error("No such payment.");
+    var c = _needCols(sheet, "Payments", PAYMENT_HEADERS);
+    var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+    var at = -1;
+    for (var i = 0; i < values.length; i++) if (String(values[i][c.payment_id - 1]).trim() === id) { at = i; break; }
+    if (at < 0) throw new Error("No such payment.");
+    var row = at + 2, r = values[at];
+    var status = String(r[c.status - 1]).trim().toLowerCase();
+    if (status !== "pending") throw new Error("This request was already " + status + ".");
+
+    var out = { ok: true, payment_id: id, phone: String(r[c.phone - 1]), name: String(r[c.name - 1]) };
+    if (decision === "approve") {
+      var scope = scopeOverride || _normalizeScope(r[c.scope - 1]);
+      var g = _grantRaw(ss, _canonicalPhone(r[c.phone - 1]) || String(r[c.phone - 1]), scope, explicit, days, "payment:" + id);
+      out.scope = g.scope; out.expires_at = g.expires_at; out.extended = g.extended;
+    }
+    out.status = decision === "approve" ? "approved" : "rejected";
+    sheet.getRange(row, c.status).setNumberFormat("@").setValue(out.status);
+    sheet.getRange(row, c.decided_at).setNumberFormat("@").setValue(_fmt(new Date(), TZ, true));
+    return out;
+  });
+}
+
+// Unlock by hand with no request (cash in person, a mistake to fix). The phone may be
+// typed any way (+20…, 0020…, missing leading 0). Works even for someone who has not
+// registered yet — `known_student` tells you whether that number has an account.
+function handleAdminGrantAccess(payload) {
+  _requireAdminAny(payload);
+  if (_normalizePhone(payload.phone).length < 10) throw new Error("Enter the student's full phone number.");
+  var phone = _canonicalPhone(payload.phone);
+  var scope = _normalizeScope(payload.scope);
+  var explicit = payload.expires_at ? _cleanYmd(payload.expires_at) : "";
+  var days = explicit ? 0 : _accessDays(payload);
+  var g = _withLock(function () { return _grantRaw(_ss(), phone, scope, explicit, days, "manual"); });
+  var stu = _findStudentRow(_students(), phone);
+  return { ok: true, phone: phone, scope: g.scope, expires_at: g.expires_at, extended: g.extended,
+           known_student: !!stu, name: stu ? String(stu.display_name == null ? "" : stu.display_name) : "" };
 }
 
 // -- One-off cleanup of duplicates written BEFORE the fix -------------------
