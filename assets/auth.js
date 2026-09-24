@@ -1489,5 +1489,10 @@
     // Phone helpers, exposed so other pages (and tests) use the same rules.
     normalizeDigits: normalizeDigits,
     canonicalPhone: canonicalPhone,
+    // Opens the same sign-in modal as the corner widget (used by video.js's
+    // "Sign in" button). The page reloads itself after a successful login.
+    openSignIn: function () {
+      openSignInModal(document.activeElement);
+    },
   };
 })();
