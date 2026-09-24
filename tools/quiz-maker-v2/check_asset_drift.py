@@ -23,7 +23,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES = os.path.join(HERE, "assets_templates")
-SCRIPTS = ("auth.js", "quiz.js", "assign.js", "attachments.js")
+SCRIPTS = ("auth.js", "quiz.js", "assign.js", "attachments.js", "video.js")
 STYLES = ("base.css", "forms.css")
 ENDPOINT_RE = re.compile(r'DRIVE_ENDPOINT\s*=\s*"([^"]*)"')
 MAX_DIFF_LINES = 40
