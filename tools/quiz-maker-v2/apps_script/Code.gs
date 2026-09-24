@@ -158,6 +158,24 @@
  *     5. installWeeklyBackupTrigger() schedules weeklyBackup() (Sundays, ~3am).
  *   Then Deploy -> Manage deployments -> pencil -> New version.
  *
+ * ---- Video lock (added) ---------------------------------------------------
+ * - Lesson videos no longer live in the page HTML. Each one is a row in a
+ *   "Videos" tab (created on first use, in the Students spreadsheet): lesson
+ *   (path, e.g. programming/other/functions), slot (lesson | quiz | assignment
+ *   = index.html | quiz.html | assignment.html), embed_url, locked, updated_at.
+ * - get_video {lesson, slot, student_id?, session_token?} is what a page calls.
+ *   Unlocked video: anyone gets embed_url. Locked video: the URL is only sent to
+ *   an admin session (the teacher previewing); everyone else gets
+ *   {locked:true, need:"login"|"payment"} and NO url. The lock FAILS CLOSED: only
+ *   an explicit FALSE in the locked cell opens a video; blank/typo stays locked.
+ * - admin_set_video {lesson, slot, video_url?, locked?} adds/updates/clears a
+ *   slot (video_url "" clears it). New videos start LOCKED. admin_list_videos
+ *   lists them all. Both take EITHER the desktop app's ADMIN_TOKEN ("token")
+ *   OR an admin session (student_id + session_token).
+ * - Looked-up rows are cached for VIDEO_CACHE_SECONDS; admin_set_video clears the
+ *   cache entry at once, but flipping the locked cell by hand in the Sheet can
+ *   take up to that long to show.
+ *
  * ---- Redeploying after editing this file --------------------------------
  * Apps Script Web Apps don't auto-update on save. After changing this
  * file: Deploy → Manage deployments → pencil (edit) → Version: "New
@@ -211,6 +229,8 @@ var PLAIN_TEXT_HEADERS = {
   student_id: 1, name: 1, subject: 1, lesson: 1, quiz_title: 1, submission_type: 1,
   text: 1, url: 1, note: 1, file_id: 1, file_name: 1,
   date: 1, start_time: 1, end_time: 1, submitted_time: 1, dedupe_key: 1,
+  // Videos ("locked" is deliberately NOT here: it is a TRUE/FALSE cell)
+  slot: 1, embed_url: 1, updated_at: 1,
 };
 // Of those, the ones that hold phone numbers (a leading 0 is easily lost).
 var PHONE_HEADERS = { phone: 1, parent_phone: 1, student_id: 1 };
@@ -915,6 +935,15 @@ function doPost(e) {
       case "admin_get_all":
         return _json(handleAdminGetAll(payload));
 
+      case "get_video":
+        return _json(handleGetVideo(payload));
+
+      case "admin_set_video":
+        return _json(handleAdminSetVideo(payload));
+
+      case "admin_list_videos":
+        return _json(handleAdminListVideos(payload));
+
       default:
         return _json({ ok: false, error: "Unknown action: " + payload.action });
     }
@@ -1179,6 +1208,175 @@ function handleAdminGetAll(payload) {
     students: studentRows,
     quiz_results: _sheetValuesAsObjects(_quizResultsSheet()),
     submissions: _sheetValuesAsObjects(_submissionsSheet()),
+  };
+}
+
+// -- Videos: locked / unlocked lesson videos ---------------------------------
+// One row per (lesson, slot). See the "Video lock" note at the top of this file.
+// Reads (get_video) never create or edit anything; the tab and its columns are
+// only ever created inside admin_set_video's lock.
+
+var VIDEO_SLOTS = { lesson: 1, quiz: 1, assignment: 1 };
+var VIDEO_HEADERS = ["lesson", "slot", "embed_url", "locked", "updated_at"];
+var VIDEO_CACHE_SECONDS = 60;
+
+// Same-origin key for a slot: "Programming/Other/Functions/" -> "programming/other/functions".
+function _videoKey(lesson, slot) {
+  var l = String(lesson == null ? "" : lesson).trim().toLowerCase()
+    .replace(/\\/g, "/").replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, "");
+  var s = String(slot == null ? "" : slot).trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9._\/-]{0,199}$/.test(l) || l.indexOf("..") !== -1) throw new Error("Missing or invalid lesson.");
+  if (!VIDEO_SLOTS.hasOwnProperty(s)) throw new Error('Slot must be "lesson", "quiz" or "assignment".');
+  return { lesson: l, slot: s };
+}
+
+// Whatever the teacher pastes -> a clean embed URL, or "" for blank (= clear the
+// slot). Only YouTube and Vimeo player URLs are accepted, so nothing else can
+// ever be put in front of students. Mirrors normalize_video_url() in common.py.
+function _normalizeEmbedUrl(raw) {
+  var url = String(raw == null ? "" : raw).trim();
+  if (!url) return "";
+  if (/^https:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/[A-Za-z0-9_-]{11}(?:\?[A-Za-z0-9_=&%.-]*)?$/.test(url)) return url;
+  if (/^https:\/\/player\.vimeo\.com\/video\/\d+(?:\?[A-Za-z0-9_=&%.-]*)?$/.test(url)) return url;
+  if (/^https?:\/\/(?:www\.|m\.)?(?:youtube\.com|youtu\.be)\//i.test(url)) {
+    var m = /youtu\.be\/([A-Za-z0-9_-]{11})/.exec(url) ||
+            /youtube\.com\/(?:shorts|live)\/([A-Za-z0-9_-]{11})/.exec(url) ||
+            /[?&]v=([A-Za-z0-9_-]{11})/.exec(url);
+    if (m) return "https://www.youtube.com/embed/" + m[1];
+  }
+  throw new Error("That doesn't look like a YouTube or Vimeo video link.");
+}
+
+// FAILS CLOSED: only an explicit FALSE (a real boolean or the text) opens a video.
+function _isLockedCell(v) {
+  return !(v === false || String(v).trim().toUpperCase() === "FALSE");
+}
+
+function _videoCacheKey(lesson, slot) {
+  return "vid:" + _md5(lesson + "|" + slot);
+}
+
+function _videoCols(sheet) {
+  var idx = _headerIndex(sheet);
+  ["lesson", "slot", "embed_url", "locked"].forEach(function (n) {
+    if (!idx[n]) throw new Error('The Videos sheet is missing the "' + n + '" column (renamed or deleted?).');
+  });
+  return idx;
+}
+
+function _findVideoRow(sheet, lesson, slot) {
+  var last = sheet.getLastRow();
+  if (last < 2) return null;
+  var c = _videoCols(sheet);
+  var values = sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson &&
+        String(values[i][c.slot - 1]).trim().toLowerCase() === slot) {
+      return { row: i + 2, cols: c, embed_url: String(values[i][c.embed_url - 1]).trim(),
+               locked: _isLockedCell(values[i][c.locked - 1]) };
+    }
+  }
+  return null;
+}
+
+// {embed_url, locked} or null. Cached briefly so a class opening the same lesson
+// at once costs one sheet read, not one per student.
+function _lookupVideo(lesson, slot) {
+  var cache = CacheService.getScriptCache();
+  var ck = _videoCacheKey(lesson, slot);
+  var hit = cache.get(ck);
+  if (hit) { try { return JSON.parse(hit); } catch (e) { /* fall through and re-read */ } }
+  var sheet = _ss().getSheetByName("Videos");
+  var found = sheet ? _findVideoRow(sheet, lesson, slot) : null;
+  var rec = found && found.embed_url ? { embed_url: found.embed_url, locked: found.locked } : null;
+  cache.put(ck, JSON.stringify(rec), VIDEO_CACHE_SECONDS);
+  return rec;
+}
+
+// "none" (not signed in / stale token), "student" or "admin". Never throws for a
+// bad session — get_video is public, so a bad session just means "not signed in".
+function _sessionState(payload) {
+  if (!payload.student_id || !payload.session_token) return "none";
+  var values = _students().getDataRange().getValues();
+  var c = _studentCols(values[0]);
+  var target = _normalizePhone(payload.student_id);
+  for (var i = 1; i < values.length; i++) {
+    if (_phonesMatch(values[i][c.phone - 1], target)) {
+      if (String(values[i][c.session_token - 1]) !== String(payload.session_token)) return "none";
+      return (c.is_admin && _isTruthyFlag(values[i][c.is_admin - 1])) ? "admin" : "student";
+    }
+  }
+  return "none";
+}
+
+// The desktop app authenticates with ADMIN_TOKEN ("token"); the web dashboards
+// with an admin session. Either one is enough.
+function _requireAdminAny(payload) {
+  if (payload.token) { _requireAdmin(payload); return; }
+  _requireAdminSession(payload);
+}
+
+// Public. The URL is only in the answer when the viewer may actually watch.
+function handleGetVideo(payload) {
+  var key = _videoKey(payload.lesson, payload.slot);
+  var rec = _lookupVideo(key.lesson, key.slot);
+  if (!rec) return { ok: true, found: false };
+  if (!rec.locked) return { ok: true, found: true, locked: false, embed_url: rec.embed_url };
+  var who = _sessionState(payload);
+  if (who === "admin") return { ok: true, found: true, locked: true, embed_url: rec.embed_url };
+  return { ok: true, found: true, locked: true, need: who === "student" ? "payment" : "login" };
+}
+
+// video_url: a link (adds/replaces), "" (clears the slot), or leave it out.
+// locked:    true / false, or leave it out (a NEW slot then starts locked).
+function handleAdminSetVideo(payload) {
+  _requireAdminAny(payload);
+  var key = _videoKey(payload.lesson, payload.slot);
+  var hasUrl = payload.video_url !== undefined && payload.video_url !== null;
+  var hasLocked = payload.locked !== undefined && payload.locked !== null;
+  if (!hasUrl && !hasLocked) throw new Error("Nothing to change — send video_url and/or locked.");
+  var embed = hasUrl ? _normalizeEmbedUrl(payload.video_url) : null;   // "" = clear
+  var wantLocked = hasLocked ? _isLockedCell(payload.locked) : null;
+
+  var result = _withLock(function () {
+    var ss = _ss();
+    var sheet = ss.getSheetByName("Videos");
+    var found = sheet ? _findVideoRow(sheet, key.lesson, key.slot) : null;
+    var now = _fmt(new Date(), TZ, true);
+
+    if (embed === "") {                                   // clear the slot
+      if (found) sheet.deleteRows(found.row, 1);
+      return { ok: true, lesson: key.lesson, slot: key.slot, cleared: !!found };
+    }
+    if (found) {                                          // update in place
+      var c = found.cols;
+      if (hasUrl) sheet.getRange(found.row, c.embed_url).setNumberFormat("@").setValue(embed);
+      if (hasLocked) sheet.getRange(found.row, c.locked).setValue(wantLocked);
+      if (c.updated_at) sheet.getRange(found.row, c.updated_at).setNumberFormat("@").setValue(now);
+      return { ok: true, lesson: key.lesson, slot: key.slot,
+               embed_url: hasUrl ? embed : found.embed_url, locked: hasLocked ? wantLocked : found.locked };
+    }
+    if (!hasUrl) throw new Error("No video is set for this slot yet — send video_url first.");
+    sheet = _sheetByName(ss, "Videos", VIDEO_HEADERS);    // created only here, inside the lock
+    _ensureColumns(sheet, VIDEO_HEADERS);
+    var locked = hasLocked ? wantLocked : true;           // new videos start locked
+    _appendByHeader(sheet, { lesson: key.lesson, slot: key.slot, embed_url: embed, locked: locked, updated_at: now });
+    return { ok: true, lesson: key.lesson, slot: key.slot, embed_url: embed, locked: locked };
+  });
+  CacheService.getScriptCache().remove(_videoCacheKey(key.lesson, key.slot));
+  return result;
+}
+
+function handleAdminListVideos(payload) {
+  _requireAdminAny(payload);
+  var sheet = _ss().getSheetByName("Videos");
+  var rows = sheet && sheet.getLastRow() >= 2 ? _sheetValuesAsObjects(sheet) : [];
+  return {
+    ok: true,
+    videos: rows.map(function (r) {
+      return { lesson: String(r.lesson || ""), slot: String(r.slot || ""), embed_url: String(r.embed_url || ""),
+               locked: _isLockedCell(r.locked), updated_at: String(r.updated_at || "") };
+    }),
   };
 }
 

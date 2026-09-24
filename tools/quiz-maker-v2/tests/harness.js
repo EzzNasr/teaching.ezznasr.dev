@@ -26,7 +26,8 @@ class Sheet {
   getDataRange() { return this.getRange(1, 1, Math.max(this.getLastRow(), 1), Math.max(this.getLastColumn(), 1)); }
   appendRow(vals) { const r = this.getLastRow() + 1; if (r > this.maxRows) this.maxRows = r; vals.forEach((v, i) => { if (i + 1 > this.maxCols) this.maxCols = i + 1; this.set(r, i + 1, v); }); }
   insertRowsAfter(after, n) { this.maxRows += n; }
-  deleteRows(start, n) { for (const k of [...this.cells.keys()]) { const [r, c] = k.split(',').map(Number); if (r >= start && r < start + n) this.cells.delete(k); } this.maxRows -= n; }
+  // Like the real thing: the deleted rows go and everything below moves UP.
+  deleteRows(start, n) { const moved = new Map(); for (const [k, v] of this.cells) { const [r, c] = k.split(',').map(Number); if (r >= start && r < start + n) continue; moved.set((r >= start + n ? r - n : r) + ',' + c, v); } this.cells = moved; this.maxRows -= n; }
   setFrozenRows() {} hideColumns() {} setColumnWidth() {} autoResizeColumn() {}
 }
 class Spreadsheet {
