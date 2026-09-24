@@ -277,5 +277,30 @@ let payA;
   t('the admin preview still works for locked videos', sees(ADMIN, L1, 'lesson', ID.l1));
 }
 
+// 13. the "how to pay" text ---------------------------------------------------------------------------------
+{
+  const P = 'english/pay-info-test';
+  setVideo(P, 'lesson', 'G'.repeat(11));
+  const stranger = reg('01000000006', 'f', 'Hana');
+  const SH = cr(stranger);
+  let r = get(SH, P);
+  t('no PAY_INSTRUCTIONS set: no pay_info key at all', r.need === 'payment' && !('pay_info' in r), JSON.stringify(r));
+  env.props.PAY_INSTRUCTIONS = '  Send 200 EGP to 01012345678 (Vodafone Cash)\nthen tap "I paid".  ';
+  r = get(SH, P);
+  t('a signed-in student without access gets pay_info (trimmed, newline kept)', r.pay_info === 'Send 200 EGP to 01012345678 (Vodafone Cash)\nthen tap "I paid".', JSON.stringify(r));
+  r = get({}, P);
+  t('a logged-out visitor sees the price before signing in', r.need === 'login' && /200 EGP/.test(r.pay_info), JSON.stringify(r));
+  r = get(ADMIN, P);
+  t('the admin preview carries the URL and no pay_info', !!r.embed_url && !('pay_info' in r), JSON.stringify(r));
+  grant(ADMIN, { phone: '01000000006', scope: P, days: 5 });
+  r = get(SH, P);
+  t('a paid student gets the URL and no pay_info', !!r.embed_url && !('pay_info' in r), JSON.stringify(r));
+  env.props.PAY_INSTRUCTIONS = 'x'.repeat(2500);
+  t('pay_info is capped at 1000 characters', get({}, P).pay_info.length === 1000);
+  env.props.PAY_INSTRUCTIONS = '   \n  ';
+  t('a blank PAY_INSTRUCTIONS counts as unset', !('pay_info' in get({}, P)));
+  delete env.props.PAY_INSTRUCTIONS;
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
