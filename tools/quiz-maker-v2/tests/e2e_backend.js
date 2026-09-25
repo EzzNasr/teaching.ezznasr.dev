@@ -21,6 +21,12 @@ http.createServer((req, res) => {
         let col = 0; for (let c = 1; c <= 12; c++) if (sh.get(1, c) === 'is_admin') col = c;
         for (let r = 2; r <= sh.getLastRow(); r++) if (String(sh.get(r, 1)).endsWith(String(p.phone).slice(-10))) sh.set(r, col, true);
         out = { ok: true };
+      } else if (req.url === '/__set_payment_status') {
+        // edit the Payments sheet by hand, like the teacher does in Google Sheets
+        const sh = env.getSS('STU').getSheetByName('Payments');
+        let idc = 0, stc = 0; for (let c = 1; c <= 12; c++) { if (sh.get(1, c) === 'payment_id') idc = c; if (sh.get(1, c) === 'status') stc = c; }
+        for (let r = 2; r <= sh.getLastRow(); r++) if (String(sh.get(r, idc)) === p.payment_id) sh.set(r, stc, p.status);
+        out = { ok: true };
       } else out = env.post(p);
     } catch (e) { out = { ok: false, error: String(e && e.message || e) }; }
     res.writeHead(200, cors); res.end(JSON.stringify(out));
