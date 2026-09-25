@@ -1712,3 +1712,5 @@ class GradedBulkDialog(tk.Toplevel):
             return
         self.result = items
         self.destroy()
+
+
