@@ -372,6 +372,8 @@
         var intro = "Once you've paid, tell us below and your teacher will unlock it.";
         if (data.request === "rejected") {
           intro = "Your last payment note wasn't approved. If you think that's a mistake, contact your teacher \u2014 or send a new note.";
+        } else if (data.request === "revoked") {
+          intro = "Your access to this video was removed. If you think that's a mistake, contact your teacher \u2014 or send a new payment note.";
         } else if (data.expired) {
           intro = "Your access ended on " + data.expired + ". Send a new payment note to renew it.";
         }
