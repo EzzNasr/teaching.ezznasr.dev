@@ -198,6 +198,21 @@
  *   student already has (renewals add to the later of today / current expiry).
  * - How long a grant lasts: expires_at, else days, else the DEFAULT_ACCESS_DAYS
  *   Script Property, else it never expires.
+ * - A grant made by approving a payment remembers that payment (source =
+ *   "payment:<id>"). If that payment's status is later changed to ANYTHING but
+ *   "approved" — by hand in the Payments tab (approved -> rejected), or by
+ *   admin_revoke_access, which writes "revoked" — the access stops at once.
+ *   (Deleting the Payments row does NOT revoke it; a grant whose source is
+ *   "manual" is only ended by deleting its row or by admin_revoke_access.)
+ * - admin_revoke_access {phone, scope} (or {payment_id}) deletes that student's
+ *   entitlement row(s) and marks the payment behind it "revoked". It never
+ *   touches other scopes: a student who also holds "folder/*" keeps that.
+ * - admin_access_overview returns everything the access dashboard
+ *   (dashboard/access.html) shows in one call: counts, videos, every payment
+ *   request, and every entitlement with its student's name and a plain state
+ *   (active / expired / cancelled / invalid) and days left.
+ * - Approve / grant take {never:true} to force "never expires" (otherwise the
+ *   DEFAULT_ACCESS_DAYS property would apply when no term is given).
  * - What the lock box tells people about paying ("Send 200 EGP to 010… then tap
  *   I paid") is the PAY_INSTRUCTIONS Script Property (plain text, max 1000
  *   characters). get_video returns it as pay_info with every locked answer that
@@ -986,6 +1001,12 @@ function doPost(e) {
       case "admin_grant_access":
         return _json(handleAdminGrantAccess(payload));
 
+      case "admin_revoke_access":
+        return _json(handleAdminRevokeAccess(payload));
+
+      case "admin_access_overview":
+        return _json(handleAdminAccessOverview(payload));
+
       default:
         return _json({ ok: false, error: "Unknown action: " + payload.action });
     }
@@ -1514,28 +1535,59 @@ function _accessDays(payload) {
   return d > 0 ? d : 0;
 }
 
+// The payment id behind an entitlement made by approving a request ("payment:p3fa91c2d"), else "".
+function _sourcePayment(source) {
+  var m = /^payment:(\S+)$/.exec(String(source == null ? "" : source).trim());
+  return m ? m[1] : "";
+}
+
+// {payment_id: "approved" | "rejected" | ...} for every row of the Payments tab.
+function _paymentStatuses(ss) {
+  var map = {};
+  var sheet = ss.getSheetByName("Payments");
+  if (!sheet || sheet.getLastRow() < 2) return map;
+  var c = _needCols(sheet, "Payments", ["payment_id", "status"]);
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
+    var id = String(r[c.payment_id - 1]).trim();
+    if (id) map[id] = String(r[c.status - 1]).trim().toLowerCase();
+  });
+  return map;
+}
+
 // {active, expired}: does this phone hold a current entitlement covering the lesson?
 // `expired` = the latest end date among covering entitlements that have run out.
+// An entitlement that came from a payment only counts while that payment is still
+// "approved" (a missing Payments row does not switch it off — only an explicit other status does).
 function _accessState(ss, phone, lesson) {
   var out = { active: false, expired: null };
   var sheet = ss.getSheetByName("Entitlements");
   if (!sheet || sheet.getLastRow() < 2) return out;
   var c = _needCols(sheet, "Entitlements", ["phone", "scope", "expires_at"]);
+  var srcCol = _headerIndex(sheet)["source"] || 0;
   var tz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
   var today = _todayCairo();
+  var statuses = null;
   var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
   for (var i = 0; i < values.length; i++) {
     if (!_phonesMatch(values[i][c.phone - 1], phone)) continue;
     if (!_scopeCovers(String(values[i][c.scope - 1]).trim().toLowerCase(), lesson)) continue;
     var ymd = _ymdOf(values[i][c.expires_at - 1], tz);
     if (ymd === null) continue;                       // unreadable date: fail closed
-    if (ymd === "" || today <= ymd) { out.active = true; return out; }
+    if (ymd === "" || today <= ymd) {
+      var pid = srcCol ? _sourcePayment(values[i][srcCol - 1]) : "";
+      if (pid) {
+        if (statuses === null) statuses = _paymentStatuses(ss);
+        if (statuses.hasOwnProperty(pid) && statuses[pid] !== "approved") continue;   // payment cancelled
+      }
+      out.active = true;
+      return out;
+    }
     if (!out.expired || ymd > out.expired) out.expired = ymd;
   }
   return out;
 }
 
-// "pending" / "rejected" for this student's most recent request for exactly this lesson.
+// "pending" / "rejected" / "revoked" for this student's most recent request for exactly this lesson.
 function _latestRequest(ss, phone, lesson) {
   var sheet = ss.getSheetByName("Payments");
   if (!sheet || sheet.getLastRow() < 2) return null;
@@ -1545,7 +1597,7 @@ function _latestRequest(ss, phone, lesson) {
     if (!_phonesMatch(values[i][c.phone - 1], phone)) continue;
     if (String(values[i][c.scope - 1]).trim().toLowerCase() !== lesson) continue;
     var st = String(values[i][c.status - 1]).trim().toLowerCase();
-    return st === "pending" || st === "rejected" ? st : null;
+    return st === "pending" || st === "rejected" || st === "revoked" ? st : null;
   }
   return null;
 }
@@ -1566,7 +1618,8 @@ function _grantRaw(ss, phone, scope, explicitYmd, days, source) {
     var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
     for (var i = 0; i < values.length; i++) {
       if (_phonesMatch(values[i][c.phone - 1], phone) && String(values[i][c.scope - 1]).trim().toLowerCase() === scope) {
-        found = { row: i + 2, ymd: _ymdOf(values[i][c.expires_at - 1], tz) };   // null = unreadable
+        found = { row: i + 2, ymd: _ymdOf(values[i][c.expires_at - 1], tz),      // null = unreadable
+                  source: String(values[i][c.source - 1] == null ? "" : values[i][c.source - 1]).trim() };
         break;
       }
     }
@@ -1581,9 +1634,21 @@ function _grantRaw(ss, phone, scope, explicitYmd, days, source) {
   else if (found && existing && target !== "" && existing > target) target = existing;   // never shorten
 
   if (found) {
+    // Extending by hand keeps the link to the payment behind the access (so cancelling that payment
+    // still switches it off) — unless that payment was already cancelled: then the teacher is
+    // deliberately switching it back on, and it becomes a manual grant. A hand-typed source stays as typed.
+    var newSource = source;
+    if (source === "manual" && found.source) {
+      var oldPid = _sourcePayment(found.source);
+      if (!oldPid) newSource = found.source;
+      else {
+        var st = _paymentStatuses(ss);
+        if (!st.hasOwnProperty(oldPid) || st[oldPid] === "approved") newSource = found.source;
+      }
+    }
     sheet.getRange(found.row, c.expires_at).setNumberFormat("@").setValue(target);
     sheet.getRange(found.row, c.granted_at).setNumberFormat("@").setValue(now);
-    sheet.getRange(found.row, c.source).setNumberFormat("@").setValue(source);
+    sheet.getRange(found.row, c.source).setNumberFormat("@").setValue(newSource);
   } else {
     _appendByHeader(sheet, { phone: phone, scope: scope, expires_at: target, granted_at: now, source: source });
   }
@@ -1660,7 +1725,7 @@ function handleAdminDecidePayment(payload) {
   if (decision !== "approve" && decision !== "reject") throw new Error('decision must be "approve" or "reject".');
   var scopeOverride = payload.scope ? _normalizeScope(payload.scope) : "";
   var explicit = payload.expires_at ? _cleanYmd(payload.expires_at) : "";
-  var days = decision === "approve" && !explicit ? _accessDays(payload) : 0;
+  var days = decision === "approve" && !explicit && payload.never !== true ? _accessDays(payload) : 0;
 
   return _withLock(function () {
     var ss = _ss();
@@ -1697,11 +1762,139 @@ function handleAdminGrantAccess(payload) {
   var phone = _canonicalPhone(payload.phone);
   var scope = _normalizeScope(payload.scope);
   var explicit = payload.expires_at ? _cleanYmd(payload.expires_at) : "";
-  var days = explicit ? 0 : _accessDays(payload);
+  var days = explicit || payload.never === true ? 0 : _accessDays(payload);
   var g = _withLock(function () { return _grantRaw(_ss(), phone, scope, explicit, days, "manual"); });
   var stu = _findStudentRow(_students(), phone);
   return { ok: true, phone: phone, scope: g.scope, expires_at: g.expires_at, extended: g.extended,
            known_student: !!stu, name: stu ? String(stu.display_name == null ? "" : stu.display_name) : "" };
+}
+
+// Ends access: deletes the matching entitlement row(s) and marks the payment behind
+// each one "revoked". By {phone, scope} (exactly that grant — other scopes the student
+// holds are untouched) or by {payment_id} (whatever that payment granted).
+function handleAdminRevokeAccess(payload) {
+  _requireAdminAny(payload);
+  var pid = String(payload.payment_id == null ? "" : payload.payment_id).trim();
+  var phone = "", scope = "";
+  if (!pid) {
+    if (_normalizePhone(payload.phone).length < 10) throw new Error("Enter the student's full phone number.");
+    phone = _canonicalPhone(payload.phone);
+    scope = _normalizeScope(payload.scope);
+  }
+  return _withLock(function () {
+    var ss = _ss();
+    var sheet = ss.getSheetByName("Entitlements");
+    if (!sheet || sheet.getLastRow() < 2) throw new Error("No matching access to revoke.");
+    var c = _needCols(sheet, "Entitlements", ["phone", "scope"]);
+    var srcCol = _headerIndex(sheet)["source"] || 0;
+    var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+    var rows = [], pays = [], seenScope = "", seenPhone = "";
+    for (var i = 0; i < values.length; i++) {
+      var src = srcCol ? _sourcePayment(values[i][srcCol - 1]) : "";
+      var rowScope = String(values[i][c.scope - 1]).trim().toLowerCase();
+      var hit = pid ? src === pid : (_phonesMatch(values[i][c.phone - 1], phone) && rowScope === scope);
+      if (!hit) continue;
+      rows.push(i + 2);
+      if (src) pays.push(src);
+      seenScope = rowScope; seenPhone = String(values[i][c.phone - 1]);
+    }
+    if (!rows.length) throw new Error("No matching access to revoke.");
+    rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
+
+    var marked = [];
+    var pSheet = pays.length ? ss.getSheetByName("Payments") : null;
+    if (pSheet && pSheet.getLastRow() >= 2) {
+      var pc = _needCols(pSheet, "Payments", ["payment_id", "status", "decided_at"]);
+      var pv = pSheet.getRange(2, 1, pSheet.getLastRow() - 1, pSheet.getLastColumn()).getValues();
+      var now = _fmt(new Date(), TZ, true);
+      for (var k = 0; k < pv.length; k++) {
+        var id = String(pv[k][pc.payment_id - 1]).trim();
+        if (pays.indexOf(id) === -1 || String(pv[k][pc.status - 1]).trim().toLowerCase() !== "approved") continue;
+        pSheet.getRange(k + 2, pc.status).setNumberFormat("@").setValue("revoked");
+        pSheet.getRange(k + 2, pc.decided_at).setNumberFormat("@").setValue(now);
+        marked.push(id);
+      }
+    }
+    return { ok: true, removed: rows.length, phone: _canonicalPhone(seenPhone) || seenPhone, scope: seenScope, payments_revoked: marked };
+  });
+}
+
+function _daysBetween(fromYmd, toYmd) {
+  var a = fromYmd.split("-"), b = toYmd.split("-");
+  return Math.round((Date.UTC(+b[0], +b[1] - 1, +b[2]) - Date.UTC(+a[0], +a[1] - 1, +a[2])) / 86400000);
+}
+
+// Everything the access dashboard shows, in one round trip. Read-only.
+function handleAdminAccessOverview(payload) {
+  _requireAdminAny(payload);
+  var ss = _ss();
+  var today = _todayCairo();
+  var tz = TZ;
+
+  var nameByKey = {};
+  _sheetValuesAsObjects(_students()).forEach(function (r) {
+    var k = _phoneKey(r.phone);
+    if (k && !nameByKey.hasOwnProperty(k)) nameByKey[k] = String(r.display_name == null ? "" : r.display_name);
+  });
+  function who(phone) {
+    var k = _phoneKey(phone);
+    return { known: nameByKey.hasOwnProperty(k), name: nameByKey.hasOwnProperty(k) ? nameByKey[k] : "" };
+  }
+
+  var vSheet = ss.getSheetByName("Videos");
+  var videos = (vSheet && vSheet.getLastRow() >= 2 ? _sheetValuesAsObjects(vSheet) : []).map(function (r) {
+    return { lesson: String(r.lesson || ""), slot: String(r.slot || ""), embed_url: String(r.embed_url || ""),
+             locked: _isLockedCell(r.locked), updated_at: String(r.updated_at || "") };
+  });
+
+  var pSheet = ss.getSheetByName("Payments");
+  var payRows = (pSheet && pSheet.getLastRow() >= 2 ? _sheetValuesAsObjects(pSheet) : []).map(function (r) {
+    return { payment_id: String(r.payment_id || "").trim(), phone: String(r.phone || ""), name: String(r.name || ""),
+             scope: String(r.scope || "").trim().toLowerCase(), reference: String(r.reference || ""), note: String(r.note || ""),
+             status: String(r.status || "").trim().toLowerCase(), created_at: String(r.created_at || ""),
+             decided_at: String(r.decided_at || "") };
+  });
+  var statusById = {};
+  payRows.forEach(function (p) { if (p.payment_id) statusById[p.payment_id] = p.status; });
+
+  var eSheet = ss.getSheetByName("Entitlements");
+  var access = (eSheet && eSheet.getLastRow() >= 2 ? _sheetValuesAsObjects(eSheet) : []).map(function (r) {
+    var scope = String(r.scope || "").trim().toLowerCase();
+    var ymd = _ymdOf(r.expires_at, tz);
+    var pid = _sourcePayment(r.source);
+    var pst = pid && statusById.hasOwnProperty(pid) ? statusById[pid] : "";
+    var state, left = null;
+    if (pid && pst && pst !== "approved") state = "cancelled";
+    else if (ymd === null) state = "invalid";
+    else if (ymd === "") state = "active";
+    else { left = _daysBetween(today, ymd); state = left >= 0 ? "active" : "expired"; }
+    var w = who(r.phone);
+    return { phone: String(r.phone || ""), name: w.name, known_student: w.known, scope: scope,
+             expires_at: ymd === null ? String(r.expires_at || "") : ymd, granted_at: String(r.granted_at || ""),
+             source: String(r.source || ""), payment_id: pid, payment_status: pst, state: state, days_left: left };
+  });
+
+  var accessByPayment = {};
+  access.forEach(function (a) { if (a.payment_id) accessByPayment[a.payment_id] = a; });
+  var payments = payRows.map(function (p) {
+    var a = accessByPayment[p.payment_id];
+    var w = who(p.phone);
+    p.known_student = w.known;
+    if (!p.name && w.name) p.name = w.name;
+    if (a) { p.access_until = a.expires_at === "" ? "never" : a.expires_at; p.access_state = a.state; }
+    return p;
+  });
+
+  var counts = { pending: 0, active: 0, ending_soon: 0, expired: 0, cancelled: 0, invalid: 0, videos_locked: 0, videos_open: 0 };
+  payments.forEach(function (p) { if (p.status === "pending") counts.pending++; });
+  access.forEach(function (a) {
+    counts[a.state]++;
+    if (a.state === "active" && a.days_left !== null && a.days_left <= 7) counts.ending_soon++;
+  });
+  videos.forEach(function (v) { if (v.locked) counts.videos_locked++; else counts.videos_open++; });
+
+  return { ok: true, today: today, counts: counts, videos: videos,
+           payments: payments.reverse().slice(0, 500), access: access.reverse().slice(0, 1000) };
 }
 
 // -- One-off cleanup of duplicates written BEFORE the fix -------------------
