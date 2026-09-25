@@ -1494,5 +1494,12 @@
     openSignIn: function () {
       openSignInModal(document.activeElement);
     },
+    // Any admin action from a dashboard page: sends the signed-in session along with it.
+    // Code.gs re-checks is_admin on every call, so this is only plumbing.
+    adminCall: function (session, payload) {
+      var missing = requireSession(session);
+      if (missing) return missing;
+      return postToDrive(Object.assign({}, payload, { student_id: session.student_id, session_token: session.session_token }));
+    },
   };
 })();
