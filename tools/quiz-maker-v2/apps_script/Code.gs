@@ -1057,6 +1057,21 @@ function doPost(e) {
       case "admin_group_revoke_access":
         return _json(handleAdminGroupRevokeAccess(payload));
 
+      case "admin_list_lessons":
+        return _json(handleAdminListLessons(payload));
+
+      case "admin_grant_quiz_access":
+        return _json(handleAdminGrantQuizAccess(payload));
+
+      case "admin_revoke_quiz_access":
+        return _json(handleAdminRevokeQuizAccess(payload));
+
+      case "admin_group_grant_quiz_access":
+        return _json(handleAdminGroupGrantQuizAccess(payload));
+
+      case "admin_group_revoke_quiz_access":
+        return _json(handleAdminGroupRevokeQuizAccess(payload));
+
       default:
         return _json({ ok: false, error: "Unknown action: " + payload.action });
     }
@@ -1230,7 +1245,7 @@ function handleUploadQuizResult(payload) {
   // IS required though (confirmed quiz.js always sends it as of the login
   // rollout) — same reasoning as handleUploadSubmission above.
   if (!payload.student_id) throw new Error("Missing student_id — please sign in and try again.");
-  if (_isQuizLocked(payload.lesson)) throw new Error("This quiz is locked right now — ask your teacher when it opens.");
+  if (_quizLockedForStudent(_lessonPath(payload.lesson), payload.student_id)) throw new Error("This quiz is locked right now — ask your teacher when it opens.");
 
   var keys = _quizKeys(payload);
   var peeked = _peekSheet("QuizResults");
@@ -1875,6 +1890,70 @@ function _daysBetween(fromYmd, toYmd) {
   return Math.round((Date.UTC(+b[0], +b[1] - 1, +b[2]) - Date.UTC(+a[0], +a[1] - 1, +a[2])) / 86400000);
 }
 
+// -- All lessons on the site, straight from GitHub -----------------------------------
+// The Videos/Quizzes sheets only know about a lesson once something toggles its lock,
+// so they're useless for "let me pick ANY lesson to gate." This reads the real lesson
+// list from the site's GitHub repo instead: one recursive tree call, cached for
+// LESSON_LIST_CACHE_SECONDS so repeat dashboard loads don't re-hit GitHub or add
+// noticeable delay. Needs Script Properties: GITHUB_REPO ("owner/repo"), optionally
+// GITHUB_BRANCH (default "main") and GITHUB_TOKEN (raises the 60/hr anonymous rate
+// limit to 5000/hr — recommended, but not required for a public repo).
+var LESSON_LIST_CACHE_SECONDS = 600;
+var LESSON_EXCLUDE_PREFIXES = ["dashboard/", "tools/", "assets/", "_deleted-lessons/", "icons/", ".git/", "Docs/", "packaged/"];
+
+function _allLessonsFromGithub() {
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get("all_lessons_v1");
+  if (hit !== null) return JSON.parse(hit);
+
+  var props = _props();
+  var repo = props.getProperty("GITHUB_REPO");
+  if (!repo) throw new Error('Set the GITHUB_REPO Script Property (e.g. "yourname/teaching.ezznasr.dev") to list lessons.');
+  var branch = props.getProperty("GITHUB_BRANCH") || "main";
+  var token = props.getProperty("GITHUB_TOKEN");
+
+  var headers = { "Accept": "application/vnd.github+json" };
+  if (token) headers["Authorization"] = "Bearer " + token;
+  var url = "https://api.github.com/repos/" + repo + "/git/trees/" + branch + "?recursive=1";
+  var resp = UrlFetchApp.fetch(url, { headers: headers, muteHttpExceptions: true });
+  if (resp.getResponseCode() !== 200) {
+    throw new Error("Couldn't list lessons from GitHub (HTTP " + resp.getResponseCode() + "). Check GITHUB_REPO/GITHUB_BRANCH/GITHUB_TOKEN.");
+  }
+  var body = JSON.parse(resp.getContentText());
+  if (body.truncated) {
+    // Repo tree too large for one call — still usable, just possibly incomplete.
+  }
+  var blobPaths = {};
+  (body.tree || []).forEach(function (item) { if (item.type === "blob") blobPaths[item.path] = 1; });
+
+  var lessons = [];
+  Object.keys(blobPaths).forEach(function (p) {
+    if (!/\/index\.html$/.test(p)) return;
+    var dir = p.slice(0, -"/index.html".length);
+    if (!dir || dir.indexOf("/") === -1) return;   // top-level index / a track's own landing page
+    if (LESSON_EXCLUDE_PREFIXES.some(function (pre) { return dir.indexOf(pre) === 0; })) return;
+    // A real lesson folder has a quiz or an assignment page next to its index.
+    if (!blobPaths[dir + "/quiz.html"] && !blobPaths[dir + "/assignment.html"]) return;
+    lessons.push({ lesson: dir.toLowerCase(), track: dir.split("/")[0].toLowerCase() });
+  });
+  lessons.sort(function (a, b) { return a.lesson < b.lesson ? -1 : 1; });
+
+  var tracks = Object.keys(lessons.reduce(function (acc, l) { acc[l.track] = 1; return acc; }, {})).sort();
+  var result = { lessons: lessons, tracks: tracks };
+  cache.put("all_lessons_v1", JSON.stringify(result), LESSON_LIST_CACHE_SECONDS);
+  return result;
+}
+
+// Public: the dashboard calls this to refresh its lesson picker on demand (e.g. a
+// "Refresh list" button), bypassing nothing — it shares the same cache as the
+// overview call, it just lets the admin force a wait for a fresh GitHub read isn't
+// needed since the cache already expires on its own after LESSON_LIST_CACHE_SECONDS.
+function handleAdminListLessons(payload) {
+  _requireAdminAny(payload);
+  var got = _allLessonsFromGithub();
+  return { ok: true, lessons: got.lessons, tracks: got.tracks };
+}
+
 // Everything the access dashboard shows, in one round trip. Read-only.
 function handleAdminAccessOverview(payload) {
   _requireAdminAny(payload);
@@ -1963,8 +2042,34 @@ function handleAdminAccessOverview(payload) {
   quizzes.forEach(function (q) { if (q.locked) counts.quizzes_locked++; });
   counts.groups = groups.length;
 
+  // Soft-fail: a GitHub hiccup or a missing GITHUB_REPO property shouldn't take down
+  // the whole dashboard. The lesson pickers fall back to whatever Videos/Quizzes
+  // already know about when this comes back empty.
+  var allLessons = [], tracks = [], lessonsError = "";
+  try {
+    var got = _allLessonsFromGithub();
+    allLessons = got.lessons; tracks = got.tracks;
+  } catch (e) {
+    lessonsError = String(e.message || e);
+  }
+
+  var qaSheet = ss.getSheetByName("QuizAccess");
+  var quizAccess = (qaSheet && qaSheet.getLastRow() >= 2 ? _sheetValuesAsObjects(qaSheet) : []).map(function (r) {
+    var ymd = _ymdOf(r.expires_at, tz);
+    var state;
+    if (ymd === null) state = "invalid";
+    else if (ymd === "") state = "active";
+    else state = _daysBetween(today, ymd) >= 0 ? "active" : "expired";
+    var w = who(r.phone);
+    return { phone: String(r.phone || ""), name: w.name, lesson: String(r.lesson || ""),
+             expires_at: ymd === null ? String(r.expires_at || "") : ymd, granted_at: String(r.granted_at || ""),
+             source: String(r.source || ""), state: state };
+  });
+
   return { ok: true, today: today, counts: counts, videos: videos, quizzes: quizzes, groups: groups,
-           payments: payments.reverse().slice(0, 500), access: access.reverse().slice(0, 1000) };
+           payments: payments.reverse().slice(0, 500), access: access.reverse().slice(0, 1000),
+           all_lessons: allLessons, tracks: tracks, lessons_error: lessonsError,
+           quiz_access: quizAccess.reverse().slice(0, 1000) };
 }
 
 // -- Quiz gate: lock/unlock a lesson's quiz, separate from its video ---------------
@@ -2018,10 +2123,14 @@ function _isQuizLocked(rawLesson) {
   return locked;
 }
 
-// Public. What quiz.js checks before showing the quiz at all.
+// Public. What quiz.js checks before showing the quiz at all. student_id is optional
+// (an anonymous check just sees the global lock); passing it also picks up a group's
+// or student's timed override, so a student in an "open early" group sees it as open.
 function handleGetQuizState(payload) {
   var lesson = _lessonPath(payload.lesson);
-  return { ok: true, lesson: lesson, locked: _isQuizLocked(lesson) };
+  var lockedGlobally = _isQuizLocked(lesson);
+  var locked = payload.student_id ? _quizLockedForStudent(lesson, payload.student_id) : lockedGlobally;
+  return { ok: true, lesson: lesson, locked: locked, locked_globally: lockedGlobally };
 }
 
 // locked is REQUIRED (this toggles one thing, unlike admin_set_video's partial updates).
@@ -2048,6 +2157,166 @@ function handleAdminSetQuizLock(payload) {
   });
   CacheService.getScriptCache().remove(_quizCacheKey(lesson));
   return result;
+}
+
+// -- Quiz access overrides: open a locked quiz for one phone/group, for a while ------
+// Layers on top of the global Quizzes lock, the same way Entitlements layer on top of
+// the video lock. A quiz that is OPEN globally ignores this entirely. A quiz that is
+// LOCKED globally is opened only for a phone holding a live row here. Expiry works
+// exactly like video access (blank = never expires; past the date = expired = locked
+// again automatically, no manual re-lock needed).
+var QUIZ_ACCESS_HEADERS = ["phone", "lesson", "expires_at", "granted_at", "source"];
+
+function _grantQuizRaw(ss, phone, lesson, explicitYmd, days, source) {
+  var sheet = _sheetByName(ss, "QuizAccess", QUIZ_ACCESS_HEADERS);
+  _ensureColumns(sheet, QUIZ_ACCESS_HEADERS);
+  var c = _needCols(sheet, "QuizAccess", QUIZ_ACCESS_HEADERS);
+  var tz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
+  var today = _todayCairo();
+  var now = _fmt(new Date(), TZ, true);
+
+  var found = null;
+  if (sheet.getLastRow() >= 2) {
+    var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+    for (var i = 0; i < values.length; i++) {
+      if (_phonesMatch(values[i][c.phone - 1], phone) && String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) {
+        found = { row: i + 2, ymd: _ymdOf(values[i][c.expires_at - 1], tz) };
+        break;
+      }
+    }
+  }
+  var existing = found ? found.ymd : null;
+  var target;
+  if (explicitYmd) target = explicitYmd;
+  else if (days) target = _addDays(existing && existing > today ? existing : today, days);
+  else target = "";
+  if (found && existing === "") target = "";
+  else if (found && existing && target !== "" && existing > target) target = existing;
+
+  if (found) {
+    sheet.getRange(found.row, c.expires_at).setNumberFormat("@").setValue(target);
+    sheet.getRange(found.row, c.granted_at).setNumberFormat("@").setValue(now);
+    sheet.getRange(found.row, c.source).setNumberFormat("@").setValue(source);
+  } else {
+    _appendByHeader(sheet, { phone: phone, lesson: lesson, expires_at: target, granted_at: now, source: source });
+  }
+  return { lesson: lesson, expires_at: target, extended: !!found };
+}
+
+// Does this phone currently hold a live QuizAccess row for this exact lesson?
+function _hasActiveQuizAccess(lesson, phone) {
+  var sheet = _ss().getSheetByName("QuizAccess");
+  if (!sheet || sheet.getLastRow() < 2) return false;
+  var c = _needCols(sheet, "QuizAccess", ["phone", "lesson", "expires_at"]);
+  var tz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
+  var today = _todayCairo();
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (!_phonesMatch(values[i][c.phone - 1], phone)) continue;
+    if (String(values[i][c.lesson - 1]).trim().toLowerCase() !== lesson) continue;
+    var ymd = _ymdOf(values[i][c.expires_at - 1], tz);
+    if (ymd === null) continue;               // unreadable date -> doesn't count as access
+    if (ymd === "" || ymd >= today) return true;
+  }
+  return false;
+}
+
+// What quiz.js / handleUploadQuizResult actually enforce: locked globally AND (no
+// phone given, or that phone has no live override) = locked for this request.
+function _quizLockedForStudent(lesson, phone) {
+  if (!_isQuizLocked(lesson)) return false;
+  if (!phone) return true;
+  return !_hasActiveQuizAccess(lesson, phone);
+}
+
+function handleAdminGrantQuizAccess(payload) {
+  _requireAdminAny(payload);
+  if (_normalizePhone(payload.phone).length < 10) throw new Error("Enter the student's full phone number.");
+  var phone = _canonicalPhone(payload.phone);
+  var lesson = _lessonPath(payload.lesson);
+  var explicit = payload.expires_at ? _cleanYmd(payload.expires_at) : "";
+  var days = explicit || payload.never === true ? 0 : _accessDays(payload);
+  var g = _withLock(function () { return _grantQuizRaw(_ss(), phone, lesson, explicit, days, "manual"); });
+  var stu = _findStudentRow(_students(), phone);
+  return { ok: true, phone: phone, lesson: g.lesson, expires_at: g.expires_at, extended: g.extended,
+           known_student: !!stu, name: stu ? String(stu.display_name == null ? "" : stu.display_name) : "" };
+}
+
+function handleAdminRevokeQuizAccess(payload) {
+  _requireAdminAny(payload);
+  if (_normalizePhone(payload.phone).length < 10) throw new Error("Enter the student's full phone number.");
+  var phone = _canonicalPhone(payload.phone);
+  var lesson = _lessonPath(payload.lesson);
+  return _withLock(function () {
+    var sheet = _ss().getSheetByName("QuizAccess");
+    if (!sheet || sheet.getLastRow() < 2) throw new Error("No matching quiz access to revoke.");
+    var c = _needCols(sheet, "QuizAccess", ["phone", "lesson"]);
+    var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+    var rows = [];
+    for (var i = 0; i < values.length; i++) {
+      if (_phonesMatch(values[i][c.phone - 1], phone) && String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) rows.push(i + 2);
+    }
+    if (!rows.length) throw new Error("No matching quiz access to revoke.");
+    rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
+    return { ok: true, phone: phone, lesson: lesson, removed: rows.length };
+  });
+}
+
+// Applies admin_grant_quiz_access to every current member of a group, in one lock.
+function handleAdminGroupGrantQuizAccess(payload) {
+  _requireAdminAny(payload);
+  var key = _groupKey(payload.group);
+  var lesson = _lessonPath(payload.lesson);
+  var explicit = payload.expires_at ? _cleanYmd(payload.expires_at) : "";
+  var days = explicit || payload.never === true ? 0 : _accessDays(payload);
+
+  return _withLock(function () {
+    var ss = _ss();
+    var gsheet = ss.getSheetByName("Groups");
+    var spelling = _groupSpellings(gsheet)[key];
+    var members = _groupMembers(gsheet, key);
+    if (!members.length) throw new Error("That group has no members yet.");
+    var who = _nameLookup(ss);
+    var expiresAt = "";
+    var granted = members.map(function (m) {
+      var g = _grantQuizRaw(ss, m.phone, lesson, explicit, days, "group:" + (spelling || payload.group));
+      expiresAt = g.expires_at;
+      return { phone: m.phone, name: who(m.phone).name };
+    });
+    return { ok: true, group: spelling || payload.group, lesson: lesson,
+             expires_at: expiresAt, granted: granted, count: granted.length };
+  });
+}
+
+// Applies admin_revoke_quiz_access to every member; a member who doesn't hold this
+// override is skipped rather than failing the whole batch.
+function handleAdminGroupRevokeQuizAccess(payload) {
+  _requireAdminAny(payload);
+  var key = _groupKey(payload.group);
+  var lesson = _lessonPath(payload.lesson);
+
+  return _withLock(function () {
+    var ss = _ss();
+    var gsheet = ss.getSheetByName("Groups");
+    var spelling = _groupSpellings(gsheet)[key];
+    var members = _groupMembers(gsheet, key);
+    if (!members.length) throw new Error("That group has no members yet.");
+    var qaSheet = ss.getSheetByName("QuizAccess");
+    var removed = 0;
+    members.forEach(function (m) {
+      if (!qaSheet || qaSheet.getLastRow() < 2) return;
+      var c = _needCols(qaSheet, "QuizAccess", ["phone", "lesson"]);
+      var values = qaSheet.getRange(2, 1, qaSheet.getLastRow() - 1, qaSheet.getLastColumn()).getValues();
+      var rows = [];
+      for (var i = 0; i < values.length; i++) {
+        if (_phonesMatch(values[i][c.phone - 1], m.phone) && String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) rows.push(i + 2);
+      }
+      if (!rows.length) return;
+      rows.sort(function (a, b) { return b - a; }).forEach(function (r) { qaSheet.deleteRows(r, 1); });
+      removed++;
+    });
+    return { ok: true, group: spelling || payload.group, lesson: lesson, removed_students: removed };
+  });
 }
 
 // -- Student groups -----------------------------------------------------------------

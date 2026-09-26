@@ -208,7 +208,7 @@
     function checkGateThenStart(session) {
       root.innerHTML = "";
       root.appendChild(el("p", { class: "qz-lede" }, ["Checking\u2026"]));
-      postToDrive({ action: "get_quiz_state", lesson: quiz.lesson })
+      postToDrive({ action: "get_quiz_state", lesson: quiz.lesson, student_id: session.student_id })
         .then(
           function (data) { data && data.locked ? renderLocked(session) : startQuiz(session); },
           function () { startQuiz(session); }
