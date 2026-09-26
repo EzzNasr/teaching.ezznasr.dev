@@ -1164,7 +1164,7 @@
 
   function grantPanel(d) {
     var lessons = {}, folders = {};
-    d.videos.forEach(function (v) { lessons[v.lesson] = 1; var p = parentOf(v.lesson); if (p) folders[p] = 1; });
+    allLessonsList(d).forEach(function (l) { lessons[l.lesson] = 1; var p = parentOf(l.lesson); if (p) folders[p] = 1; });
     var phone = el("input", { class: "ac-input", type: "tel", id: "gr-phone", placeholder: "01xxxxxxxxx", "aria-label": "Student phone", autocomplete: "off" });
     var scopeSel = el("select", { class: "ac-input", id: "gr-scope", "aria-label": "What it covers" }, [
       el("option", { value: "" }, ["Choose\u2026"]),

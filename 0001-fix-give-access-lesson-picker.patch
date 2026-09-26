@@ -1,0 +1,31 @@
+From 29d8043a6b86f8809e882f79283c21635e24392c Mon Sep 17 00:00:00 2001
+From: Assistant <assistant@local>
+Date: Sat, 26 Sep 2026 20:55:36 +0000
+Subject: [PATCH] Fix single-student Give-access panel to list every real
+ lesson, not just ones with a Videos-sheet row
+
+grantPanel() (the main, non-group 'Give access' form) was still building its
+lesson/folder dropdown from d.videos, the same bug already fixed for the
+quiz-gate and group-access dropdowns. Switched it to allLessonsList(d), so
+it now shows every lesson on the site (via the GitHub listing, same as the
+other two), not just ones that already had a video toggled once.
+---
+ dashboard/access.html | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/dashboard/access.html b/dashboard/access.html
+index f903241..4fa5ab8 100644
+--- a/dashboard/access.html
++++ b/dashboard/access.html
+@@ -1164,7 +1164,7 @@
+ 
+   function grantPanel(d) {
+     var lessons = {}, folders = {};
+-    d.videos.forEach(function (v) { lessons[v.lesson] = 1; var p = parentOf(v.lesson); if (p) folders[p] = 1; });
++    allLessonsList(d).forEach(function (l) { lessons[l.lesson] = 1; var p = parentOf(l.lesson); if (p) folders[p] = 1; });
+     var phone = el("input", { class: "ac-input", type: "tel", id: "gr-phone", placeholder: "01xxxxxxxxx", "aria-label": "Student phone", autocomplete: "off" });
+     var scopeSel = el("select", { class: "ac-input", id: "gr-scope", "aria-label": "What it covers" }, [
+       el("option", { value: "" }, ["Choose\u2026"]),
+-- 
+2.43.0
+
