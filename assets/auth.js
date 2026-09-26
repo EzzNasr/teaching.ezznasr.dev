@@ -46,8 +46,7 @@
   "use strict";
 
   var SESSION_KEY = "teaching_session";
-  var DRIVE_ENDPOINT =
-    "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
+  var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
