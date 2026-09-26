@@ -22,7 +22,7 @@
 
   var QUEUE_KEY = "teaching_pending_submissions";
   var LAST_ATTEMPT_PREFIX = "teaching_last_attempt:";
-  var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
+  var DRIVE_ENDPOINT = "{{DRIVE_ENDPOINT}}";
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
