@@ -218,6 +218,33 @@
  *   characters). get_video returns it as pay_info with every locked answer that
  *   has no URL, so you can change it any time without touching the site.
  *
+ * ---- Quiz gate (added) -----------------------------------------------------
+ * - Separate from the video lock: a "Quizzes" tab (lesson | locked | updated_at)
+ *   controls whether a lesson's QUIZ ITSELF can be opened and submitted, for
+ *   locking it until the actual test time. A lesson with NO row here behaves
+ *   exactly as before (open) — this only applies once you explicitly gate a
+ *   lesson, and a newly-gated lesson starts LOCKED.
+ * - get_quiz_state {lesson} (public) -> {locked}. admin_set_quiz_lock
+ *   {lesson, locked} creates/updates the row (desktop token or admin session).
+ * - upload_quiz_result is refused server-side while locked ("retryable" is NOT
+ *   set — resending the same attempt would just fail again), so a page left
+ *   open from before the lock can't sneak a submission through. get_quiz_state
+ *   is what quiz.js checks before showing the quiz at all. Cached briefly like
+ *   the video lock; admin_set_quiz_lock clears the cache at once.
+ *
+ * ---- Student groups (added) ------------------------------------------------
+ * - A "Groups" tab (group | phone | name | added_at): one row per membership,
+ *   so a student can be in several groups. admin_group_add / admin_group_remove
+ *   manage membership; admin_list_groups lists every group with its members
+ *   (name/known_student joined from Students, same as the access overview).
+ * - admin_group_grant_access / admin_group_revoke_access apply
+ *   admin_grant_access / admin_revoke_access to every member of a group in one
+ *   call. Revoking is quiet about members who don't hold that access — it
+ *   skips them rather than failing the whole batch.
+ * - Group names are matched without regard to case/spacing ("Grade 2" and
+ *   "grade  2" are the same group); the first spelling used is kept for
+ *   display so every row of one group reads the same way.
+ *
  * ---- Redeploying after editing this file --------------------------------
  * Apps Script Web Apps don't auto-update on save. After changing this
  * file: Deploy → Manage deployments → pencil (edit) → Version: "New
@@ -276,6 +303,8 @@ var PLAIN_TEXT_HEADERS = {
   // Entitlements + Payments (phone/name/scope-like text must never be reinterpreted)
   scope: 1, expires_at: 1, granted_at: 1, source: 1,
   payment_id: 1, reference: 1, status: 1, decided_at: 1,
+  // Groups
+  group: 1, added_at: 1,
 };
 // Of those, the ones that hold phone numbers (a leading 0 is easily lost).
 var PHONE_HEADERS = { phone: 1, parent_phone: 1, student_id: 1 };
@@ -1007,6 +1036,27 @@ function doPost(e) {
       case "admin_access_overview":
         return _json(handleAdminAccessOverview(payload));
 
+      case "get_quiz_state":
+        return _json(handleGetQuizState(payload));
+
+      case "admin_set_quiz_lock":
+        return _json(handleAdminSetQuizLock(payload));
+
+      case "admin_list_groups":
+        return _json(handleAdminListGroups(payload));
+
+      case "admin_group_add":
+        return _json(handleAdminGroupAdd(payload));
+
+      case "admin_group_remove":
+        return _json(handleAdminGroupRemove(payload));
+
+      case "admin_group_grant_access":
+        return _json(handleAdminGroupGrantAccess(payload));
+
+      case "admin_group_revoke_access":
+        return _json(handleAdminGroupRevokeAccess(payload));
+
       default:
         return _json({ ok: false, error: "Unknown action: " + payload.action });
     }
@@ -1180,6 +1230,7 @@ function handleUploadQuizResult(payload) {
   // IS required though (confirmed quiz.js always sends it as of the login
   // rollout) — same reasoning as handleUploadSubmission above.
   if (!payload.student_id) throw new Error("Missing student_id — please sign in and try again.");
+  if (_isQuizLocked(payload.lesson)) throw new Error("This quiz is locked right now — ask your teacher when it opens.");
 
   var keys = _quizKeys(payload);
   var peeked = _peekSheet("QuizResults");
@@ -1847,6 +1898,23 @@ function handleAdminAccessOverview(payload) {
              locked: _isLockedCell(r.locked), updated_at: String(r.updated_at || "") };
   });
 
+  var qSheet = ss.getSheetByName("Quizzes");
+  var quizzes = (qSheet && qSheet.getLastRow() >= 2 ? _sheetValuesAsObjects(qSheet) : []).map(function (r) {
+    return { lesson: String(r.lesson || ""), locked: _isLockedCell(r.locked), updated_at: String(r.updated_at || "") };
+  });
+
+  var gSheet = ss.getSheetByName("Groups");
+  var groupsByKey = {};
+  _groupMembers(gSheet, "", who).forEach(function (m) {
+    var k = _groupKey(m.group);
+    if (!groupsByKey[k]) groupsByKey[k] = { group: m.group, members: [] };
+    groupsByKey[k].members.push({ phone: m.phone, name: m.name, known_student: m.known_student });
+  });
+  var groupSpellings = _groupSpellings(gSheet);
+  var groups = Object.keys(groupsByKey).map(function (k) {
+    var g = groupsByKey[k]; g.group = groupSpellings[k] || g.group; return g;
+  }).sort(function (a, b) { return a.group.toLowerCase() < b.group.toLowerCase() ? -1 : 1; });
+
   var pSheet = ss.getSheetByName("Payments");
   var payRows = (pSheet && pSheet.getLastRow() >= 2 ? _sheetValuesAsObjects(pSheet) : []).map(function (r) {
     return { payment_id: String(r.payment_id || "").trim(), phone: String(r.phone || ""), name: String(r.name || ""),
@@ -1885,16 +1953,294 @@ function handleAdminAccessOverview(payload) {
     return p;
   });
 
-  var counts = { pending: 0, active: 0, ending_soon: 0, expired: 0, cancelled: 0, invalid: 0, videos_locked: 0, videos_open: 0 };
+  var counts = { pending: 0, active: 0, ending_soon: 0, expired: 0, cancelled: 0, invalid: 0, videos_locked: 0, videos_open: 0, quizzes_locked: 0, groups: 0 };
   payments.forEach(function (p) { if (p.status === "pending") counts.pending++; });
   access.forEach(function (a) {
     counts[a.state]++;
     if (a.state === "active" && a.days_left !== null && a.days_left <= 7) counts.ending_soon++;
   });
   videos.forEach(function (v) { if (v.locked) counts.videos_locked++; else counts.videos_open++; });
+  quizzes.forEach(function (q) { if (q.locked) counts.quizzes_locked++; });
+  counts.groups = groups.length;
 
-  return { ok: true, today: today, counts: counts, videos: videos,
+  return { ok: true, today: today, counts: counts, videos: videos, quizzes: quizzes, groups: groups,
            payments: payments.reverse().slice(0, 500), access: access.reverse().slice(0, 1000) };
+}
+
+// -- Quiz gate: lock/unlock a lesson's quiz, separate from its video ---------------
+// A lesson with no row here is OPEN (unchanged behaviour). Once explicitly gated,
+// a new row starts LOCKED. See the "Quiz gate" note at the top of this file.
+
+var QUIZ_HEADERS = ["lesson", "locked", "updated_at"];
+var QUIZ_CACHE_SECONDS = 30;
+function _quizCacheKey(lesson) { return "qlk:" + _md5(lesson); }
+
+function _findQuizRow(sheet, lesson) {
+  var last = sheet.getLastRow();
+  if (last < 2) return null;
+  var c = _needCols(sheet, "Quizzes", ["lesson", "locked"]);
+  var values = sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) {
+      return { row: i + 2, cols: c, locked: _isLockedCell(values[i][c.locked - 1]) };
+    }
+  }
+  return null;
+}
+
+// True/false, straight from the sheet — used by admin_set_quiz_lock and the dashboard,
+// where a fresh answer matters more than saving a read. A damaged Quizzes tab (a
+// renamed/deleted column) FAILS CLOSED, same as the video lock and entitlements: the
+// quiz is treated as locked until the sheet is fixed, rather than quietly opening it.
+function _quizLockedNow(lesson) {
+  var sheet = _ss().getSheetByName("Quizzes");
+  if (!sheet) return false;
+  try {
+    var found = _findQuizRow(sheet, lesson);
+    return !!(found && found.locked);
+  } catch (e) {
+    return true;
+  }
+}
+
+// Cached briefly — this is called on every quiz SUBMISSION, so a class finishing
+// together shouldn't cost one sheet read each. admin_set_quiz_lock clears the entry
+// at once; a lock flipped by hand in the Sheet can take up to this long to apply.
+function _isQuizLocked(rawLesson) {
+  var lesson;
+  try { lesson = _lessonPath(rawLesson); } catch (e) { return false; }   // an unrecognisable lesson can't be "locked"
+  var cache = CacheService.getScriptCache();
+  var ck = _quizCacheKey(lesson);
+  var hit = cache.get(ck);
+  if (hit !== null) return hit === "1";
+  var locked = _quizLockedNow(lesson);
+  cache.put(ck, locked ? "1" : "0", QUIZ_CACHE_SECONDS);
+  return locked;
+}
+
+// Public. What quiz.js checks before showing the quiz at all.
+function handleGetQuizState(payload) {
+  var lesson = _lessonPath(payload.lesson);
+  return { ok: true, lesson: lesson, locked: _isQuizLocked(lesson) };
+}
+
+// locked is REQUIRED (this toggles one thing, unlike admin_set_video's partial updates).
+function handleAdminSetQuizLock(payload) {
+  _requireAdminAny(payload);
+  var lesson = _lessonPath(payload.lesson);
+  if (payload.locked === undefined || payload.locked === null) throw new Error("Missing locked (true or false).");
+  var wantLocked = _isLockedCell(payload.locked);
+
+  var result = _withLock(function () {
+    var ss = _ss();
+    var sheet = ss.getSheetByName("Quizzes");
+    var found = sheet ? _findQuizRow(sheet, lesson) : null;
+    var now = _fmt(new Date(), TZ, true);
+    if (found) {
+      sheet.getRange(found.row, found.cols.locked).setValue(wantLocked);
+      if (found.cols.updated_at) sheet.getRange(found.row, found.cols.updated_at).setNumberFormat("@").setValue(now);
+      return { ok: true, lesson: lesson, locked: wantLocked };
+    }
+    sheet = _sheetByName(ss, "Quizzes", QUIZ_HEADERS);
+    _ensureColumns(sheet, QUIZ_HEADERS);
+    _appendByHeader(sheet, { lesson: lesson, locked: wantLocked, updated_at: now });
+    return { ok: true, lesson: lesson, locked: wantLocked };
+  });
+  CacheService.getScriptCache().remove(_quizCacheKey(lesson));
+  return result;
+}
+
+// -- Student groups -----------------------------------------------------------------
+// One row per (group, phone) membership in a "Groups" tab. See the "Student groups"
+// note at the top of this file.
+
+var GROUP_HEADERS = ["group", "phone", "name", "added_at"];
+var GROUP_NAME_RE = /^[\w][\w .-]{0,59}$/;   // letters/digits/underscore, space, dot, hyphen — 1-60 chars
+
+function _groupKey(name) {
+  return String(name == null ? "" : name).trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function _cleanGroupName(raw) {
+  var name = String(raw == null ? "" : raw).trim().replace(/\s+/g, " ");
+  if (!GROUP_NAME_RE.test(name)) throw new Error("Group names can use letters, numbers, spaces, \".\" and \"-\" (1-60 characters).");
+  return name;
+}
+
+// Every existing group's key -> the exact spelling first used for it, so every
+// membership row of one group displays identically however it was typed later.
+function _groupSpellings(sheet) {
+  var map = {};
+  if (!sheet || sheet.getLastRow() < 2) return map;
+  var c = _needCols(sheet, "Groups", ["group"]);
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
+    var g = String(r[c.group - 1] || "").trim();
+    var k = _groupKey(g);
+    if (g && !map.hasOwnProperty(k)) map[k] = g;
+  });
+  return map;
+}
+
+function _nameLookup() {
+  var byKey = {};
+  _sheetValuesAsObjects(_students()).forEach(function (r) {
+    var k = _phoneKey(r.phone);
+    if (k && !byKey.hasOwnProperty(k)) byKey[k] = String(r.display_name == null ? "" : r.display_name);
+  });
+  return function (phone) {
+    var k = _phoneKey(phone);
+    return { known: byKey.hasOwnProperty(k), name: byKey.hasOwnProperty(k) ? byKey[k] : "" };
+  };
+}
+
+// {group, phone} rows for one group (canonical key), or every row grouped by
+// group when groupKey is "". `who` is an optional _nameLookup() result.
+function _groupMembers(sheet, groupKey, who) {
+  var out = [];
+  if (!sheet || sheet.getLastRow() < 2) return out;
+  var c = _needCols(sheet, "Groups", ["group", "phone"]);
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  for (var i = 0; i < values.length; i++) {
+    var g = String(values[i][c.group - 1] || "");
+    if (groupKey && _groupKey(g) !== groupKey) continue;
+    var phone = String(values[i][c.phone - 1] || "");
+    var w = who ? who(phone) : { known: null, name: "" };
+    out.push({ row: i + 2, group: g, phone: phone, name: w.name, known_student: w.known });
+  }
+  return out;
+}
+
+function handleAdminListGroups(payload) {
+  _requireAdminAny(payload);
+  var ss = _ss();
+  var sheet = ss.getSheetByName("Groups");
+  var who = _nameLookup(ss);
+  var all = _groupMembers(sheet, "", who);
+  var spellings = _groupSpellings(sheet);
+  var byKey = {};
+  all.forEach(function (m) {
+    var k = _groupKey(m.group);
+    if (!byKey[k]) byKey[k] = { group: spellings[k] || m.group, members: [] };
+    byKey[k].members.push({ phone: m.phone, name: m.name, known_student: m.known_student });
+  });
+  var groups = Object.keys(byKey).map(function (k) { return byKey[k]; })
+    .sort(function (a, b) { return a.group.toLowerCase() < b.group.toLowerCase() ? -1 : 1; });
+  return { ok: true, groups: groups };
+}
+
+function handleAdminGroupAdd(payload) {
+  _requireAdminAny(payload);
+  var group = _cleanGroupName(payload.group);
+  if (_normalizePhone(payload.phone).length < 10) throw new Error("Enter the student's full phone number.");
+  var phone = _canonicalPhone(payload.phone);
+  var key = _groupKey(group);
+
+  return _withLock(function () {
+    var ss = _ss();
+    var sheet = _sheetByName(ss, "Groups", GROUP_HEADERS);
+    _ensureColumns(sheet, GROUP_HEADERS);
+    var spelling = _groupSpellings(sheet)[key] || group;   // keep the group's existing spelling if it has one
+    var existing = _groupMembers(sheet, key).filter(function (m) { return _phonesMatch(m.phone, phone); });
+    var stu = _findStudentRow(_students(), phone);
+    var name = stu ? String(stu.display_name == null ? "" : stu.display_name) : "";
+    if (existing.length) return { ok: true, group: spelling, phone: phone, name: name, known_student: !!stu, already: true };
+    _appendByHeader(sheet, { group: spelling, phone: phone, name: name, added_at: _fmt(new Date(), TZ, true) });
+    return { ok: true, group: spelling, phone: phone, name: name, known_student: !!stu, already: false };
+  });
+}
+
+function handleAdminGroupRemove(payload) {
+  _requireAdminAny(payload);
+  var key = _groupKey(payload.group);
+  if (_normalizePhone(payload.phone).length < 10) throw new Error("Enter the student's full phone number.");
+  var phone = _canonicalPhone(payload.phone);
+
+  return _withLock(function () {
+    var sheet = _ss().getSheetByName("Groups");
+    var members = sheet ? _groupMembers(sheet, key) : [];
+    var rows = members.filter(function (m) { return _phonesMatch(m.phone, phone); }).map(function (m) { return m.row; });
+    if (!rows.length) throw new Error("That student isn't in that group.");
+    rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
+    return { ok: true, removed: rows.length };
+  });
+}
+
+// Applies admin_grant_access to every member of a group, in one lock.
+function handleAdminGroupGrantAccess(payload) {
+  _requireAdminAny(payload);
+  var key = _groupKey(payload.group);
+  var scope = _normalizeScope(payload.scope);
+  var explicit = payload.expires_at ? _cleanYmd(payload.expires_at) : "";
+  var days = explicit || payload.never === true ? 0 : _accessDays(payload);
+
+  return _withLock(function () {
+    var ss = _ss();
+    var sheet = ss.getSheetByName("Groups");
+    var spelling = _groupSpellings(sheet)[key];
+    var members = _groupMembers(sheet, key);
+    if (!members.length) throw new Error("That group has no members yet.");
+    var who = _nameLookup();
+    var expiresAt = "";
+    var granted = members.map(function (m) {
+      var g = _grantRaw(ss, m.phone, scope, explicit, days, "group:" + (spelling || payload.group));
+      expiresAt = g.expires_at;
+      return { phone: m.phone, name: who(m.phone).name };
+    });
+    return { ok: true, group: spelling || payload.group, scope: scope,
+             expires_at: expiresAt, granted: granted, count: granted.length };
+  });
+}
+
+// Applies admin_revoke_access to every member of a group; members who don't hold
+// that access are skipped rather than failing the whole batch.
+function handleAdminGroupRevokeAccess(payload) {
+  _requireAdminAny(payload);
+  var key = _groupKey(payload.group);
+  var scope = _normalizeScope(payload.scope);
+
+  return _withLock(function () {
+    var ss = _ss();
+    var gsheet = ss.getSheetByName("Groups");
+    var spelling = _groupSpellings(gsheet)[key];
+    var members = _groupMembers(gsheet, key);
+    if (!members.length) throw new Error("That group has no members yet.");
+    var eSheet = ss.getSheetByName("Entitlements");
+    var pSheet = null, pIdx = null;
+    var removedStudents = 0, paymentsRevoked = [];
+    members.forEach(function (m) {
+      if (!eSheet || eSheet.getLastRow() < 2) return;
+      var c = _needCols(eSheet, "Entitlements", ["phone", "scope"]);
+      var srcCol = _headerIndex(eSheet)["source"] || 0;
+      var values = eSheet.getRange(2, 1, eSheet.getLastRow() - 1, eSheet.getLastColumn()).getValues();
+      var rows = [], pays = [];
+      for (var i = 0; i < values.length; i++) {
+        if (!_phonesMatch(values[i][c.phone - 1], m.phone)) continue;
+        if (String(values[i][c.scope - 1]).trim().toLowerCase() !== scope) continue;
+        rows.push(i + 2);
+        var src = srcCol ? _sourcePayment(values[i][srcCol - 1]) : "";
+        if (src) pays.push(src);
+      }
+      if (!rows.length) return;
+      rows.sort(function (a, b) { return b - a; }).forEach(function (r) { eSheet.deleteRows(r, 1); });
+      removedStudents++;
+      if (!pays.length) return;
+      if (!pSheet) {
+        pSheet = ss.getSheetByName("Payments");
+        if (pSheet && pSheet.getLastRow() >= 2) pIdx = _needCols(pSheet, "Payments", ["payment_id", "status", "decided_at"]);
+      }
+      if (!pSheet || !pIdx) return;
+      var pv = pSheet.getRange(2, 1, pSheet.getLastRow() - 1, pSheet.getLastColumn()).getValues();
+      var now = _fmt(new Date(), TZ, true);
+      for (var k = 0; k < pv.length; k++) {
+        var id = String(pv[k][pIdx.payment_id - 1]).trim();
+        if (pays.indexOf(id) === -1 || String(pv[k][pIdx.status - 1]).trim().toLowerCase() !== "approved") continue;
+        pSheet.getRange(k + 2, pIdx.status).setNumberFormat("@").setValue("revoked");
+        pSheet.getRange(k + 2, pIdx.decided_at).setNumberFormat("@").setValue(now);
+        paymentsRevoked.push(id);
+      }
+    });
+    return { ok: true, group: spelling || payload.group, scope: scope, removed_students: removedStudents, payments_revoked: paymentsRevoked };
+  });
 }
 
 // -- One-off cleanup of duplicates written BEFORE the fix -------------------
