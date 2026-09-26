@@ -305,6 +305,7 @@
   .ac-preview { margin: 12px 0 2px; padding: 10px 12px; border-radius: 10px; color: var(--ink); background: var(--accent-soft); font: 600 12px/1.55 var(--sans); }
 
   .ac-count { margin-left: 8px; color: var(--ink-dim); font: 600 11px var(--mono); }
+  .ac-hint { margin: 0; padding: 8px 0; color: var(--ink-dim); font: 12px var(--sans); }
   .ac-mono { font-family: var(--mono); }
   @media (max-width: 640px) { .ac-fields { grid-template-columns: 1fr; } .ac-input { min-width: 0; width: 100%; } .ac-row label { width: 100%; } }
 </style>
@@ -558,6 +559,8 @@
       ["access", "Who has access", c.active + c.expired + c.cancelled + c.invalid],
       ["history", "Payment history", d.payments.length],
       ["videos", "Videos", d.videos.length],
+      ["quizzes", "Quiz gate", c.quizzes_locked],
+      ["groups", "Groups", c.groups],
       ["grant", "Give access", null],
     ];
     return el("div", { class: "dash-tabs ac-tabs", role: "group", "aria-label": "Sections" }, list.map(function (t) {
@@ -851,6 +854,195 @@
     return wrap;
   }
 
+  // ---- QUIZ GATE --------------------------------------------------------------------------------------
+
+  function quizLockPanel(lesson, isNew) {
+    var box = el("div", { class: "ac-panel", "data-panel": "quiz-lock" });
+    var note = isNew
+      ? "This lesson has no quiz gate yet. Adding one starts it LOCKED \u2014 open it yourself right before the test."
+      : "Locking stops new submissions at once (a page already open can't sneak one through). Unlocking lets students in immediately.";
+    var goLock = el("button", { class: "ac-btn danger solid", type: "button" }, [isNew ? "Add gate, start locked" : "Lock it"]);
+    var goOpen = el("button", { class: "ac-btn primary", type: "button" }, [isNew ? "Add gate, start open" : "Open it"]);
+    function fire(locked, btn) {
+      btn.disabled = true;
+      run({ action: "admin_set_quiz_lock", lesson: lesson, locked: locked },
+        pretty(lesson) + "'s quiz is now " + (locked ? "locked." : "open."), btn);
+    }
+    goLock.addEventListener("click", function () { fire(true, goLock); });
+    goOpen.addEventListener("click", function () { fire(false, goOpen); });
+    box.appendChild(el("p", {}, [note]));
+    box.appendChild(el("div", { class: "ac-actions" }, isNew ? [goOpen, goLock, cancelBtn()] : [goLock, goOpen, cancelBtn()]));
+    return box;
+  }
+
+  function quizAddForm(d) {
+    var known = {};
+    d.videos.forEach(function (v) { known[v.lesson] = 1; });
+    d.quizzes.forEach(function (q) { known[q.lesson] = 1; });
+    var sel = el("select", { class: "ac-input", id: "qz-lesson-sel" }, [el("option", { value: "" }, ["Choose a lesson\u2026"])]
+      .concat(Object.keys(known).sort().filter(function (l) { return !d.quizzes.some(function (q) { return q.lesson === l; }); })
+        .map(function (l) { return el("option", { value: l }, [pretty(l) + "  (" + l + ")"]); }))
+      .concat([el("option", { value: "__custom" }, ["Type a path\u2026"])]));
+    var custom = el("input", { class: "ac-input", type: "text", placeholder: "programming/other/some-lesson", hidden: "" });
+    var go = el("button", { class: "ac-btn primary", type: "button" }, ["Gate this quiz\u2026"]);
+    function value() { return sel.value === "__custom" ? custom.value.trim() : sel.value; }
+    sel.addEventListener("change", function () { custom.hidden = sel.value !== "__custom"; go.disabled = !value(); });
+    custom.addEventListener("input", function () { go.disabled = !value(); });
+    go.disabled = true;
+    go.addEventListener("click", function () { openPanel("qz:" + value() + ":new"); });
+    return el("div", { class: "dash-section" }, [
+      el("h2", {}, ["Gate another quiz"]),
+      el("p", { class: "dash-section-note" }, ["A lesson with no gate behaves as it always has \u2014 open. Add one to control it."]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Lesson", sel, custom]), go]),
+      STATE.open && STATE.open.slice(0, 3) === "qz:" && STATE.open.slice(-4) === ":new" ? quizLockPanel(STATE.open.slice(3, -4), true) : null,
+    ]);
+  }
+
+  function quizzesPanel(d) {
+    var section = el("div", { class: "dash-section" }, [
+      el("h2", {}, ["Quiz gate", el("span", { class: "ac-count" }, [String(d.counts.quizzes_locked) + " locked of " + d.quizzes.length])]),
+      el("p", { class: "dash-section-note" }, ["Separate from the video lock \\u2014 this controls whether the QUIZ ITSELF can be opened and submitted. Most useful right at test time."]),
+    ]);
+    if (!d.quizzes.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, ["No quiz has been gated yet. Every quiz is open by default \\u2014 add a gate below only for the ones you want to control."]));
+    }
+    d.quizzes.slice().sort(function (a, b) { return a.lesson < b.lesson ? -1 : 1; }).forEach(function (q) {
+      var key = "qz:" + q.lesson;
+      var card = el("div", { class: "ac-card", "data-quiz": q.lesson }, [
+        el("div", { class: "ac-top" }, [
+          el("div", { class: "ac-who" }, [el("b", {}, [pretty(q.lesson)]), el("span", {}, [q.lesson])]),
+          badge(q.locked ? { text: "Locked", cls: "is-good" } : { text: "Open", cls: "is-warn" }),
+        ]),
+        el("div", { class: "ac-fields" }, [field("Last changed", dash(q.updated_at))]),
+      ]);
+      var toggle = el("button", { class: "ac-btn " + (q.locked ? "primary" : "danger"), type: "button" }, [q.locked ? "Open it\u2026" : "Lock it\u2026"]);
+      toggle.addEventListener("click", function () { openPanel(key); });
+      if (STATE.open === key) card.appendChild(quizLockPanel(q.lesson, false));
+      else card.appendChild(el("div", { class: "ac-actions" }, [toggle]));
+      section.appendChild(card);
+    });
+    return el("div", {}, [section, quizAddForm(d)]);
+  }
+
+  // ---- GROUPS -------------------------------------------------------------------------------------------
+
+  function groupApplyPanel(d, g, mode) {
+    var lessons = {}, folders = {};
+    d.videos.forEach(function (v) { lessons[v.lesson] = 1; var p = parentOf(v.lesson); if (p) folders[p] = 1; });
+    var scopeSel = el("select", { class: "ac-input" }, [el("option", { value: "" }, ["Choose\u2026"])]
+      .concat([el("optgroup", { label: "One lesson" }, Object.keys(lessons).sort().map(function (l) { return el("option", { value: l }, [pretty(l) + "  (" + l + ")"]); }))])
+      .concat([el("optgroup", { label: "A whole folder" }, Object.keys(folders).sort().map(function (f) { return el("option", { value: f + "/*" }, ["All lessons in " + pretty(f)]); }))])
+      .concat([el("optgroup", { label: "Everything" }, [el("option", { value: "*" }, ["Every lesson on the site"])])]));
+    var preview = el("div", { class: "ac-preview" });
+    var go, term;
+    function update() {
+      if (mode === "grant") {
+        var t = term.term();
+        preview.textContent = scopeSel.value ? "Every member of \u201c" + g.group + "\u201d (" + g.members.length + ") will be able to watch " + scopeInfo(scopeSel.value).title + " " + term.describe(d.today, "") + "." : "Choose what this unlocks.";
+        go.disabled = !(scopeSel.value && t);
+      } else {
+        preview.textContent = scopeSel.value ? "Removes every member of \u201c" + g.group + "\u201d's access to " + scopeInfo(scopeSel.value).title + " (only members who currently have it)." : "Choose what to take away.";
+        go.disabled = !scopeSel.value;
+      }
+    }
+    scopeSel.addEventListener("change", update);
+    if (mode === "grant") {
+      term = termControls("gap-" + g.group, update, "30");
+      go = el("button", { class: "ac-btn primary", type: "button" }, ["Give the group access"]);
+      go.addEventListener("click", function () {
+        var t = term.term();
+        go.disabled = true;
+        run(Object.assign({ action: "admin_group_grant_access", group: g.group, scope: scopeSel.value }, t),
+          function (r) { return "Gave " + r.count + " " + (r.count === 1 ? "member" : "members") + " of \u201c" + g.group + "\u201d access to " + scopeInfo(r.scope).title + (r.expires_at ? " until " + r.expires_at : ", no end date") + "."; }, go);
+      });
+    } else {
+      go = el("button", { class: "ac-btn danger solid", type: "button" }, ["Revoke from the whole group"]);
+      go.addEventListener("click", function () {
+        go.disabled = true;
+        run({ action: "admin_group_revoke_access", group: g.group, scope: scopeSel.value },
+          function (r) { return "Removed access to " + scopeInfo(r.scope).title + " from " + r.removed_students + " " + (r.removed_students === 1 ? "member" : "members") + " of \u201c" + g.group + "\u201d."; }, go);
+      });
+    }
+    update();
+    return el("div", { class: "ac-panel" }, [
+      el("p", {}, [el("b", {}, [mode === "grant" ? "Give the whole group access." : "Revoke the whole group's access."]), mode === "grant" ? " Applies to every current member." : " A member who doesn't have this scope is simply skipped."]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["What", scopeSel])]),
+      mode === "grant" ? term.node : null, preview,
+      el("div", { class: "ac-actions" }, [go, cancelBtn()]),
+    ]);
+  }
+
+  function groupCard(d, g) {
+    var key = "grp:" + g.group;
+    var card = el("div", { class: "ac-card", "data-group": g.group }, [
+      el("div", { class: "ac-top" }, [el("div", { class: "ac-who" }, [el("b", {}, [g.group]), el("span", {}, [plural(g.members.length, "student")])])]),
+    ]);
+    var memberList = el("div", { class: "ac-fields" }, g.members.map(function (m) {
+      var row = el("dl", { class: "ac-field" }, [
+        el("dt", {}, ["\u00a0"]),
+        el("dd", {}, [(m.name || "Unknown") + "  \u00b7  " + m.phone + (m.known_student === false ? "  (no account yet)" : "")]),
+      ]);
+      return row;
+    }));
+    if (!g.members.length) memberList = el("div", { class: "ac-fields" }, [el("p", { class: "ac-hint" }, ["No members yet."])]);
+    card.appendChild(memberList);
+
+    var phoneIn = el("input", { class: "ac-input", type: "tel", placeholder: "01xxxxxxxxx", "aria-label": "Phone to add" });
+    var addBtn = el("button", { class: "ac-btn", type: "button" }, ["Add"]);
+    addBtn.addEventListener("click", function () {
+      if (!phoneIn.value.trim()) return;
+      addBtn.disabled = true;
+      run({ action: "admin_group_add", group: g.group, phone: phoneIn.value.trim() },
+        function (r) { return "Added " + (r.name || r.phone) + " to \u201c" + g.group + "\u201d."; }, addBtn);
+    });
+    var removeSel = el("select", { class: "ac-input", "aria-label": "Remove a member" }, [el("option", { value: "" }, ["Remove\u2026"])]
+      .concat(g.members.map(function (m) { return el("option", { value: m.phone }, [(m.name || m.phone) + " (" + m.phone + ")"]); })));
+    removeSel.addEventListener("change", function () {
+      if (!removeSel.value) return;
+      var phone = removeSel.value;
+      removeSel.disabled = true;
+      run({ action: "admin_group_remove", group: g.group, phone: phone }, "Removed " + phone + " from \u201c" + g.group + "\u201d.", removeSel);
+    });
+
+    var grantBtn = el("button", { class: "ac-btn primary", type: "button" }, ["Give this group access\u2026"]);
+    var revokeBtn = el("button", { class: "ac-btn danger", type: "button" }, ["Revoke from this group\u2026"]);
+    grantBtn.addEventListener("click", function () { openPanel(key + ":grant"); });
+    revokeBtn.addEventListener("click", function () { openPanel(key + ":revoke"); });
+
+    card.appendChild(el("div", { class: "ac-row" }, [el("label", {}, ["Add a student", phoneIn]), addBtn, el("label", {}, ["Remove", removeSel])]));
+    if (STATE.open === key + ":grant") card.appendChild(groupApplyPanel(d, g, "grant"));
+    else if (STATE.open === key + ":revoke") card.appendChild(groupApplyPanel(d, g, "revoke"));
+    else card.appendChild(el("div", { class: "ac-actions" }, [grantBtn, revokeBtn]));
+    return card;
+  }
+
+  function groupCreateForm() {
+    var name = el("input", { class: "ac-input", type: "text", placeholder: "e.g. Grade 2 \u2014 Section A", "aria-label": "New group name" });
+    var phone = el("input", { class: "ac-input", type: "tel", placeholder: "01xxxxxxxxx (first student)", "aria-label": "First student's phone" });
+    var go = el("button", { class: "ac-btn primary", type: "button" }, ["Create group"]);
+    go.addEventListener("click", function () {
+      if (!name.value.trim() || !phone.value.trim()) return;
+      go.disabled = true;
+      run({ action: "admin_group_add", group: name.value.trim(), phone: phone.value.trim() },
+        function (r) { return "Created \u201c" + r.group + "\u201d with " + (r.name || r.phone) + "."; }, go);
+    });
+    return el("div", { class: "dash-section" }, [
+      el("h2", {}, ["New group"]),
+      el("p", { class: "dash-section-note" }, ["Add more students to it afterward from the group's own card."]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Group name", name]), el("label", {}, ["First student", phone]), go]),
+    ]);
+  }
+
+  function groupsPanel(d) {
+    var section = el("div", { class: "dash-section" }, [
+      el("h2", {}, ["Groups", el("span", { class: "ac-count" }, [String(d.groups.length)])]),
+      el("p", { class: "dash-section-note" }, ["Classify students, then grant or revoke access for the whole group in one action."]),
+    ]);
+    if (!d.groups.length) section.appendChild(el("div", { class: "dash-empty" }, ["No groups yet \u2014 create one below."]));
+    d.groups.forEach(function (g) { section.appendChild(groupCard(d, g)); });
+    return el("div", {}, [section, groupCreateForm()]);
+  }
+
   // ---- VIDEOS -----------------------------------------------------------------------------------------
 
   function videosPanel(d) {
@@ -977,12 +1169,16 @@
       statCard(Object.keys(people).length, "students with active access"),
       statCard(c.ending_soon, "ending within 7 days"),
       statCard(c.videos_locked + " / " + c.videos_open, "videos locked / open"),
+      statCard(c.quizzes_locked, "quizzes currently locked"),
+      statCard(c.groups, "groups"),
     ]));
     root.appendChild(tabsNode(d));
     var panel = STATE.tab === "requests" ? requestsPanel(d)
       : STATE.tab === "access" ? accessPanel(d)
       : STATE.tab === "history" ? historyPanel(d)
       : STATE.tab === "videos" ? videosPanel(d)
+      : STATE.tab === "quizzes" ? quizzesPanel(d)
+      : STATE.tab === "groups" ? groupsPanel(d)
       : grantPanel(d);
     root.appendChild(panel);
     window.scrollTo(0, y);

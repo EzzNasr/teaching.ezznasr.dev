@@ -198,8 +198,35 @@
     }
 
     window.AuthEngine.mount(rootSelector, function (session) {
-      startQuiz(session);
+      checkGateThenStart(session);
     });
+
+    // The quiz can be locked separately from its lesson (get_quiz_state / admin_set_quiz_lock
+    // in Code.gs) so a teacher can open it right at test time. A lesson that has never been
+    // gated is unaffected. A network error here fails OPEN (lets the quiz start) — the server
+    // still refuses the submission if it is really locked, so nothing unlocks by accident.
+    function checkGateThenStart(session) {
+      root.innerHTML = "";
+      root.appendChild(el("p", { class: "qz-lede" }, ["Checking\u2026"]));
+      postToDrive({ action: "get_quiz_state", lesson: quiz.lesson })
+        .then(
+          function (data) { data && data.locked ? renderLocked(session) : startQuiz(session); },
+          function () { startQuiz(session); }
+        );
+    }
+
+    function renderLocked(session) {
+      root.innerHTML = "";
+      var retry = el("button", { class: "qz-next", type: "button" }, ["Check again"]);
+      retry.addEventListener("click", function () { checkGateThenStart(session); });
+      root.appendChild(el("div", { class: "qz-card frame" }, [
+        el("span", { class: "tick-br" }),
+        el("span", { class: "tick-bl" }),
+        el("p", { class: "qz-question" }, [quiz.title ? (quiz.title + " \u2014 not open yet") : "Not open yet"]),
+        el("p", { class: "qz-lede" }, ["This quiz isn't open yet. Ask your teacher when it will unlock."]),
+        el("div", { class: "qz-actions" }, [retry]),
+      ]));
+    }
 
     function startQuiz(session) {
       var state = {
