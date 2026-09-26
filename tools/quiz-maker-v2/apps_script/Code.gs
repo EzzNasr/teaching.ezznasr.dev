@@ -244,6 +244,11 @@
  *   a video added afterward is born locked (it already starts locked by
  *   default, and this makes locking-the-lesson-first the normal way to gate a
  *   lesson before its video even exists).
+ * - get_video now answers found:true (with need:"login"/"payment", no_video:true)
+ *   for a lesson locked this way even when it has NO video row at all, so
+ *   video.js shows a lock box instead of silently showing nothing. Admin
+ *   preview is the one exception: with no video row, an admin gets found:false
+ *   (nothing to preview, and they already see the lock state on the dashboard).
  * - Deliberately separate from the Quiz gate above: locking/unlocking a lesson
  *   never touches its Quizzes row. A locked quiz stays locked even when its
  *   lesson is unlocked, and an open quiz stays open even when its lesson is
@@ -1559,20 +1564,34 @@ function handleAdminSetLessonLock(payload) {
 }
 
 // Public. The URL is only in the answer when the viewer may actually watch.
+// found:false means "nothing here, don't show a box at all" — the only case for
+// that now is an unlocked lesson with no video row. Everything else that's
+// locked (a locked video row, OR a lesson-wide lock even with no video row yet)
+// answers found:true so the page shows a lock box; no_video:true marks the case
+// where there's genuinely no video behind it, so the page can soften the
+// wording instead of implying a video is waiting once they get access.
 function handleGetVideo(payload) {
   var key = _videoKey(payload.lesson, payload.slot);
   var rec = _lookupVideo(key.lesson, key.slot);
-  if (!rec) return { ok: true, found: false };
-  var locked = rec.locked || _isLessonLocked(key.lesson);
+  var locked = (rec && rec.locked) || _isLessonLocked(key.lesson);
+  if (!rec && !locked) return { ok: true, found: false };
   if (!locked) return { ok: true, found: true, locked: false, embed_url: rec.embed_url };
+
   var who = _sessionState(payload);
-  if (who === "admin") return { ok: true, found: true, locked: true, embed_url: rec.embed_url };
+  if (who === "admin") {
+    if (rec) return { ok: true, found: true, locked: true, embed_url: rec.embed_url };
+    return { ok: true, found: false };   // admin already knows it's locked, from the dashboard
+  }
   var info = _payInfo();
   if (who === "student") {
     var ss = _ss();
     var acc = _accessState(ss, payload.student_id, key.lesson);
-    if (acc.active) return { ok: true, found: true, locked: true, embed_url: rec.embed_url };
+    if (acc.active) {
+      if (rec) return { ok: true, found: true, locked: true, embed_url: rec.embed_url };
+      return { ok: true, found: true, locked: true, no_video: true };
+    }
     var out = { ok: true, found: true, locked: true, need: "payment" };
+    if (!rec) out.no_video = true;
     var req = _latestRequest(ss, payload.student_id, key.lesson);
     if (req) out.request = req;                    // "pending" (waiting for you) or "rejected"
     if (acc.expired) out.expired = acc.expired;    // their access ended on this date
@@ -1580,6 +1599,7 @@ function handleGetVideo(payload) {
     return out;
   }
   var login = { ok: true, found: true, locked: true, need: "login" };
+  if (!rec) login.no_video = true;
   if (info) login.pay_info = info;
   return login;
 }

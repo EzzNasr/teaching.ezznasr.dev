@@ -43,7 +43,7 @@
 
   if (window.VideoSlot) return; // loaded twice — the first copy already did the work
 
-  var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
+  var DRIVE_ENDPOINT = "{{DRIVE_ENDPOINT}}";
   var SESSION_KEY = "teaching_session";
   var RECHECK_AFTER_MS = 20000; // returning to a tab that shows a locked box re-checks, at most this often
 
