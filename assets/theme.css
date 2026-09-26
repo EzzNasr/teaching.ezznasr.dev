@@ -27,3 +27,10 @@ body.track-one{--accent:#e58a45;--accent-strong:#b86127;--accent-soft:#ffead8}
 body.track-two{--accent:#2f6fed;--accent-strong:#2056bd;--accent-soft:#dce9ff}
 html[data-theme="dark"] body.track-one{--accent:#ffb36f;--accent-strong:#ffc78e;--accent-soft:#5a3926}
 html[data-theme="dark"] body.track-two{--accent:#72a5ff;--accent-strong:#9fc2ff;--accent-soft:#1c3e6a}
+
+/* page-transition: cross-document view transitions for same-origin nav */
+@view-transition{navigation:auto}
+::view-transition-old(root){animation:180ms ease-out both vt-fade-out}
+::view-transition-new(root){animation:220ms ease-out both vt-fade-in}
+@keyframes vt-fade-out{to{opacity:0;transform:translateY(-6px)}}
+@keyframes vt-fade-in{from{opacity:0;transform:translateY(6px)}}

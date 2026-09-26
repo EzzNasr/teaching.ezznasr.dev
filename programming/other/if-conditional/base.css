@@ -187,3 +187,10 @@ footer{ border-top:1px solid var(--line); padding:42px 0 34px; background:var(--
   .footer-bottom span{ display:block; }
   .whatsapp-float{ right:16px; bottom:max(16px, env(safe-area-inset-bottom)); padding:13px 16px; }
 }
+
+/* page-transition: cross-document view transitions for same-origin nav */
+@view-transition{navigation:auto}
+::view-transition-old(root){animation:180ms ease-out both vt-fade-out}
+::view-transition-new(root){animation:220ms ease-out both vt-fade-in}
+@keyframes vt-fade-out{to{opacity:0;transform:translateY(-6px)}}
+@keyframes vt-fade-in{from{opacity:0;transform:translateY(6px)}}
