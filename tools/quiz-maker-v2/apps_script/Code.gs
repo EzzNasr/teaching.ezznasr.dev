@@ -232,6 +232,25 @@
  *   is what quiz.js checks before showing the quiz at all. Cached briefly like
  *   the video lock; admin_set_quiz_lock clears the cache at once.
  *
+ * ---- Lesson lock (added) -----------------------------------------------------
+ * - A "Lessons" tab (lesson | locked | updated_at), same shape/convention as the
+ *   Quizzes tab: no row = open, a newly-gated lesson starts LOCKED, fails closed
+ *   on a damaged tab. Locks the WHOLE lesson without needing a video to exist
+ *   first — admin_set_lesson_lock {lesson, locked}.
+ * - Only ADDS restriction: get_video's effective lock is
+ *   (that video's own "locked" cell) OR (its lesson locked here). Unlocking the
+ *   lesson never opens a video that was locked on its own; locking the lesson
+ *   locks every video under it even if none has been toggled individually, and
+ *   a video added afterward is born locked (it already starts locked by
+ *   default, and this makes locking-the-lesson-first the normal way to gate a
+ *   lesson before its video even exists).
+ * - Deliberately separate from the Quiz gate above: locking/unlocking a lesson
+ *   never touches its Quizzes row. A locked quiz stays locked even when its
+ *   lesson is unlocked, and an open quiz stays open even when its lesson is
+ *   locked — the quiz gate always overrides the lesson-wide setting for the quiz
+ *   specifically. Use the lesson lock for "can they get into this lesson at
+ *   all" and the quiz gate for "can the quiz be submitted right now."
+ *
  * ---- Student groups (added) ------------------------------------------------
  * - A "Groups" tab (group | phone | name | added_at): one row per membership,
  *   so a student can be in several groups. admin_group_add / admin_group_remove
@@ -1018,6 +1037,9 @@ function doPost(e) {
       case "admin_list_videos":
         return _json(handleAdminListVideos(payload));
 
+      case "admin_set_lesson_lock":
+        return _json(handleAdminSetLessonLock(payload));
+
       case "request_access":
         return _json(handleRequestAccess(payload));
 
@@ -1456,12 +1478,93 @@ function _requireAdminAny(payload) {
   _requireAdminSession(payload);
 }
 
+// -- Lesson lock: lock a whole lesson, with or without a video ---------------------
+// A lesson with no row here is OPEN (same convention as the Quizzes gate below).
+// Once explicitly gated, a new row starts LOCKED. Locking a lesson forces every one
+// of its videos locked too, on top of whatever that video's own "locked" cell says
+// (it only ever ADDS restriction — unlocking the lesson does not open a video that
+// was locked on its own). This exists so a lesson can be locked before any video
+// has been added to it: handleAdminSetVideo's "new videos start locked" rule and
+// this combine to mean a freshly-added video to a locked lesson is born locked.
+var LESSON_HEADERS = ["lesson", "locked", "updated_at"];
+var LESSON_CACHE_SECONDS = 30;
+function _lessonCacheKey(lesson) { return "llk:" + _md5(lesson); }
+
+function _findLessonRow(sheet, lesson) {
+  var last = sheet.getLastRow();
+  if (last < 2) return null;
+  var c = _needCols(sheet, "Lessons", ["lesson", "locked"]);
+  var values = sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) {
+      return { row: i + 2, cols: c, locked: _isLockedCell(values[i][c.locked - 1]) };
+    }
+  }
+  return null;
+}
+
+// Fails closed, same as the video lock and quiz gate: a damaged Lessons tab is
+// treated as locked until fixed, rather than quietly opening every lesson.
+function _lessonLockedNow(lesson) {
+  var sheet = _ss().getSheetByName("Lessons");
+  if (!sheet) return false;
+  try {
+    var found = _findLessonRow(sheet, lesson);
+    return !!(found && found.locked);
+  } catch (e) {
+    return true;
+  }
+}
+
+function _isLessonLocked(rawLesson) {
+  var lesson;
+  try { lesson = _lessonPath(rawLesson); } catch (e) { return false; }
+  var cache = CacheService.getScriptCache();
+  var ck = _lessonCacheKey(lesson);
+  var hit = cache.get(ck);
+  if (hit !== null) return hit === "1";
+  var locked = _lessonLockedNow(lesson);
+  cache.put(ck, locked ? "1" : "0", LESSON_CACHE_SECONDS);
+  return locked;
+}
+
+// locked is REQUIRED, same shape as admin_set_quiz_lock.
+function handleAdminSetLessonLock(payload) {
+  _requireAdminAny(payload);
+  var lesson = _lessonPath(payload.lesson);
+  if (payload.locked === undefined || payload.locked === null) throw new Error("Missing locked (true or false).");
+  var wantLocked = _isLockedCell(payload.locked);
+
+  var result = _withLock(function () {
+    var ss = _ss();
+    var sheet = ss.getSheetByName("Lessons");
+    var found = sheet ? _findLessonRow(sheet, lesson) : null;
+    var now = _fmt(new Date(), TZ, true);
+    if (found) {
+      sheet.getRange(found.row, found.cols.locked).setValue(wantLocked);
+      if (found.cols.updated_at) sheet.getRange(found.row, found.cols.updated_at).setNumberFormat("@").setValue(now);
+      return { ok: true, lesson: lesson, locked: wantLocked };
+    }
+    sheet = _sheetByName(ss, "Lessons", LESSON_HEADERS);
+    _ensureColumns(sheet, LESSON_HEADERS);
+    _appendByHeader(sheet, { lesson: lesson, locked: wantLocked, updated_at: now });
+    return { ok: true, lesson: lesson, locked: wantLocked };
+  });
+  CacheService.getScriptCache().remove(_lessonCacheKey(lesson));
+  // Clear every video slot's cache for this lesson too, since their effective
+  // locked state (rec.locked || lesson-locked) may have just changed.
+  var cache = CacheService.getScriptCache();
+  Object.keys(VIDEO_SLOTS).forEach(function (slot) { cache.remove(_videoCacheKey(lesson, slot)); });
+  return result;
+}
+
 // Public. The URL is only in the answer when the viewer may actually watch.
 function handleGetVideo(payload) {
   var key = _videoKey(payload.lesson, payload.slot);
   var rec = _lookupVideo(key.lesson, key.slot);
   if (!rec) return { ok: true, found: false };
-  if (!rec.locked) return { ok: true, found: true, locked: false, embed_url: rec.embed_url };
+  var locked = rec.locked || _isLessonLocked(key.lesson);
+  if (!locked) return { ok: true, found: true, locked: false, embed_url: rec.embed_url };
   var who = _sessionState(payload);
   if (who === "admin") return { ok: true, found: true, locked: true, embed_url: rec.embed_url };
   var info = _payInfo();
@@ -1982,6 +2085,11 @@ function handleAdminAccessOverview(payload) {
     return { lesson: String(r.lesson || ""), locked: _isLockedCell(r.locked), updated_at: String(r.updated_at || "") };
   });
 
+  var lSheet = ss.getSheetByName("Lessons");
+  var lessonLocks = (lSheet && lSheet.getLastRow() >= 2 ? _sheetValuesAsObjects(lSheet) : []).map(function (r) {
+    return { lesson: String(r.lesson || ""), locked: _isLockedCell(r.locked), updated_at: String(r.updated_at || "") };
+  });
+
   var gSheet = ss.getSheetByName("Groups");
   var groupsByKey = {};
   _groupMembers(gSheet, "", who).forEach(function (m) {
@@ -2032,7 +2140,7 @@ function handleAdminAccessOverview(payload) {
     return p;
   });
 
-  var counts = { pending: 0, active: 0, ending_soon: 0, expired: 0, cancelled: 0, invalid: 0, videos_locked: 0, videos_open: 0, quizzes_locked: 0, groups: 0 };
+  var counts = { pending: 0, active: 0, ending_soon: 0, expired: 0, cancelled: 0, invalid: 0, videos_locked: 0, videos_open: 0, quizzes_locked: 0, lessons_locked: 0, groups: 0 };
   payments.forEach(function (p) { if (p.status === "pending") counts.pending++; });
   access.forEach(function (a) {
     counts[a.state]++;
@@ -2040,6 +2148,7 @@ function handleAdminAccessOverview(payload) {
   });
   videos.forEach(function (v) { if (v.locked) counts.videos_locked++; else counts.videos_open++; });
   quizzes.forEach(function (q) { if (q.locked) counts.quizzes_locked++; });
+  lessonLocks.forEach(function (l) { if (l.locked) counts.lessons_locked++; });
   counts.groups = groups.length;
 
   // Soft-fail: a GitHub hiccup or a missing GITHUB_REPO property shouldn't take down
@@ -2069,7 +2178,7 @@ function handleAdminAccessOverview(payload) {
   return { ok: true, today: today, counts: counts, videos: videos, quizzes: quizzes, groups: groups,
            payments: payments.reverse().slice(0, 500), access: access.reverse().slice(0, 1000),
            all_lessons: allLessons, tracks: tracks, lessons_error: lessonsError,
-           quiz_access: quizAccess.reverse().slice(0, 1000) };
+           quiz_access: quizAccess.reverse().slice(0, 1000), lesson_locks: lessonLocks };
 }
 
 // -- Quiz gate: lock/unlock a lesson's quiz, separate from its video ---------------

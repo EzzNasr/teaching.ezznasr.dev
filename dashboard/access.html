@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video access — Teaching Portal</title>
+<title>Lesson access — Teaching Portal</title>
 <link rel="icon" href="/icons/favicon.ico">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -365,7 +365,7 @@
     tab: null,
     open: null,                 // which inline panel is open: "<kind>:<id>"
     toast: null,                // { ok: true|false, text }
-    filters: { access: { q: "", status: "active" }, history: { q: "", status: "all" }, quizAdd: { track: "", q: "" } },
+    filters: { access: { q: "", status: "active" }, history: { q: "", status: "all" }, quizAdd: { track: "", q: "" }, lessons: { track: "", q: "" } },
   };
 
   function el(tag, attrs, children) {
@@ -561,7 +561,8 @@
         el("li", {}, [el("b", {}, ["Approving"]), " unlocks that lesson's three videos (lesson, quiz solution, assignment solution), or a whole folder / everything if you choose that."]),
         el("li", {}, [el("b", {}, ["Access ends by itself"]), " on its end date. ", el("b", {}, ["Revoke"]), " ends it right now: the video closes the next time they load the page (or press \u201cCheck again\u201d)."]),
         el("li", {}, ["Changing a payment's status in the Google Sheet to anything but \u201capproved\u201d also switches its access off. Deleting the payment row does not."]),
-        el("li", {}, [el("b", {}, ["Open"]), " a video (Videos tab) and everyone can watch it without paying; ", el("b", {}, ["Locked"]), " means only you and students with access."]),
+        el("li", {}, [el("b", {}, ["Lock a lesson"]), " (Lessons tab) and every video in it needs access, whether or not that video exists yet; leave it open and each video still follows its own lock if you set one."]),
+        el("li", {}, [el("b", {}, ["Quiz gate"]), " is separate from the lesson lock and always wins for the quiz itself \u2014 lock a quiz and it stays locked even if the lesson is open; leave it ungated and it stays open even if the lesson is locked."]),
         el("li", {}, ["Revoking stops new views. Someone who already saved the video's link could still use it \u2014 that can't be taken back."]),
       ]),
     ]);
@@ -575,7 +576,7 @@
       ["requests", "Requests", c.pending],
       ["access", "Who has access", c.active + c.expired + c.cancelled + c.invalid],
       ["history", "Payment history", d.payments.length],
-      ["videos", "Videos", d.videos.length],
+      ["lessons", "Lessons", c.lessons_locked],
       ["quizzes", "Quiz gate", c.quizzes_locked],
       ["groups", "Groups", c.groups],
       ["grant", "Give access", null],
@@ -1107,54 +1108,105 @@
     return el("div", {}, [section, groupCreateForm()]);
   }
 
-  // ---- VIDEOS -----------------------------------------------------------------------------------------
+  // ---- LESSONS ------------------------------------------------------------------------------------------
 
-  function videosPanel(d) {
+  function lessonLockPanel(lesson, isNew) {
+    var box = el("div", { class: "ac-panel", "data-panel": "lesson-lock" });
+    var note = isNew
+      ? "This lesson has no lock yet. Locking it closes every video in it \u2014 existing, or added later from the Quiz Maker \u2014 until you open it. The quiz gate is separate and untouched either way."
+      : "Locking closes every video in this lesson at once, including ones you never toggled on their own (those stay closed regardless). Opening lets everyone in, unless a video was locked on its own \u2014 that one stays locked. The quiz gate below is separate and untouched either way.";
+    var goLock = el("button", { class: "ac-btn danger solid", type: "button" }, [isNew ? "Add lock, start closed" : "Lock it"]);
+    var goOpen = el("button", { class: "ac-btn primary", type: "button" }, [isNew ? "Add row, start open" : "Open it"]);
+    function fire(locked, btn) {
+      btn.disabled = true;
+      run({ action: "admin_set_lesson_lock", lesson: lesson, locked: locked },
+        pretty(lesson) + " is now " + (locked ? "locked." : "open."), btn);
+    }
+    goLock.addEventListener("click", function () { fire(true, goLock); });
+    goOpen.addEventListener("click", function () { fire(false, goOpen); });
+    box.appendChild(el("p", {}, [note]));
+    box.appendChild(el("div", { class: "ac-actions" }, isNew ? [goOpen, goLock, cancelBtn()] : [goLock, goOpen, cancelBtn()]));
+    return box;
+  }
+
+  function lessonsPanel(d) {
+    var lockByLesson = {};
+    (d.lesson_locks || []).forEach(function (l) { lockByLesson[l.lesson] = l; });
+    var quizByLesson = {};
+    d.quizzes.forEach(function (q) { quizByLesson[q.lesson] = q; });
+    var videosByLesson = {};
+    d.videos.forEach(function (v) { (videosByLesson[v.lesson] = videosByLesson[v.lesson] || []).push(v); });
+
+    var f = STATE.filters.lessons;
+    var all0 = allLessonsList(d);
+    var tracks = allTracksList(d);
+    var trackSel = el("select", { class: "ac-input", "aria-label": "Filter by track" },
+      [el("option", { value: "" }, ["All tracks"])].concat(tracks.map(function (t) { return el("option", { value: t }, [pretty(t)]); })));
+    trackSel.value = f.track;
+    var search = el("input", { class: "ac-input", type: "text", placeholder: "Filter by name or path\u2026", "aria-label": "Filter lessons", "data-search": "lessons", value: f.q });
+    trackSel.addEventListener("change", function () { f.track = trackSel.value; render(); });
+    search.addEventListener("input", function () {
+      f.q = search.value;
+      var pos = search.selectionStart;
+      render();
+      var again = document.querySelector('[data-search="lessons"]');
+      if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
+    });
+
+    var all = all0.filter(function (l) {
+      if (f.track && l.track !== f.track) return false;
+      var q = f.q.trim().toLowerCase();
+      if (q && l.lesson.indexOf(q) === -1 && pretty(l.lesson).toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+
     var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, ["Videos", el("span", { class: "ac-count" }, [d.counts.videos_locked + " locked \u00b7 " + d.counts.videos_open + " open"])]),
-      el("p", { class: "dash-section-note" }, ["Locked = only you and students with access can watch. Open = anyone who visits the page."]),
+      el("h2", {}, ["Lessons", el("span", { class: "ac-count" }, [String(d.counts.lessons_locked) + " locked of " + all0.length])]),
+      el("p", { class: "dash-section-note" }, [d.lessons_error
+        ? "Couldn't read the full lesson list from GitHub (" + d.lessons_error + ") \u2014 showing only lessons already known here."
+        : "Locking a lesson closes every video in it, whether or not a video exists yet. The quiz gate on each card is separate and overrides this \u2014 a quiz can stay locked while its lesson is open, or open while its lesson is locked."]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Track", trackSel]), el("label", {}, ["Search", search])]),
     ]);
-    if (!d.videos.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, ["No videos are set up yet. They are added from the Quiz Maker."]));
+
+    if (!all.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, [all0.length ? "Nothing matches this filter." : "No lessons found."]));
       return section;
     }
-    var sorted = d.videos.slice().sort(function (a, b) { return (a.lesson + a.slot) < (b.lesson + b.slot) ? -1 : 1; });
-    sorted.forEach(function (v) {
-      var key = "vid:" + v.lesson + "|" + v.slot;
-      var watchers = new Set();
-      if (v.locked) d.access.forEach(function (a) { if (a.state === "active" && scopeCovers(a.scope, v.lesson)) watchers.add(a.phone.replace(/\D/g, "").slice(-10)); });
-      var idMatch = /embed\/([A-Za-z0-9_-]+)/.exec(v.embed_url) || /video\/(\d+)/.exec(v.embed_url);
-      var card = el("div", { class: "ac-card", "data-video": v.lesson + "|" + v.slot }, [
+
+    all.forEach(function (l) {
+      var lock = lockByLesson[l.lesson];
+      var locked = !!(lock && lock.locked);
+      var quiz = quizByLesson[l.lesson];
+      var quizLocked = !!(quiz && quiz.locked);
+      var vids = (videosByLesson[l.lesson] || []).slice().sort(function (a, b) { return a.slot < b.slot ? -1 : 1; });
+      var key = "lsn:" + l.lesson;
+      var qkey = "qz:" + l.lesson;
+
+      var card = el("div", { class: "ac-card", "data-lesson": l.lesson }, [
         el("div", { class: "ac-top" }, [
-          el("div", { class: "ac-who" }, [el("b", {}, [pretty(v.lesson) + " \u2014 " + (SLOT_LABEL[v.slot] || v.slot)]), el("span", {}, [v.lesson])]),
-          badge(v.locked ? { text: "Locked", cls: "is-good" } : { text: "Open to everyone", cls: "is-warn" }),
-        ]),
-        el("div", { class: "ac-fields" }, [
-          field("Who can watch", v.locked ? "You + " + plural(watchers.size, "student") : "Everyone", v.locked ? "students with active access to this lesson" : "no payment needed"),
-          field("Video", idMatch ? idMatch[1] : "\u2014", v.embed_url),
-          field("Last changed", dash(v.updated_at)),
+          el("div", { class: "ac-who" }, [el("b", {}, [pretty(l.lesson)]), el("span", {}, [l.lesson])]),
+          badge(locked ? { text: "Lesson locked", cls: "is-good" } : { text: "Lesson open", cls: "is-warn" }),
         ]),
       ]);
-      var toggle = el("button", { class: "ac-btn " + (v.locked ? "" : "primary"), type: "button", "data-open": "lock" }, [v.locked ? "Open to everyone\u2026" : "Lock it"]);
-      function doToggle(btn) {
-        btn.disabled = true;
-        run({ action: "admin_set_video", lesson: v.lesson, slot: v.slot, locked: !v.locked },
-          (SLOT_LABEL[v.slot] || v.slot) + " of \u201c" + pretty(v.lesson) + "\u201d is now " + (v.locked ? "open to everyone." : "locked."), btn);
-      }
-      if (v.locked) {
-        toggle.addEventListener("click", function () { openPanel(key + ":open"); });
-        if (STATE.open === key + ":open") {
-          var yes = el("button", { class: "ac-btn primary", type: "button", "data-do": "open" }, ["Yes, open it to everyone"]);
-          yes.addEventListener("click", function () { doToggle(yes); });
-          card.appendChild(el("div", { class: "ac-panel", "data-panel": "open" }, [
-            el("p", {}, [el("b", {}, ["Open this video to everyone?"]), " Anyone who visits the page can watch it without paying, and anyone who sees the link can keep it. You can lock it again later, but not take back what people already saw."]),
-            el("div", { class: "ac-actions" }, [yes, cancelBtn()]),
-          ]));
-        } else card.appendChild(el("div", { class: "ac-actions" }, [toggle]));
-      } else {
-        toggle.addEventListener("click", function () { doToggle(toggle); });
-        card.appendChild(el("div", { class: "ac-actions" }, [toggle]));
-      }
+
+      var fields = vids.length
+        ? vids.map(function (v) {
+            var effLocked = v.locked || locked;
+            return field(SLOT_LABEL[v.slot] || v.slot, effLocked ? "Locked" + (locked && !v.locked ? " (via lesson lock)" : "") : "Open to everyone");
+          })
+        : [field("Videos", "None yet", "added from the Quiz Maker \u2014 locking the lesson now means one added later starts locked too")];
+      fields.push(field("Quiz gate", quiz ? (quizLocked ? "Locked" : "Open") : "No gate (open)", "separate \u2014 overrides the lesson lock for the quiz itself"));
+      card.appendChild(el("div", { class: "ac-fields" }, fields));
+
+      var lockToggle = el("button", { class: "ac-btn " + (locked ? "" : "primary"), type: "button" }, [lock ? (locked ? "Open it\u2026" : "Lock it\u2026") : "Lock this lesson\u2026"]);
+      lockToggle.addEventListener("click", function () { openPanel(key); });
+      var quizToggle = el("button", { class: "ac-btn " + (quizLocked ? "" : "danger"), type: "button" }, [quiz ? (quizLocked ? "Open the quiz\u2026" : "Lock the quiz\u2026") : "Gate this quiz\u2026"]);
+      quizToggle.addEventListener("click", function () { openPanel(qkey); });
+
+      if (STATE.open === key) card.appendChild(lessonLockPanel(l.lesson, !lock));
+      else if (STATE.open === qkey) card.appendChild(quizLockPanel(l.lesson, !quiz));
+      else card.appendChild(el("div", { class: "ac-actions" }, [lockToggle, quizToggle]));
+
       section.appendChild(card);
     });
     return section;
@@ -1222,8 +1274,8 @@
     var people = {};
     d.access.forEach(function (a) { if (a.state === "active") people[a.phone.replace(/\D/g, "").slice(-10)] = 1; });
     root.appendChild(el("div", { class: "dash-head" }, [el("div", {}, [
-      el("h1", {}, ["Video access"]),
-      el("p", {}, ["Who can watch which videos, the payments behind it, and how to take access away. Today is " + d.today + " (Cairo)."]),
+      el("h1", {}, ["Lesson access"]),
+      el("p", {}, ["Who can get into which lessons, the payments behind it, and how to take access away. Today is " + d.today + " (Cairo)."]),
     ])]));
     var t = toastNode();
     if (t) root.appendChild(t);
@@ -1232,6 +1284,7 @@
       statCard(c.pending, "requests waiting for you"),
       statCard(Object.keys(people).length, "students with active access"),
       statCard(c.ending_soon, "ending within 7 days"),
+      statCard(c.lessons_locked, "lessons locked"),
       statCard(c.videos_locked + " / " + c.videos_open, "videos locked / open"),
       statCard(c.quizzes_locked, "quizzes currently locked"),
       statCard(c.groups, "groups"),
@@ -1240,7 +1293,7 @@
     var panel = STATE.tab === "requests" ? requestsPanel(d)
       : STATE.tab === "access" ? accessPanel(d)
       : STATE.tab === "history" ? historyPanel(d)
-      : STATE.tab === "videos" ? videosPanel(d)
+      : STATE.tab === "lessons" ? lessonsPanel(d)
       : STATE.tab === "quizzes" ? quizzesPanel(d)
       : STATE.tab === "groups" ? groupsPanel(d)
       : grantPanel(d);
@@ -1273,8 +1326,8 @@
       el("div", { class: "dash-loading-card" }, [
         el("div", { class: "dash-loading-art", "aria-hidden": "true" }, [el("span", { class: "dash-loading-ring" }), el("span", { class: "dash-loading-core" })]),
         el("div", { class: "dash-loading-copy" }, [
-          el("h1", { class: "dash-loading-title" }, ["Loading video access"]),
-          el("p", { class: "dash-loading-note" }, ["Reading payments, access and videos", el("span", { class: "dash-loading-dots", "aria-hidden": "true" }, [el("i"), el("i"), el("i")])]),
+          el("h1", { class: "dash-loading-title" }, ["Loading lesson access"]),
+          el("p", { class: "dash-loading-note" }, ["Reading payments, access and lessons", el("span", { class: "dash-loading-dots", "aria-hidden": "true" }, [el("i"), el("i"), el("i")])]),
         ]),
       ]),
     ]));
