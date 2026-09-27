@@ -341,10 +341,18 @@
           }
         });
         box.appendChild(el("div", { class: "vp-icon", "aria-hidden": "true" }, [LOCK]));
-        box.appendChild(el("p", { class: "vp-title" }, ["This video is for enrolled students"]));
-        box.appendChild(el("p", { class: "vp-text" }, ["Sign in with your phone number to watch it."]));
+        box.appendChild(el("p", { class: "vp-title" }, [data.no_video ? "This lesson is for enrolled students" : "This video is for enrolled students"]));
+        box.appendChild(el("p", { class: "vp-text" }, [data.no_video ? "Sign in with your phone number to get access." : "Sign in with your phone number to watch it."]));
         payBlock(box, data);
         box.appendChild(btn);
+      });
+    }
+
+    function showNoVideoYet() {
+      panel(function (box) {
+        box.appendChild(el("div", { class: "vp-icon", "aria-hidden": "true" }, ["\u23F3"]));
+        box.appendChild(el("p", { class: "vp-title" }, ["Nothing here yet"]));
+        box.appendChild(el("p", { class: "vp-text" }, ["This lesson is unlocked for you \u2014 the video just hasn't been added yet. Check back soon."]));
       });
     }
 
@@ -425,7 +433,7 @@
         });
 
         box.appendChild(el("div", { class: "vp-icon", "aria-hidden": "true" }, [LOCK]));
-        box.appendChild(el("p", { class: "vp-title" }, ["This video is for enrolled students"]));
+        box.appendChild(el("p", { class: "vp-title" }, [data.no_video ? "This lesson is for enrolled students" : "This video is for enrolled students"]));
         box.appendChild(el("p", { class: "vp-text" }, [intro]));
         payBlock(box, data);
         box.appendChild(el("div", { class: "vp-form" }, [input, send]));
@@ -444,7 +452,8 @@
       if (data.need === "payment") {
         return data.request === "pending" ? showPending(data) : showPayment(data, session);
       }
-      return showLogin(data);
+      if (data.need === "login") return showLogin(data);
+      return showNoVideoYet(); // locked (lesson-wide), they already have access, nothing to show yet
     }
 
     function load() {
