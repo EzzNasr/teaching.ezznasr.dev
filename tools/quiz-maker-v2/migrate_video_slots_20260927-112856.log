@@ -1,0 +1,49 @@
+Video slot migration — DRY RUN — site_root=d:\projects\teaching-site-new\teaching.ezznasr.dev
+
+TAG    english\ace-the-interview\assignment.html  -- adding <script src="/assets/video.js">
+TAG    english\ace-the-interview\index.html  -- adding <script src="/assets/video.js">
+TAG    english\ace-the-interview\quiz.html  -- adding <script src="/assets/video.js">
+TAG    english\get-into-call-centre\assignment.html  -- adding <script src="/assets/video.js">
+TAG    english\get-into-call-centre\index.html  -- adding <script src="/assets/video.js">
+TAG    english\get-into-call-centre\quiz.html  -- adding <script src="/assets/video.js">
+TAG    english\present-perfect-vs-past-simple\assignment.html  -- adding <script src="/assets/video.js">
+TAG    english\present-perfect-vs-past-simple\index.html  -- adding <script src="/assets/video.js">
+TAG    english\present-perfect-vs-past-simple\quiz.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-1-lesson-1-information-and-media\assignment.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-1-lesson-1-information-and-media\index.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-1-lesson-1-information-and-media\quiz.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-1-lesson-2-information-ethics\assignment.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-1-lesson-2-information-ethics\index.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-1-lesson-2-information-ethics\quiz.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-2-lesson-1-personal-information\assignment.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-2-lesson-1-personal-information\index.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-2-lesson-1-personal-information\quiz.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-2-lesson-2-intellectual-property-rights\assignment.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-2-lesson-2-intellectual-property-rights\index.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-2-lesson-2-intellectual-property-rights\quiz.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-2-lesson-3-utilization-and-disclosure-of-information\assignment.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-2-lesson-3-utilization-and-disclosure-of-information\index.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-1-secondary\chapter-2-lesson-3-utilization-and-disclosure-of-information\quiz.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-2-secondary\introductory-session\assignment.html  -- adding <script src="/assets/video.js">
+VIDEO  programming\baccalaureate\grade-2-secondary\introductory-session\index.html  [lesson]  https://www.youtube.com/embed/Fq4jZwsaoMk  -> registering as locked, then clearing the page
+TAG    programming\baccalaureate\grade-2-secondary\introductory-session\index.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-2-secondary\introductory-session\quiz.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-2-secondary\lesson-1-development-of-information-technology-and-social-transformation\assignment.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-2-secondary\lesson-1-development-of-information-technology-and-social-transformation\index.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-2-secondary\lesson-1-development-of-information-technology-and-social-transformation\quiz.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-2-secondary\lesson-2-how-ai-works\assignment.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-2-secondary\lesson-2-how-ai-works\index.html  -- adding <script src="/assets/video.js">
+TAG    programming\baccalaureate\grade-2-secondary\lesson-2-how-ai-works\quiz.html  -- adding <script src="/assets/video.js">
+TAG    programming\other\demi-ministry-of-communication\assignment.html  -- adding <script src="/assets/video.js">
+VIDEO  programming\other\demi-ministry-of-communication\index.html  [lesson]  https://www.youtube.com/embed/f-ZFLNHUWi4  -> registering as locked, then clearing the page
+TAG    programming\other\demi-ministry-of-communication\index.html  -- adding <script src="/assets/video.js">
+TAG    programming\other\demi-ministry-of-communication\quiz.html  -- adding <script src="/assets/video.js">
+TAG    programming\other\functions\assignment.html  -- adding <script src="/assets/video.js">
+VIDEO  programming\other\functions\index.html  [lesson]  https://www.youtube.com/embed/hIwSQZpAQ_I  -> registering as locked, then clearing the page
+TAG    programming\other\functions\index.html  -- adding <script src="/assets/video.js">
+TAG    programming\other\functions\quiz.html  -- adding <script src="/assets/video.js">
+TAG    programming\other\if-conditional\assignment.html  -- adding <script src="/assets/video.js">
+TAG    programming\other\if-conditional\index.html  -- adding <script src="/assets/video.js">
+TAG    programming\other\if-conditional\quiz.html  -- adding <script src="/assets/video.js">
+
+DRY RUN summary -- 3 video(s) migrated, 42 page(s) tagged with video.js, 0 skipped (no auth.js anchor), 0 error(s)

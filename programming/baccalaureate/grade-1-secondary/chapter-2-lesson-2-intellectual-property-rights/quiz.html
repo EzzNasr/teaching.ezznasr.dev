@@ -275,6 +275,7 @@
 }
 </script>
 <script src="/assets/auth.js"></script>
+<script src="/assets/video.js"></script>
 <script src="/assets/quiz.js"></script>
 <script>QuizEngine.mount('#quiz-root', '#quiz-data');</script>
 <script>(function(){var slot=document.querySelector('.media-slot');if(!slot)return;var frame=slot.querySelector('iframe');if(!frame)return;var dataEl=document.getElementById('quiz-data');var quiz={};try{quiz=JSON.parse((dataEl&&dataEl.textContent)||'{}');}catch(e){}var key='teaching_last_attempt:'+(quiz.subject||'?')+':'+(quiz.lesson||'?');function done(){try{return !!localStorage.getItem(key);}catch(e){return false;}}var overlay=document.createElement('div');overlay.className='video-lock';overlay.innerHTML='<span class="video-lock__icon" aria-hidden="true">\uD83D\uDD12</span><span class="video-lock__msg">Finish the quiz below to unlock this video.</span>';function lock(){if(slot.contains(overlay))return;slot.classList.add('is-locked');slot.appendChild(overlay);}function unlock(){slot.classList.remove('is-locked');if(slot.contains(overlay))slot.removeChild(overlay);}function sync(){if(done())unlock();else lock();}sync();overlay.addEventListener('click',function(){overlay.classList.add('is-tapped');overlay.classList.remove('shake');void overlay.offsetWidth;overlay.classList.add('shake');});var root=document.getElementById('quiz-root');if(root)new MutationObserver(sync).observe(root,{childList:true,subtree:true});})();</script>
