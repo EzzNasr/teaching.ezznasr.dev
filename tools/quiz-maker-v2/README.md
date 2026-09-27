@@ -52,14 +52,21 @@ Stdlib only (`tkinter`, `urllib`) — no `pip install` needed.
   "Coming soon" stamp with no way to add files. Now it uploads to a
   Drive folder you control (through the Apps Script bridge) and the lesson
   page renders it via `attachments.js`, linking to Drive's own viewer.
-- **Video embeds**: every lesson page (`index.html`, `assignment.html`,
-  `quiz.html`) has a shared `media-slot` box. Quiz Maker still controls
-  the lesson’s main intro video; Assignment Maker and Quiz Maker each
-  also have their own “Solution video” control for a walkthrough video
-  embedded directly on that lesson’s assignment/quiz page. Paste any
-  YouTube link (watch/share/Shorts/embed) and it’s normalized automatically;
-  leave the field blank and click Update to clear it back to a placeholder.
-  These are independent per page and are preserved across regeneration.
+- **Video embeds:** every lesson page (`index.html`, `assignment.html`,
+  `quiz.html`) has a shared `media-slot` box, now rendered client-side by
+  `/assets/video.js` (wired into all three page templates) instead of
+  being baked into the HTML as a raw `<iframe>`. Pasting a video URL in
+  Quiz Maker / Assignment Maker registers it with the Drive bridge's
+  Videos sheet (`common.set_lesson_video`) — new videos start **locked**,
+  unlock them from `dashboard/access.html` once ready. If the Drive
+  bridge isn't configured yet, it falls back to the old direct-iframe
+  behavior (unprotected, but the app keeps working). Re-opening a lesson
+  for editing reads the video URL back from the Videos sheet first,
+  falling back to whatever's still baked into the page for
+  legacy/not-yet-migrated lessons. **Already-generated lesson pages from
+  before this change need `migrate_video_slots.py` run once** (see the
+  entry in "Folder layout" below) — the template fix alone only affects
+  lessons generated from now on.
 
 ## What this *isn't*
 
@@ -84,7 +91,7 @@ modules/
   attachment_tab.py          Tab 3
 templates/                   HTML templates (unchanged files + updated
                               assignment.html / lesson_index.html)
-assets_templates/             auth.js / quiz.js / assign.js / attachments.js +
+assets_templates/             auth.js / quiz.js / assign.js / attachments.js / video.js +
                               base.css / forms.css — synced into
                               <site_root>/assets/ by "Sync site assets"
 check_asset_drift.py         compares assets_templates/ with the live assets/
@@ -92,6 +99,10 @@ check_asset_drift.py         compares assets_templates/ with the live assets/
 apps_script/
   Code.gs                    the Drive bridge — deploy this once
   DEPLOY.md                  step-by-step deployment
+migrate_video_slots.py       one-off: migrates any lesson still using a raw baked-in video
+                              <iframe> into the Videos sheet (locked) and retrofits the
+                              /assets/video.js script tag onto already-generated lesson
+                              pages. Dry-run by default; --apply to actually write/send.
 quiz_maker_config.json       site_root + Drive bridge URL/token (local only, git-ignored;
                               copy quiz_maker_config.example.json to create it)
 ```
