@@ -75,3 +75,50 @@ def delete_attachment(web_app_url, admin_token, file_id):
 def test_connection(web_app_url, admin_token):
     payload = {"action": "ping", "token": admin_token}
     return _post_json(web_app_url, payload)
+
+
+# -- Videos: locked/unlocked lesson videos, see Code.gs's "Videos" section --
+# admin_set_video/get_video/admin_list_videos are already implemented and
+# deployed server-side; this is just a thin client for them, matching the
+# upload_attachment/delete_attachment pattern above.
+
+def set_video(web_app_url, admin_token, lesson, slot, video_url, locked=None):
+    """Admin-only: add/update/clear a (lesson, slot) row in the Videos
+    sheet. video_url: a link (adds/replaces), or "" to clear the slot.
+    locked: True/False, or leave as None to leave an existing row's lock
+    state untouched (a brand-new row then starts locked, server-side
+    default — see admin_set_video in Code.gs)."""
+    payload = {
+        "action": "admin_set_video",
+        "token": admin_token,
+        "lesson": lesson,
+        "slot": slot,
+        "video_url": video_url,
+    }
+    if locked is not None:
+        payload["locked"] = locked
+    return _post_json(web_app_url, payload)
+
+
+def list_videos(web_app_url, admin_token):
+    """Admin-only: every row in the Videos sheet, as a list of
+    {"lesson", "slot", "embed_url", "locked", "updated_at"} dicts."""
+    payload = {"action": "admin_list_videos", "token": admin_token}
+    return _post_json(web_app_url, payload)
+
+
+def get_video(web_app_url, admin_token, lesson, slot):
+    """Admin-only convenience: the Videos-sheet row for one (lesson, slot),
+    as {"lesson", "slot", "embed_url", "locked", "updated_at"}, or None if
+    nothing is set there yet. There's no single-row admin lookup action
+    server-side (get_video there is the public, session-gated one), so
+    this pulls the full list and filters — fine at the size this sheet is
+    expected to stay at."""
+    lesson = str(lesson or "").strip().lower().strip("/")
+    slot = str(slot or "").strip().lower()
+    result = list_videos(web_app_url, admin_token)
+    for row in result.get("videos", []):
+        if str(row.get("lesson", "")).strip().lower() == lesson and \
+           str(row.get("slot", "")).strip().lower() == slot:
+            return row
+    return None

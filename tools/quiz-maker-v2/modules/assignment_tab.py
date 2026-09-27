@@ -20,7 +20,7 @@ import re
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from modules import common
+from modules import common, drive_bridge
 from modules.common import (
     GRADED_BULK_HELP,
     parse_bulk_graded_questions,
@@ -317,20 +317,20 @@ class AssignmentTab(ttk.Frame):
             messagebox.showinfo("No lesson selected", "Pick a subject and lesson first.")
             return
 
+        drive_cfg = common.get_drive_config(common.load_config())
+        lesson_key = self._lesson_key()
+
         index_path = os.path.join(lesson_dir, "index.html")
         if os.path.exists(index_path):
-            with open(index_path, "r", encoding="utf-8") as f:
-                index_content = f.read()
-            slot_match = self._MEDIA_SLOT_RE.search(index_content)
-            if slot_match:
-                iframe_match = re.search(r'<iframe src="([^"]+)"', slot_match.group(2))
-                self.video_url_var.set(iframe_match.group(1) if iframe_match else "")
+            self.video_url_var.set(common.get_lesson_video_url(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "lesson", index_path))
 
         assignment_path = os.path.join(lesson_dir, "assignment.html")
         if os.path.exists(assignment_path):
             with open(assignment_path, "r", encoding="utf-8") as f:
                 content = f.read()
-            self.solution_video_url_var.set(common.read_media_slot_url(assignment_path))
+            self.solution_video_url_var.set(common.get_lesson_video_url(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "assignment", assignment_path))
             prompt_match = re.search(r'<p class="lede">(.*?)</p>', content, re.DOTALL)
             if prompt_match:
                 prompt = prompt_match.group(1).strip()
@@ -372,6 +372,9 @@ class AssignmentTab(ttk.Frame):
     _VIDEO_PLACEHOLDER = common.VIDEO_PLACEHOLDER
     _normalize_video_url = staticmethod(common.normalize_video_url)
 
+    def _lesson_key(self):
+        return common.lesson_url_path(self._subject_slug(), self._group_relpath(), self.lesson_var.get().strip())
+
     def _update_video(self):
         """Update the video on this lesson's main page (index.html)."""
         lesson_dir = self._lesson_dir()
@@ -383,9 +386,12 @@ class AssignmentTab(ttk.Frame):
         index_path = os.path.join(lesson_dir, "index.html")
         lesson_title = self._lesson_title(lesson_dir)
         raw_url = self.video_url_var.get().strip()
+        drive_cfg = common.get_drive_config(common.load_config())
 
         try:
-            embed_url = common.update_media_slot(index_path, raw_url, lesson_title)
+            embed_url, used_backend = common.set_lesson_video(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], self._lesson_key(), "lesson",
+                raw_url, lesson_title, index_path)
         except FileNotFoundError:
             messagebox.showerror("No lesson page found", "This lesson has no index.html to update.")
             return
@@ -394,15 +400,23 @@ class AssignmentTab(ttk.Frame):
                                   "This lesson's index.html doesn't have the expected media-slot section — "
                                   "it may have been hand-edited or use an older template.")
             return
+        except drive_bridge.DriveBridgeError as e:
+            messagebox.showerror("Couldn't reach the Drive bridge", str(e))
+            return
 
         if embed_url and embed_url != raw_url:
             self.video_url_var.set(embed_url)
 
         self.status_var.set("Updated video for {}/{}".format(self._subject_slug(), self.lesson_var.get()))
-        if embed_url:
-            messagebox.showinfo("Done", "Video embed updated.")
-        else:
+        if not embed_url:
             messagebox.showinfo("Done", "Video removed — back to a placeholder box.")
+        elif used_backend:
+            messagebox.showinfo("Done", "Video embed updated (starts locked if new — unlock it from the "
+                                         "dashboard once you're ready).")
+        else:
+            messagebox.showinfo("Done", "Video embed updated.\n\nNote: the Drive bridge Web App URL/admin token "
+                                         "aren't set (top of the window), so this video was baked in as a plain, "
+                                         "unprotected embed — configure the Drive bridge to make it lockable.")
 
     def _update_solution_video(self):
         """Update the solution/walkthrough video embedded directly on
@@ -417,9 +431,12 @@ class AssignmentTab(ttk.Frame):
         assignment_path = os.path.join(lesson_dir, "assignment.html")
         lesson_title = self._lesson_title(lesson_dir)
         raw_url = self.solution_video_url_var.get().strip()
+        drive_cfg = common.get_drive_config(common.load_config())
 
         try:
-            embed_url = common.update_media_slot(assignment_path, raw_url, lesson_title)
+            embed_url, used_backend = common.set_lesson_video(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], self._lesson_key(), "assignment",
+                raw_url, lesson_title, assignment_path)
         except FileNotFoundError:
             messagebox.showerror("No assignment page found",
                                   "This lesson has no assignment.html yet — click \u201cUpdate assignment page\u201d "
@@ -430,16 +447,25 @@ class AssignmentTab(ttk.Frame):
                                   "This lesson's assignment.html doesn't have the expected media-slot section — "
                                   "it may have been hand-edited or use an older template.")
             return
+        except drive_bridge.DriveBridgeError as e:
+            messagebox.showerror("Couldn't reach the Drive bridge", str(e))
+            return
 
         if embed_url and embed_url != raw_url:
             self.solution_video_url_var.set(embed_url)
 
         self.status_var.set("Updated solution video for {}/{} assignment page".format(
             self._subject_slug(), self.lesson_var.get()))
-        if embed_url:
-            messagebox.showinfo("Done", "Assignment solution video updated.")
-        else:
+        if not embed_url:
             messagebox.showinfo("Done", "Video removed — back to a placeholder box.")
+        elif used_backend:
+            messagebox.showinfo("Done", "Assignment solution video updated (starts locked if new — unlock it "
+                                         "from the dashboard once you're ready).")
+        else:
+            messagebox.showinfo("Done", "Assignment solution video updated.\n\nNote: the Drive bridge Web App "
+                                         "URL/admin token aren't set (top of the window), so this video was "
+                                         "baked in as a plain, unprotected embed — configure the Drive bridge "
+                                         "to make it lockable.")
 
     def _lesson_title(self, lesson_dir):
         index_path = os.path.join(lesson_dir, "index.html")
@@ -466,9 +492,9 @@ class AssignmentTab(ttk.Frame):
                                                          "Quiz Maker tab if it doesn't exist yet).")
             return
 
+        drive_cfg = common.get_drive_config(common.load_config())
         mode_slug = self._mode_slug()
         if mode_slug != "text":
-            drive_cfg = common.get_drive_config(common.load_config())
             if not drive_cfg["web_app_url"]:
                 if not messagebox.askyesno(
                         "Drive bridge not configured",
@@ -500,12 +526,17 @@ class AssignmentTab(ttk.Frame):
         location_label = common.lesson_url_path(subject_slug, group_relpath, lesson_slug)
         track_class = common.track_class_for_group(subject_slug, group_relpath)
 
-        # Preserve a solution video already embedded on this assignment
-        # page (via the "Solution video" control above) across updates —
-        # editing the prompt/mode/questions shouldn't wipe it out.
+        # Preserve a solution video already set on this assignment page
+        # (via the "Solution video" control above) across updates — editing
+        # the prompt/mode/questions shouldn't wipe it out. If it's backend-
+        # managed (Videos sheet), always write the placeholder — video.js
+        # renders the real thing client-side, so baking it back into raw
+        # HTML here would defeat any lock on it. Otherwise preserve
+        # whatever's already baked into the page (legacy/unmigrated, or none).
         assignment_path = os.path.join(lesson_dir, "assignment.html")
-        existing_video_url = common.read_media_slot_url(assignment_path)
-        video_block = common.video_block_for(existing_video_url, lesson_title)
+        video_block = common.video_block_for_regen(
+            drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, "assignment",
+            assignment_path, lesson_title)
 
         assignment_html = common.load_template("assignment.html")
         assignment_html = (assignment_html

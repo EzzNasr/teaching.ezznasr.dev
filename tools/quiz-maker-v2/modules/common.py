@@ -24,6 +24,8 @@ import time
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+from modules import drive_bridge
+
 # --------------------------------------------------------------------------
 # Path resolution — has to work both as a raw script AND as a frozen
 # PyInstaller --onefile exe, where __file__ / cwd point somewhere temporary.
@@ -150,6 +152,90 @@ def update_media_slot(html_path, raw_url, title):
         f.write(new_content)
 
     return embed_url
+
+
+# --------------------------------------------------------------------------
+# Drive-bridge-backed video slots.
+#
+# Going forward, a *new or changed* video should be registered with the
+# backend's Videos sheet (via drive_bridge.set_video) instead of being
+# baked into the page as a raw, public <iframe> — the Videos sheet is what
+# lets a video be locked behind entitlements (see Code.gs's "Videos"
+# section) and what video.js reads at view time. update_media_slot() /
+# video_block_for() above are unchanged and still used for CLEARING a slot
+# to the placeholder and for legacy (not-yet-migrated) pages — the change
+# is only in how a new video gets set.
+#
+# lesson here is a URL path like "programming/other/functions" (see
+# lesson_url_path()); slot is "lesson" | "quiz" | "assignment".
+# --------------------------------------------------------------------------
+
+
+def set_lesson_video(web_app_url, admin_token, lesson, slot, video_url, title, html_path):
+    """Register (or clear) a lesson's video. If the Drive bridge is
+    configured, this calls drive_bridge.set_video first and, only if that
+    succeeds, clears html_path's media-slot back to the placeholder —
+    video.js fetches and renders the real thing (locked or not) at view
+    time, so the page's own HTML never carries a live embed for this slot
+    again. If the Drive bridge ISN'T configured, falls back to the old
+    direct-iframe behavior (update_media_slot) so the app keeps working
+    for anyone who hasn't set that up yet — that fallback video is a
+    plain public iframe, not lock-protected.
+
+    Returns (embed_url, used_backend): embed_url is "" if cleared;
+    used_backend is False when the fallback path ran.
+
+    Raises drive_bridge.DriveBridgeError if the backend call itself
+    fails — html_path is left untouched in that case, so a failed call
+    never leaves the page and the backend disagreeing about the video.
+    Raises FileNotFoundError / ValueError exactly as update_media_slot
+    does if html_path doesn't exist / has no media-slot section.
+    """
+    if not (web_app_url and admin_token):
+        return update_media_slot(html_path, video_url, title), False
+
+    embed_url = normalize_video_url(video_url)
+    drive_bridge.set_video(web_app_url, admin_token, lesson, slot, embed_url)
+    update_media_slot(html_path, "", title)  # always the placeholder now
+    return embed_url, True
+
+
+def get_lesson_video_url(web_app_url, admin_token, lesson, slot, html_path=None):
+    """The embed URL currently set for (lesson, slot), for pre-filling a
+    "Video URL" field when re-opening a lesson for editing. Prefers the
+    Drive-bridge Videos sheet (the source of truth for anything set via
+    set_lesson_video); falls back to whatever iframe is still baked into
+    html_path for legacy/not-yet-migrated lessons, or if the Drive bridge
+    isn't configured or isn't reachable right now. Returns "" if nothing
+    is set either way."""
+    if web_app_url and admin_token:
+        try:
+            row = drive_bridge.get_video(web_app_url, admin_token, lesson, slot)
+        except drive_bridge.DriveBridgeError:
+            row = None
+        if row is not None:
+            return row.get("embed_url", "")
+    return read_media_slot_url(html_path) if html_path else ""
+
+
+def video_block_for_regen(web_app_url, admin_token, lesson, slot, html_path, title):
+    """What to write into a template's {{VIDEO_BLOCK}} when regenerating a
+    page whose video (if any) was set independently of this regeneration
+    (e.g. quiz.html/assignment.html's solution video, carried forward
+    while the questions/prompt are rewritten). If this slot is backend-
+    managed (a row exists in the Videos sheet), always returns the
+    placeholder — video.js renders the real, possibly-locked video
+    client-side, so baking it back into raw HTML on every regen would
+    defeat the lock. Otherwise, preserves exactly what's already baked
+    into html_path (a legacy iframe if this slot hasn't been migrated
+    yet, or the placeholder if there's nothing)."""
+    if web_app_url and admin_token:
+        try:
+            if drive_bridge.get_video(web_app_url, admin_token, lesson, slot) is not None:
+                return VIDEO_PLACEHOLDER
+        except drive_bridge.DriveBridgeError:
+            pass  # backend unreachable right now — fall back to preserving what's on the page
+    return video_block_for(read_media_slot_url(html_path), title)
 
 
 def fit_geometry(win, want_w, want_h, min_w=480, min_h=360, margin=80):

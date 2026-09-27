@@ -21,7 +21,7 @@ import tkinter as tk
 import webbrowser
 from tkinter import ttk, messagebox, filedialog
 
-from modules import common
+from modules import common, drive_bridge
 from modules.common import (
     GRADED_BULK_HELP,
     parse_bulk_graded_questions,
@@ -443,10 +443,13 @@ class QuizTab(ttk.Frame):
         group_relpath = self._group_relpath()
         lesson_dir = os.path.join(common.group_dir(site_root, subject_slug, group_relpath), lesson_slug)
         quiz_path = os.path.join(lesson_dir, "quiz.html")
+        lesson_key = common.lesson_url_path(subject_slug, group_relpath, lesson_slug)
+        drive_cfg = common.get_drive_config(common.load_config())
 
         try:
-            embed_url = common.update_media_slot(
-                quiz_path, self.quiz_solution_video_var.get(), lesson_slug.replace("-", " ").title())
+            embed_url, used_backend = common.set_lesson_video(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "quiz",
+                self.quiz_solution_video_var.get(), lesson_slug.replace("-", " ").title(), quiz_path)
         except FileNotFoundError:
             messagebox.showerror("No quiz page found",
                                   "{}/quiz.html doesn't exist yet \u2014 generate this lesson first.".format(lesson_slug))
@@ -456,11 +459,23 @@ class QuizTab(ttk.Frame):
                                   "This lesson's quiz.html doesn't have the expected media-slot section \u2014 "
                                   "it may have been hand-edited or use an older template.")
             return
+        except drive_bridge.DriveBridgeError as e:
+            messagebox.showerror("Couldn't reach the Drive bridge", str(e))
+            return
 
         if embed_url != self.quiz_solution_video_var.get().strip():
             self.quiz_solution_video_var.set(embed_url)
         self.status_var.set("Updated solution video for {}/{} quiz page".format(subject_slug, lesson_slug))
-        messagebox.showinfo("Done", "Quiz solution video updated." if embed_url else "Quiz solution video cleared.")
+        if not embed_url:
+            messagebox.showinfo("Done", "Quiz solution video cleared.")
+        elif used_backend:
+            messagebox.showinfo("Done", "Quiz solution video updated (starts locked if new \u2014 unlock it from "
+                                         "the dashboard once you're ready).")
+        else:
+            messagebox.showinfo("Done", "Quiz solution video updated.\n\nNote: the Drive bridge Web App URL/admin "
+                                         "token aren't set (top of the window), so this video was baked in as a "
+                                         "plain, unprotected embed \u2014 configure the Drive bridge to make it "
+                                         "lockable.")
 
     def _load_lesson_for_edit(self):
         site_root = self.site_root_var.get().strip()
@@ -510,10 +525,9 @@ class QuizTab(ttk.Frame):
                         lesson_slug)):
                 return
 
-        # -- description + video, from index.html (best-effort; quiz.html
-        # alone doesn't carry these) --------------------------------------
+        # -- description, from index.html (best-effort; quiz.html alone
+        # doesn't carry it) --------------------------------------------
         lesson_desc = ""
-        video_url = ""
         index_path = os.path.join(lesson_dir, "index.html")
         if os.path.isfile(index_path):
             with open(index_path, "r", encoding="utf-8") as f:
@@ -521,14 +535,15 @@ class QuizTab(ttk.Frame):
             desc_match = re.search(r'<h1>.*?</h1>\s*<p class="lede">(.*?)</p>', index_content, re.DOTALL)
             if desc_match:
                 lesson_desc = desc_match.group(1).strip()
-            slot_match = re.search(r'<div class="media-slot">\s*(.*?)\s*</div>', index_content, re.DOTALL)
-            if slot_match:
-                iframe_match = re.search(r'<iframe src="([^"]+)"', slot_match.group(1))
-                if iframe_match:
-                    video_url = iframe_match.group(1)
 
-        # -- solution video already on quiz.html itself, if any -----------
-        quiz_solution_video_url = common.read_media_slot_url(quiz_path)
+        # -- video (lesson page) and solution video (quiz.html), preferring
+        # the Drive-bridge Videos sheet over whatever's baked in the page --
+        lesson_key = common.lesson_url_path(subject_slug, group_relpath, lesson_slug)
+        drive_cfg = common.get_drive_config(common.load_config())
+        video_url = common.get_lesson_video_url(
+            drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "lesson", index_path)
+        quiz_solution_video_url = common.get_lesson_video_url(
+            drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "quiz", quiz_path)
 
         # -- assignment prompt + whether one exists, from assignment.html --
         # (submission mode itself is left alone here — see _generate(),
@@ -897,13 +912,18 @@ class QuizTab(ttk.Frame):
             "questions": self.questions,
         }
         track_class = common.track_class_for_group(subject_slug, group_relpath)
+        drive_cfg = common.get_drive_config(common.load_config())
 
         # Preserve a solution video already set on this quiz page (via the
         # standalone "Solution video" control below) across regeneration —
-        # regenerating the questions shouldn't wipe it out.
+        # regenerating the questions shouldn't wipe it out. If it's backend-
+        # managed (Videos sheet), always write the placeholder here — video.js
+        # renders the real thing client-side, so baking it back in on every
+        # regen would defeat any lock on it. Otherwise preserve whatever's
+        # already baked into the page (legacy, not-yet-migrated video, or none).
         quiz_path = os.path.join(lesson_dir, "quiz.html")
-        quiz_video_url = common.read_media_slot_url(quiz_path)
-        quiz_video_block = common.video_block_for(quiz_video_url, lesson_name)
+        quiz_video_block = common.video_block_for_regen(
+            drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, "quiz", quiz_path, lesson_name)
 
         quiz_html = common.load_template("quiz.html")
         quiz_html = (quiz_html
@@ -926,9 +946,11 @@ class QuizTab(ttk.Frame):
         if include_assignment:
             # Preserve a solution video already set on this assignment page
             # (via the Assignment Maker tab's "Solution video" control)
-            # across regeneration, same as submit_mode above.
-            assign_video_url = common.read_media_slot_url(assignment_path)
-            assign_video_block = common.video_block_for(assign_video_url, lesson_name)
+            # across regeneration, same as submit_mode above — and same
+            # backend-managed-vs-legacy handling as quiz_video_block above.
+            assign_video_block = common.video_block_for_regen(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, "assignment",
+                assignment_path, lesson_name)
 
             assignment_html = common.load_template("assignment.html")
             assignment_html = (assignment_html
@@ -946,11 +968,12 @@ class QuizTab(ttk.Frame):
                 f.write(assignment_html)
 
         # ---- lesson index.html ----
-        video_url = self.video_url_var.get().strip()
-        if video_url:
-            video_block = '<iframe src="{}" title="{}" allowfullscreen></iframe>'.format(video_url, lesson_name)
-        else:
-            video_block = "Video placeholder &mdash; add a YouTube embed URL to replace this box."
+        # The video field is written from scratch here every time (not
+        # preserved from the file, unlike the quiz/assignment solution
+        # videos above), so the template always gets the placeholder;
+        # the actual video (if any) is applied via set_lesson_video just
+        # below, once the file exists on disk for it to update.
+        video_block = common.VIDEO_PLACEHOLDER
 
         if include_assignment:
             mode_desc = {"text": "Paste your work as text", "url": "Submit a link",
@@ -978,8 +1001,31 @@ class QuizTab(ttk.Frame):
                               .replace("{{ASSIGNMENT_LINK_BLOCK}}", assign_link_block)
                               .replace("{{TRACK_CLASS}}", track_class)
                      .replace("{{LESSON_URL_PATH}}", location_label))
-        with open(os.path.join(lesson_dir, "index.html"), "w", encoding="utf-8") as f:
+        lesson_index_path = os.path.join(lesson_dir, "index.html")
+        with open(lesson_index_path, "w", encoding="utf-8") as f:
             f.write(lesson_index_html)
+
+        # Now that index.html exists on disk (with the placeholder just
+        # written above), apply the lesson's own video field — it's set
+        # directly by the user every time (not preserved from the file),
+        # so it always goes through the Drive bridge when one is configured.
+        video_warning = None
+        try:
+            video_url, video_used_backend = common.set_lesson_video(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, "lesson",
+                self.video_url_var.get(), lesson_name, lesson_index_path)
+        except drive_bridge.DriveBridgeError as e:
+            video_url, video_used_backend = self.video_url_var.get().strip(), False
+            video_warning = ("The lesson's video couldn't be saved: {}\n\nEverything else was generated "
+                              "normally \u2014 fix the Drive bridge connection and click Generate again, or "
+                              "paste the video URL again once it's reachable.".format(e))
+        else:
+            if video_url and video_url != self.video_url_var.get().strip():
+                self.video_url_var.set(video_url)
+            if video_url and not video_used_backend:
+                video_warning = ("Drive bridge Web App URL/admin token aren't set (top of the window), so the "
+                                  "lesson video was baked in as a plain, unprotected embed \u2014 configure the "
+                                  "Drive bridge to make it lockable.")
 
         # ---- attachments.json (empty manifest; Attachment Maker tab fills it in) ----
         attachments_path = os.path.join(lesson_dir, "attachments.json")
@@ -1003,12 +1049,16 @@ class QuizTab(ttk.Frame):
                 self.on_lessons_changed()
             return
 
-        self.status_var.set("Generated {}/ ({} files) and updated {} ({} style)".format(
-            location_label, 3 if include_assignment else 2, index_path, style_used))
-        messagebox.showinfo("Done", "Lesson files created at:\n{}\n\nListing page updated:\n{}\n\n"
-                                     "Tip: switch to the Attachment Maker or Assignment Maker tabs to "
-                                     "add files or change the submission mode for this lesson.".format(
-                                         lesson_dir, index_path))
+        status = "Generated {}/ ({} files) and updated {} ({} style)".format(
+            location_label, 3 if include_assignment else 2, index_path, style_used)
+        self.status_var.set(status + (" \u2014 video not saved, see popup" if video_warning else ""))
+        done_msg = ("Lesson files created at:\n{}\n\nListing page updated:\n{}\n\n"
+                     "Tip: switch to the Attachment Maker or Assignment Maker tabs to "
+                     "add files or change the submission mode for this lesson.".format(lesson_dir, index_path))
+        if video_warning:
+            messagebox.showwarning("Done, with a video issue", done_msg + "\n\n" + video_warning)
+        else:
+            messagebox.showinfo("Done", done_msg)
         self._editing = {"subject_slug": subject_slug, "group_relpath": group_relpath, "lesson_slug": lesson_slug}
         self._refresh_lessons()
         if lesson_slug in self.delete_lesson_combo["values"]:
