@@ -149,6 +149,8 @@
       "font-family:var(--sans,system-ui,sans-serif);font-size:14px;color:var(--ink,#10233f);border-style:solid}" +
       ".vp-box{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:22px;max-width:560px;margin:0 auto}" +
       ".vp-icon{font-size:26px;line-height:1}" +
+      ".vp-icon-badge{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;" +
+      "font-size:28px;margin:0 auto 4px;background:var(--accent-soft,rgba(47,111,237,.12));border:1px solid var(--line,#d6e1ef)}" +
       ".vp-title{margin:0;font-size:17px;font-weight:800;line-height:1.3}" +
       ".vp-text,.vp-status{margin:0;line-height:1.5;color:var(--ink-dim,#63738a)}" +
       ".vp-status:empty{display:none}" +
@@ -156,6 +158,11 @@
       ".vp-status.vp-error{color:var(--status-fail,#e2574c)}" +
       ".vp-pay{margin:0;width:100%;box-sizing:border-box;white-space:pre-line;line-height:1.5;color:var(--ink,#10233f);" +
       "background:var(--panel,#fff);border:1px solid var(--line,#d6e1ef);border-radius:10px;padding:10px 12px}" +
+      ".vp-pay-ar{font-family:'Cairo',var(--sans,system-ui,sans-serif);font-size:15px;line-height:2;text-align:right;padding:14px 16px}" +
+      ".vp-paywall{align-items:center;text-align:center}" +
+      ".vp-paywall .vp-pay-ar,.vp-paywall .vp-form,.vp-paywall .vp-hint{text-align:right}" +
+      ".vp-paywall.vp-box[dir=rtl]{font-family:'Cairo',var(--sans,system-ui,sans-serif)}" +
+      ".vp-paywall .vp-form{flex-direction:row-reverse}" +
       ".vp-form{display:flex;gap:8px;flex-wrap:wrap;width:100%}" +
       ".vp-input{flex:1 1 220px;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid var(--line-strong,#b8c9df);" +
       "background:var(--panel,#fff);color:var(--ink,#10233f);font:inherit}" +
@@ -170,6 +177,20 @@
     var style = el("style", { id: "vp-style" });
     style.appendChild(document.createTextNode(css));
     document.head.appendChild(style);
+  }
+
+  // The Arabic payment instructions (vp-pay-ar) are set in Cairo -- loaded once,
+  // same guard pattern as injectStyle above. If this fails to load for any reason
+  // (offline, blocked), .vp-pay-ar's font-family already falls back to the site's
+  // normal sans-serif, so nothing breaks -- it just looks like the rest of the page.
+  function loadArabicFont() {
+    if (document.getElementById("vp-font-cairo")) return;
+    var link = el("link", {
+      id: "vp-font-cairo",
+      rel: "stylesheet",
+      href: "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap",
+    });
+    document.head.appendChild(link);
   }
 
   // -- "finish the quiz / assignment first" (same rule as the old inline script) -
@@ -325,8 +346,12 @@
       });
     }
 
-    function payBlock(box, data) {
-      if (data.pay_info) box.appendChild(el("p", { class: "vp-pay" }, [data.pay_info]));
+    function payBlock(box, data, arabic) {
+      if (!data.pay_info) return;
+      var cls = arabic ? "vp-pay vp-pay-ar" : "vp-pay";
+      var p = el("p", { class: cls }, [data.pay_info]);
+      if (arabic) p.setAttribute("dir", "rtl");
+      box.appendChild(p);
     }
 
     function showLogin(data) {
@@ -377,28 +402,37 @@
 
     function showPayment(data, session) {
       panel(function (box, say) {
-        var intro = "Once you've paid, tell us below and your teacher will unlock it.";
+        loadArabicFont();
+        box.classList.add("vp-paywall");
+        box.setAttribute("dir", "rtl");
+
+        var intro = "\u0628\u0639\u062F \u0625\u062A\u0645\u0627\u0645 \u0627\u0644\u062F\u0641\u0639\u060C \u0623\u062E\u0628\u0631\u0646\u0627 \u0628\u0631\u0642\u0645 \u0627\u0644\u062A\u062D\u0648\u064A\u0644 \u0623\u062F\u0646\u0627\u0647\u060C \u0648\u0633\u064A\u0642\u0648\u0645 \u0641\u0631\u064A\u0642 \u0627\u0644\u062F\u0639\u0645 \u0628\u0641\u062A\u062D \u0627\u0644\u062F\u0631\u0633.";
         if (data.request === "rejected") {
-          intro = "Your last payment note wasn't approved. If you think that's a mistake, contact your teacher \u2014 or send a new note.";
+          intro = "\u0644\u0645 \u062A\u062A\u0645 \u0627\u0644\u0645\u0648\u0627\u0641\u0642\u0629 \u0639\u0644\u0649 \u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u062F\u0641\u0639 \u0627\u0644\u0623\u062E\u064A\u0631\u0629. \u0625\u0630\u0627 \u0643\u0646\u062A \u062A\u0639\u062A\u0642\u062F \u0623\u0646 \u0647\u0630\u0627 \u062E\u0637\u0623\u060C \u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0641\u0631\u064A\u0642 \u0627\u0644\u062F\u0639\u0645 \u2014 \u0623\u0648 \u0623\u0631\u0633\u0644 \u0631\u0642\u0645 \u062A\u062D\u0648\u064A\u0644 \u062C\u062F\u064A\u062F.";
         } else if (data.request === "revoked") {
-          intro = "Your access to this video was removed. If you think that's a mistake, contact your teacher \u2014 or send a new payment note.";
+          intro = "\u062A\u0645 \u0625\u0644\u063A\u0627\u0621 \u0648\u0635\u0648\u0644\u0643 \u0625\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0641\u064A\u062F\u064A\u0648. \u0625\u0630\u0627 \u0643\u0646\u062A \u062A\u0639\u062A\u0642\u062F \u0623\u0646 \u0647\u0630\u0627 \u062E\u0637\u0623\u060C \u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0641\u0631\u064A\u0642 \u0627\u0644\u062F\u0639\u0645 \u2014 \u0623\u0648 \u0623\u0631\u0633\u0644 \u0631\u0642\u0645 \u062A\u062D\u0648\u064A\u0644 \u062C\u062F\u064A\u062F.";
         } else if (data.expired) {
-          intro = "Your access ended on " + data.expired + ". Send a new payment note to renew it.";
+          intro = "\u0627\u0646\u062A\u0647\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0648\u0635\u0648\u0644\u0643 \u0628\u062A\u0627\u0631\u064A\u062E " + data.expired + ". \u0623\u0631\u0633\u0644 \u0631\u0642\u0645 \u062A\u062D\u0648\u064A\u0644 \u062C\u062F\u064A\u062F \u0644\u0644\u062A\u062C\u062F\u064A\u062F.";
         }
+        var title = data.no_video
+          ? "\u0647\u0630\u0627 \u0627\u0644\u062F\u0631\u0633 \u0645\u062A\u0627\u062D \u0644\u0644\u0637\u0644\u0627\u0628 \u0627\u0644\u0645\u0634\u062A\u0631\u0643\u064A\u0646 \u0641\u0642\u0637"
+          : "\u0647\u0630\u0627 \u0627\u0644\u0641\u064A\u062F\u064A\u0648 \u0645\u062A\u0627\u062D \u0644\u0644\u0637\u0644\u0627\u0628 \u0627\u0644\u0645\u0634\u062A\u0631\u0643\u064A\u0646 \u0641\u0642\u0637";
+
         var input = el("input", {
           class: "vp-input",
           type: "text",
+          dir: "auto",
           maxlength: "200",
           autocomplete: "off",
-          placeholder: "Payment reference",
-          "aria-label": "Payment reference",
+          placeholder: "\u0631\u0642\u0645 \u0627\u0644\u062A\u062D\u0648\u064A\u0644",
+          "aria-label": "\u0631\u0642\u0645 \u0627\u0644\u062A\u062D\u0648\u064A\u0644",
         });
-        var send = el("button", { class: "vp-btn", type: "button" }, ["I paid"]);
+        var send = el("button", { class: "vp-btn", type: "button" }, ["\u0627\u0634\u062A\u0631\u0643"]);
 
         function submit() {
           var ref = input.value.trim();
           if (!ref) {
-            say("Type the payment reference first, so your teacher can find your payment.", true);
+            say("\u0627\u0643\u062A\u0628 \u0631\u0642\u0645 \u0627\u0644\u062A\u062D\u0648\u064A\u0644 \u0623\u0648\u0644\u0627\u064B\u060C \u062D\u062A\u0649 \u064A\u062A\u0645\u0643\u0646 \u0641\u0631\u064A\u0642 \u0627\u0644\u062F\u0639\u0645 \u0645\u0646 \u0625\u064A\u062C\u0627\u062F \u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u062F\u0641\u0639.", true);
             input.focus();
             return;
           }
@@ -408,7 +442,7 @@
             return;
           }
           send.disabled = true;
-          say("Sending\u2026");
+          say("\u062C\u0627\u0631\u064A \u0627\u0644\u0625\u0631\u0633\u0627\u0644\u2026");
           call({
             action: "request_access",
             student_id: s.student_id,
@@ -432,12 +466,12 @@
           if (e.key === "Enter") submit();
         });
 
-        box.appendChild(el("div", { class: "vp-icon", "aria-hidden": "true" }, [LOCK]));
-        box.appendChild(el("p", { class: "vp-title" }, [data.no_video ? "This lesson is for enrolled students" : "This video is for enrolled students"]));
+        box.appendChild(el("div", { class: "vp-icon vp-icon-badge", "aria-hidden": "true" }, [LOCK]));
+        box.appendChild(el("p", { class: "vp-title" }, [title]));
         box.appendChild(el("p", { class: "vp-text" }, [intro]));
-        payBlock(box, data);
+        payBlock(box, data, true);
         box.appendChild(el("div", { class: "vp-form" }, [input, send]));
-        box.appendChild(el("p", { class: "vp-hint" }, ["The transaction number, or the phone number you paid from."]));
+        box.appendChild(el("p", { class: "vp-hint" }, ["\u0631\u0642\u0645 \u0627\u0644\u0639\u0645\u0644\u064A\u0629\u060C \u0623\u0648 \u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062A\u0641 \u0627\u0644\u0630\u064A \u062D\u0648\u0651\u0644\u062A \u0645\u0646\u0647."]));
       });
     }
 
