@@ -105,6 +105,23 @@
     return d.toISOString().slice(0, 10);
   }
 
+  // The full subject/[group/]slug lesson path, derived from the page URL —
+  // same approach and same result as video.js's own slotInfo(), used here so
+  // the quiz gate check (get_quiz_state / upload_quiz_result) matches the
+  // identifier every admin_* lock action actually keys its sheets by. quiz.lesson
+  // (from the embedded quiz data) is only ever the bare slug — see the note by
+  // this function's one call site below and the matching note in Code.gs's
+  // handleUploadQuizResult for why that's a different, intentionally-untouched
+  // field.
+  function fullLessonPath() {
+    var parts = location.pathname.split("/").filter(Boolean).map(function (p) {
+      try { return decodeURIComponent(p); } catch (e) { return p; }
+    });
+    var last = parts.length ? parts[parts.length - 1] : "";
+    if (/\.html?$/i.test(last)) parts.pop();
+    return parts.join("/");
+  }
+
   function lastAttemptKey(quiz) {
     return LAST_ATTEMPT_PREFIX + (quiz.subject || "?") + ":" + (quiz.lesson || "?");
   }
@@ -208,7 +225,7 @@
     function checkGateThenStart(session) {
       root.innerHTML = "";
       root.appendChild(el("p", { class: "qz-lede" }, ["Checking\u2026"]));
-      postToDrive({ action: "get_quiz_state", lesson: quiz.lesson, student_id: session.student_id })
+      postToDrive({ action: "get_quiz_state", lesson: fullLessonPath(), student_id: session.student_id })
         .then(
           function (data) { data && data.locked ? renderLocked(session) : startQuiz(session); },
           function () { startQuiz(session); }
@@ -513,6 +530,7 @@
             client_id: state.clientId,
             subject: quiz.subject || null,
             lesson: quiz.lesson || null,
+            lesson_path: fullLessonPath(),   // for the quiz-gate re-check server-side — see the note above fullLessonPath()
             quiz_title: quiz.title || null,
             student_id: state.studentId,
             name: state.studentName,
