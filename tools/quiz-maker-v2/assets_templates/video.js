@@ -43,7 +43,7 @@
 
   if (window.VideoSlot) return; // loaded twice — the first copy already did the work
 
-  var DRIVE_ENDPOINT = "{{DRIVE_ENDPOINT}}";
+  var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
   var SESSION_KEY = "teaching_session";
   var RECHECK_AFTER_MS = 20000; // returning to a tab that shows a locked box re-checks, at most this often
 
@@ -172,6 +172,19 @@
       'html[data-theme="dark"] .vp-btn.vp-ghost{color:var(--accent,#72a5ff)}' +
       ".vp-btn[disabled]{opacity:.6;cursor:default}" +
       ".vp-btn.vp-ghost{background:transparent;color:var(--accent,#2f6fed)}" +
+      ".vp-shield{position:absolute;inset:0;z-index:2;cursor:pointer;background:transparent}" +
+      ".vp-bar{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;align-items:center;gap:10px;padding:8px 12px;" +
+      "background:linear-gradient(transparent,rgba(8,12,22,.85));color:#fff;font:12px var(--mono,monospace);user-select:none}" +
+      ".vp-bar button{background:none;border:0;color:#fff;font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}" +
+      ".vp-bar input[type=range]{flex:1;accent-color:#fff;cursor:pointer}" +
+      ".media-slot.is-locked .vp-shield,.media-slot.is-locked .vp-bar,.media-slot.is-locked .vp-cover{display:none}" +
+      ".media-slot:fullscreen{border-radius:0;margin:0;background:#000}" +
+      ".media-slot.vp-yt iframe{position:absolute;left:0;top:-64px;width:100%;height:calc(100% + 128px)}" +
+      ".vp-cover{position:absolute;inset:0;z-index:2;background:#000;display:flex;align-items:center;justify-content:center;" +
+      "color:rgba(255,255,255,.85);font-size:54px;cursor:pointer}" +
+      ".vp-cover.vp-off{display:none}" +
+      ".vp-wm{position:absolute;z-index:5;pointer-events:none;user-select:none;white-space:nowrap;font:600 15px var(--mono,monospace);" +
+      "color:rgba(255,255,255,.32);text-shadow:0 0 3px rgba(0,0,0,.55);letter-spacing:.06em;transition:left 9s linear,top 9s linear}" +
       ".vp-badge{position:absolute;top:8px;left:8px;z-index:4;padding:4px 9px;border-radius:999px;background:rgba(8,12,22,.78);" +
       "color:#e8ecf6;font:11px var(--mono,monospace);pointer-events:none}";
     var style = el("style", { id: "vp-style" });
@@ -266,6 +279,82 @@
     };
   }
 
+  // Click-shield + custom controls over a YouTube iframe: the visitor never gets
+  // YouTube's title bar, logo, "Watch on YouTube", share/copy-link or right-click menu.
+  function attachControls(slot, frame) {
+    var playing = false, dur = 0, seeking = false;
+    function cmd(func, args) {
+      try { frame.contentWindow.postMessage(JSON.stringify({ event: "command", func: func, args: args || [] }), "*"); } catch (e) {}
+    }
+    function fmt(t) { t = Math.max(0, t | 0); return ((t / 60) | 0) + ":" + ("0" + (t % 60)).slice(-2); }
+    var shield = el("div", { class: "vp-shield" });
+    var cover = el("div", { class: "vp-cover" }, ["\u25B6"]);
+    var btn = el("button", { type: "button", "aria-label": "Play/pause" }, ["\u25B6"]);
+    var range = el("input", { type: "range", min: "0", max: "1000", value: "0", "aria-label": "Seek" });
+    var time = el("span", {}, ["0:00"]);
+    var fs = el("button", { type: "button", "aria-label": "Fullscreen" }, ["\u26F6"]);
+    var bar = el("div", { class: "vp-bar" }, [btn, range, time, fs]);
+    function toggle() { cmd(playing ? "pauseVideo" : "playVideo"); }
+    shield.addEventListener("click", toggle);
+    cover.addEventListener("click", toggle);
+    cover.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    shield.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    btn.addEventListener("click", toggle);
+    range.addEventListener("input", function () { seeking = true; });
+    range.addEventListener("change", function () { cmd("seekTo", [(range.value / 1000) * dur, true]); seeking = false; });
+    fs.addEventListener("click", function () {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else if (slot.requestFullscreen) slot.requestFullscreen();
+    });
+    slot.appendChild(cover);
+    slot.appendChild(shield);
+    slot.appendChild(bar);
+    function onMsg(e) {
+      if (e.source !== frame.contentWindow) return;
+      var d; try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch (x) { return; }
+      if (!d || d.event !== "infoDelivery" || !d.info) return;
+      var i = d.info;
+      if (typeof i.playerState === "number") { playing = i.playerState === 1; cover.classList.toggle("vp-off", i.playerState === 1 || i.playerState === 3); btn.textContent = playing ? "\u275A\u275A" : "\u25B6"; }
+      if (i.duration) dur = i.duration;
+      if (typeof i.currentTime === "number" && dur) {
+        time.textContent = fmt(i.currentTime) + " / " + fmt(dur);
+        if (!seeking) range.value = Math.round((i.currentTime / dur) * 1000);
+      }
+    }
+    window.addEventListener("message", onMsg);
+    frame.addEventListener("load", function () {
+      frame.contentWindow.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), "*");
+    });
+  }
+
+  // Moving watermark with the student's number. Drifts slowly to a new random
+  // spot every ~9s; re-added if someone deletes or restyles it via DevTools.
+  function attachWatermark(slot, text) {
+    var wm = el("div", { class: "vp-wm" }, [String(text)]);
+    function place() {
+      wm.style.left = (4 + Math.random() * 62) + "%";
+      wm.style.top = (6 + Math.random() * 78) + "%";
+    }
+    function fresh() {
+      wm.setAttribute("class", "vp-wm");
+      wm.removeAttribute("style");
+      wm.style.left = (4 + Math.random() * 62) + "%";
+      wm.style.top = (6 + Math.random() * 78) + "%";
+    }
+    fresh();
+    slot.appendChild(wm);
+    var timer = setInterval(function () { if (wm.isConnected) place(); }, 9000);
+    var obs = new MutationObserver(function () {
+      if (!wm.parentNode) slot.appendChild(wm);
+      var st = wm.getAttribute("style") || "";
+      if (wm.getAttribute("class") !== "vp-wm" || /display|opacity|visibility|font-size|color/.test(st)) fresh();
+      if (wm.textContent !== String(text)) wm.textContent = String(text);
+    });
+    obs.observe(slot, { childList: true });
+    obs.observe(wm, { attributes: true, childList: true, characterData: true, subtree: true });
+    slot._vpWm = function () { clearInterval(timer); obs.disconnect(); };
+  }
+
   // -- one slot -----------------------------------------------------------------
 
   function mountSlot(slot) {
@@ -283,11 +372,12 @@
     var rule = null;
 
     function clear() {
+      if (slot._vpWm) { slot._vpWm(); slot._vpWm = null; }
       if (rule) {
         rule.stop();
         rule = null;
       }
-      slot.classList.remove("vp-panel", "is-locked");
+      slot.classList.remove("vp-panel", "is-locked", "vp-yt");
       while (slot.firstChild) slot.removeChild(slot.firstChild);
     }
 
@@ -305,14 +395,24 @@
       }
       clear();
       state = "video";
-      slot.appendChild(
-        el("iframe", {
-          src: data.embed_url,
-          title: titleText(),
-          allowfullscreen: "",
-          referrerpolicy: "strict-origin-when-cross-origin",
-        }),
-      );
+      var isYT = /youtube/.test(data.embed_url);
+      var src = data.embed_url;
+      if (isYT) {
+        // nocookie host, no YouTube UI, no related videos, no keyboard/fullscreen buttons
+        src = src.split("?")[0].replace("www.youtube.com", "www.youtube-nocookie.com") +
+          "?controls=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&cc_load_policy=0" +
+          "&enablejsapi=1&origin=" + encodeURIComponent(location.origin);
+      }
+      var frame = el("iframe", {
+        src: src,
+        title: titleText(),
+        allow: "autoplay; encrypted-media; picture-in-picture",
+        referrerpolicy: "strict-origin-when-cross-origin",
+      });
+      if (isYT) slot.classList.add("vp-yt");
+      slot.appendChild(frame);
+      if (isYT) attachControls(slot, frame);
+      if (session && session.student_id) attachWatermark(slot, session.student_id);
       if (data.locked && session && session.is_admin) {
         slot.appendChild(el("div", { class: "vp-badge" }, [LOCK + " Locked for students \u2014 you're previewing"]));
       }
