@@ -359,26 +359,30 @@ function handleTelegramUpdate(e, update) {
     var m = /^(ap|rj):(\S+)$/.exec(String(cq.data));
     if (!m) return _json({ ok: true });
     var approve = m[1] === "ap";
-    var verdict, popup;
+    console.log("telegram tap: " + m[1] + " " + m[2] + " from " + cq.from.id);
+    // Clear the button spinner FIRST — the sheet work below can take several seconds
+    // and Telegram drops the spinner-clearing call if it comes too late.
+    _tgCall("answerCallbackQuery", { callback_query_id: cq.id });
+    var chatId = cq.message && cq.message.chat ? cq.message.chat.id : cq.from.id;
     try {
-      var r = handleAdminDecidePayment({
+      handleAdminDecidePayment({
         token: _props().getProperty("ADMIN_TOKEN"),
         payment_id: m[2],
         decision: approve ? "approve" : "reject",
       });
-      verdict = approve ? "\u2705 Approved" : "\u274c Rejected";
-      popup = verdict;
+      var verdict = approve ? "\u2705 Approved" : "\u274c Rejected";
+      if (cq.message) {
+        _tgCall("editMessageText", {
+          chat_id: chatId, message_id: cq.message.message_id,
+          text: String(cq.message.text || "") + "\n\n" + verdict,
+          entities: cq.message.entities || [],
+        });
+      } else {
+        _tgCall("sendMessage", { chat_id: chatId, text: verdict });
+      }
     } catch (err) {
-      verdict = null;
-      popup = String(err.message || err).slice(0, 190);
-    }
-    _tgCall("answerCallbackQuery", { callback_query_id: cq.id, text: popup, show_alert: !verdict });
-    if (verdict && cq.message) {
-      _tgCall("editMessageText", {
-        chat_id: cq.message.chat.id, message_id: cq.message.message_id,
-        text: String(cq.message.text || "") + "\n\n" + verdict,
-        entities: cq.message.entities || [],
-      });
+      console.error("telegram decision failed: " + err);
+      _tgCall("sendMessage", { chat_id: chatId, text: "\u26a0\ufe0f " + String(err.message || err).slice(0, 300) });
     }
   } catch (err) {
     console.error("telegram update failed: " + err);
