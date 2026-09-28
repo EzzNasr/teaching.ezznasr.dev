@@ -1262,7 +1262,7 @@ def _site_asset_contents(drive_web_app_url):
     preview_site_assets_changes so the "what would change" check can never
     disagree with what the sync really does."""
     out = []
-    for name in ("auth.js", "quiz.js", "assign.js", "attachments.js", "video.js"):
+    for name in ("auth.js", "quiz.js", "assign.js", "attachments.js", "video.js", "subscribe.js"):
         content = load_asset_template(name)
         content = content.replace("{{DRIVE_ENDPOINT}}", drive_web_app_url.strip())
         out.append((name, content))

@@ -1,0 +1,23 @@
+// Paste into tools/quiz-maker-v2/tests/test_subscriptions.js, just BEFORE the final
+// console.log('\n' + pass + ' passed ...') line. Covers the three Code.gs additions.
+
+// 8. chunk 4 additions ----------------------------------------------------------------------
+{
+  let r = post(Object.assign({ action: 'admin_list_lesson_tags' }, SA));
+  t('a student cannot list lesson tags', !r.ok && /Not authorized/.test(r.error), JSON.stringify(r));
+  r = post(Object.assign({ action: 'admin_list_lesson_tags' }, ADMIN));
+  t('admin lists every tagged lesson with chapter and term', r.ok && Array.isArray(r.tags) &&
+    r.tags.some(x => x.lesson === G1_C1_L1 && x.chapter === 1 && x.term === 1) &&
+    r.tags.some(x => x.lesson === G1_C5_L1 && x.chapter === 5 && x.term === 2), JSON.stringify(r));
+  t('untagged lessons are not listed', !r.tags.some(x => x.lesson === G1_UNTAGGED));
+  r = post(Object.assign({ action: 'admin_list_lesson_tags' }, TOK));
+  t('the desktop app token works too (that is what the Tkinter tab sends)', r.ok, JSON.stringify(r));
+
+  env.props.PAY_INSTRUCTIONS = 'Send 250 EGP to 010...';
+  t('options carry the payment instructions', opts(null, 'grade-1-secondary').pay_info === 'Send 250 EGP to 010...');
+  delete env.props.PAY_INSTRUCTIONS;
+  t('...and an empty string when none is set', opts(null, 'grade-1-secondary').pay_info === '');
+
+  const ov = post(Object.assign({ action: 'admin_access_overview' }, ADMIN));
+  t('the access overview reports each grade\u2019s year-end', ov.ok && ov.year_ends && ov.year_ends[G1] === '2027-08-01' && ov.year_ends[G2] === '2027-08-01', JSON.stringify(ov.year_ends));
+}

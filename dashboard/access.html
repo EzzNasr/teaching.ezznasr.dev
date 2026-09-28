@@ -399,7 +399,15 @@
     var s = last.replace(/[-_]+/g, " ").trim();
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : path;
   }
+  // Grade subscriptions: "<grade folder>#ch3" (chapter 3) / "#t1" (term 1), see subscription-plan.md.
+  var SUB_SCOPE_RE = /^programming\/baccalaureate\/grade-(\d+)-secondary#(ch|t)(\d+)$/;
+  function subScope(scope) {
+    var m = SUB_SCOPE_RE.exec(String(scope || ""));
+    return m ? { grade: m[1], kind: m[2], n: m[3], base: String(scope).slice(0, String(scope).indexOf("#")) } : null;
+  }
   function scopeInfo(scope) {
+    var sub = subScope(scope);
+    if (sub) return { title: "Grade " + sub.grade + " - " + (sub.kind === "ch" ? "Chapter " : "Term ") + sub.n, sub: scope };
     if (scope === "*") return { title: "Every lesson on the site", sub: "*" };
     if (/\/\*$/.test(scope)) return { title: "All lessons in \u201c" + pretty(scope.slice(0, -2)) + "\u201d", sub: scope };
     return { title: pretty(scope), sub: scope };
@@ -407,6 +415,8 @@
   function scopeCovers(scope, lesson) {
     if (!scope) return false;
     if (scope === "*" || scope === lesson) return true;
+    // "#ch"/"#t" subscription scopes are decided server-side from the lesson tags; this copy only
+    // feeds the "already has access" hint, so it deliberately treats them as not covering.
     return scope.slice(-2) === "/*" && lesson.indexOf(scope.slice(0, -1)) === 0;
   }
   function parentOf(path) {
@@ -645,6 +655,22 @@
     return panel;
   }
 
+  // Subscription requests (chapter/term): scope and duration are fixed server-side (access runs to
+  // the grade's year-end), so there is nothing to choose \u2014 just approve or reject.
+  function subApproveBlock(d, p, sub, reject) {
+    var ye = d.year_ends && d.year_ends[sub.base];
+    var go = el("button", { class: "ac-btn primary", type: "button", "data-do": "approve-sub" }, ["Approve"]);
+    go.addEventListener("click", function () {
+      go.disabled = true;
+      run({ action: "admin_decide_payment", payment_id: p.payment_id, decision: "approve" },
+        function (r) { return "Approved " + (p.name || p.phone) + " \u2014 " + scopeInfo(r.scope).title + (r.expires_at ? " until " + r.expires_at : "") + "."; }, go);
+    });
+    return el("div", {}, [
+      el("div", { class: "ac-preview" }, [(p.name || p.phone) + " will be able to watch " + scopeInfo(p.scope).title + " " + (ye ? "until " + ye : "until the grade's year-end") + "."]),
+      el("div", { class: "ac-actions" }, [go, reject]),
+    ]);
+  }
+
   function rejectPanel(p) {
     var yes = el("button", { class: "ac-btn danger solid", type: "button", "data-do": "reject" }, ["Yes, reject it"]);
     yes.addEventListener("click", function () {
@@ -675,7 +701,7 @@
         el("div", { class: "ac-fields" }, [
           field("Wants to watch", si.title, si.sub),
           field("Payment reference", dash(p.reference)),
-          p.note ? field("Note from the student", p.note) : null,
+          p.note ? field(subScope(p.scope) ? "Amount" : "Note from the student", p.note) : null,
           field("Asked", dash(p.created_at)),
           field("Access right now", have ? "Already has access (renewal)" : "None", have ? (have.expires_at ? "until " + have.expires_at : "never expires") : "this would be their first"),
           field("Request id", p.payment_id),
@@ -686,7 +712,11 @@
       var reject = el("button", { class: "ac-btn danger", type: "button", "data-open": "reject" }, ["Reject\u2026"]);
       approve.addEventListener("click", function () { openPanel(key + ":approve"); });
       reject.addEventListener("click", function () { openPanel(key + ":reject"); });
-      if (STATE.open === key + ":approve") card.appendChild(approvePanel(d, p));
+      var sub = subScope(p.scope);
+      if (sub) {
+        if (STATE.open === key + ":reject") card.appendChild(rejectPanel(p));
+        else card.appendChild(subApproveBlock(d, p, sub, reject));
+      } else if (STATE.open === key + ":approve") card.appendChild(approvePanel(d, p));
       else if (STATE.open === key + ":reject") card.appendChild(rejectPanel(p));
       else card.appendChild(el("div", { class: "ac-actions" }, [approve, reject]));
       section.appendChild(card);
@@ -842,7 +872,7 @@
         el("div", { class: "ac-fields" }, [
           field("Asked for", si.title, si.sub),
           field("Payment reference", dash(p.reference)),
-          p.note ? field("Note from the student", p.note) : null,
+          p.note ? field(subScope(p.scope) ? "Amount" : "Note from the student", p.note) : null,
           field("Asked", dash(p.created_at)),
           field("Decided", p.status === "pending" ? "Not yet" : dash(p.decided_at)),
           accessText ? field("Access it gave", accessText, accessSub) : null,

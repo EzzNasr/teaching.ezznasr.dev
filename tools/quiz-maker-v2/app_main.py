@@ -6,6 +6,7 @@ three tabs sharing one site root and one Drive bridge config:
   1. Quiz Maker        — generate a lesson (index/quiz/assignment/attachments.json)
   2. Assignment Maker   — bigger description + text/url/file/both submission mode
   3. Attachment Maker   — upload files to your Drive, embedded on the lesson page
+  4. Lesson Tags        — tag lessons with chapter/term for the grade subscriptions
 
 Run:  python3 app_main.py
 Requires only the Python standard library (tkinter, urllib).
@@ -22,6 +23,7 @@ from modules import common, drive_bridge
 from modules.quiz_tab import QuizTab
 from modules.assignment_tab import AssignmentTab
 from modules.attachment_tab import AttachmentTab
+from modules.tags_tab import TagsTab
 
 
 class DriveConfigDialog(tk.Toplevel):
@@ -171,7 +173,7 @@ class App(tk.Tk):
             self.site_root_var.set(path)
             self.config_data["site_root"] = path
             common.save_config(self.config_data)
-            for tab in (self.quiz_tab, self.assignment_tab, self.attachment_tab):
+            for tab in (self.quiz_tab, self.assignment_tab, self.attachment_tab, self.tags_tab):
                 if hasattr(tab, "_refresh_groups"):
                     tab._refresh_groups()
                 elif hasattr(tab, "_refresh_lessons"):
@@ -243,10 +245,12 @@ class App(tk.Tk):
                                  on_lessons_changed=self._refresh_all_lessons)
         self.assignment_tab = AssignmentTab(notebook, self.site_root_var, self.status_var)
         self.attachment_tab = AttachmentTab(notebook, self.site_root_var, self.status_var)
+        self.tags_tab = TagsTab(notebook, self.site_root_var, self.status_var)
 
         notebook.add(self.quiz_tab, text="1. Quiz Maker")
         notebook.add(self.assignment_tab, text="2. Assignment Maker")
         notebook.add(self.attachment_tab, text="3. Attachment Maker")
+        notebook.add(self.tags_tab, text="4. Lesson Tags")
 
         self.notebook = notebook
         # Auto-refresh: whenever you switch into the Assignment or Attachment

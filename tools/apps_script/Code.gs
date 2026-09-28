@@ -994,6 +994,8 @@ function doPost(e) {
     return _json({ ok: false, error: "Invalid JSON body." });
   }
 
+  _lessonTagsCache = null;   // per-request cache — see _lessonTagsMap
+
   try {
     switch (payload.action) {
       case "ping":
@@ -1107,6 +1109,15 @@ function doPost(e) {
 
       case "admin_group_revoke_quiz_access":
         return _json(handleAdminGroupRevokeQuizAccess(payload));
+
+      case "admin_set_lesson_tags":
+        return _json(handleAdminSetLessonTags(payload));
+
+      case "get_subscription_options":
+        return _json(handleGetSubscriptionOptions(payload));
+
+      case "request_subscription":
+        return _json(handleRequestSubscription(payload));
 
       default:
         return _json({ ok: false, error: "Unknown action: " + payload.action });
@@ -1694,21 +1705,184 @@ var ENT_HEADERS = ["phone", "scope", "expires_at", "granted_at", "source"];
 var PAYMENT_HEADERS = ["payment_id", "phone", "name", "scope", "reference", "note", "status", "created_at", "decided_at"];
 var MAX_PENDING_REQUESTS = 5;
 
-// One lesson path, "some/folder/*" (everything under it), or "*" (everything).
+// -- Grade subscriptions: chapter/term scopes for programming/baccalaureate ---------
+// See subscription-plan.md. A subscription scope is one of the two grade folders below
+// plus a "#chN" or "#tN" tag (e.g. ".../grade-1-secondary#ch3"). Coverage is decided at
+// check time by looking up the lesson's tags in the LessonTags tab (below), so retagging
+// a lesson, or adding a new lesson to a chapter, changes coverage for every existing
+// holder automatically — nothing needs to be re-granted.
+
+var GRADE_SCOPE_FOLDERS = {
+  "programming/baccalaureate/grade-1-secondary": "G1",
+  "programming/baccalaureate/grade-2-secondary": "G2",
+};
+var SUB_SCOPE_TAG_RE = /^(ch|t)([1-9][0-9]*)$/;
+var DEFAULT_YEAR_END = "2027-08-01";
+var DEFAULT_CURRENT_TERM = 1;
+
+// "G1"/"G2" if this lesson is under one of the two grade folders, else "".
+function _gradeSuffixForLesson(lesson) {
+  for (var base in GRADE_SCOPE_FOLDERS) {
+    if (lesson === base || lesson.indexOf(base + "/") === 0) return GRADE_SCOPE_FOLDERS[base];
+  }
+  return "";
+}
+
+// "G1"/"G2" if `scope` is a "#ch"/"#t" scope for one of the two grade folders, else "".
+function _subscriptionGradeSuffix(scope) {
+  var hashAt = String(scope == null ? "" : scope).indexOf("#");
+  if (hashAt === -1) return "";
+  return GRADE_SCOPE_FOLDERS[scope.slice(0, hashAt)] || "";
+}
+
+// Script Property YEAR_END_<suffix>, else the shared default. Both fall back the
+// same way, so an unset property never blocks anything.
+function _gradeYearEnd(suffix) {
+  var v = _props().getProperty("YEAR_END_" + suffix);
+  return v ? _cleanYmd(v) : DEFAULT_YEAR_END;
+}
+
+// Script Property CURRENT_TERM_<suffix> as a whole number, else the default (1).
+function _gradeCurrentTerm(suffix) {
+  var n = parseInt(_props().getProperty("CURRENT_TERM_" + suffix), 10);
+  return n > 0 ? n : DEFAULT_CURRENT_TERM;
+}
+
+// A whole number >= 1, from a form field that may arrive as a number or a string.
+function _wholePositiveInt(v, label) {
+  var n = Number(v);
+  if (v === "" || v === null || v === undefined || !isFinite(n) || n !== Math.floor(n) || n < 1) {
+    throw new Error(label + " must be a whole number of 1 or more.");
+  }
+  return n;
+}
+
+// -- LessonTags: chapter/term tags for lessons under the two grade folders -----------
+// A NEW tab, deliberately separate from the Lessons tab (where a row means "explicitly
+// gated", and a new row starts LOCKED) — writing tags there could accidentally change
+// lock state. Reads never create this tab; it is only ever created inside the lock of
+// admin_set_lesson_tags.
+
+var LESSONTAGS_HEADERS = ["lesson", "chapter", "term", "updated_at"];
+var _lessonTagsCache = null;   // reset at the top of every doPost — see doPost
+
+// {lesson -> {chapter, term}} for every tagged lesson. Cached for the lifetime of one
+// request so a loop over entitlement rows (in _accessState) doesn't re-read the sheet
+// once per row.
+function _lessonTagsMap(ss) {
+  if (_lessonTagsCache) return _lessonTagsCache;
+  var map = {};
+  var sheet = ss.getSheetByName("LessonTags");
+  if (sheet && sheet.getLastRow() >= 2) {
+    var c = _needCols(sheet, "LessonTags", ["lesson", "chapter", "term"]);
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
+      var lesson = String(r[c.lesson - 1]).trim().toLowerCase();
+      var chapter = parseInt(r[c.chapter - 1], 10);
+      var term = parseInt(r[c.term - 1], 10);
+      if (lesson && chapter > 0 && term > 0) map[lesson] = { chapter: chapter, term: term };
+    });
+  }
+  _lessonTagsCache = map;
+  return map;
+}
+
+// Admin (Tkinter "Lesson Tags" tab): set, edit, or clear one lesson's chapter/term.
+// Blank BOTH fields to clear. All lessons of one chapter (within one grade) must share
+// the same term — a conflicting tag is rejected rather than silently applied.
+function handleAdminSetLessonTags(payload) {
+  _requireAdminAny(payload);
+  var lesson = _lessonPath(payload.lesson);
+  var suffix = _gradeSuffixForLesson(lesson);
+  if (!suffix) throw new Error("Tags can only be set on grade 1 or grade 2 baccalaureate lessons.");
+
+  var chapterBlank = payload.chapter === "" || payload.chapter === null || payload.chapter === undefined;
+  var termBlank = payload.term === "" || payload.term === null || payload.term === undefined;
+  if (chapterBlank !== termBlank) throw new Error("Provide both chapter and term, or leave both blank to clear.");
+  var clearing = chapterBlank && termBlank;
+  var chapter = 0, term = 0;
+  if (!clearing) {
+    chapter = _wholePositiveInt(payload.chapter, "chapter");
+    term = _wholePositiveInt(payload.term, "term");
+  }
+
+  return _withLock(function () {
+    var ss = _ss();
+    var sheet = _sheetByName(ss, "LessonTags", LESSONTAGS_HEADERS);
+    _ensureColumns(sheet, LESSONTAGS_HEADERS);
+    var c = _needCols(sheet, "LessonTags", LESSONTAGS_HEADERS);
+    var last = sheet.getLastRow();
+    var values = last >= 2 ? sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues() : [];
+    var at = -1;
+    for (var i = 0; i < values.length; i++) {
+      if (String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) { at = i; break; }
+    }
+
+    if (!clearing) {
+      for (var j = 0; j < values.length; j++) {
+        if (j === at) continue;
+        var otherLesson = String(values[j][c.lesson - 1]).trim().toLowerCase();
+        if (_gradeSuffixForLesson(otherLesson) !== suffix) continue;
+        if (parseInt(values[j][c.chapter - 1], 10) !== chapter) continue;
+        var otherTerm = parseInt(values[j][c.term - 1], 10);
+        if (otherTerm !== term) {
+          throw new Error("Chapter " + chapter + " is already tagged term " + otherTerm + " for this grade \u2014 every lesson in a chapter must share the same term.");
+        }
+      }
+    }
+
+    var now = _fmt(new Date(), TZ, true);
+    if (clearing) {
+      if (at >= 0) sheet.deleteRows(at + 2, 1);
+    } else if (at >= 0) {
+      sheet.getRange(at + 2, c.chapter).setNumberFormat("@").setValue(chapter);
+      sheet.getRange(at + 2, c.term).setNumberFormat("@").setValue(term);
+      sheet.getRange(at + 2, c.updated_at).setNumberFormat("@").setValue(now);
+    } else {
+      _appendByHeader(sheet, { lesson: lesson, chapter: chapter, term: term, updated_at: now });
+    }
+    _lessonTagsCache = null;   // this request's cache is stale now
+    return { ok: true, lesson: lesson, chapter: clearing ? "" : chapter, term: clearing ? "" : term };
+  });
+}
+
+// One lesson path, "some/folder/*" (everything under it), "*" (everything), or a
+// subscription scope ("<grade folder>#chN" / "<grade folder>#tN").
 function _normalizeScope(raw) {
   var s = String(raw == null ? "" : raw).trim().toLowerCase()
     .replace(/\\/g, "/").replace(/\/{2,}/g, "/").replace(/^\/+/, "");
   if (s === "*") return "*";
+  var hashAt = s.indexOf("#");
+  if (hashAt !== -1) {
+    var base = s.slice(0, hashAt), tag = s.slice(hashAt + 1);
+    if (!GRADE_SCOPE_FOLDERS.hasOwnProperty(base)) {
+      throw new Error("Subscription scopes are only valid for the grade 1 or grade 2 baccalaureate folders.");
+    }
+    var m = SUB_SCOPE_TAG_RE.exec(tag);
+    if (!m) throw new Error('Subscription scope must end in "#ch<N>" or "#t<N>".');
+    return base + "#" + m[1] + Number(m[2]);   // drops any leading zeros
+  }
   if (/\/\*$/.test(s)) return _lessonPath(s.replace(/\/\*$/, "")) + "/*";
   return _lessonPath(s);
 }
 
-// Does a stored scope cover this lesson? "a/b/*" covers "a/b/x" but NOT "a/bx" or "a/b" itself.
-function _scopeCovers(scope, lesson) {
+// Does a stored scope cover this lesson? "a/b/*" covers "a/b/x" but NOT "a/bx" or "a/b"
+// itself. A "#ch"/"#t" scope covers a lesson under its grade folder only if the
+// lesson's tags (from LessonTags, via `ss`) match — untagged lessons never match.
+function _scopeCovers(scope, lesson, ss) {
   if (!scope) return false;
   if (scope === "*") return true;
   if (scope === lesson) return true;
   if (scope.slice(-2) === "/*") return lesson.indexOf(scope.slice(0, -1)) === 0;
+  var hashAt = scope.indexOf("#");
+  if (hashAt !== -1 && ss) {
+    var base = scope.slice(0, hashAt);
+    if (lesson.indexOf(base + "/") !== 0) return false;
+    var tags = _lessonTagsMap(ss)[lesson];
+    if (!tags) return false;
+    var m = SUB_SCOPE_TAG_RE.exec(scope.slice(hashAt + 1));
+    if (!m) return false;
+    return m[1] === "ch" ? tags.chapter === Number(m[2]) : tags.term === Number(m[2]);
+  }
   return false;
 }
 
@@ -1783,7 +1957,7 @@ function _accessState(ss, phone, lesson) {
   var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
   for (var i = 0; i < values.length; i++) {
     if (!_phonesMatch(values[i][c.phone - 1], phone)) continue;
-    if (!_scopeCovers(String(values[i][c.scope - 1]).trim().toLowerCase(), lesson)) continue;
+    if (!_scopeCovers(String(values[i][c.scope - 1]).trim().toLowerCase(), lesson, ss)) continue;
     var ymd = _ymdOf(values[i][c.expires_at - 1], tz);
     if (ymd === null) continue;                       // unreadable date: fail closed
     if (ymd === "" || today <= ymd) {
@@ -1909,6 +2083,179 @@ function handleRequestAccess(payload) {
   });
 }
 
+// -- Grade subscriptions: buying a chapter or the current term ----------------------
+// Students use get_subscription_options (what can I buy, and what is my state for each?)
+// and request_subscription (the "I paid" for one chapter/term). The scope string, the
+// label and the price are all built HERE — nothing but the item and the reference comes
+// from the client. Approval is unchanged from chunk 1 (handleAdminDecidePayment).
+
+var CHAPTER_PRICE_EGP = 250;
+var TERM_PRICE_EGP = 1000;
+var MAX_PENDING_SUBSCRIPTIONS = 20;   // its own cap; MAX_PENDING_REQUESTS only guards request_access
+
+// "grade-1-secondary" / "1" / "g1" / the full folder -> the full grade folder, else an error.
+function _gradeFolder(raw) {
+  var s = String(raw == null ? "" : raw).trim().toLowerCase()
+    .replace(/^programming\/baccalaureate\//, "").replace(/^\/+|\/+$/g, "");
+  var m = /^(?:g|grade-)?([12])(?:-secondary)?$/.exec(s);
+  if (!m) throw new Error("Unknown grade.");
+  return "programming/baccalaureate/grade-" + m[1] + "-secondary";
+}
+
+// "Grade 1 \u00b7 Chapter 3 \u00b7 250 EGP" — goes in the Payments `note`, so the dashboard needs no new column.
+function _subscriptionLabel(suffix, kind, n) {
+  return "Grade " + suffix.slice(1) + " \u00b7 " + (kind === "ch" ? "Chapter " : "Term ") + n +
+         " \u00b7 " + (kind === "ch" ? CHAPTER_PRICE_EGP : TERM_PRICE_EGP) + " EGP";
+}
+
+// Chapters that have at least one tagged lesson under this grade: [{chapter, term, lessons}], by chapter.
+function _gradeChapters(ss, base) {
+  var tags = _lessonTagsMap(ss), by = {};
+  for (var lesson in tags) {
+    if (lesson.indexOf(base + "/") !== 0) continue;
+    var tg = tags[lesson];
+    var e = by[tg.chapter] || (by[tg.chapter] = { chapter: tg.chapter, term: tg.term, lessons: 0 });
+    e.lessons++;
+  }
+  return Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return a.chapter - b.chapter; });
+}
+
+// The signed-in student's canonical phone, or "" (no/stale session, or an admin session).
+function _subscriberPhone(payload) {
+  if (_sessionState(payload) !== "student") return "";
+  var found = _findStudentRow(_students(), payload.student_id);
+  return found ? (_canonicalPhone(found.phone) || String(found.phone)) : "";
+}
+
+// {scope: true} for every "#" scope this phone holds RIGHT NOW: not expired, and (if it came
+// from a payment) that payment still approved — the same rules _accessState applies.
+function _heldSubscriptionScopes(ss, phone) {
+  var held = {};
+  var sheet = ss.getSheetByName("Entitlements");
+  if (!sheet || sheet.getLastRow() < 2) return held;
+  var c = _needCols(sheet, "Entitlements", ["phone", "scope", "expires_at"]);
+  var srcCol = _headerIndex(sheet)["source"] || 0;
+  var tz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
+  var today = _todayCairo(), statuses = null;
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
+    var scope = String(r[c.scope - 1]).trim().toLowerCase();
+    if (scope.indexOf("#") === -1 || !_phonesMatch(r[c.phone - 1], phone)) return;
+    var ymd = _ymdOf(r[c.expires_at - 1], tz);
+    if (ymd === null || (ymd !== "" && today > ymd)) return;
+    var pid = srcCol ? _sourcePayment(r[srcCol - 1]) : "";
+    if (pid) {
+      if (statuses === null) statuses = _paymentStatuses(ss);
+      if (statuses.hasOwnProperty(pid) && statuses[pid] !== "approved") return;
+    }
+    held[scope] = true;
+  });
+  return held;
+}
+
+// {scope: payment_id} for this phone's PENDING "#" requests (the newest wins per scope).
+function _pendingSubscriptionScopes(ss, phone) {
+  var out = {};
+  var sheet = ss.getSheetByName("Payments");
+  if (!sheet || sheet.getLastRow() < 2) return out;
+  var c = _needCols(sheet, "Payments", ["payment_id", "phone", "scope", "status"]);
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
+    var scope = String(r[c.scope - 1]).trim().toLowerCase();
+    if (scope.indexOf("#") === -1 || String(r[c.status - 1]).trim().toLowerCase() !== "pending") return;
+    if (_phonesMatch(r[c.phone - 1], phone)) out[scope] = String(r[c.payment_id - 1]);
+  });
+  return out;
+}
+
+// Public read (like get_video): a missing/stale session just means "not signed in", and every
+// item then shows "available". Never creates a tab.
+function handleGetSubscriptionOptions(payload) {
+  var base = _gradeFolder(payload.grade), suffix = GRADE_SCOPE_FOLDERS[base];
+  var ss = _ss();
+  var phone = _subscriberPhone(payload);
+  var held = phone ? _heldSubscriptionScopes(ss, phone) : {};
+  var pending = phone ? _pendingSubscriptionScopes(ss, phone) : {};
+  var current = _gradeCurrentTerm(suffix);
+
+  var chapters = _gradeChapters(ss, base);
+  var termLessons = 0;
+  var list = chapters.map(function (ch) {
+    var state = "available";
+    if (held[base + "#ch" + ch.chapter]) state = "owned";
+    else if (held[base + "#t" + ch.term]) state = "covered_by_term";
+    else if (pending[base + "#ch" + ch.chapter]) state = "pending";
+    if (ch.term === current) termLessons += ch.lessons;
+    return { chapter: ch.chapter, term: ch.term, lessons: ch.lessons, price: CHAPTER_PRICE_EGP, state: state };
+  });
+  var term = null;
+  if (termLessons > 0) {
+    var tState = held[base + "#t" + current] ? "owned" : (pending[base + "#t" + current] ? "pending" : "available");
+    term = { term: current, lessons: termLessons, price: TERM_PRICE_EGP, state: tState };
+  }
+  return { ok: true, grade: base.split("/").pop(), signed_in: !!phone, year_end: _gradeYearEnd(suffix),
+           current_term: current, prices: { chapter: CHAPTER_PRICE_EGP, term: TERM_PRICE_EGP },
+           chapters: list, term: term };
+}
+
+// The student's "I paid" for ONE chapter or the current term. Adds a PENDING row only.
+function handleRequestSubscription(payload) {
+  _requireStudentSession(payload);
+  var base = _gradeFolder(payload.grade), suffix = GRADE_SCOPE_FOLDERS[base];
+  var type = String(payload.item_type == null ? "" : payload.item_type).trim().toLowerCase();
+  var kind, n;
+  if (type === "chapter") { kind = "ch"; n = _wholePositiveInt(payload.chapter, "chapter"); }
+  else if (type === "term") { kind = "t"; n = _wholePositiveInt(payload.term, "term"); }
+  else throw new Error('item_type must be "chapter" or "term".');
+  var reference = String(payload.reference == null ? "" : payload.reference).trim().slice(0, 200);
+  if (!reference) throw new Error("Enter the payment reference (or the phone number you paid from).");
+  var found = _findStudentRow(_students(), payload.student_id);
+  if (!found) throw new Error("No matching student.");
+  var phone = _canonicalPhone(found.phone) || String(found.phone);
+  var scope = base + "#" + kind + n;
+
+  return _withLock(function () {
+    var ss = _ss();
+    var chapters = _gradeChapters(ss, base);
+    var held = _heldSubscriptionScopes(ss, phone);
+    if (kind === "ch") {
+      var ch = chapters.filter(function (x) { return x.chapter === n; })[0];
+      if (!ch) throw new Error("That chapter isn't available yet.");
+      if (held[scope]) throw new Error("You already own this chapter.");
+      if (held[base + "#t" + ch.term]) throw new Error("Your term subscription already covers this chapter.");
+    } else {
+      var current = _gradeCurrentTerm(suffix);
+      if (n !== current) throw new Error("Only the current term (term " + current + ") can be bought.");
+      if (!chapters.some(function (x) { return x.term === n; })) throw new Error("That term isn't available yet.");
+      if (held[scope]) throw new Error("You already own this term.");
+    }
+
+    var sheet = _sheetByName(ss, "Payments", PAYMENT_HEADERS);
+    _ensureColumns(sheet, PAYMENT_HEADERS);
+    var pendingSubs = 0, dup = null;
+    if (sheet.getLastRow() >= 2) {
+      var c = _needCols(sheet, "Payments", PAYMENT_HEADERS);
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
+        var rs = String(r[c.scope - 1]).trim().toLowerCase();
+        if (rs.indexOf("#") === -1 || String(r[c.status - 1]).trim().toLowerCase() !== "pending" || !_phonesMatch(r[c.phone - 1], phone)) return;
+        pendingSubs++;
+        if (!dup && rs === scope) dup = String(r[c.payment_id - 1]);
+      });
+    }
+    if (dup) return { ok: true, status: "pending", duplicate: true, payment_id: dup };   // double-tap / resend
+    if (pendingSubs >= MAX_PENDING_SUBSCRIPTIONS) {
+      throw new Error("You already have " + pendingSubs + " subscription requests waiting for approval — please wait until they are reviewed.");
+    }
+    var id = "p" + Utilities.getUuid().replace(/-/g, "").slice(0, 8);
+    var note = _subscriptionLabel(suffix, kind, n);
+    _appendByHeader(sheet, {
+      payment_id: id, phone: phone, name: String(found.display_name == null ? "" : found.display_name),
+      scope: scope, reference: reference, note: note, status: "pending",
+      created_at: _fmt(new Date(), TZ, true), decided_at: "",
+    });
+    return { ok: true, status: "pending", payment_id: id, scope: scope, note: note,
+             price: kind === "ch" ? CHAPTER_PRICE_EGP : TERM_PRICE_EGP };
+  });
+}
+
 // status: pending (default) | approved | rejected | all. Newest first, at most 300.
 function handleAdminListPayments(payload) {
   _requireAdminAny(payload);
@@ -1956,7 +2303,19 @@ function handleAdminDecidePayment(payload) {
     var out = { ok: true, payment_id: id, phone: String(r[c.phone - 1]), name: String(r[c.name - 1]) };
     if (decision === "approve") {
       var scope = scopeOverride || _normalizeScope(r[c.scope - 1]);
-      var g = _grantRaw(ss, _canonicalPhone(r[c.phone - 1]) || String(r[c.phone - 1]), scope, explicit, days, "payment:" + id);
+      var g;
+      var subSuffix = _subscriptionGradeSuffix(scope);
+      if (subSuffix) {
+        // Subscription scopes: the manual scope/duration inputs are ignored — access
+        // always runs to the grade's year-end.
+        var yearEnd = _gradeYearEnd(subSuffix);
+        if (_todayCairo() > yearEnd) {
+          throw new Error("This grade's year has already ended (" + yearEnd + ") \u2014 update YEAR_END_" + subSuffix + " first.");
+        }
+        g = _grantRaw(ss, _canonicalPhone(r[c.phone - 1]) || String(r[c.phone - 1]), scope, yearEnd, 0, "payment:" + id);
+      } else {
+        g = _grantRaw(ss, _canonicalPhone(r[c.phone - 1]) || String(r[c.phone - 1]), scope, explicit, days, "payment:" + id);
+      }
       out.scope = g.scope; out.expires_at = g.expires_at; out.extended = g.extended;
     }
     out.status = decision === "approve" ? "approved" : "rejected";
