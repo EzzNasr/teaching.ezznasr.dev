@@ -74,6 +74,11 @@ SUBMIT_MODES = [
 
 MEDIA_SLOT_RE = re.compile(r'(<div class="media-slot">)(.*?)(</div>)', re.DOTALL)
 VIDEO_PLACEHOLDER = "Video placeholder &mdash; add a YouTube embed URL to replace this box."
+# Baked into a backend-managed slot instead of VIDEO_PLACEHOLDER: a video DOES
+# exist there, video.js just hasn't fetched it yet, so the "add a URL" text
+# would be actively wrong for the split second (or the JS-disabled case)
+# before it runs.
+VIDEO_LOADING_PLACEHOLDER = "Loading video&hellip;"
 
 
 def normalize_video_url(url):
@@ -103,13 +108,15 @@ def normalize_video_url(url):
     return url  # not recognized as YouTube — pass through unchanged
 
 
-def video_block_for(embed_url, title):
+def video_block_for(embed_url, title, placeholder=None):
     """Return the markup that belongs inside a <div class="media-slot">
     for a given (already-normalized) embed URL — an <iframe> if there is
-    one, otherwise the standard placeholder box."""
+    one, otherwise a placeholder box (VIDEO_PLACEHOLDER by default; pass
+    placeholder= to use a different one, e.g. VIDEO_LOADING_PLACEHOLDER
+    for a slot that's backend-managed but not yet fetched)."""
     if embed_url:
         return '<iframe src="{}" title="{}" allowfullscreen></iframe>'.format(embed_url, title)
-    return VIDEO_PLACEHOLDER
+    return VIDEO_PLACEHOLDER if placeholder is None else placeholder
 
 
 def read_media_slot_url(html_path):
@@ -127,12 +134,13 @@ def read_media_slot_url(html_path):
     return iframe_match.group(1) if iframe_match else ""
 
 
-def update_media_slot(html_path, raw_url, title):
+def update_media_slot(html_path, raw_url, title, placeholder=None):
     """Find the <div class="media-slot">...</div> in html_path and swap
     its contents for an iframe embedding raw_url (normalized first), or
-    back to the placeholder if raw_url is blank. Returns the normalized
-    embed_url ("" if cleared). Raises FileNotFoundError if html_path
-    doesn't exist, or ValueError if it has no media-slot section."""
+    back to the placeholder if raw_url is blank (see video_block_for for
+    what placeholder= does). Returns the normalized embed_url ("" if
+    cleared). Raises FileNotFoundError if html_path doesn't exist, or
+    ValueError if it has no media-slot section."""
     if not os.path.isfile(html_path):
         raise FileNotFoundError(html_path)
 
@@ -143,7 +151,7 @@ def update_media_slot(html_path, raw_url, title):
         raise ValueError("no media-slot section found in {}".format(html_path))
 
     embed_url = normalize_video_url(raw_url)
-    video_block = video_block_for(embed_url, title)
+    video_block = video_block_for(embed_url, title, placeholder)
 
     new_content = MEDIA_SLOT_RE.sub(
         lambda m: m.group(1) + "\n      " + video_block + "\n    " + m.group(3), content, count=1)
@@ -196,7 +204,9 @@ def set_lesson_video(web_app_url, admin_token, lesson, slot, video_url, title, h
 
     embed_url = normalize_video_url(video_url)
     drive_bridge.set_video(web_app_url, admin_token, lesson, slot, embed_url)
-    update_media_slot(html_path, "", title)  # always the placeholder now
+    # The video IS set now — just not fetched into this page yet — so bake
+    # "Loading video…", not "add a YouTube embed URL to replace this box".
+    update_media_slot(html_path, "", title, placeholder=VIDEO_LOADING_PLACEHOLDER)
     return embed_url, True
 
 
@@ -232,7 +242,7 @@ def video_block_for_regen(web_app_url, admin_token, lesson, slot, html_path, tit
     if web_app_url and admin_token:
         try:
             if drive_bridge.get_video(web_app_url, admin_token, lesson, slot) is not None:
-                return VIDEO_PLACEHOLDER
+                return VIDEO_LOADING_PLACEHOLDER
         except drive_bridge.DriveBridgeError:
             pass  # backend unreachable right now — fall back to preserving what's on the page
     return video_block_for(read_media_slot_url(html_path), title)
