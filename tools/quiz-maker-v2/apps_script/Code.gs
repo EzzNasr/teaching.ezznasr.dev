@@ -286,25 +286,27 @@ function _json(obj) {
 }
 
 // Telegram ping to the admin. Needs Script Properties TELEGRAM_BOT_TOKEN and
-// TELEGRAM_ADMIN_CHAT_ID; silently does nothing if either is missing. Never throws,
-// so a Telegram outage can't fail a student's request. Call it OUTSIDE _withLock.
-function _notifyAdmin(text) {
+// TELEGRAM_ADMIN_CHAT_ID (one id, or several separated by commas); silently does
+// nothing if either is missing. Never throws, so a Telegram outage can't fail a
+// student's request. Call it OUTSIDE _withLock.
+// paymentId (optional) adds Approve / Reject buttons under the message.
+function _notifyAdmin(text, paymentId) {
   try {
     var p = _props();
     var token = p.getProperty("TELEGRAM_BOT_TOKEN");
     var chat = p.getProperty("TELEGRAM_ADMIN_CHAT_ID");
     if (!token || !chat) return;
-    // TELEGRAM_ADMIN_CHAT_ID may hold several chat ids separated by commas.
-    String(chat).split(",").forEach(function (id) {
-      id = id.trim();
-      if (!id) return;
+    var body = { text: String(text).slice(0, 3500), disable_web_page_preview: true };
+    if (paymentId) {
+      body.reply_markup = { inline_keyboard: [[
+        { text: "\u2705 Approve", callback_data: "ap:" + paymentId },
+        { text: "\u274c Reject", callback_data: "rj:" + paymentId },
+      ]] };
+    }
+    _tgAdminIds().forEach(function (id) {
       try {
-        UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
-          method: "post",
-          contentType: "application/json",
-          payload: JSON.stringify({ chat_id: id, text: String(text).slice(0, 3500), disable_web_page_preview: true }),
-          muteHttpExceptions: true,
-        });
+        body.chat_id = id;
+        _tgCall("sendMessage", body);
       } catch (err) {
         console.error("notifyAdmin failed for " + id + ": " + err);
       }
@@ -312,6 +314,60 @@ function _notifyAdmin(text) {
   } catch (err) {
     console.error("notifyAdmin failed: " + err);
   }
+}
+
+function _tgAdminIds() {
+  return String(_props().getProperty("TELEGRAM_ADMIN_CHAT_ID") || "")
+    .split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+}
+
+function _tgCall(method, body) {
+  var token = _props().getProperty("TELEGRAM_BOT_TOKEN");
+  return UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/" + method, {
+    method: "post", contentType: "application/json",
+    payload: JSON.stringify(body), muteHttpExceptions: true,
+  });
+}
+
+// Telegram webhook entry: a tap on Approve / Reject. Two checks before anything
+// happens: the webhook URL must carry ?tg=<TELEGRAM_WEBHOOK_SECRET>, and the tapper
+// must be one of the ids in TELEGRAM_ADMIN_CHAT_ID. Always returns ok so Telegram
+// doesn't retry.
+function handleTelegramUpdate(e, update) {
+  try {
+    var secret = _props().getProperty("TELEGRAM_WEBHOOK_SECRET");
+    if (!secret || !e || !e.parameter || e.parameter.tg !== secret) return _json({ ok: true });
+    var cq = update && update.callback_query;
+    if (!cq || !cq.from || !cq.data) return _json({ ok: true });
+    if (_tgAdminIds().indexOf(String(cq.from.id)) === -1) return _json({ ok: true });
+
+    var m = /^(ap|rj):(\S+)$/.exec(String(cq.data));
+    if (!m) return _json({ ok: true });
+    var approve = m[1] === "ap";
+    var verdict, popup;
+    try {
+      var r = handleAdminDecidePayment({
+        token: _props().getProperty("ADMIN_TOKEN"),
+        payment_id: m[2],
+        decision: approve ? "approve" : "reject",
+      });
+      verdict = approve ? "\u2705 Approved" : "\u274c Rejected";
+      popup = verdict;
+    } catch (err) {
+      verdict = null;
+      popup = String(err.message || err).slice(0, 190);
+    }
+    _tgCall("answerCallbackQuery", { callback_query_id: cq.id, text: popup, show_alert: !verdict });
+    if (verdict && cq.message) {
+      _tgCall("editMessageText", {
+        chat_id: cq.message.chat.id, message_id: cq.message.message_id,
+        text: String(cq.message.text || "").slice(0, 3400) + "\n\n" + verdict,
+      });
+    }
+  } catch (err) {
+    console.error("telegram update failed: " + err);
+  }
+  return _json({ ok: true });
 }
 
 function _requireAdmin(payload) {
@@ -1031,6 +1087,8 @@ function doPost(e) {
   }
 
   _lessonTagsCache = null;   // per-request cache — see _lessonTagsMap
+
+  if (payload && payload.update_id !== undefined) return handleTelegramUpdate(e, payload);   // Telegram webhook
 
   try {
     switch (payload.action) {
@@ -2140,7 +2198,7 @@ function handleRequestAccess(payload) {
     return { ok: true, status: "pending", payment_id: id };
   });
   if (res && res.ok && res.status === "pending" && !res.duplicate) {
-    _notifyAdmin("Payment request\n" + String(found.display_name || "") + " " + phone + "\n" + lesson + "\nRef: " + reference);
+    _notifyAdmin("Payment request\n" + String(found.display_name || "") + " " + phone + "\n" + lesson + "\nRef: " + reference, res.payment_id);
   }
   return res;
 }
@@ -2319,7 +2377,7 @@ function handleRequestSubscription(payload) {
              price: kind === "ch" ? CHAPTER_PRICE_EGP : TERM_PRICE_EGP };
   });
   if (res && res.ok && res.status === "pending" && !res.duplicate) {
-    _notifyAdmin("Subscription request\n" + String(found.display_name || "") + " " + phone + "\n" + res.note + "\nRef: " + reference);
+    _notifyAdmin("Subscription request\n" + String(found.display_name || "") + " " + phone + "\n" + res.note + "\nRef: " + reference, res.payment_id);
   }
   return res;
 }
