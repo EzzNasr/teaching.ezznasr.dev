@@ -122,3 +122,30 @@ def get_video(web_app_url, admin_token, lesson, slot):
            str(row.get("slot", "")).strip().lower() == slot:
             return row
     return None
+
+
+def set_quiz_content(web_app_url, admin_token, lesson, quiz_json):
+    """Admin-only: upsert the full quiz object (title/subject/lesson/questions,
+    with correct answers) into the backend's QuizContent sheet, keyed by
+    lesson. This is what get_quiz reads at view time — the questions never
+    need to be baked into quiz.html's own source once this has run, the same
+    way a video's URL doesn't need to be baked in once set_video has run."""
+    payload = {
+        "action": "admin_set_quiz_content",
+        "token": admin_token,
+        "lesson": lesson,
+        "content_json": json.dumps(quiz_json),
+    }
+    return _post_json(web_app_url, payload)
+
+
+def get_quiz_content(web_app_url, admin_token, lesson):
+    """Admin-only: the full quiz object currently stored server-side for
+    lesson (title/subject/lesson/questions), regardless of whether the quiz
+    is locked — unlike the public get_quiz action, which withholds it while
+    locked. Returns None if nothing has been synced there yet. Used when
+    reopening a lesson for editing, so a synced lesson's question list still
+    shows even though it's no longer baked into quiz.html."""
+    payload = {"action": "admin_get_quiz_content", "token": admin_token, "lesson": lesson}
+    result = _post_json(web_app_url, payload)
+    return result.get("quiz")

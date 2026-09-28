@@ -1069,6 +1069,15 @@ function doPost(e) {
       case "admin_set_quiz_lock":
         return _json(handleAdminSetQuizLock(payload));
 
+      case "get_quiz":
+        return _json(handleGetQuiz(payload));
+
+      case "admin_set_quiz_content":
+        return _json(handleAdminSetQuizContent(payload));
+
+      case "admin_get_quiz_content":
+        return _json(handleAdminGetQuizContent(payload));
+
       case "admin_list_groups":
         return _json(handleAdminListGroups(payload));
 
@@ -1272,7 +1281,22 @@ function handleUploadQuizResult(payload) {
   // IS required though (confirmed quiz.js always sends it as of the login
   // rollout) — same reasoning as handleUploadSubmission above.
   if (!payload.student_id) throw new Error("Missing student_id — please sign in and try again.");
-  if (_quizLockedForStudent(_lessonPath(payload.lesson), payload.student_id)) throw new Error("This quiz is locked right now — ask your teacher when it opens.");
+  // Bug fix (found alongside the video-lock pipeline fix): quiz.js's embedded
+  // quiz data only ever carried the bare lesson SLUG (e.g. "functions"), never
+  // the full subject/[group/]slug path the Quizzes sheet is actually keyed by
+  // (the same convention as admin_set_quiz_lock, admin_set_lesson_lock,
+  // admin_set_video, and admin_list_lessons — see _lessonPath). That meant
+  // this check NEVER matched a real Quizzes row for ANY lesson, so a locked
+  // quiz always looked open at submission time too. quiz.js now also sends
+  // lesson_path (derived from the page URL, same way video.js already does)
+  // specifically for this check; lesson_path is a payload field, kept
+  // separate from payload.lesson (the bare slug) since QuizResults/dashboards
+  // already store/read that field as the slug — changing its meaning would
+  // break existing rows. Falls back to payload.lesson for any client that
+  // hasn't picked up the quiz.js fix yet (fails toward the OLD, broken-open
+  // behavior in that case, not toward newly locking out a stale client).
+  var gateLesson = payload.lesson_path || payload.lesson;
+  if (_quizLockedForStudent(_lessonPath(gateLesson), payload.student_id)) throw new Error("This quiz is locked.");
 
   var keys = _quizKeys(payload);
   var peeked = _peekSheet("QuizResults");
@@ -2286,6 +2310,112 @@ function handleAdminSetQuizLock(payload) {
   });
   CacheService.getScriptCache().remove(_quizCacheKey(lesson));
   return result;
+}
+
+// -- Quiz content: the actual questions/answers, served only when unlocked --------
+// Historically the quiz's full question+answer JSON was baked straight into
+// quiz.html by the desktop Quiz Maker, so the quiz-lock above only ever hid the
+// UI — the real content sat in the page source for anyone to read regardless of
+// lock state. This mirrors what get_video already does for videos: the content
+// lives here instead, and get_quiz only puts it in a response when this viewer
+// is actually allowed to see it. A locked (or not-yet-synced) quiz never has its
+// questions leave the server.
+var QUIZ_CONTENT_HEADERS = ["lesson", "content_json", "updated_at"];
+var QUIZ_CONTENT_CACHE_SECONDS = 30;
+function _quizContentCacheKey(lesson) { return "qct:" + _md5(lesson); }
+
+function _findQuizContentRow(sheet, lesson) {
+  var last = sheet.getLastRow();
+  if (last < 2) return null;
+  var c = _needCols(sheet, "QuizContent", ["lesson", "content_json"]);
+  var values = sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) {
+      return { row: i + 2, cols: c, content_json: String(values[i][c.content_json - 1] || "") };
+    }
+  }
+  return null;
+}
+
+function _lookupQuizContent(lesson) {
+  var cache = CacheService.getScriptCache();
+  var ck = _quizContentCacheKey(lesson);
+  var hit = cache.get(ck);
+  if (hit !== null) return hit === "" ? null : hit;
+  var sheet = _ss().getSheetByName("QuizContent");
+  var found = sheet ? _findQuizContentRow(sheet, lesson) : null;
+  var json = found ? found.content_json : null;
+  // Cache stores "" for "nothing synced yet" so that case doesn't re-read every time either.
+  cache.put(ck, json || "", QUIZ_CONTENT_CACHE_SECONDS);
+  return json;
+}
+
+// Public. What quiz.js now actually loads the quiz from — replaces reading the
+// questions out of the page's own embedded JSON. locked:true means exactly what
+// get_quiz_state's locked meant, computed the same way (global lock plus any
+// per-student QuizAccess override), except this also withholds the questions
+// themselves rather than just telling the page to show a "locked" screen.
+function handleGetQuiz(payload) {
+  var gateLesson = payload.lesson_path || payload.lesson;   // same convention as handleUploadQuizResult above
+  var lesson = _lessonPath(gateLesson);
+  var locked = payload.student_id
+    ? _quizLockedForStudent(lesson, payload.student_id)
+    : _isQuizLocked(lesson);
+  if (locked) return { ok: true, locked: true };
+  var json = _lookupQuizContent(lesson);
+  if (!json) return { ok: true, locked: false, quiz: null }; // this lesson hasn't been synced to the server yet
+  try {
+    return { ok: true, locked: false, quiz: JSON.parse(json) };
+  } catch (e) {
+    return { ok: true, locked: false, quiz: null };
+  }
+}
+
+// content_json: the full quiz object (subject/lesson/title/questions, with
+// correct answers) as a JSON string. Kept in sync by the desktop Quiz Maker the
+// same way admin_set_video keeps a video's URL in sync — called every time a
+// lesson's quiz is generated or edited, so this is always what get_quiz reads.
+function handleAdminSetQuizContent(payload) {
+  _requireAdminAny(payload);
+  var lesson = _lessonPath(payload.lesson);
+  if (!payload.content_json) throw new Error("Missing content_json.");
+  var json = String(payload.content_json);
+  JSON.parse(json); // throws on malformed input, before anything is written
+
+  var result = _withLock(function () {
+    var ss = _ss();
+    var sheet = ss.getSheetByName("QuizContent");
+    var found = sheet ? _findQuizContentRow(sheet, lesson) : null;
+    var now = _fmt(new Date(), TZ, true);
+    if (found) {
+      sheet.getRange(found.row, found.cols.content_json).setValue(json);
+      if (found.cols.updated_at) sheet.getRange(found.row, found.cols.updated_at).setNumberFormat("@").setValue(now);
+      return { ok: true, lesson: lesson };
+    }
+    sheet = _sheetByName(ss, "QuizContent", QUIZ_CONTENT_HEADERS);
+    _ensureColumns(sheet, QUIZ_CONTENT_HEADERS);
+    _appendByHeader(sheet, { lesson: lesson, content_json: json, updated_at: now });
+    return { ok: true, lesson: lesson };
+  });
+  CacheService.getScriptCache().remove(_quizContentCacheKey(lesson));
+  return result;
+}
+
+// Admin-only: read a lesson's stored quiz content regardless of lock state,
+// so the desktop Quiz Maker can reload it for editing even while the quiz is
+// currently locked (the public get_quiz withholds content whenever locked —
+// that's the whole point of it, but an admin reopening their own lesson to
+// edit it needs the real thing either way).
+function handleAdminGetQuizContent(payload) {
+  _requireAdminAny(payload);
+  var lesson = _lessonPath(payload.lesson);
+  var json = _lookupQuizContent(lesson);
+  if (!json) return { ok: true, quiz: null };
+  try {
+    return { ok: true, quiz: JSON.parse(json) };
+  } catch (e) {
+    return { ok: true, quiz: null };
+  }
 }
 
 // -- Quiz access overrides: open a locked quiz for one phone/group, for a while ------

@@ -516,6 +516,27 @@ class QuizTab(ttk.Frame):
         if not isinstance(questions, list):
             questions = []
 
+        # -- video (lesson page) and solution video (quiz.html), preferring
+        # the Drive-bridge Videos sheet over whatever's baked in the page --
+        lesson_key = common.lesson_url_path(subject_slug, group_relpath, lesson_slug)
+        drive_cfg = common.get_drive_config(common.load_config())
+
+        # Once a lesson's quiz content has been synced (set_quiz_content, in
+        # _generate() below), quiz.html itself may only carry meta (title/
+        # subject/lesson) — the questions live server-side instead, same as
+        # a synced video's URL isn't baked into the page either. Prefer that
+        # stored copy here so re-opening a synced lesson for editing doesn't
+        # show an empty question list; falls back to whatever's already in
+        # the page (legacy pages, or no Drive bridge configured) otherwise.
+        if drive_cfg["web_app_url"] and drive_cfg["admin_token"]:
+            try:
+                synced_quiz = drive_bridge.get_quiz_content(
+                    drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key)
+            except drive_bridge.DriveBridgeError:
+                synced_quiz = None
+            if synced_quiz and isinstance(synced_quiz.get("questions"), list):
+                questions = synced_quiz["questions"]
+
         if self.questions or self.lesson_name_var.get().strip():
             if not messagebox.askyesno(
                     "Replace current form?",
@@ -538,8 +559,6 @@ class QuizTab(ttk.Frame):
 
         # -- video (lesson page) and solution video (quiz.html), preferring
         # the Drive-bridge Videos sheet over whatever's baked in the page --
-        lesson_key = common.lesson_url_path(subject_slug, group_relpath, lesson_slug)
-        drive_cfg = common.get_drive_config(common.load_config())
         video_url = common.get_lesson_video_url(
             drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "lesson", index_path)
         quiz_solution_video_url = common.get_lesson_video_url(
@@ -914,6 +933,33 @@ class QuizTab(ttk.Frame):
         track_class = common.track_class_for_group(subject_slug, group_relpath)
         drive_cfg = common.get_drive_config(common.load_config())
 
+        # The questions (and their correct answers) now live behind the same
+        # lock the "Quiz gate" lock/unlock control sets — get_quiz only hands
+        # them to a viewer the server has actually cleared, the same way a
+        # video's URL only ever reaches someone allowed to watch it. Baking
+        # them into the static page too (the old behavior) meant a "locked"
+        # quiz still put its full answer key in the page's own source for
+        # anyone to read regardless of what the on-screen lock said. If no
+        # Drive bridge is configured there's nowhere else for them to live,
+        # so they're kept in the page as a fallback — same as
+        # quiz_video_block below falling back to a plain iframe with no
+        # bridge configured.
+        content_synced = False
+        if drive_cfg["web_app_url"] and drive_cfg["admin_token"]:
+            try:
+                drive_bridge.set_quiz_content(
+                    drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, quiz_json)
+                content_synced = True
+            except drive_bridge.DriveBridgeError as e:
+                messagebox.showerror(
+                    "Couldn't reach the Drive bridge",
+                    "The quiz's questions weren't synced to the server, so they've been kept "
+                    "in the page itself for now instead (same as before this feature):\n{}".format(e))
+
+        quiz_meta = {"title": lesson_name, "subject": subject_slug, "lesson": lesson_slug}
+        if not content_synced:
+            quiz_meta["questions"] = self.questions
+
         # Preserve a solution video already set on this quiz page (via the
         # standalone "Solution video" control below) across regeneration —
         # regenerating the questions shouldn't wipe it out. If it's backend-
@@ -931,7 +977,7 @@ class QuizTab(ttk.Frame):
                      .replace("{{LESSON_SLUG}}", lesson_slug)
                      .replace("{{LESSON_TITLE}}", lesson_name)
                      .replace("{{QUESTION_COUNT}}", str(len(self.questions)))
-                     .replace("{{QUIZ_JSON}}", json.dumps(quiz_json, indent=2))
+                     .replace("{{QUIZ_JSON}}", json.dumps(quiz_meta, indent=2))
                      .replace("{{VIDEO_BLOCK}}", quiz_video_block)
                      .replace("{{TRACK_CLASS}}", track_class)
                      .replace("{{LESSON_URL_PATH}}", location_label))

@@ -271,6 +271,7 @@
   function mountSlot(slot) {
     if (slot.getAttribute("data-vp-mounted")) return;
     if (slot.querySelector("iframe")) return; // a hard-coded video on an older page: leave it alone
+    injectStyle(); // manual callers (quiz.js, once its own gate says this slot may show) skip mountAll's call
     var info = slotInfo(slot);
     if (!info.lesson) return;
     slot.setAttribute("data-vp-mounted", "1");
@@ -527,10 +528,17 @@
   function mountAll() {
     injectStyle();
     var slots = document.querySelectorAll(".media-slot");
-    for (var i = 0; i < slots.length; i++) mountSlot(slots[i]);
+    for (var i = 0; i < slots.length; i++) {
+      // A slot marked data-manual-mount (quiz.js, on quiz.html) decides for itself
+      // when — or whether — to show this slot at all, tied to its own quiz-lock
+      // check; auto-mounting it here would show/request the video before that
+      // check has run. mountSlot stays available for that caller to use directly.
+      if (slots[i].hasAttribute("data-manual-mount")) continue;
+      mountSlot(slots[i]);
+    }
   }
 
-  window.VideoSlot = { mountAll: mountAll, slotInfo: slotInfo };
+  window.VideoSlot = { mountAll: mountAll, mountSlot: mountSlot, slotInfo: slotInfo };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mountAll);
   else mountAll();

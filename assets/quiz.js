@@ -24,6 +24,18 @@
   var LAST_ATTEMPT_PREFIX = "teaching_last_attempt:";
   var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
 
+  // Claims this page's media-slot for manual mounting (by mount(), below,
+  // once the quiz-lock check has actually run) before video.js's own
+  // auto-mount — which fires later, on DOMContentLoaded — can reach it.
+  // Without this, a locked quiz's solution video would still load (and be
+  // visible/inspectable) the instant the page opened, before quiz.js had
+  // any chance to say no. quiz.js runs synchronously at parse time, ahead
+  // of DOMContentLoaded, which is what makes the timing here reliable.
+  (function () {
+    var slot = document.querySelector(".media-slot");
+    if (slot) slot.setAttribute("data-manual-mount", "1");
+  })();
+
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     attrs = attrs || {};
@@ -201,6 +213,15 @@
     var dataNode = document.querySelector(dataSelector);
     if (!root || !dataNode) return;
 
+    // dataNode now holds metadata only (subject/lesson/title/question_count) —
+    // never the questions themselves. Those come from the server (get_quiz),
+    // and only when this viewer is actually allowed to see them: a locked quiz
+    // used to still ship its full Q&A JSON in the page source, visible to
+    // anyone regardless of what the on-screen "locked" message said. A page
+    // generated before this change may still carry a legacy embedded
+    // "questions" array here too; that's kept as a fallback ONLY for the
+    // unlocked, nothing-synced-to-the-server-yet case below — never shown
+    // while locked.
     var quiz;
     try {
       quiz = JSON.parse(dataNode.textContent);
@@ -208,28 +229,67 @@
       root.textContent = "Quiz data could not be loaded.";
       return;
     }
+    var legacyQuestions = quiz.questions || null;
+    quiz.questions = null;
 
     if (!window.AuthEngine) {
       root.textContent = "Sign-in couldn't load. Please refresh the page.";
       return;
     }
 
+    var mediaSlot = document.querySelector(".media-slot");
+
     window.AuthEngine.mount(rootSelector, function (session) {
       checkGateThenStart(session);
     });
 
-    // The quiz can be locked separately from its lesson (get_quiz_state / admin_set_quiz_lock
-    // in Code.gs) so a teacher can open it right at test time. A lesson that has never been
-    // gated is unaffected. A network error here fails OPEN (lets the quiz start) — the server
-    // still refuses the submission if it is really locked, so nothing unlocks by accident.
+    // The quiz (and its solution video, if this page has one) can be locked
+    // separately from its lesson (get_quiz / admin_set_quiz_lock in Code.gs) so
+    // a teacher can open it right at test time. A lesson that has never been
+    // gated is unaffected. get_quiz withholds the actual questions whenever
+    // it says locked, so there is nothing for a locked page to leak via its
+    // source — same as the video's own lock. A network error here fails OPEN
+    // for the quiz using the legacy embedded copy if this page still has one
+    // (older, not-yet-synced lessons) — the server still refuses the
+    // submission if it's really locked, so nothing unlocks by accident — but
+    // once a lesson's content lives only on the server, a network error
+    // means there is nothing to fall back to, so that shows a plain "try
+    // again" screen instead of silently starting a quiz with no questions.
     function checkGateThenStart(session) {
       root.innerHTML = "";
       root.appendChild(el("p", { class: "qz-lede" }, ["Checking\u2026"]));
-      postToDrive({ action: "get_quiz_state", lesson: fullLessonPath(), student_id: session.student_id })
+      postToDrive({ action: "get_quiz", lesson: fullLessonPath(), student_id: session.student_id })
         .then(
-          function (data) { data && data.locked ? renderLocked(session) : startQuiz(session); },
-          function () { startQuiz(session); }
+          function (data) {
+            if (data && data.locked) { renderLocked(session); return; }
+            var loaded = (data && data.quiz && data.quiz.questions) || legacyQuestions || null;
+            if (!loaded || !loaded.length) { renderLoadError(session); return; }
+            quiz.questions = loaded;
+            if (mediaSlot && window.VideoSlot) window.VideoSlot.mountSlot(mediaSlot);
+            startQuiz(session);
+          },
+          function () {
+            if (legacyQuestions && legacyQuestions.length) {
+              quiz.questions = legacyQuestions;
+              startQuiz(session);
+            } else {
+              renderLoadError(session);
+            }
+          }
         );
+    }
+
+    function renderLoadError(session) {
+      root.innerHTML = "";
+      var retry = el("button", { class: "qz-next", type: "button" }, ["Try again"]);
+      retry.addEventListener("click", function () { checkGateThenStart(session); });
+      root.appendChild(el("div", { class: "qz-card frame" }, [
+        el("span", { class: "tick-br" }),
+        el("span", { class: "tick-bl" }),
+        el("p", { class: "qz-question" }, ["Couldn't load the quiz"]),
+        el("p", { class: "qz-lede" }, ["Check your connection and try again."]),
+        el("div", { class: "qz-actions" }, [retry]),
+      ]));
     }
 
     function renderLocked(session) {
@@ -239,10 +299,21 @@
       root.appendChild(el("div", { class: "qz-card frame" }, [
         el("span", { class: "tick-br" }),
         el("span", { class: "tick-bl" }),
-        el("p", { class: "qz-question" }, [quiz.title ? (quiz.title + " \u2014 not open yet") : "Not open yet"]),
-        el("p", { class: "qz-lede" }, ["This quiz isn't open yet. Ask your teacher when it will unlock."]),
+        el("p", { class: "qz-question" }, ["Quiz locked"]),
+        el("p", { class: "qz-lede" }, ["This quiz is locked."]),
         el("div", { class: "qz-actions" }, [retry]),
       ]));
+      // Nothing about the solution video is requested from the server while the
+      // quiz itself is locked — showing it would defeat the point of the gate.
+      if (mediaSlot) {
+        mediaSlot.setAttribute("data-vp-mounted", "1"); // keeps video.js from mounting it later on this load
+        mediaSlot.innerHTML = "";
+        mediaSlot.classList.add("vp-panel", "is-locked");
+        mediaSlot.appendChild(el("div", { class: "vp-box" }, [
+          el("p", { class: "vp-title" }, ["Quiz locked"]),
+          el("p", { class: "vp-text" }, ["This quiz is locked."]),
+        ]));
+      }
     }
 
     function startQuiz(session) {
