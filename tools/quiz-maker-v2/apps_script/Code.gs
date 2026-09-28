@@ -874,11 +874,14 @@ function handleLoginStudent(payload) {
     throw new Error("Incorrect password.");
   }
   CacheService.getScriptCache().remove(attemptKey);
-  // Accounts registered before the session_token column existed won't
-  // have one yet — issue it on this login instead of forcing a
-  // re-registration.
+  // ONE ACTIVE SESSION PER ACCOUNT: every student login issues a fresh token, which
+  // signs out whatever device held the old one (its next call fails the token check
+  // and video.js shows "signed in on another device"). This is what stops one paid
+  // account being shared across a group. Admin accounts keep their existing token so
+  // the teacher can use the dashboards on several devices. Accounts registered before
+  // the session_token column existed have no token yet, so they get one here either way.
   var token = found.session_token;
-  if (!token) {
+  if (!token || !_isTruthyFlag(found.is_admin)) {
     token = Utilities.getUuid();
     sheet.getRange(found.row, found.cols.session_token).setValue(token);
   }
@@ -1498,8 +1501,10 @@ function _lookupVideo(lesson, slot) {
   return rec;
 }
 
-// "none" (not signed in / stale token), "student" or "admin". Never throws for a
-// bad session — get_video is public, so a bad session just means "not signed in".
+// "none" (not signed in), "stale" (a real account, but this token was replaced — the
+// account was signed in somewhere else, or its password was reset), "student" or
+// "admin". Never throws for a bad session — get_video is public, so a bad session
+// just means "not signed in". Every caller treats "stale" like "none".
 function _sessionState(payload) {
   if (!payload.student_id || !payload.session_token) return "none";
   var values = _students().getDataRange().getValues();
@@ -1507,7 +1512,7 @@ function _sessionState(payload) {
   var target = _normalizePhone(payload.student_id);
   for (var i = 1; i < values.length; i++) {
     if (_phonesMatch(values[i][c.phone - 1], target)) {
-      if (String(values[i][c.session_token - 1]) !== String(payload.session_token)) return "none";
+      if (String(values[i][c.session_token - 1]) !== String(payload.session_token)) return "stale";
       return (c.is_admin && _isTruthyFlag(values[i][c.is_admin - 1])) ? "admin" : "student";
     }
   }
@@ -1637,6 +1642,7 @@ function handleGetVideo(payload) {
     return out;
   }
   var login = { ok: true, found: true, locked: true, need: "login" };
+  if (who === "stale") login.session_replaced = true;   // the page says "signed in on another device"
   if (!rec) login.no_video = true;
   if (info) login.pay_info = info;
   return login;

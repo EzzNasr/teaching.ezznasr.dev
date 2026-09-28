@@ -12,6 +12,7 @@ node tests/test_access.js              apps_script/Code.gs   # payments: "I paid
 node tests/test_revoke.js              apps_script/Code.gs   # revoking access, cancelled payments, the access-dashboard overview
 node tests/test_quiz_gate.js           apps_script/Code.gs   # locking/unlocking a quiz itself, separate from its video
 node tests/test_groups.js              apps_script/Code.gs   # student groups: membership, bulk grant/revoke access
+node tests/test_single_session.js      apps_script/Code.gs   # one active session per account: a new login signs out the old device
 ```
 
 Each prints PASS/FAIL per check and exits non-zero on any failure. Run them before
