@@ -46,9 +46,25 @@
 
   if (window.SubscriptionPanel) return; // loaded twice — the first copy already did the work
 
-  var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
+  var DRIVE_ENDPOINT = "{{DRIVE_ENDPOINT}}";
   var SESSION_KEY = "teaching_session";
   var LOCK = "\uD83D\uDD12";
+
+  // What a subscription includes, shown on the front of each card (RTL list).
+  var CHAPTER_DETAILS = [
+    "جميع فيديوهات ال Chapter شاملة فديو مراجعه ال Chapter",
+    "حل ل جميع اسأله الكويز بعد التسليم في فيديو",
+    "حل ل جميع اسأله الواجب بعد التسليم",
+    "عدد مشاهدات غير محدود طوال العام",
+    "امكانيه الدخول على ال Dashboard  ال بتجمع كل الاسئلة الأخطأت فيها طوال السنة عشان توفر وقتك ف المراجعه",
+  ];
+  var TERM_DETAILS = [
+    "جميع فيديوهات ال Chapters الخاصة بالترم شاملة فديو مراجعه كل Chapter",
+    "حل ل جميع اسأله الكويز بعد التسليم في فيديو",
+    "حل ل جميع اسأله الواجب بعد التسليم",
+    "عدد مشاهدات غير محدود طوال العام",
+    "امكانيه الدخول على ال Dashboard  ال بتجمع كل الاسئلة الأخطأت فيها طوال السنة عشان توفر وقتك ف المراجعه",
+  ];
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
@@ -159,6 +175,9 @@
       ".sp-face-back{transform:rotateY(180deg)}" +
       ".sp-face>div:first-child{display:flex;flex-direction:column;gap:10px}" +
       ".sp-face h3{margin:0;font-size:16px;line-height:1.3;overflow-wrap:anywhere}" +
+      ".sp-details{margin:4px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px;text-align:right}" +
+      ".sp-details li{position:relative;padding-right:22px;font-size:13px;line-height:1.6;color:var(--ink-dim,#63738a)}" +
+      ".sp-details li::before{content:'\\2713';position:absolute;right:0;top:0;font-weight:700;color:var(--mint-strong,#168a56)}" +
       ".sp-price{font:700 15px var(--mono,monospace);color:var(--accent-strong,#2056bd)}" +
       ".sp-badge{align-self:flex-start;font:600 11px var(--mono,monospace);padding:4px 9px;border-radius:999px;" +
       "background:var(--accent-soft,#dce9ff);color:var(--accent-strong,#2056bd);overflow-wrap:anywhere}" +
@@ -360,6 +379,11 @@
       ]);
       var badge = stateBadge(item.state, yearEnd);
       if (badge) top.appendChild(badge);
+      if (item.details && item.details.length) {
+        top.appendChild(
+          el("ul", { class: "sp-details", dir: "rtl" }, item.details.map(function (t) { return el("li", {}, [t]); })),
+        );
+      }
       front.appendChild(top);
       flip.appendChild(front);
       if (item.state === "available") {
@@ -402,6 +426,7 @@
               price: c.price,
               state: c.state,
               pay_info: data.pay_info_chapter,
+              details: CHAPTER_DETAILS,
             },
             session,
             data.year_end,
@@ -418,6 +443,7 @@
               price: data.term.price,
               state: data.term.state,
               pay_info: data.pay_info_term,
+              details: TERM_DETAILS,
             },
             session,
             data.year_end,
