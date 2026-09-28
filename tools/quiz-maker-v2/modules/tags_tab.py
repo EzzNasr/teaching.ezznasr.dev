@@ -200,8 +200,8 @@ class TagsTab(ttk.Frame):
             try:
                 result = drive_bridge._post_json(cfg["web_app_url"], payload)
                 self.after(0, lambda: self._done(on_ok, result))
-            except drive_bridge.DriveBridgeError as e:
-                msg = str(e)
+            except Exception as e:   # ANY failure (timeout, reset, bad JSON...) must re-enable the button
+                msg = str(e) or e.__class__.__name__
                 self.after(0, lambda: self._done(on_err, msg))
 
         threading.Thread(target=worker, daemon=True).start()
