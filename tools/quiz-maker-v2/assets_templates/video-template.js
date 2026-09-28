@@ -149,6 +149,8 @@
       "font-family:var(--sans,system-ui,sans-serif);font-size:14px;color:var(--ink,#10233f);border-style:solid}" +
       ".vp-box{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:22px;max-width:560px;margin:0 auto}" +
       ".vp-icon{font-size:26px;line-height:1}" +
+      ".vp-icon-badge{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;" +
+      "font-size:28px;margin:0 auto 4px;background:var(--accent-soft,rgba(47,111,237,.12));border:1px solid var(--line,#d6e1ef)}" +
       ".vp-title{margin:0;font-size:17px;font-weight:800;line-height:1.3}" +
       ".vp-text,.vp-status{margin:0;line-height:1.5;color:var(--ink-dim,#63738a)}" +
       ".vp-status:empty{display:none}" +
@@ -156,6 +158,11 @@
       ".vp-status.vp-error{color:var(--status-fail,#e2574c)}" +
       ".vp-pay{margin:0;width:100%;box-sizing:border-box;white-space:pre-line;line-height:1.5;color:var(--ink,#10233f);" +
       "background:var(--panel,#fff);border:1px solid var(--line,#d6e1ef);border-radius:10px;padding:10px 12px}" +
+      ".vp-pay-ar{font-family:'Cairo',var(--sans,system-ui,sans-serif);font-size:15px;line-height:2;text-align:right;padding:14px 16px}" +
+      ".vp-paywall{align-items:center;text-align:center}" +
+      ".vp-paywall .vp-pay-ar,.vp-paywall .vp-form,.vp-paywall .vp-hint{text-align:right}" +
+      ".vp-paywall.vp-box[dir=rtl]{font-family:'Cairo',var(--sans,system-ui,sans-serif)}" +
+      ".vp-paywall .vp-form{flex-direction:row-reverse}" +
       ".vp-form{display:flex;gap:8px;flex-wrap:wrap;width:100%}" +
       ".vp-input{flex:1 1 220px;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid var(--line-strong,#b8c9df);" +
       "background:var(--panel,#fff);color:var(--ink,#10233f);font:inherit}" +
@@ -165,11 +172,34 @@
       'html[data-theme="dark"] .vp-btn.vp-ghost{color:var(--accent,#72a5ff)}' +
       ".vp-btn[disabled]{opacity:.6;cursor:default}" +
       ".vp-btn.vp-ghost{background:transparent;color:var(--accent,#2f6fed)}" +
+      ".vp-shield{position:absolute;inset:0;z-index:2;cursor:pointer;background:transparent}" +
+      ".vp-bar{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;align-items:center;gap:10px;padding:8px 12px;" +
+      "background:linear-gradient(transparent,rgba(8,12,22,.85));color:#fff;font:12px var(--mono,monospace);user-select:none}" +
+      ".vp-bar button{background:none;border:0;color:#fff;font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}" +
+      ".vp-bar input[type=range]{flex:1;accent-color:#fff;cursor:pointer}" +
+      ".media-slot.is-locked .vp-shield,.media-slot.is-locked .vp-bar{display:none}" +
+      ".media-slot:fullscreen{border-radius:0;margin:0;background:#000}" +
+      ".vp-wm{position:absolute;z-index:5;pointer-events:none;user-select:none;white-space:nowrap;font:600 15px var(--mono,monospace);" +
+      "color:rgba(255,255,255,.32);text-shadow:0 0 3px rgba(0,0,0,.55);letter-spacing:.06em;transition:left 9s linear,top 9s linear}" +
       ".vp-badge{position:absolute;top:8px;left:8px;z-index:4;padding:4px 9px;border-radius:999px;background:rgba(8,12,22,.78);" +
       "color:#e8ecf6;font:11px var(--mono,monospace);pointer-events:none}";
     var style = el("style", { id: "vp-style" });
     style.appendChild(document.createTextNode(css));
     document.head.appendChild(style);
+  }
+
+  // The Arabic payment instructions (vp-pay-ar) are set in Cairo -- loaded once,
+  // same guard pattern as injectStyle above. If this fails to load for any reason
+  // (offline, blocked), .vp-pay-ar's font-family already falls back to the site's
+  // normal sans-serif, so nothing breaks -- it just looks like the rest of the page.
+  function loadArabicFont() {
+    if (document.getElementById("vp-font-cairo")) return;
+    var link = el("link", {
+      id: "vp-font-cairo",
+      rel: "stylesheet",
+      href: "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap",
+    });
+    document.head.appendChild(link);
   }
 
   // -- "finish the quiz / assignment first" (same rule as the old inline script) -
@@ -245,11 +275,84 @@
     };
   }
 
+  // Click-shield + custom controls over a YouTube iframe: the visitor never gets
+  // YouTube's title bar, logo, "Watch on YouTube", share/copy-link or right-click menu.
+  function attachControls(slot, frame) {
+    var playing = false, dur = 0, seeking = false;
+    function cmd(func, args) {
+      try { frame.contentWindow.postMessage(JSON.stringify({ event: "command", func: func, args: args || [] }), "*"); } catch (e) {}
+    }
+    function fmt(t) { t = Math.max(0, t | 0); return ((t / 60) | 0) + ":" + ("0" + (t % 60)).slice(-2); }
+    var shield = el("div", { class: "vp-shield" });
+    var btn = el("button", { type: "button", "aria-label": "Play/pause" }, ["\u25B6"]);
+    var range = el("input", { type: "range", min: "0", max: "1000", value: "0", "aria-label": "Seek" });
+    var time = el("span", {}, ["0:00"]);
+    var fs = el("button", { type: "button", "aria-label": "Fullscreen" }, ["\u26F6"]);
+    var bar = el("div", { class: "vp-bar" }, [btn, range, time, fs]);
+    function toggle() { cmd(playing ? "pauseVideo" : "playVideo"); }
+    shield.addEventListener("click", toggle);
+    shield.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    btn.addEventListener("click", toggle);
+    range.addEventListener("input", function () { seeking = true; });
+    range.addEventListener("change", function () { cmd("seekTo", [(range.value / 1000) * dur, true]); seeking = false; });
+    fs.addEventListener("click", function () {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else if (slot.requestFullscreen) slot.requestFullscreen();
+    });
+    slot.appendChild(shield);
+    slot.appendChild(bar);
+    function onMsg(e) {
+      if (e.source !== frame.contentWindow) return;
+      var d; try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch (x) { return; }
+      if (!d || d.event !== "infoDelivery" || !d.info) return;
+      var i = d.info;
+      if (typeof i.playerState === "number") { playing = i.playerState === 1; btn.textContent = playing ? "\u275A\u275A" : "\u25B6"; }
+      if (i.duration) dur = i.duration;
+      if (typeof i.currentTime === "number" && dur) {
+        time.textContent = fmt(i.currentTime) + " / " + fmt(dur);
+        if (!seeking) range.value = Math.round((i.currentTime / dur) * 1000);
+      }
+    }
+    window.addEventListener("message", onMsg);
+    frame.addEventListener("load", function () {
+      frame.contentWindow.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), "*");
+    });
+  }
+
+  // Moving watermark with the student's number. Drifts slowly to a new random
+  // spot every ~9s; re-added if someone deletes or restyles it via DevTools.
+  function attachWatermark(slot, text) {
+    var wm = el("div", { class: "vp-wm" }, [String(text)]);
+    function place() {
+      wm.style.left = (4 + Math.random() * 62) + "%";
+      wm.style.top = (6 + Math.random() * 78) + "%";
+    }
+    function fresh() {
+      wm.setAttribute("class", "vp-wm");
+      wm.removeAttribute("style");
+      wm.style.left = (4 + Math.random() * 62) + "%";
+      wm.style.top = (6 + Math.random() * 78) + "%";
+    }
+    fresh();
+    slot.appendChild(wm);
+    var timer = setInterval(function () { if (wm.isConnected) place(); }, 9000);
+    var obs = new MutationObserver(function () {
+      if (!wm.parentNode) slot.appendChild(wm);
+      var st = wm.getAttribute("style") || "";
+      if (wm.getAttribute("class") !== "vp-wm" || /display|opacity|visibility|font-size|color/.test(st)) fresh();
+      if (wm.textContent !== String(text)) wm.textContent = String(text);
+    });
+    obs.observe(slot, { childList: true });
+    obs.observe(wm, { attributes: true, childList: true, characterData: true, subtree: true });
+    slot._vpWm = function () { clearInterval(timer); obs.disconnect(); };
+  }
+
   // -- one slot -----------------------------------------------------------------
 
   function mountSlot(slot) {
     if (slot.getAttribute("data-vp-mounted")) return;
     if (slot.querySelector("iframe")) return; // a hard-coded video on an older page: leave it alone
+    injectStyle(); // manual callers (quiz.js, once its own gate says this slot may show) skip mountAll's call
     var info = slotInfo(slot);
     if (!info.lesson) return;
     slot.setAttribute("data-vp-mounted", "1");
@@ -261,6 +364,7 @@
     var rule = null;
 
     function clear() {
+      if (slot._vpWm) { slot._vpWm(); slot._vpWm = null; }
       if (rule) {
         rule.stop();
         rule = null;
@@ -283,14 +387,23 @@
       }
       clear();
       state = "video";
-      slot.appendChild(
-        el("iframe", {
-          src: data.embed_url,
-          title: titleText(),
-          allowfullscreen: "",
-          referrerpolicy: "strict-origin-when-cross-origin",
-        }),
-      );
+      var isYT = /youtube/.test(data.embed_url);
+      var src = data.embed_url;
+      if (isYT) {
+        // nocookie host, no YouTube UI, no related videos, no keyboard/fullscreen buttons
+        src = src.split("?")[0].replace("www.youtube.com", "www.youtube-nocookie.com") +
+          "?controls=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&cc_load_policy=0" +
+          "&enablejsapi=1&origin=" + encodeURIComponent(location.origin);
+      }
+      var frame = el("iframe", {
+        src: src,
+        title: titleText(),
+        allow: "autoplay; encrypted-media; picture-in-picture",
+        referrerpolicy: "strict-origin-when-cross-origin",
+      });
+      slot.appendChild(frame);
+      if (isYT) attachControls(slot, frame);
+      if (session && session.student_id) attachWatermark(slot, session.student_id);
       if (data.locked && session && session.is_admin) {
         slot.appendChild(el("div", { class: "vp-badge" }, [LOCK + " Locked for students \u2014 you're previewing"]));
       }
@@ -325,8 +438,12 @@
       });
     }
 
-    function payBlock(box, data) {
-      if (data.pay_info) box.appendChild(el("p", { class: "vp-pay" }, [data.pay_info]));
+    function payBlock(box, data, arabic) {
+      if (!data.pay_info) return;
+      var cls = arabic ? "vp-pay vp-pay-ar" : "vp-pay";
+      var p = el("p", { class: cls }, [data.pay_info]);
+      if (arabic) p.setAttribute("dir", "rtl");
+      box.appendChild(p);
     }
 
     function showLogin(data) {
@@ -377,28 +494,37 @@
 
     function showPayment(data, session) {
       panel(function (box, say) {
-        var intro = "Once you've paid, tell us below and your teacher will unlock it.";
+        loadArabicFont();
+        box.classList.add("vp-paywall");
+        box.setAttribute("dir", "rtl");
+
+        var intro = "\u0628\u0639\u062F \u0625\u062A\u0645\u0627\u0645 \u0627\u0644\u062F\u0641\u0639\u060C \u0623\u062E\u0628\u0631\u0646\u0627 \u0628\u0631\u0642\u0645 \u0627\u0644\u062A\u062D\u0648\u064A\u0644 \u0623\u062F\u0646\u0627\u0647\u060C \u0648\u0633\u064A\u0642\u0648\u0645 \u0641\u0631\u064A\u0642 \u0627\u0644\u062F\u0639\u0645 \u0628\u0641\u062A\u062D \u0627\u0644\u062F\u0631\u0633.";
         if (data.request === "rejected") {
-          intro = "Your last payment note wasn't approved. If you think that's a mistake, contact your teacher \u2014 or send a new note.";
+          intro = "\u0644\u0645 \u062A\u062A\u0645 \u0627\u0644\u0645\u0648\u0627\u0641\u0642\u0629 \u0639\u0644\u0649 \u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u062F\u0641\u0639 \u0627\u0644\u0623\u062E\u064A\u0631\u0629. \u0625\u0630\u0627 \u0643\u0646\u062A \u062A\u0639\u062A\u0642\u062F \u0623\u0646 \u0647\u0630\u0627 \u062E\u0637\u0623\u060C \u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0641\u0631\u064A\u0642 \u0627\u0644\u062F\u0639\u0645 \u2014 \u0623\u0648 \u0623\u0631\u0633\u0644 \u0631\u0642\u0645 \u062A\u062D\u0648\u064A\u0644 \u062C\u062F\u064A\u062F.";
         } else if (data.request === "revoked") {
-          intro = "Your access to this video was removed. If you think that's a mistake, contact your teacher \u2014 or send a new payment note.";
+          intro = "\u062A\u0645 \u0625\u0644\u063A\u0627\u0621 \u0648\u0635\u0648\u0644\u0643 \u0625\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0641\u064A\u062F\u064A\u0648. \u0625\u0630\u0627 \u0643\u0646\u062A \u062A\u0639\u062A\u0642\u062F \u0623\u0646 \u0647\u0630\u0627 \u062E\u0637\u0623\u060C \u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0641\u0631\u064A\u0642 \u0627\u0644\u062F\u0639\u0645 \u2014 \u0623\u0648 \u0623\u0631\u0633\u0644 \u0631\u0642\u0645 \u062A\u062D\u0648\u064A\u0644 \u062C\u062F\u064A\u062F.";
         } else if (data.expired) {
-          intro = "Your access ended on " + data.expired + ". Send a new payment note to renew it.";
+          intro = "\u0627\u0646\u062A\u0647\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0648\u0635\u0648\u0644\u0643 \u0628\u062A\u0627\u0631\u064A\u062E " + data.expired + ". \u0623\u0631\u0633\u0644 \u0631\u0642\u0645 \u062A\u062D\u0648\u064A\u0644 \u062C\u062F\u064A\u062F \u0644\u0644\u062A\u062C\u062F\u064A\u062F.";
         }
+        var title = data.no_video
+          ? "\u0647\u0630\u0627 \u0627\u0644\u062F\u0631\u0633 \u0645\u062A\u0627\u062D \u0644\u0644\u0637\u0644\u0627\u0628 \u0627\u0644\u0645\u0634\u062A\u0631\u0643\u064A\u0646 \u0641\u0642\u0637"
+          : "\u0647\u0630\u0627 \u0627\u0644\u0641\u064A\u062F\u064A\u0648 \u0645\u062A\u0627\u062D \u0644\u0644\u0637\u0644\u0627\u0628 \u0627\u0644\u0645\u0634\u062A\u0631\u0643\u064A\u0646 \u0641\u0642\u0637";
+
         var input = el("input", {
           class: "vp-input",
           type: "text",
+          dir: "auto",
           maxlength: "200",
           autocomplete: "off",
-          placeholder: "Payment reference",
-          "aria-label": "Payment reference",
+          placeholder: "\u0631\u0642\u0645 \u0627\u0644\u062A\u062D\u0648\u064A\u0644",
+          "aria-label": "\u0631\u0642\u0645 \u0627\u0644\u062A\u062D\u0648\u064A\u0644",
         });
-        var send = el("button", { class: "vp-btn", type: "button" }, ["I paid"]);
+        var send = el("button", { class: "vp-btn", type: "button" }, ["\u0627\u0634\u062A\u0631\u0643"]);
 
         function submit() {
           var ref = input.value.trim();
           if (!ref) {
-            say("Type the payment reference first, so your teacher can find your payment.", true);
+            say("\u0627\u0643\u062A\u0628 \u0631\u0642\u0645 \u0627\u0644\u062A\u062D\u0648\u064A\u0644 \u0623\u0648\u0644\u0627\u064B\u060C \u062D\u062A\u0649 \u064A\u062A\u0645\u0643\u0646 \u0641\u0631\u064A\u0642 \u0627\u0644\u062F\u0639\u0645 \u0645\u0646 \u0625\u064A\u062C\u0627\u062F \u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u062F\u0641\u0639.", true);
             input.focus();
             return;
           }
@@ -408,7 +534,7 @@
             return;
           }
           send.disabled = true;
-          say("Sending\u2026");
+          say("\u062C\u0627\u0631\u064A \u0627\u0644\u0625\u0631\u0633\u0627\u0644\u2026");
           call({
             action: "request_access",
             student_id: s.student_id,
@@ -432,12 +558,12 @@
           if (e.key === "Enter") submit();
         });
 
-        box.appendChild(el("div", { class: "vp-icon", "aria-hidden": "true" }, [LOCK]));
-        box.appendChild(el("p", { class: "vp-title" }, [data.no_video ? "This lesson is for enrolled students" : "This video is for enrolled students"]));
+        box.appendChild(el("div", { class: "vp-icon vp-icon-badge", "aria-hidden": "true" }, [LOCK]));
+        box.appendChild(el("p", { class: "vp-title" }, [title]));
         box.appendChild(el("p", { class: "vp-text" }, [intro]));
-        payBlock(box, data);
+        payBlock(box, data, true);
         box.appendChild(el("div", { class: "vp-form" }, [input, send]));
-        box.appendChild(el("p", { class: "vp-hint" }, ["The transaction number, or the phone number you paid from."]));
+        box.appendChild(el("p", { class: "vp-hint" }, ["\u0631\u0642\u0645 \u0627\u0644\u0639\u0645\u0644\u064A\u0629\u060C \u0623\u0648 \u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062A\u0641 \u0627\u0644\u0630\u064A \u062D\u0648\u0651\u0644\u062A \u0645\u0646\u0647."]));
       });
     }
 
@@ -493,10 +619,17 @@
   function mountAll() {
     injectStyle();
     var slots = document.querySelectorAll(".media-slot");
-    for (var i = 0; i < slots.length; i++) mountSlot(slots[i]);
+    for (var i = 0; i < slots.length; i++) {
+      // A slot marked data-manual-mount (quiz.js, on quiz.html) decides for itself
+      // when — or whether — to show this slot at all, tied to its own quiz-lock
+      // check; auto-mounting it here would show/request the video before that
+      // check has run. mountSlot stays available for that caller to use directly.
+      if (slots[i].hasAttribute("data-manual-mount")) continue;
+      mountSlot(slots[i]);
+    }
   }
 
-  window.VideoSlot = { mountAll: mountAll, slotInfo: slotInfo };
+  window.VideoSlot = { mountAll: mountAll, mountSlot: mountSlot, slotInfo: slotInfo };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mountAll);
   else mountAll();
