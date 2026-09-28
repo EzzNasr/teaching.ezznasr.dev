@@ -41,7 +41,9 @@
 (function () {
   "use strict";
 
-  if (window.VideoSlot) return; // loaded twice — the first copy already did the work
+  if (window.VideoSlot) return;
+  window.__videoJsVersion = "v3-cover-crop-wm"; // check in DevTools console to confirm the new file is live
+ // loaded twice — the first copy already did the work
 
   var DRIVE_ENDPOINT = "{{DRIVE_ENDPOINT}}";
   var SESSION_KEY = "teaching_session";
@@ -183,8 +185,9 @@
       ".vp-cover{position:absolute;inset:0;z-index:2;background:#000;display:flex;align-items:center;justify-content:center;" +
       "color:rgba(255,255,255,.85);font-size:54px;cursor:pointer}" +
       ".vp-cover.vp-off{display:none}" +
-      ".vp-wm{position:absolute;z-index:5;pointer-events:none;user-select:none;white-space:nowrap;font:600 15px var(--mono,monospace);" +
-      "color:rgba(255,255,255,.32);text-shadow:0 0 3px rgba(0,0,0,.55);letter-spacing:.06em;transition:left 9s linear,top 9s linear}" +
+      ".vp-wm{position:absolute;z-index:5;pointer-events:none;user-select:none;white-space:nowrap;padding:3px 10px;border-radius:999px;" +
+      "background:rgba(0,0,0,.26);color:rgba(255,255,255,.5);font:600 12px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;" +
+      "font-variant-numeric:tabular-nums;letter-spacing:.08em;transition:left 9s linear,top 9s linear}" +
       ".vp-badge{position:absolute;top:8px;left:8px;z-index:4;padding:4px 9px;border-radius:999px;background:rgba(8,12,22,.78);" +
       "color:#e8ecf6;font:11px var(--mono,monospace);pointer-events:none}";
     var style = el("style", { id: "vp-style" });
