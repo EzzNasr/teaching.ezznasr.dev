@@ -296,7 +296,7 @@ function _notifyAdmin(text, paymentId) {
     var token = p.getProperty("TELEGRAM_BOT_TOKEN");
     var chat = p.getProperty("TELEGRAM_ADMIN_CHAT_ID");
     if (!token || !chat) return;
-    var body = { text: String(text).slice(0, 3500), disable_web_page_preview: true };
+    var body = { text: String(text).slice(0, 3500), parse_mode: "HTML", disable_web_page_preview: true };
     if (paymentId) {
       body.reply_markup = { inline_keyboard: [[
         { text: "\u2705 Approve", callback_data: "ap:" + paymentId },
@@ -314,6 +314,21 @@ function _notifyAdmin(text, paymentId) {
   } catch (err) {
     console.error("notifyAdmin failed: " + err);
   }
+}
+
+// Text goes to Telegram as HTML, so anything a student typed must be escaped.
+function _esc(v) {
+  return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// "programming/baccalaureate/grade-1-secondary/loops-intro" -> "Grade 1 Secondary \u203a Loops Intro"
+function _prettyLesson(path) {
+  var parts = String(path || "").split("/").filter(function (x) {
+    return x && x !== "programming" && x !== "baccalaureate";
+  });
+  return parts.map(function (x) {
+    return x.replace(/[-_]+/g, " ").replace(/\b\w/g, function (ch) { return ch.toUpperCase(); });
+  }).join(" \u203a ") || String(path || "");
 }
 
 function _tgAdminIds() {
@@ -361,7 +376,8 @@ function handleTelegramUpdate(e, update) {
     if (verdict && cq.message) {
       _tgCall("editMessageText", {
         chat_id: cq.message.chat.id, message_id: cq.message.message_id,
-        text: String(cq.message.text || "").slice(0, 3400) + "\n\n" + verdict,
+        text: String(cq.message.text || "") + "\n\n" + verdict,
+        entities: cq.message.entities || [],
       });
     }
   } catch (err) {
@@ -926,7 +942,8 @@ function handleRegisterStudent(payload) {
     return { ok: true, student_id: _normalizePhone(phone), student_name: displayName, session_token: token, year: year, parent_phone: parentPhone, is_admin: false };
   });
   if (res && res.ok) {
-    _notifyAdmin("New student\n" + res.student_name + "\n" + res.student_id + (res.year ? "\n" + res.year : ""));
+    _notifyAdmin("\ud83c\udd95 <b>New student</b>\n\n\ud83d\udc64 " + _esc(res.student_name) + "\n\ud83d\udcf1 " + _esc(res.student_id) +
+      (res.year ? "\n\ud83c\udf93 " + _esc(res.year) : ""));
   }
   return res;
 }
@@ -2198,7 +2215,8 @@ function handleRequestAccess(payload) {
     return { ok: true, status: "pending", payment_id: id };
   });
   if (res && res.ok && res.status === "pending" && !res.duplicate) {
-    _notifyAdmin("Payment request\n" + String(found.display_name || "") + " " + phone + "\n" + lesson + "\nRef: " + reference, res.payment_id);
+    _notifyAdmin("\ud83d\udcb3 <b>Payment request</b>\n\n\ud83d\udc64 " + _esc(found.display_name) + "\n\ud83d\udcf1 " + _esc(phone) +
+      "\n\ud83d\udcd8 " + _esc(_prettyLesson(lesson)) + "\n\ud83e\uddfe Ref: " + _esc(reference), res.payment_id);
   }
   return res;
 }
@@ -2377,7 +2395,8 @@ function handleRequestSubscription(payload) {
              price: kind === "ch" ? CHAPTER_PRICE_EGP : TERM_PRICE_EGP };
   });
   if (res && res.ok && res.status === "pending" && !res.duplicate) {
-    _notifyAdmin("Subscription request\n" + String(found.display_name || "") + " " + phone + "\n" + res.note + "\nRef: " + reference, res.payment_id);
+    _notifyAdmin("\ud83d\udd14 <b>Subscription request</b>\n\n\ud83d\udc64 " + _esc(found.display_name) + "\n\ud83d\udcf1 " + _esc(phone) +
+      "\n\ud83d\udce6 " + _esc(res.note) + "\n\ud83e\uddfe Ref: " + _esc(reference), res.payment_id);
   }
   return res;
 }
