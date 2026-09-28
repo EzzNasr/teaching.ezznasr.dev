@@ -357,7 +357,7 @@
             {
               item_type: "chapter",
               chapter: c.chapter,
-              title: c.title || "الفصل " + c.chapter,
+              title: c.title || "Chapter " + c.chapter,
               price: c.price,
               state: c.state,
               pay_info: data.pay_info,
