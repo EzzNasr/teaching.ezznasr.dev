@@ -58,7 +58,7 @@
 {"items": []}
 </script>
 <script src="/assets/auth.js"></script>
-<script src="/assets/video.js"></script>
+<script src="/assets/video.js?v=3"></script>
 <script src="/assets/assign.js"></script>
 <script>AssignEngine.mount('#assign-root');</script>
 <script>(function(){var slot=document.querySelector('.media-slot');if(!slot)return;var frame=slot.querySelector('iframe');if(!frame)return;var root=document.getElementById('assign-root');var subject=root?root.getAttribute('data-subject'):null;var lesson=root?root.getAttribute('data-lesson'):null;var key='teaching_last_submission:'+(subject||'?')+':'+(lesson||'?');function done(){try{return !!localStorage.getItem(key);}catch(e){return false;}}var overlay=document.createElement('div');overlay.className='video-lock';overlay.innerHTML='<span class="video-lock__icon" aria-hidden="true">\uD83D\uDD12</span><span class="video-lock__msg">Submit the assignment below to unlock this video.</span>';function lock(){if(slot.contains(overlay))return;slot.classList.add('is-locked');slot.appendChild(overlay);}function unlock(){slot.classList.remove('is-locked');if(slot.contains(overlay))slot.removeChild(overlay);}function sync(){if(done())unlock();else lock();}sync();overlay.addEventListener('click',function(){overlay.classList.add('is-tapped');overlay.classList.remove('shake');void overlay.offsetWidth;overlay.classList.add('shake');});if(root)new MutationObserver(sync).observe(root,{childList:true,subtree:true});})();</script>
