@@ -46,7 +46,7 @@
 
   if (window.SubscriptionPanel) return; // loaded twice — the first copy already did the work
 
-  var DRIVE_ENDPOINT = "{{DRIVE_ENDPOINT}}";
+  var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
   var SESSION_KEY = "teaching_session";
   var LOCK = "\uD83D\uDD12";
 
