@@ -158,7 +158,28 @@
       "border:1px solid var(--line-strong,#b8c9df);background:var(--panel,#fff);color:var(--ink,#10233f);font:inherit}" +
       ".sp-status{margin:0;font-size:12.5px;line-height:1.5;color:var(--ink-dim,#63738a)}" +
       ".sp-status:empty{display:none}" +
-      ".sp-status.sp-error{color:var(--status-fail,#e2574c)}";
+      ".sp-status.sp-error{color:var(--status-fail,#e2574c)}" +
+      ".sp-flip{perspective:1400px}" +
+      ".sp-inner{display:grid;position:relative;transform-style:preserve-3d;transition:transform .6s cubic-bezier(.4,.2,.2,1)}" +
+      ".sp-flip.sp-flipped .sp-inner{transform:rotateY(180deg)}" +
+      ".sp-face{grid-area:1/1;box-sizing:border-box;padding:21px;display:flex;flex-direction:column;gap:12px;" +
+      "background:var(--panel,#fff);border:1px solid var(--line,#d6e1ef);border-radius:14px;" +
+      "box-shadow:0 10px 24px rgba(16,35,63,.07);backface-visibility:hidden;-webkit-backface-visibility:hidden;" +
+      "transition:visibility 0s linear .3s}" +
+      ".sp-back{transform:rotateY(180deg);visibility:hidden;font-family:'Cairo',var(--sans,system-ui,sans-serif)}" +
+      ".sp-flipped .sp-back{visibility:visible}" +
+      ".sp-flipped .sp-front{visibility:hidden}" +
+      ".sp-front .sp-btn{margin-top:auto}" +
+      ".sp-teaser{margin:0;color:var(--ink-dim,#63738a);font-size:13px;line-height:1.6}" +
+      ".sp-back-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}" +
+      ".sp-back-top h3{margin:0;font-size:16px;line-height:1.4}" +
+      ".sp-back-btn{padding:6px 12px;font-size:13px;flex:0 0 auto}" +
+      ".sp-feat{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}" +
+      ".sp-feat li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.7}" +
+      ".sp-tick{flex:0 0 22px;height:22px;margin-top:2px;border-radius:50%;display:grid;place-items:center;" +
+      "font-size:13px;font-weight:700;background:var(--mint-soft,#d7f5e6);color:var(--mint-strong,#168a56)}" +
+      ".sp-label{margin:4px 0 -4px;font-size:12.5px;font-weight:700;color:var(--ink-dim,#63738a)}" +
+      "@media(prefers-reduced-motion:reduce){.sp-inner{transition:none}.sp-face{transition:none}}";
     var style = el("style", { id: "sp-style" });
     style.appendChild(document.createTextNode(css));
     document.head.appendChild(style);
@@ -229,18 +250,63 @@
       root.appendChild(box);
     }
 
-    // -- one card's purchase form ---------------------------------------------
+    // -- what each subscription includes (shown on the back of the card) -----------
+
+    var FEATURES = {
+      chapter: [
+        "شرح جميع دروس الـ Chapter",
+        "فيديوهات حل الكويز بعد الانتهاء منه",
+        "فيديو حل الواجب",
+        "صلاحية استخدام الـ Dashboard التي تجمع لك كل الأسئلة التي أخطأت فيها في الكويز أو الواجب طوال الترم، لتراجعها وتوفّر وقتك",
+        "الفيديوهات مفتوحة لك طوال السنة بدون عدد مشاهدات معين",
+      ],
+      term: [
+        "شرح جميع دروس كل الـ Chapters في الترم",
+        "فيديوهات حل الكويز بعد الانتهاء منه",
+        "فيديوهات حل الواجب",
+        "صلاحية استخدام الـ Dashboard التي تجمع لك كل الأسئلة التي أخطأت فيها في الكويز أو الواجب طوال الترم، لتراجعها وتوفّر وقتك",
+        "الفيديوهات مفتوحة لك طوال السنة بدون عدد مشاهدات معين",
+      ],
+    };
+
+    // -- cards -----------------------------------------------------------------
+
+    function stateBadge(state, yearEnd) {
+      if (state === "owned") return el("span", { class: "sp-badge sp-badge-owned" }, ["مفعّل حتى " + yearEnd]);
+      if (state === "pending") return el("span", { class: "sp-badge" }, ["بانتظار موافقة المعلم"]);
+      if (state === "covered_by_term") return el("span", { class: "sp-badge sp-badge-owned" }, ["ضمن اشتراك الترم"]);
+      return null;
+    }
 
     function collapseForm() {
       if (openForm && openForm.__spCollapse) openForm.__spCollapse();
       openForm = null;
     }
 
-    function openBuyForm(card, item, session, onDone) {
-      collapseForm();
-      loadArabicFont();
-      var form = el("div", { class: "sp-form" });
-      var pay = el("p", { class: "sp-pay-ar" }, [item.pay_info || ""]);
+    // The back of an available card: what's included, how to pay, transfer number, subscribe.
+    function buildBack(item, flipBack) {
+      var back = el("div", { class: "sp-face sp-back", dir: "rtl" });
+
+      var backBtn = el("button", { class: "sp-btn sp-ghost sp-back-btn", type: "button" }, ["رجوع"]);
+      backBtn.addEventListener("click", flipBack);
+      back.appendChild(
+        el("div", { class: "sp-back-top" }, [
+          el("div", {}, [el("h3", { dir: "auto" }, [item.title]), el("span", { class: "sp-price" }, [item.price + " جنيه"])]),
+          backBtn,
+        ]),
+      );
+
+      var list = el("ul", { class: "sp-feat" });
+      (FEATURES[item.item_type] || []).forEach(function (text) {
+        list.appendChild(el("li", {}, [el("span", { class: "sp-tick", "aria-hidden": "true" }, ["\u2713"]), el("span", {}, [text])]));
+      });
+      back.appendChild(list);
+
+      if (item.pay_info) {
+        back.appendChild(el("p", { class: "sp-label" }, ["طريقة الدفع"]));
+        back.appendChild(el("p", { class: "sp-pay-ar" }, [item.pay_info]));
+      }
+
       var input = el("input", {
         class: "sp-input",
         type: "text",
@@ -251,8 +317,9 @@
         "aria-label": "رقم التحويل",
       });
       var send = el("button", { class: "sp-btn", type: "button" }, ["اشترك"]);
-      var cancel = el("button", { class: "sp-btn sp-ghost", type: "button" }, ["إلغاء"]);
       var status = el("p", { class: "sp-status", role: "status", "aria-live": "polite" });
+      back.appendChild(el("div", { class: "sp-row" }, [input, send]));
+      back.appendChild(status);
 
       function say(msg, isError) {
         status.textContent = msg || "";
@@ -272,7 +339,7 @@
           return;
         }
         send.disabled = true;
-        cancel.disabled = true;
+        backBtn.disabled = true;
         say("جاري الإرسال\u2026");
         var payload = {
           action: "request_subscription",
@@ -286,11 +353,11 @@
         else payload.term = item.term;
         call(payload).then(
           function () {
-            onDone();
+            load();
           },
           function (err) {
             send.disabled = false;
-            cancel.disabled = false;
+            backBtn.disabled = false;
             say(err.message, true);
             if (/session|log in|sign in|تسجيل/i.test(err.message)) load();
           },
@@ -298,47 +365,63 @@
       }
 
       send.addEventListener("click", submit);
-      cancel.addEventListener("click", function () {
-        collapseForm();
-      });
       input.addEventListener("keydown", function (e) {
         if (e.key === "Enter") submit();
       });
-
-      form.appendChild(pay);
-      form.appendChild(el("div", { class: "sp-row" }, [input, send, cancel]));
-      form.appendChild(status);
-      card.appendChild(form);
-      card.__spCollapse = function () {
-        if (card.contains(form)) card.removeChild(form);
-      };
-      openForm = card;
-      input.focus();
-    }
-
-    // -- cards -----------------------------------------------------------------
-
-    function stateBadge(state, yearEnd) {
-      if (state === "owned") return el("span", { class: "sp-badge sp-badge-owned" }, ["مفعّل حتى " + yearEnd]);
-      if (state === "pending") return el("span", { class: "sp-badge" }, ["بانتظار موافقة المعلم"]);
-      if (state === "covered_by_term") return el("span", { class: "sp-badge sp-badge-owned" }, ["ضمن اشتراك الترم"]);
-      return null;
+      back.__spInput = input;
+      return back;
     }
 
     function buildCard(item, session, yearEnd) {
-      var card = el("div", { class: "sp-card" });
-      card.appendChild(el("h3", {}, [item.title]));
-      card.appendChild(el("span", { class: "sp-price" }, [item.price + " جنيه"]));
-      var badge = stateBadge(item.state, yearEnd);
-      if (badge) card.appendChild(badge);
-      if (item.state === "available") {
-        var buy = el("button", { class: "sp-btn", type: "button" }, ["اشتراك"]);
-        buy.addEventListener("click", function () {
-          openBuyForm(card, item, session, load);
-        });
-        card.appendChild(buy);
+      // Not purchasable right now (owned / pending / covered by term): a plain card, no flip.
+      if (item.state !== "available") {
+        var plain = el("div", { class: "sp-card" });
+        plain.appendChild(el("h3", { dir: "auto" }, [item.title]));
+        plain.appendChild(el("span", { class: "sp-price" }, [item.price + " جنيه"]));
+        var badge = stateBadge(item.state, yearEnd);
+        if (badge) plain.appendChild(badge);
+        return plain;
       }
-      return card;
+
+      var wrap = el("div", { class: "sp-flip" });
+      var inner = el("div", { class: "sp-inner" });
+
+      function setFlipped(on) {
+        if (on) {
+          collapseForm();
+          loadArabicFont();
+          wrap.classList.add("sp-flipped");
+          openForm = wrap;
+          setTimeout(function () {
+            if (back.__spInput) back.__spInput.focus({ preventScroll: true });
+          }, 350);
+        } else {
+          wrap.classList.remove("sp-flipped");
+          if (openForm === wrap) openForm = null;
+        }
+      }
+      wrap.__spCollapse = function () {
+        wrap.classList.remove("sp-flipped");
+      };
+
+      var front = el("div", { class: "sp-face sp-front" });
+      front.appendChild(el("h3", { dir: "auto" }, [item.title]));
+      front.appendChild(el("span", { class: "sp-price" }, [item.price + " جنيه"]));
+      front.appendChild(el("p", { class: "sp-teaser" }, ["ما يشمله الاشتراك وطريقة الدفع"]));
+      var open = el("button", { class: "sp-btn", type: "button" }, ["عرض تفاصيل الاشتراك"]);
+      open.addEventListener("click", function () {
+        setFlipped(true);
+      });
+      front.appendChild(open);
+
+      var back = buildBack(item, function () {
+        setFlipped(false);
+      });
+
+      inner.appendChild(front);
+      inner.appendChild(back);
+      wrap.appendChild(inner);
+      return wrap;
     }
 
     function showOptions(data, session) {
