@@ -361,9 +361,16 @@ const pendingId = () => cell('Payments', tab('Payments').getLastRow(), 'payment_
   t('the desktop app token works too (that is what the Tkinter tab sends)', r.ok, JSON.stringify(r));
 
   env.props.PAY_INSTRUCTIONS = 'Send 250 EGP to 010...';
-  t('options carry the payment instructions', opts(null, 'grade-1-secondary').pay_info === 'Send 250 EGP to 010...');
-  delete env.props.PAY_INSTRUCTIONS;
-  t('...and an empty string when none is set', opts(null, 'grade-1-secondary').pay_info === '');
+  env.props.PAY_INSTRUCTIONS = 'lesson text 75 EGP';
+  env.props.PAY_INSTRUCTIONS_CHAPTER = 'chapter text 250 EGP';
+  env.props.PAY_INSTRUCTIONS_TERM = 'term text 1000 EGP';
+  let po = opts(null, 'grade-1-secondary');
+  t('chapter and term each get their own payment text', po.pay_info_chapter === 'chapter text 250 EGP' && po.pay_info_term === 'term text 1000 EGP', JSON.stringify(po));
+  t('the per-lesson text never leaks into subscription options', !('pay_info' in po) && !JSON.stringify(po).includes('lesson text'));
+  t('the per-lesson lock box still uses PAY_INSTRUCTIONS', get({}, G1_C1_L1).pay_info === 'lesson text 75 EGP' || get({}, G1_C1_L1).pay_info === undefined);
+  delete env.props.PAY_INSTRUCTIONS; delete env.props.PAY_INSTRUCTIONS_CHAPTER; delete env.props.PAY_INSTRUCTIONS_TERM;
+  po = opts(null, 'grade-1-secondary');
+  t('...and each is an empty string when its property is unset', po.pay_info_chapter === '' && po.pay_info_term === '');
 
   const ov = post(Object.assign({ action: 'admin_access_overview' }, ADMIN));
   t('the access overview reports each grade\u2019s year-end', ov.ok && ov.year_ends && ov.year_ends[G1] === '2027-08-01' && ov.year_ends[G2] === '2027-08-01', JSON.stringify(ov.year_ends));

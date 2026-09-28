@@ -1644,7 +1644,13 @@ function handleGetVideo(payload) {
 
 // The public "how to pay" text shown in the lock box (Script Property PAY_INSTRUCTIONS).
 function _payInfo() {
-  return String(_props().getProperty("PAY_INSTRUCTIONS") || "").trim().slice(0, 1000);
+  return _payInfoProp("PAY_INSTRUCTIONS");
+}
+
+// Same, for any property. Subscriptions use their own texts (PAY_INSTRUCTIONS_CHAPTER /
+// PAY_INSTRUCTIONS_TERM) so a chapter or term never shows the per-lesson price; unset = "".
+function _payInfoProp(name) {
+  return String(_props().getProperty(name) || "").trim().slice(0, 1000);
 }
 
 // video_url: a link (adds/replaces), "" (clears the slot), or leave it out.
@@ -2205,7 +2211,8 @@ function handleGetSubscriptionOptions(payload) {
     term = { term: current, lessons: termLessons, price: TERM_PRICE_EGP, state: tState };
   }
   return { ok: true, grade: base.split("/").pop(), signed_in: !!phone, year_end: _gradeYearEnd(suffix),
-           pay_info: _payInfo(),
+           pay_info_chapter: _payInfoProp("PAY_INSTRUCTIONS_CHAPTER"),
+           pay_info_term: _payInfoProp("PAY_INSTRUCTIONS_TERM"),
            current_term: current, prices: { chapter: CHAPTER_PRICE_EGP, term: TERM_PRICE_EGP },
            chapters: list, term: term };
 }
