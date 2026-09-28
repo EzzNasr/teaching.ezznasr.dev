@@ -358,6 +358,11 @@ function handleTelegramUpdate(e, update) {
 
     var m = /^(ap|rj):(\S+)$/.exec(String(cq.data));
     if (!m) return _json({ ok: true });
+    // Apps Script answers a POST with a redirect, which Telegram counts as a failure and
+    // RETRIES. Each update_id is handled once; retries are ignored.
+    var seenKey = "tgu:" + update.update_id, cache = CacheService.getScriptCache();
+    if (cache.get(seenKey)) return _json({ ok: true });
+    cache.put(seenKey, "1", 21600);
     var approve = m[1] === "ap";
     console.log("telegram tap: " + m[1] + " " + m[2] + " from " + cq.from.id);
     // Clear the button spinner FIRST — the sheet work below can take several seconds
@@ -382,7 +387,10 @@ function handleTelegramUpdate(e, update) {
       }
     } catch (err) {
       console.error("telegram decision failed: " + err);
-      _tgCall("sendMessage", { chat_id: chatId, text: "\u26a0\ufe0f " + String(err.message || err).slice(0, 300) });
+      var msg = String(err.message || err);
+      if (!/already (approved|rejected|revoked)/i.test(msg)) {   // a stale tap is not worth a message
+        _tgCall("sendMessage", { chat_id: chatId, text: "\u26a0\ufe0f " + msg.slice(0, 300) });
+      }
     }
   } catch (err) {
     console.error("telegram update failed: " + err);

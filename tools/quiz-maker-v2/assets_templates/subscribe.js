@@ -127,7 +127,9 @@
   function injectStyle() {
     if (document.getElementById("sp-style")) return;
     var css =
-      "#subscriptions{font-family:var(--sans,system-ui,sans-serif);color:var(--ink,#10233f);margin-top:12px}" +
+      // This section is almost entirely Arabic (headings, buttons, badges, not just the
+      // payment paragraph), so it uses Cairo throughout rather than the site's Latin sans.
+      "#subscriptions{font-family:'Cairo',var(--sans,system-ui,sans-serif);color:var(--ink,#10233f);margin-top:12px}" +
       ".sp-panel{background:linear-gradient(180deg,var(--accent-soft,#dce9ff) 0%,var(--panel,#fff) 200px);" +
       "border:1px solid var(--line,#d6e1ef);border-radius:20px;padding:28px;" +
       "box-shadow:0 14px 32px rgba(16,35,63,.07)}" +
@@ -139,16 +141,29 @@
       ".sp-head p{margin:6px 0 0;color:var(--ink-dim,#63738a);font-size:13px}" +
       ".sp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:17px;align-items:start}" +
       "@media(max-width:760px){.sp-grid{grid-template-columns:1fr}}" +
-      ".sp-card{min-height:148px;padding:18px;display:flex;flex-direction:column;gap:10px;" +
-      "justify-content:space-between;background:var(--panel,#fff);" +
-      "border:1px solid var(--line,#d6e1ef);border-radius:14px;box-shadow:0 10px 24px rgba(16,35,63,.07)}" +
-      ".sp-card>div:first-child{display:flex;flex-direction:column;gap:10px}" +
-      ".sp-card h3{margin:0;font-size:16px;line-height:1.3}" +
+      // The card is a flip card: .sp-card is just the 3D perspective + hover-lift shell;
+      // .sp-flip is what actually rotates; .sp-face-front/.sp-face-back are the two faces,
+      // stacked in the same grid cell so the card's height is the taller of the two — a
+      // longer title or a longer payment text simply makes that face (and so the whole
+      // card) taller, never clipped.
+      ".sp-card{position:relative;perspective:1400px;transition:transform .25s ease}" +
+      ".sp-card:hover{transform:translateY(-5px)}" +
+      ".sp-flip{position:relative;display:grid;min-height:148px;" +
+      "transition:transform .5s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d}" +
+      ".sp-flip.is-flipped{transform:rotateY(180deg)}" +
+      ".sp-face{grid-area:1/1;padding:18px;display:flex;flex-direction:column;gap:10px;" +
+      "justify-content:space-between;background:var(--panel,#fff);overflow-wrap:anywhere;" +
+      "border:1px solid var(--line,#d6e1ef);border-radius:14px;box-shadow:0 10px 24px rgba(16,35,63,.07);" +
+      "backface-visibility:hidden;-webkit-backface-visibility:hidden}" +
+      ".sp-card:hover .sp-face{border-color:var(--accent,#2f6fed);box-shadow:0 17px 32px rgba(16,35,63,.14)}" +
+      ".sp-face-back{transform:rotateY(180deg)}" +
+      ".sp-face>div:first-child{display:flex;flex-direction:column;gap:10px}" +
+      ".sp-face h3{margin:0;font-size:16px;line-height:1.3;overflow-wrap:anywhere}" +
       ".sp-price{font:700 15px var(--mono,monospace);color:var(--accent-strong,#2056bd)}" +
       ".sp-badge{align-self:flex-start;font:600 11px var(--mono,monospace);padding:4px 9px;border-radius:999px;" +
-      "background:var(--accent-soft,#dce9ff);color:var(--accent-strong,#2056bd)}" +
+      "background:var(--accent-soft,#dce9ff);color:var(--accent-strong,#2056bd);overflow-wrap:anywhere}" +
       ".sp-badge.sp-badge-owned{background:var(--mint-soft,#d7f5e6);color:var(--mint-strong,#168a56)}" +
-      ".sp-note{margin:0;color:var(--ink-dim,#63738a);font-size:13px;line-height:1.5}" +
+      ".sp-note{margin:0;color:var(--ink-dim,#63738a);font-size:13px;line-height:1.5;overflow-wrap:anywhere}" +
       ".sp-btn{padding:10px 16px;border-radius:10px;border:1px solid var(--accent,#2f6fed);" +
       "background:var(--accent,#2f6fed);color:#fff;font:inherit;font-weight:700;cursor:pointer;align-self:flex-start}" +
       'html[data-theme="dark"] .sp-btn{color:#0a1a32}' +
@@ -157,6 +172,9 @@
       'html[data-theme="dark"] .sp-btn.sp-ghost{color:var(--accent-strong,#9fc2ff)}' +
       ".sp-empty{grid-column:1/-1;padding:24px;border:1px dashed var(--line-strong,#b8c9df);border-radius:14px;" +
       "color:var(--ink-dim,#63738a);background:var(--panel-soft,#eef4fb)}" +
+      // Plain info boxes (signed-out prompt, error state) — same look as a card face, but no flip.
+      ".sp-box{padding:18px;display:flex;flex-direction:column;gap:10px;background:var(--panel,#fff);" +
+      "border:1px solid var(--line,#d6e1ef);border-radius:14px;box-shadow:0 10px 24px rgba(16,35,63,.07)}" +
       ".sp-form{display:flex;flex-direction:column;gap:10px;width:100%;box-sizing:border-box}" +
       ".sp-pay-ar{margin:0;width:100%;box-sizing:border-box;white-space:pre-line;line-height:1.8;" +
       "font-family:'Cairo',var(--sans,system-ui,sans-serif);font-size:14.5px;text-align:right;" +
@@ -192,9 +210,10 @@
     if (root.getAttribute("data-sp-mounted")) return;
     root.setAttribute("data-sp-mounted", "1");
     injectStyle();
+    loadArabicFont(); // whole section is Cairo now, not just the payment paragraph — load it up front
 
     var grade = gradeFromRoot(root);
-    var openForm = null; // the card element currently showing its purchase form, if any
+    var openForm = null; // the .sp-flip currently flipped open to its payment-details face, if any
     var panel = el("div", { class: "sp-panel" }); // a section of its own, distinct from the lesson grid above
     root.appendChild(panel);
 
@@ -218,7 +237,7 @@
     function showSignedOut() {
       clear();
       head("افتح دروس الفيديو باشتراك في فصل أو في الترم كاملاً.");
-      var box = el("div", { class: "sp-card" });
+      var box = el("div", { class: "sp-box" });
       box.appendChild(el("p", { class: "sp-note" }, ["سجّل الدخول برقم هاتفك لعرض خيارات الاشتراك المتاحة لهذا الصف."]));
       var btn = el("button", { class: "sp-btn", type: "button" }, ["تسجيل الدخول"]);
       btn.addEventListener("click", function () {
@@ -236,7 +255,7 @@
     function showProblem(message) {
       clear();
       head("افتح دروس الفيديو باشتراك في فصل أو في الترم كاملاً.");
-      var box = el("div", { class: "sp-card" });
+      var box = el("div", { class: "sp-box" });
       box.appendChild(el("p", { class: "sp-note sp-error" }, [message]));
       var retry = el("button", { class: "sp-btn sp-ghost", type: "button" }, ["إعادة المحاولة"]);
       retry.addEventListener("click", load);
@@ -244,17 +263,24 @@
       panel.appendChild(box);
     }
 
-    // -- one card's purchase form ---------------------------------------------
+    // -- cards: a click on "اشتراك" flips the card over to show the payment details --------
+    // Only one card is flipped open at a time; opening a second one flips the first back.
 
     function collapseForm() {
-      if (openForm && openForm.__spCollapse) openForm.__spCollapse();
+      if (openForm) openForm.classList.remove("is-flipped");
       openForm = null;
     }
 
-    function openBuyForm(card, item, session, onDone) {
-      collapseForm();
-      loadArabicFont();
-      var form = el("div", { class: "sp-form" });
+    function stateBadge(state, yearEnd) {
+      if (state === "owned") return el("span", { class: "sp-badge sp-badge-owned" }, ["مفعّل حتى " + yearEnd]);
+      if (state === "pending") return el("span", { class: "sp-badge" }, ["بانتظار موافقة المعلم"]);
+      if (state === "covered_by_term") return el("span", { class: "sp-badge sp-badge-owned" }, ["ضمن اشتراك الترم"]);
+      return null;
+    }
+
+    // The back face: payment instructions, the reference field, and confirm/back buttons.
+    function buildBackFace(item) {
+      var back = el("div", { class: "sp-face sp-face-back" });
       var pay = el("p", { class: "sp-pay-ar" }, [item.pay_info || ""]);
       var input = el("input", {
         class: "sp-input",
@@ -266,7 +292,7 @@
         "aria-label": "رقم التحويل",
       });
       var send = el("button", { class: "sp-btn", type: "button" }, ["اشترك"]);
-      var cancel = el("button", { class: "sp-btn sp-ghost", type: "button" }, ["إلغاء"]);
+      var back_btn = el("button", { class: "sp-btn sp-ghost", type: "button" }, ["\u2190 رجوع"]);
       var status = el("p", { class: "sp-status", role: "status", "aria-live": "polite" });
 
       function say(msg, isError) {
@@ -287,7 +313,7 @@
           return;
         }
         send.disabled = true;
-        cancel.disabled = true;
+        back_btn.disabled = true;
         say("جاري الإرسال\u2026");
         var payload = {
           action: "request_subscription",
@@ -301,11 +327,11 @@
         else payload.term = item.term;
         call(payload).then(
           function () {
-            onDone();
+            load();
           },
           function (err) {
             send.disabled = false;
-            cancel.disabled = false;
+            back_btn.disabled = false;
             say(err.message, true);
             if (/session|log in|sign in|تسجيل/i.test(err.message)) load();
           },
@@ -313,49 +339,46 @@
       }
 
       send.addEventListener("click", submit);
-      cancel.addEventListener("click", function () {
-        collapseForm();
-      });
+      back_btn.addEventListener("click", collapseForm);
       input.addEventListener("keydown", function (e) {
         if (e.key === "Enter") submit();
       });
 
-      form.appendChild(pay);
-      form.appendChild(el("div", { class: "sp-row" }, [input, send, cancel]));
-      form.appendChild(status);
-      card.appendChild(form);
-      card.__spCollapse = function () {
-        if (card.contains(form)) card.removeChild(form);
-      };
-      openForm = card;
-      input.focus();
-    }
-
-    // -- cards -----------------------------------------------------------------
-
-    function stateBadge(state, yearEnd) {
-      if (state === "owned") return el("span", { class: "sp-badge sp-badge-owned" }, ["مفعّل حتى " + yearEnd]);
-      if (state === "pending") return el("span", { class: "sp-badge" }, ["بانتظار موافقة المعلم"]);
-      if (state === "covered_by_term") return el("span", { class: "sp-badge sp-badge-owned" }, ["ضمن اشتراك الترم"]);
-      return null;
+      back.appendChild(pay);
+      back.appendChild(el("div", { class: "sp-row" }, [input, send, back_btn]));
+      back.appendChild(status);
+      return back;
     }
 
     function buildCard(item, session, yearEnd) {
       var card = el("div", { class: "sp-card" });
+      var flip = el("div", { class: "sp-flip" });
+      var front = el("div", { class: "sp-face sp-face-front" });
       var top = el("div", {}, [
         el("h3", {}, [item.title]),
         el("span", { class: "sp-price" }, [item.price + " جنيه"]),
       ]);
       var badge = stateBadge(item.state, yearEnd);
       if (badge) top.appendChild(badge);
-      card.appendChild(top);
+      front.appendChild(top);
+      flip.appendChild(front);
       if (item.state === "available") {
         var buy = el("button", { class: "sp-btn", type: "button" }, ["اشتراك"]);
         buy.addEventListener("click", function () {
-          openBuyForm(card, item, session, load);
+          var wasOpen = flip === openForm;
+          collapseForm();
+          if (!wasOpen) {
+            loadArabicFont();
+            flip.classList.add("is-flipped");
+            openForm = flip;
+            var input = flip.querySelector(".sp-input");
+            if (input) setTimeout(function () { input.focus(); }, 260); // after the flip settles
+          }
         });
-        card.appendChild(buy);
+        front.appendChild(buy);
+        flip.appendChild(buildBackFace(item));
       }
+      card.appendChild(flip);
       return card;
     }
 
