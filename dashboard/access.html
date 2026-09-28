@@ -295,6 +295,8 @@
   .ac-panel { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface-soft); }
   .ac-panel > p { margin: 0 0 10px; color: var(--ink-dim); font: 12px/1.65 var(--sans); }
   .ac-panel > p b { color: var(--ink); }
+  .ac-check { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+  .ac-check input { margin-top: 3px; }
   .ac-radio { display: flex; align-items: flex-start; gap: 9px; margin: 8px 0; color: var(--ink); font: 600 13px/1.4 var(--sans); cursor: pointer; }
   .ac-radio input { margin-top: 3px; accent-color: var(--accent); }
   .ac-radio small { display: block; margin-top: 2px; color: var(--ink-dim); font: 400 11px var(--mono); }
@@ -509,6 +511,29 @@
         setToast(false, (err && err.message) || "That didn't work.");
         refreshToast();
         if (btn) btn.disabled = false;
+      }
+    );
+  }
+
+  // Same as run(), for an action that needs several calls (e.g. open a lesson AND the videos
+  // that were locked on their own). Stops at the first failure; whatever already went through
+  // stays done, and the refresh below shows the real state.
+  function runMany(payloads, okText, btn) {
+    STATE.toast = null;
+    refreshToast();
+    return payloads.reduce(function (chain, p) {
+      return chain.then(function () { return api(p); });
+    }, Promise.resolve()).then(
+      function () {
+        setToast(true, okText);
+        STATE.open = null;
+        return load(true);
+      },
+      function (err) {
+        setToast(false, (err && err.message) || "That didn't work.");
+        refreshToast();
+        if (btn) btn.disabled = false;
+        return load(true);
       }
     );
   }
@@ -1140,22 +1165,54 @@
 
   // ---- LESSONS ------------------------------------------------------------------------------------------
 
-  function lessonLockPanel(lesson, isNew) {
+  function lessonLockPanel(lesson, isNew, ownLocked) {
+    ownLocked = ownLocked || [];
     var box = el("div", { class: "ac-panel", "data-panel": "lesson-lock" });
     var note = isNew
       ? "This lesson has no lock yet. Locking it closes every video in it \u2014 existing, or added later from the Quiz Maker \u2014 until you open it. The quiz gate is separate and untouched either way."
       : "Locking closes every video in this lesson at once, including ones you never toggled on their own (those stay closed regardless). Opening lets everyone in, unless a video was locked on its own \u2014 that one stays locked. The quiz gate below is separate and untouched either way.";
     var goLock = el("button", { class: "ac-btn danger solid", type: "button" }, [isNew ? "Add lock, start closed" : "Lock it"]);
     var goOpen = el("button", { class: "ac-btn primary", type: "button" }, [isNew ? "Add row, start open" : "Open it"]);
+    // A video can be locked on its own, and opening the lesson does NOT open it. Say so here and
+    // let the teacher open those videos in the same click (ticked by default: that is what
+    // "open this lesson" almost always means).
+    var alsoBox = null, alsoRow = null;
+    if (ownLocked.length) {
+      alsoBox = el("input", { type: "checkbox", id: "lsn-also-open" });
+      alsoBox.checked = true;   // el() drops empty attributes, so set the property
+      alsoRow = el("label", { class: "ac-check", for: "lsn-also-open" }, [alsoBox, el("span", {}, ["Also open the " + (ownLocked.length === 1 ? "video" : ownLocked.length + " videos") + " locked on their own: " + ownLocked.map(function (v) { return (SLOT_LABEL[v.slot] || v.slot).toLowerCase(); }).join(", ")])]);
+    }
     function fire(locked, btn) {
       btn.disabled = true;
-      run({ action: "admin_set_lesson_lock", lesson: lesson, locked: locked },
-        pretty(lesson) + " is now " + (locked ? "locked." : "open."), btn);
+      var calls = [{ action: "admin_set_lesson_lock", lesson: lesson, locked: locked }];
+      var alsoVideos = !locked && alsoBox && alsoBox.checked;
+      if (alsoVideos) ownLocked.forEach(function (v) { calls.push({ action: "admin_set_video", lesson: lesson, slot: v.slot, locked: false }); });
+      runMany(calls, pretty(lesson) + " is now " + (locked ? "locked." : "open.") + (alsoVideos ? " Its videos are open too." : ""), btn);
     }
     goLock.addEventListener("click", function () { fire(true, goLock); });
     goOpen.addEventListener("click", function () { fire(false, goOpen); });
     box.appendChild(el("p", {}, [note]));
+    if (alsoRow) box.appendChild(el("p", {}, [alsoRow]));
     box.appendChild(el("div", { class: "ac-actions" }, isNew ? [goOpen, goLock, cancelBtn()] : [goLock, goOpen, cancelBtn()]));
+    return box;
+  }
+
+  // One video's own lock (the Videos row's "locked" cell). This is the switch that was missing:
+  // videos are born locked, and the lesson-level switch above can never open one of them.
+  function videoLockPanel(lesson, v, lessonLocked) {
+    var label = SLOT_LABEL[v.slot] || v.slot;
+    var box = el("div", { class: "ac-panel", "data-panel": "video-lock" });
+    var note = v.locked
+      ? "Opening the " + label.toLowerCase() + " lets everyone watch it." + (lessonLocked ? " The lesson itself is still locked, so it stays closed until you open the lesson too." : "")
+      : "Locking the " + label.toLowerCase() + " closes just this video. Students need approved access to watch it.";
+    var go = el("button", { class: "ac-btn " + (v.locked ? "primary" : "danger solid"), type: "button" }, [v.locked ? "Open it" : "Lock it"]);
+    go.addEventListener("click", function () {
+      go.disabled = true;
+      run({ action: "admin_set_video", lesson: lesson, slot: v.slot, locked: !v.locked },
+        "The " + label.toLowerCase() + " for " + pretty(lesson) + " is now " + (v.locked ? "open." : "locked."), go);
+    });
+    box.appendChild(el("p", {}, [note]));
+    box.appendChild(el("div", { class: "ac-actions" }, [go, cancelBtn()]));
     return box;
   }
 
@@ -1222,7 +1279,8 @@
       var fields = vids.length
         ? vids.map(function (v) {
             var effLocked = v.locked || locked;
-            return field(SLOT_LABEL[v.slot] || v.slot, effLocked ? "Locked" + (locked && !v.locked ? " (via lesson lock)" : "") : "Open to everyone");
+            var why = v.locked ? (locked ? "" : " (locked on its own \u2014 the lesson being open doesn't open it)") : (locked ? " (via lesson lock)" : "");
+            return field(SLOT_LABEL[v.slot] || v.slot, effLocked ? "Locked" + why : "Open to everyone");
           })
         : [field("Videos", "None yet", "added from the Quiz Maker \u2014 locking the lesson now means one added later starts locked too")];
       fields.push(field("Quiz gate", quiz ? (quizLocked ? "Locked" : "Open") : "No gate (open)", "separate \u2014 overrides the lesson lock for the quiz itself"));
@@ -1233,9 +1291,18 @@
       var quizToggle = el("button", { class: "ac-btn " + (quizLocked ? "" : "danger"), type: "button" }, [quiz ? (quizLocked ? "Open the quiz\u2026" : "Lock the quiz\u2026") : "Gate this quiz\u2026"]);
       quizToggle.addEventListener("click", function () { openPanel(qkey); });
 
-      if (STATE.open === key) card.appendChild(lessonLockPanel(l.lesson, !lock));
+      var ownLocked = vids.filter(function (v) { return v.locked; });
+      var videoToggles = vids.map(function (v) {
+        var b = el("button", { class: "ac-btn " + (v.locked ? "primary" : ""), type: "button", "data-video-toggle": v.slot }, [(v.locked ? "Open " : "Lock ") + (SLOT_LABEL[v.slot] || v.slot).toLowerCase() + "\u2026"]);
+        b.addEventListener("click", function () { openPanel("vid:" + l.lesson + ":" + v.slot); });
+        return b;
+      });
+      var openVideo = vids.filter(function (v) { return STATE.open === "vid:" + l.lesson + ":" + v.slot; })[0];
+
+      if (STATE.open === key) card.appendChild(lessonLockPanel(l.lesson, !lock, ownLocked));
       else if (STATE.open === qkey) card.appendChild(quizLockPanel(l.lesson, !quiz));
-      else card.appendChild(el("div", { class: "ac-actions" }, [lockToggle, quizToggle]));
+      else if (openVideo) card.appendChild(videoLockPanel(l.lesson, openVideo, locked));
+      else card.appendChild(el("div", { class: "ac-actions" }, [lockToggle, quizToggle].concat(videoToggles)));
 
       section.appendChild(card);
     });

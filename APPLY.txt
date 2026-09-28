@@ -1,0 +1,14 @@
+Fix: a video locked on its own could not be unlocked from the dashboard.
+
+Unzip over the ROOT of your repo, accepting "replace". Files:
+  dashboard/access.html                                   REPLACES  (Lessons tab: per-video Open/Lock buttons + "also open its videos")
+  tools/quiz-maker-v2/tests/e2e_lesson_video_lock.py      NEW       (real-browser test, 12 checks)
+  tools/quiz-maker-v2/tests/e2e_video.py                  REPLACES  (1 line: the test harness now fills in auth.js's backend address)
+  tools/quiz-maker-v2/tests/README.md                     REPLACES  (+1 line)
+
+No Apps Script redeploy and no "Sync site assets" needed: access.html is a plain page on GitHub Pages.
+Commit + push, then hard-refresh the dashboard.
+
+Note: tests/e2e_video.py and tests/e2e_dashboard.py had failures BEFORE this change (their expectations are
+out of date: the video iframe now uses the nocookie host, and the dashboard no longer has a "videos" tab).
+They fail identically on the original files. Not touched here.

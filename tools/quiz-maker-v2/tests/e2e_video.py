@@ -64,7 +64,7 @@ def read(*parts):
 
 
 ASSETS = {
-    "/assets/auth.js": read(QM, "assets_templates", "auth.js"),
+    "/assets/auth.js": read(QM, "assets_templates", "auth.js").replace("{{DRIVE_ENDPOINT}}", GAS),
     "/assets/video.js": read(QM, "assets_templates", "video.js").replace("{{DRIVE_ENDPOINT}}", GAS),
     "/assets/base.css": read(QM, "assets_templates", "base.css"),
 }
