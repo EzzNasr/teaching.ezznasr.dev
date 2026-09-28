@@ -127,14 +127,22 @@
   function injectStyle() {
     if (document.getElementById("sp-style")) return;
     var css =
-      "#subscriptions{font-family:var(--sans,system-ui,sans-serif);color:var(--ink,#10233f)}" +
+      "#subscriptions{font-family:var(--sans,system-ui,sans-serif);color:var(--ink,#10233f);margin-top:12px}" +
+      ".sp-panel{background:linear-gradient(180deg,var(--accent-soft,#dce9ff) 0%,var(--panel,#fff) 200px);" +
+      "border:1px solid var(--line,#d6e1ef);border-radius:20px;padding:28px;" +
+      "box-shadow:0 14px 32px rgba(16,35,63,.07)}" +
+      ".sp-kicker{display:inline-block;background:var(--accent,#2f6fed);color:#fff;padding:5px 11px;" +
+      "border-radius:999px;font:700 11px var(--mono,monospace);letter-spacing:.04em;margin-bottom:10px}" +
+      "html[data-theme=\"dark\"] .sp-kicker{color:#0a1a32}" +
       ".sp-head{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:20px}" +
       ".sp-head h2{font-size:27px;letter-spacing:-.05em;margin:0}" +
-      ".sp-head p{margin:0;color:var(--ink-dim,#63738a);font-size:13px}" +
-      ".sp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:17px}" +
+      ".sp-head p{margin:6px 0 0;color:var(--ink-dim,#63738a);font-size:13px}" +
+      ".sp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:17px;align-items:start}" +
       "@media(max-width:760px){.sp-grid{grid-template-columns:1fr}}" +
-      ".sp-card{padding:21px;display:flex;flex-direction:column;gap:12px;background:var(--panel,#fff);" +
+      ".sp-card{min-height:148px;padding:18px;display:flex;flex-direction:column;gap:10px;" +
+      "justify-content:space-between;background:var(--panel,#fff);" +
       "border:1px solid var(--line,#d6e1ef);border-radius:14px;box-shadow:0 10px 24px rgba(16,35,63,.07)}" +
+      ".sp-card>div:first-child{display:flex;flex-direction:column;gap:10px}" +
       ".sp-card h3{margin:0;font-size:16px;line-height:1.3}" +
       ".sp-price{font:700 15px var(--mono,monospace);color:var(--accent-strong,#2056bd)}" +
       ".sp-badge{align-self:flex-start;font:600 11px var(--mono,monospace);padding:4px 9px;border-radius:999px;" +
@@ -146,6 +154,7 @@
       'html[data-theme="dark"] .sp-btn{color:#0a1a32}' +
       ".sp-btn[disabled]{opacity:.6;cursor:default}" +
       ".sp-btn.sp-ghost{background:transparent;color:var(--accent,#2f6fed)}" +
+      'html[data-theme="dark"] .sp-btn.sp-ghost{color:var(--accent-strong,#9fc2ff)}' +
       ".sp-empty{grid-column:1/-1;padding:24px;border:1px dashed var(--line-strong,#b8c9df);border-radius:14px;" +
       "color:var(--ink-dim,#63738a);background:var(--panel-soft,#eef4fb)}" +
       ".sp-form{display:flex;flex-direction:column;gap:10px;width:100%;box-sizing:border-box}" +
@@ -158,28 +167,7 @@
       "border:1px solid var(--line-strong,#b8c9df);background:var(--panel,#fff);color:var(--ink,#10233f);font:inherit}" +
       ".sp-status{margin:0;font-size:12.5px;line-height:1.5;color:var(--ink-dim,#63738a)}" +
       ".sp-status:empty{display:none}" +
-      ".sp-status.sp-error{color:var(--status-fail,#e2574c)}" +
-      ".sp-flip{perspective:1400px}" +
-      ".sp-inner{display:grid;position:relative;transform-style:preserve-3d;transition:transform .6s cubic-bezier(.4,.2,.2,1)}" +
-      ".sp-flip.sp-flipped .sp-inner{transform:rotateY(180deg)}" +
-      ".sp-face{grid-area:1/1;box-sizing:border-box;padding:21px;display:flex;flex-direction:column;gap:12px;" +
-      "background:var(--panel,#fff);border:1px solid var(--line,#d6e1ef);border-radius:14px;" +
-      "box-shadow:0 10px 24px rgba(16,35,63,.07);backface-visibility:hidden;-webkit-backface-visibility:hidden;" +
-      "transition:visibility 0s linear .3s}" +
-      ".sp-back{transform:rotateY(180deg);visibility:hidden;font-family:'Cairo',var(--sans,system-ui,sans-serif)}" +
-      ".sp-flipped .sp-back{visibility:visible}" +
-      ".sp-flipped .sp-front{visibility:hidden}" +
-      ".sp-front .sp-btn{margin-top:auto}" +
-      ".sp-teaser{margin:0;color:var(--ink-dim,#63738a);font-size:13px;line-height:1.6}" +
-      ".sp-back-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}" +
-      ".sp-back-top h3{margin:0;font-size:16px;line-height:1.4}" +
-      ".sp-back-btn{padding:6px 12px;font-size:13px;flex:0 0 auto}" +
-      ".sp-feat{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}" +
-      ".sp-feat li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.7}" +
-      ".sp-tick{flex:0 0 22px;height:22px;margin-top:2px;border-radius:50%;display:grid;place-items:center;" +
-      "font-size:13px;font-weight:700;background:var(--mint-soft,#d7f5e6);color:var(--mint-strong,#168a56)}" +
-      ".sp-label{margin:4px 0 -4px;font-size:12.5px;font-weight:700;color:var(--ink-dim,#63738a)}" +
-      "@media(prefers-reduced-motion:reduce){.sp-inner{transition:none}.sp-face{transition:none}}";
+      ".sp-status.sp-error{color:var(--status-fail,#e2574c)}";
     var style = el("style", { id: "sp-style" });
     style.appendChild(document.createTextNode(css));
     document.head.appendChild(style);
@@ -207,16 +195,22 @@
 
     var grade = gradeFromRoot(root);
     var openForm = null; // the card element currently showing its purchase form, if any
+    var panel = el("div", { class: "sp-panel" }); // a section of its own, distinct from the lesson grid above
+    root.appendChild(panel);
 
     function clear() {
       openForm = null;
-      while (root.firstChild) root.removeChild(root.firstChild);
+      while (panel.firstChild) panel.removeChild(panel.firstChild);
     }
 
     function head(subtitle) {
-      root.appendChild(
+      panel.appendChild(
         el("div", { class: "sp-head" }, [
-          el("div", {}, [el("h2", {}, ["الاشتراكات"]), el("p", {}, [subtitle])]),
+          el("div", {}, [
+            el("span", { class: "sp-kicker" }, ["اشتراكات الفيديو"]),
+            el("h2", {}, ["الاشتراكات"]),
+            el("p", {}, [subtitle]),
+          ]),
         ]),
       );
     }
@@ -236,7 +230,7 @@
         }
       });
       box.appendChild(btn);
-      root.appendChild(box);
+      panel.appendChild(box);
     }
 
     function showProblem(message) {
@@ -247,66 +241,21 @@
       var retry = el("button", { class: "sp-btn sp-ghost", type: "button" }, ["إعادة المحاولة"]);
       retry.addEventListener("click", load);
       box.appendChild(retry);
-      root.appendChild(box);
+      panel.appendChild(box);
     }
 
-    // -- what each subscription includes (shown on the back of the card) -----------
-
-    var FEATURES = {
-      chapter: [
-        "شرح جميع دروس الـ Chapter",
-        "فيديوهات حل الكويز بعد الانتهاء منه",
-        "فيديو حل الواجب",
-        "صلاحية استخدام الـ Dashboard التي تجمع لك كل الأسئلة التي أخطأت فيها في الكويز أو الواجب طوال الترم، لتراجعها وتوفّر وقتك",
-        "الفيديوهات مفتوحة لك طوال السنة بدون عدد مشاهدات معين",
-      ],
-      term: [
-        "شرح جميع دروس كل الـ Chapters في الترم",
-        "فيديوهات حل الكويز بعد الانتهاء منه",
-        "فيديوهات حل الواجب",
-        "صلاحية استخدام الـ Dashboard التي تجمع لك كل الأسئلة التي أخطأت فيها في الكويز أو الواجب طوال الترم، لتراجعها وتوفّر وقتك",
-        "الفيديوهات مفتوحة لك طوال السنة بدون عدد مشاهدات معين",
-      ],
-    };
-
-    // -- cards -----------------------------------------------------------------
-
-    function stateBadge(state, yearEnd) {
-      if (state === "owned") return el("span", { class: "sp-badge sp-badge-owned" }, ["مفعّل حتى " + yearEnd]);
-      if (state === "pending") return el("span", { class: "sp-badge" }, ["بانتظار موافقة المعلم"]);
-      if (state === "covered_by_term") return el("span", { class: "sp-badge sp-badge-owned" }, ["ضمن اشتراك الترم"]);
-      return null;
-    }
+    // -- one card's purchase form ---------------------------------------------
 
     function collapseForm() {
       if (openForm && openForm.__spCollapse) openForm.__spCollapse();
       openForm = null;
     }
 
-    // The back of an available card: what's included, how to pay, transfer number, subscribe.
-    function buildBack(item, flipBack) {
-      var back = el("div", { class: "sp-face sp-back", dir: "rtl" });
-
-      var backBtn = el("button", { class: "sp-btn sp-ghost sp-back-btn", type: "button" }, ["رجوع"]);
-      backBtn.addEventListener("click", flipBack);
-      back.appendChild(
-        el("div", { class: "sp-back-top" }, [
-          el("div", {}, [el("h3", { dir: "auto" }, [item.title]), el("span", { class: "sp-price" }, [item.price + " جنيه"])]),
-          backBtn,
-        ]),
-      );
-
-      var list = el("ul", { class: "sp-feat" });
-      (FEATURES[item.item_type] || []).forEach(function (text) {
-        list.appendChild(el("li", {}, [el("span", { class: "sp-tick", "aria-hidden": "true" }, ["\u2713"]), el("span", {}, [text])]));
-      });
-      back.appendChild(list);
-
-      if (item.pay_info) {
-        back.appendChild(el("p", { class: "sp-label" }, ["طريقة الدفع"]));
-        back.appendChild(el("p", { class: "sp-pay-ar" }, [item.pay_info]));
-      }
-
+    function openBuyForm(card, item, session, onDone) {
+      collapseForm();
+      loadArabicFont();
+      var form = el("div", { class: "sp-form" });
+      var pay = el("p", { class: "sp-pay-ar" }, [item.pay_info || ""]);
       var input = el("input", {
         class: "sp-input",
         type: "text",
@@ -317,9 +266,8 @@
         "aria-label": "رقم التحويل",
       });
       var send = el("button", { class: "sp-btn", type: "button" }, ["اشترك"]);
+      var cancel = el("button", { class: "sp-btn sp-ghost", type: "button" }, ["إلغاء"]);
       var status = el("p", { class: "sp-status", role: "status", "aria-live": "polite" });
-      back.appendChild(el("div", { class: "sp-row" }, [input, send]));
-      back.appendChild(status);
 
       function say(msg, isError) {
         status.textContent = msg || "";
@@ -339,7 +287,7 @@
           return;
         }
         send.disabled = true;
-        backBtn.disabled = true;
+        cancel.disabled = true;
         say("جاري الإرسال\u2026");
         var payload = {
           action: "request_subscription",
@@ -353,11 +301,11 @@
         else payload.term = item.term;
         call(payload).then(
           function () {
-            load();
+            onDone();
           },
           function (err) {
             send.disabled = false;
-            backBtn.disabled = false;
+            cancel.disabled = false;
             say(err.message, true);
             if (/session|log in|sign in|تسجيل/i.test(err.message)) load();
           },
@@ -365,63 +313,50 @@
       }
 
       send.addEventListener("click", submit);
+      cancel.addEventListener("click", function () {
+        collapseForm();
+      });
       input.addEventListener("keydown", function (e) {
         if (e.key === "Enter") submit();
       });
-      back.__spInput = input;
-      return back;
+
+      form.appendChild(pay);
+      form.appendChild(el("div", { class: "sp-row" }, [input, send, cancel]));
+      form.appendChild(status);
+      card.appendChild(form);
+      card.__spCollapse = function () {
+        if (card.contains(form)) card.removeChild(form);
+      };
+      openForm = card;
+      input.focus();
+    }
+
+    // -- cards -----------------------------------------------------------------
+
+    function stateBadge(state, yearEnd) {
+      if (state === "owned") return el("span", { class: "sp-badge sp-badge-owned" }, ["مفعّل حتى " + yearEnd]);
+      if (state === "pending") return el("span", { class: "sp-badge" }, ["بانتظار موافقة المعلم"]);
+      if (state === "covered_by_term") return el("span", { class: "sp-badge sp-badge-owned" }, ["ضمن اشتراك الترم"]);
+      return null;
     }
 
     function buildCard(item, session, yearEnd) {
-      // Not purchasable right now (owned / pending / covered by term): a plain card, no flip.
-      if (item.state !== "available") {
-        var plain = el("div", { class: "sp-card" });
-        plain.appendChild(el("h3", { dir: "auto" }, [item.title]));
-        plain.appendChild(el("span", { class: "sp-price" }, [item.price + " جنيه"]));
-        var badge = stateBadge(item.state, yearEnd);
-        if (badge) plain.appendChild(badge);
-        return plain;
+      var card = el("div", { class: "sp-card" });
+      var top = el("div", {}, [
+        el("h3", {}, [item.title]),
+        el("span", { class: "sp-price" }, [item.price + " جنيه"]),
+      ]);
+      var badge = stateBadge(item.state, yearEnd);
+      if (badge) top.appendChild(badge);
+      card.appendChild(top);
+      if (item.state === "available") {
+        var buy = el("button", { class: "sp-btn", type: "button" }, ["اشتراك"]);
+        buy.addEventListener("click", function () {
+          openBuyForm(card, item, session, load);
+        });
+        card.appendChild(buy);
       }
-
-      var wrap = el("div", { class: "sp-flip" });
-      var inner = el("div", { class: "sp-inner" });
-
-      function setFlipped(on) {
-        if (on) {
-          collapseForm();
-          loadArabicFont();
-          wrap.classList.add("sp-flipped");
-          openForm = wrap;
-          setTimeout(function () {
-            if (back.__spInput) back.__spInput.focus({ preventScroll: true });
-          }, 350);
-        } else {
-          wrap.classList.remove("sp-flipped");
-          if (openForm === wrap) openForm = null;
-        }
-      }
-      wrap.__spCollapse = function () {
-        wrap.classList.remove("sp-flipped");
-      };
-
-      var front = el("div", { class: "sp-face sp-front" });
-      front.appendChild(el("h3", { dir: "auto" }, [item.title]));
-      front.appendChild(el("span", { class: "sp-price" }, [item.price + " جنيه"]));
-      front.appendChild(el("p", { class: "sp-teaser" }, ["ما يشمله الاشتراك وطريقة الدفع"]));
-      var open = el("button", { class: "sp-btn", type: "button" }, ["عرض تفاصيل الاشتراك"]);
-      open.addEventListener("click", function () {
-        setFlipped(true);
-      });
-      front.appendChild(open);
-
-      var back = buildBack(item, function () {
-        setFlipped(false);
-      });
-
-      inner.appendChild(front);
-      inner.appendChild(back);
-      wrap.appendChild(inner);
-      return wrap;
+      return card;
     }
 
     function showOptions(data, session) {
@@ -466,7 +401,7 @@
           ),
         );
       }
-      root.appendChild(grid);
+      panel.appendChild(grid);
     }
 
     function load() {
@@ -477,7 +412,7 @@
       }
       if (!grade) return; // page not under a recognised grade folder — nothing to show
       clear();
-      root.textContent = "جاري تحميل خيارات الاشتراك\u2026";
+      panel.appendChild(el("p", { class: "sp-note" }, ["جاري تحميل خيارات الاشتراك\u2026"]));
       call({
         action: "get_subscription_options",
         student_id: session.student_id,
