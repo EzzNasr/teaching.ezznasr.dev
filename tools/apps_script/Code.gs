@@ -1113,6 +1113,9 @@ function doPost(e) {
       case "admin_set_lesson_tags":
         return _json(handleAdminSetLessonTags(payload));
 
+      case "admin_list_lesson_tags":
+        return _json(handleAdminListLessonTags(payload));
+
       case "get_subscription_options":
         return _json(handleGetSubscriptionOptions(payload));
 
@@ -1845,6 +1848,16 @@ function handleAdminSetLessonTags(payload) {
   });
 }
 
+// Admin (Tkinter "Lesson Tags" tab): every tagged lesson, so the tab can show its current chapter/term.
+function handleAdminListLessonTags(payload) {
+  _requireAdminAny(payload);
+  var map = _lessonTagsMap(_ss());
+  return {
+    ok: true,
+    tags: Object.keys(map).sort().map(function (l) { return { lesson: l, chapter: map[l].chapter, term: map[l].term }; }),
+  };
+}
+
 // One lesson path, "some/folder/*" (everything under it), "*" (everything), or a
 // subscription scope ("<grade folder>#chN" / "<grade folder>#tN").
 function _normalizeScope(raw) {
@@ -2192,6 +2205,7 @@ function handleGetSubscriptionOptions(payload) {
     term = { term: current, lessons: termLessons, price: TERM_PRICE_EGP, state: tState };
   }
   return { ok: true, grade: base.split("/").pop(), signed_in: !!phone, year_end: _gradeYearEnd(suffix),
+           pay_info: _payInfo(),
            current_term: current, prices: { chapter: CHAPTER_PRICE_EGP, term: TERM_PRICE_EGP },
            chapters: list, term: term };
 }
@@ -2578,10 +2592,15 @@ function handleAdminAccessOverview(payload) {
              source: String(r.source || ""), state: state };
   });
 
+  var yearEnds = {};
+  Object.keys(GRADE_SCOPE_FOLDERS).forEach(function (base) {
+    try { yearEnds[base] = _gradeYearEnd(GRADE_SCOPE_FOLDERS[base]); } catch (e) { yearEnds[base] = ""; }
+  });
+
   return { ok: true, today: today, counts: counts, videos: videos, quizzes: quizzes, groups: groups,
            payments: payments.reverse().slice(0, 500), access: access.reverse().slice(0, 1000),
            all_lessons: allLessons, tracks: tracks, lessons_error: lessonsError,
-           quiz_access: quizAccess.reverse().slice(0, 1000), lesson_locks: lessonLocks };
+           quiz_access: quizAccess.reverse().slice(0, 1000), lesson_locks: lessonLocks, year_ends: yearEnds };
 }
 
 // -- Quiz gate: lock/unlock a lesson's quiz, separate from its video ---------------
