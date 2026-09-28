@@ -285,6 +285,35 @@ function _json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
+// Telegram ping to the admin. Needs Script Properties TELEGRAM_BOT_TOKEN and
+// TELEGRAM_ADMIN_CHAT_ID; silently does nothing if either is missing. Never throws,
+// so a Telegram outage can't fail a student's request. Call it OUTSIDE _withLock.
+function _notifyAdmin(text) {
+  try {
+    var p = _props();
+    var token = p.getProperty("TELEGRAM_BOT_TOKEN");
+    var chat = p.getProperty("TELEGRAM_ADMIN_CHAT_ID");
+    if (!token || !chat) return;
+    // TELEGRAM_ADMIN_CHAT_ID may hold several chat ids separated by commas.
+    String(chat).split(",").forEach(function (id) {
+      id = id.trim();
+      if (!id) return;
+      try {
+        UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
+          method: "post",
+          contentType: "application/json",
+          payload: JSON.stringify({ chat_id: id, text: String(text).slice(0, 3500), disable_web_page_preview: true }),
+          muteHttpExceptions: true,
+        });
+      } catch (err) {
+        console.error("notifyAdmin failed for " + id + ": " + err);
+      }
+    });
+  } catch (err) {
+    console.error("notifyAdmin failed: " + err);
+  }
+}
+
 function _requireAdmin(payload) {
   var expected = _props().getProperty("ADMIN_TOKEN");
   if (!expected || payload.token !== expected) {
@@ -814,7 +843,7 @@ function handleRegisterStudent(payload) {
   // Locked: the row is written by header name at "last row + 1", so two
   // registrations arriving together must not pick the same row (and a
   // double-tap must not create two accounts).
-  return _withLock(function () {
+  var res = _withLock(function () {
     var sheet = _students();
     var existing = _findStudentRow(sheet, payload.phone);
     if (existing) throw new Error("An account with that phone number already exists — log in instead.");
@@ -840,6 +869,10 @@ function handleRegisterStudent(payload) {
     });
     return { ok: true, student_id: _normalizePhone(phone), student_name: displayName, session_token: token, year: year, parent_phone: parentPhone, is_admin: false };
   });
+  if (res && res.ok) {
+    _notifyAdmin("New student\n" + res.student_name + "\n" + res.student_id + (res.year ? "\n" + res.year : ""));
+  }
+  return res;
 }
 
 // Wrong-password limit per account. Without it anyone could script thousands of
@@ -2082,7 +2115,7 @@ function handleRequestAccess(payload) {
   var ss = _ss();
   if (_accessState(ss, phone, lesson).active) return { ok: true, status: "active" };
 
-  return _withLock(function () {
+  var res = _withLock(function () {
     var sheet = _sheetByName(ss, "Payments", PAYMENT_HEADERS);
     _ensureColumns(sheet, PAYMENT_HEADERS);
     var pending = 0, dup = null;
@@ -2106,6 +2139,10 @@ function handleRequestAccess(payload) {
     });
     return { ok: true, status: "pending", payment_id: id };
   });
+  if (res && res.ok && res.status === "pending" && !res.duplicate) {
+    _notifyAdmin("Payment request\n" + String(found.display_name || "") + " " + phone + "\n" + lesson + "\nRef: " + reference);
+  }
+  return res;
 }
 
 // -- Grade subscriptions: buying a chapter or the current term ----------------------
@@ -2239,7 +2276,7 @@ function handleRequestSubscription(payload) {
   var phone = _canonicalPhone(found.phone) || String(found.phone);
   var scope = base + "#" + kind + n;
 
-  return _withLock(function () {
+  var res = _withLock(function () {
     var ss = _ss();
     var chapters = _gradeChapters(ss, base);
     var held = _heldSubscriptionScopes(ss, phone);
@@ -2281,6 +2318,10 @@ function handleRequestSubscription(payload) {
     return { ok: true, status: "pending", payment_id: id, scope: scope, note: note,
              price: kind === "ch" ? CHAPTER_PRICE_EGP : TERM_PRICE_EGP };
   });
+  if (res && res.ok && res.status === "pending" && !res.duplicate) {
+    _notifyAdmin("Subscription request\n" + String(found.display_name || "") + " " + phone + "\n" + res.note + "\nRef: " + reference);
+  }
+  return res;
 }
 
 // status: pending (default) | approved | rejected | all. Newest first, at most 300.
