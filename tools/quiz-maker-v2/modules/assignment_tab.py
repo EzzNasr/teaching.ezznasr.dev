@@ -556,6 +556,7 @@ class AssignmentTab(ttk.Frame):
         # page (in case this lesson was generated with "include assignment"
         # unchecked, or this is the first time an assignment is being added).
         self._ensure_assignment_link(lesson_dir, location_label)
+        common.run_seo_build(site_root)  # keeps robots/meta on the assignment page consistent
 
         self.status_var.set("Updated assignment.html for {}/{} (mode: {})".format(
             location_label, lesson_slug, mode_slug))

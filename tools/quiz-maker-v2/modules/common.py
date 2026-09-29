@@ -1200,10 +1200,38 @@ def _upsert_legacy_group_card(index_path, subject_slug, lesson_slug, lesson_titl
         f.write(new_content)
 
 
+SEO_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "seo"))
+
+
+def site_name():
+    """The one place the site's name lives: tools/seo/seo_config.json -> "site_name"."""
+    try:
+        with open(os.path.join(SEO_DIR, "seo_config.json"), "r", encoding="utf-8") as f:
+            return json.load(f).get("site_name") or "Teaching"
+    except Exception:
+        return "Teaching"
+
+
+def run_seo_build(site_root):
+    """Re-stamp titles/meta/robots/JSON-LD on every page and rewrite sitemap.xml.
+    Called after the Quiz/Assignment makers save a lesson so new pages are never
+    published without SEO. Never raises: a failure here must not block saving."""
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("seo_build", os.path.join(SEO_DIR, "seo_build.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.run(site_root, quiet=True)
+        return True
+    except Exception as e:  # pragma: no cover - best effort
+        print("SEO build skipped:", e)
+        return False
+
+
 def load_template(name):
     path = os.path.join(TEMPLATES_DIR, name)
     with open(path, "r", encoding="utf-8") as f:
-        return f.read()
+        return f.read().replace("{{SITE_NAME}}", site_name())
 
 
 def load_asset_template(name):

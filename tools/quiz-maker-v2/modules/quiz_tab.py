@@ -1095,6 +1095,7 @@ class QuizTab(ttk.Frame):
                 self.on_lessons_changed()
             return
 
+        common.run_seo_build(site_root)  # titles / meta / sitemap for the new lesson
         status = "Generated {}/ ({} files) and updated {} ({} style)".format(
             location_label, 3 if include_assignment else 2, index_path, style_used)
         self.status_var.set(status + (" \u2014 video not saved, see popup" if video_warning else ""))

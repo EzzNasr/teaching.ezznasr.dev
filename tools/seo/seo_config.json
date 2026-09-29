@@ -1,0 +1,99 @@
+{
+  "_readme": "Edit values here, then run: python tools/seo/seo_build.py   (the Quiz Maker also runs it automatically after every save). Placeholders usable in any text below: {site_name}, {author_name}.",
+  "site_name": "Ezz Nasr Teaching",
+  "site_alt_names": [
+    "Ezz Nasr Teaching Portal",
+    "teaching.ezznasr.dev"
+  ],
+  "site_url": "https://teaching.ezznasr.dev",
+  "author_name": "Ezz Nasr",
+  "author_url": "https://ezznasr.dev",
+  "same_as": [
+    "https://ezznasr.dev",
+    "https://www.linkedin.com/in/EzzNasr",
+    "https://github.com/EzzNasr",
+    "https://www.facebook.com/profile.php?id=61593926633619"
+  ],
+  "og_image": "/icons/og-default.png",
+  "og_image_alt": "{site_name}",
+  "og_tagline": "Programming, AI, Math & English lessons",
+  "title_separator": " | ",
+  "title_target_max": 65,
+  "description_max": 158,
+  "index_quiz_pages": false,
+  "index_assignment_pages": false,
+  "text_fixes": {
+    "Chaper": "Chapter"
+  },
+  "text_fixes_regex": {
+    "\\bAi\\b": "AI"
+  },
+  "sections": {
+    "programming/baccalaureate/grade-1-secondary": {
+      "phrase": "Egyptian Baccalaureate programming & AI lesson for Grade 1 Secondary",
+      "label_ar": "البرمجة والذكاء الاصطناعي",
+      "level": "Grade 1 Secondary"
+    },
+    "programming/baccalaureate/grade-2-secondary": {
+      "phrase": "Egyptian Baccalaureate programming & AI lesson for Grade 2 Secondary",
+      "label_ar": "البرمجة والذكاء الاصطناعي",
+      "level": "Grade 2 Secondary"
+    },
+    "programming/other": {
+      "phrase": "Programming lesson",
+      "level": "Beginner"
+    },
+    "english": {
+      "phrase": "English lesson",
+      "level": "Intermediate to advanced"
+    },
+    "math": {
+      "phrase": "SAT / EST math lesson",
+      "level": "High school"
+    }
+  },
+  "lesson_description_tail": "{phrase}: video walkthrough, {questions}-question quiz and guided assignment.",
+  "lesson_description_tail_noquiz": "{phrase}: video walkthrough, quiz and guided assignment.",
+  "lesson_description_tail_ar": "درس من مادة {label_ar} مع فيديو شرح واختبار تفاعلي وواجب.",
+  "pages": {
+    "/": {
+      "title": "{site_name} — Programming, Math & English Lessons",
+      "description": "Concept-first lessons with video walkthroughs, instant-feedback quizzes and guided assignments: Baccalaureate programming & AI, SAT/EST math and English.",
+      "crumb": "Home"
+    },
+    "/programming/": {
+      "title": "Programming & AI Lessons (Baccalaureate) | {site_name}",
+      "description": "Programming and AI lessons for Egyptian Baccalaureate grade 1 and grade 2 secondary students, plus extra lessons on functions and conditionals, with quizzes and assignments.",
+      "crumb": "Programming"
+    },
+    "/programming/baccalaureate/grade-1-secondary/": {
+      "title": "البرمجة والذكاء الاصطناعي للصف الأول الثانوي | {site_name}",
+      "description": "دروس مادة البرمجة والذكاء الاصطناعي للصف الأول الثانوي (البكالوريا المصرية) مع فيديوهات شرح واختبارات تفاعلية وواجبات بعد كل درس.",
+      "crumb": "الصف الأول الثانوي"
+    },
+    "/programming/baccalaureate/grade-2-secondary/": {
+      "title": "البرمجة والذكاء الاصطناعي للصف الثاني الثانوي | {site_name}",
+      "description": "دروس مادة البرمجة والذكاء الاصطناعي للصف الثاني الثانوي (البكالوريا المصرية) مع فيديوهات شرح واختبارات تفاعلية وواجبات بعد كل درس.",
+      "crumb": "الصف الثاني الثانوي"
+    },
+    "/programming/other/": {
+      "title": "More Programming Lessons: Functions & Robotics | {site_name}",
+      "description": "Extra programming lessons outside the Baccalaureate track: functions, if/elif/else conditionals and a hands-on robotics session, each with a quiz and assignment.",
+      "crumb": "More lessons"
+    },
+    "/math/": {
+      "title": "SAT & EST Math Lessons and Practice | {site_name}",
+      "description": "Math lessons and practice for SAT and EST: probability, differential equations and focused problem sets, with quizzes and assignments.",
+      "crumb": "Math"
+    },
+    "/english/": {
+      "title": "English Lessons: Interview Prep & Grammar | {site_name}",
+      "description": "English lessons and quizzes: interview preparation with the STAR method, call-centre English, and grammar such as present perfect vs past simple.",
+      "crumb": "English"
+    }
+  },
+  "overrides": {
+    "_example": "Add per-URL overrides here, e.g. \"/english/ace-the-interview/\": {\"title\": \"...\", \"description\": \"...\"}"
+  },
+  "lesson_name_in_generated_description_max": 45
+}
