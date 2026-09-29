@@ -34,3 +34,43 @@ html[data-theme="dark"] body.track-two{--accent:#72a5ff;--accent-strong:#9fc2ff;
 ::view-transition-new(root){animation:220ms ease-out both vt-fade-in}
 @keyframes vt-fade-out{to{opacity:0;transform:translateY(-6px)}}
 @keyframes vt-fade-in{from{opacity:0;transform:translateY(6px)}}
+
+/* "Open lesson" button on lesson cards: a solid pill that pops, and reacts when the card is hovered */
+.lesson .open{
+  align-self:flex-start;display:inline-flex;align-items:center;gap:9px;margin-top:auto;
+  position:relative;overflow:hidden;
+  padding:10px 18px;border-radius:999px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-strong));
+  color:#fff;font:700 13px/1 Manrope,Cairo,system-ui,sans-serif;letter-spacing:0;
+  box-shadow:0 6px 16px -4px rgba(47,111,237,.5),inset 0 1px 0 rgba(255,255,255,.3);
+  box-shadow:0 6px 16px -4px color-mix(in srgb,var(--accent) 70%,transparent),inset 0 1px 0 rgba(255,255,255,.3);
+  transition:transform .2s ease,box-shadow .2s ease,filter .2s ease;
+}
+.lesson .open::before{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);
+  transform:translateX(-120%);
+}
+.lesson .open:after{
+  content:"\2192";display:inline-flex;align-items:center;justify-content:center;
+  width:20px;height:20px;border-radius:50%;
+  background:rgba(255,255,255,.24);font-size:12px;line-height:1;
+  transition:transform .2s ease,background .2s ease;
+}
+html[dir="rtl"] .lesson .open:after{content:"\2190"}
+.lesson:hover .open,.lesson:focus-visible .open{
+  transform:translateY(-2px) scale(1.05);filter:brightness(1.07);
+  box-shadow:0 12px 24px -6px rgba(47,111,237,.6),inset 0 1px 0 rgba(255,255,255,.35);
+  box-shadow:0 12px 24px -6px color-mix(in srgb,var(--accent) 80%,transparent),inset 0 1px 0 rgba(255,255,255,.35);
+}
+.lesson:hover .open::before,.lesson:focus-visible .open::before{transform:translateX(120%);transition:transform .7s ease}
+.lesson:hover .open:after{transform:translateX(3px);background:rgba(255,255,255,.34)}
+html[dir="rtl"] .lesson:hover .open:after{transform:translateX(-3px)}
+.lesson:active .open{transform:scale(.97)}
+/* dark mode: accents are light, so switch the label to dark ink for contrast */
+html[data-theme="dark"] .lesson .open{color:#071a33;box-shadow:0 6px 18px -4px rgba(114,165,255,.45),inset 0 1px 0 rgba(255,255,255,.35)}
+html[data-theme="dark"] .lesson .open:after{background:rgba(7,26,51,.18)}
+@media (prefers-reduced-motion:reduce){
+  .lesson .open,.lesson .open:after,.lesson .open::before{transition:none}
+  .lesson:hover .open{transform:none}
+}
