@@ -42,7 +42,7 @@
   "use strict";
 
   if (window.VideoSlot) return; // loaded twice — the first copy already did the work
-  window.__videoJsVersion = "v4-lazy-thumb-crop-wm";
+  window.__videoJsVersion = "v5-mobile-fs-autoplay";
 
   var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
   var SESSION_KEY = "teaching_session";
@@ -185,9 +185,11 @@
       "background:linear-gradient(transparent,rgba(8,12,22,.85));color:#fff;font:12px var(--mono,monospace);user-select:none}" +
       ".vp-bar button{background:none;border:0;color:#fff;font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}" +
       ".vp-bar input[type=range]{flex:1;accent-color:#fff;cursor:pointer}" +
-      ".vp-bar .vp-speed{font:600 12px var(--mono,monospace);min-width:40px;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:2px 6px}" +
       ".media-slot.is-locked .vp-shield,.media-slot.is-locked .vp-bar,.media-slot.is-locked .vp-poster{display:none}" +
       ".media-slot:fullscreen{border-radius:0;margin:0;background:#000}" +
+      ".media-slot.vp-fs{position:fixed!important;inset:0;width:100vw;height:100vh;height:100dvh;max-width:none;margin:0;border-radius:0;z-index:2147483000;background:#000;aspect-ratio:auto}" +
+      ".media-slot.vp-fs iframe{top:0;height:100%}" +
+      "html.vp-fs-lock,html.vp-fs-lock body{overflow:hidden}" +
       ".vp-wm{position:absolute;z-index:5;pointer-events:none;user-select:none;white-space:nowrap;padding:3px 10px;border-radius:999px;" +
       "background:rgba(0,0,0,.26);color:rgba(255,255,255,.5);font:600 12px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;" +
       "font-variant-numeric:tabular-nums;letter-spacing:.08em;transition:left 9s linear,top 9s linear}" +
@@ -303,24 +305,38 @@
     var range = el("input", { type: "range", min: "0", max: "1000", value: "0", "aria-label": "Seek" });
     var time = el("span", {}, ["0:00"]);
     var fs = el("button", { type: "button", "aria-label": "Fullscreen" }, ["\u26F6"]);
-    var rates = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2], rate = 1;
-    var spd = el("button", { type: "button", class: "vp-speed", "aria-label": "Playback speed" }, ["1x"]);
-    var bar = el("div", { class: "vp-bar" }, [btn, range, time, spd, fs]);
-    function toggle() { cmd(playing ? "pauseVideo" : "playVideo"); }
+    var bar = el("div", { class: "vp-bar" }, [btn, range, time, fs]);
+    var startedAt = Date.now(), unmuted = false, gaveUp = false;
+    function toggle() { cmd("unMute"); cmd(playing ? "pauseVideo" : "playVideo"); }
+    // If the phone blocked autoplay, YouTube shows its own red play button under our shield.
+    // Let the next tap go straight through to it (a tap inside the iframe always counts as a gesture).
+    var giveUpTimer = setTimeout(function () {
+      if (!playing) { gaveUp = true; shield.style.pointerEvents = "none"; }
+    }, 2500);
     shield.addEventListener("click", toggle);
     shield.addEventListener("contextmenu", function (e) { e.preventDefault(); });
     btn.addEventListener("click", toggle);
-    spd.addEventListener("click", function () {
-      var i = rates.indexOf(rate);
-      rate = rates[(i + 1) % rates.length];
-      spd.textContent = rate + "x";
-      cmd("setPlaybackRate", [rate]);
-    });
     range.addEventListener("input", function () { seeking = true; });
     range.addEventListener("change", function () { cmd("seekTo", [(range.value / 1000) * dur, true]); seeking = false; });
+    // iPhone Safari has no element fullscreen, and some Android browsers refuse it:
+    // fall back to a CSS fixed overlay covering the viewport.
+    function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
+    function cssFs(on) {
+      slot.classList.toggle("vp-fs", on);
+      document.documentElement.classList.toggle("vp-fs-lock", on);
+    }
     fs.addEventListener("click", function () {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else if (slot.requestFullscreen) slot.requestFullscreen();
+      if (slot.classList.contains("vp-fs")) { cssFs(false); return; }
+      if (fsElement()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+      var req = slot.requestFullscreen || slot.webkitRequestFullscreen;
+      if (!req) { cssFs(true); return; }
+      var r;
+      try { r = req.call(slot); } catch (e) { cssFs(true); return; }
+      if (r && r.then) {
+        r.then(function () {
+          try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(function () {}); } catch (e) {}
+        }, function () { cssFs(true); });
+      }
     });
     slot.appendChild(shield);
     slot.appendChild(bar);
@@ -329,9 +345,16 @@
       var d; try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch (x) { return; }
       if (!d || d.event !== "infoDelivery" || !d.info) return;
       var i = d.info;
-      if (typeof i.playerState === "number") { playing = i.playerState === 1; btn.textContent = playing ? "\u275A\u275A" : "\u25B6"; }
+      if (typeof i.playerState === "number") {
+        playing = i.playerState === 1;
+        btn.textContent = playing ? "\u275A\u275A" : "\u25B6";
+        if (playing) {
+          clearTimeout(giveUpTimer);
+          if (gaveUp) { gaveUp = false; shield.style.pointerEvents = ""; }
+          if (!unmuted) { unmuted = true; cmd("unMute"); cmd("setVolume", [100]); }
+        }
+      }
       if (i.duration) dur = i.duration;
-      if (typeof i.playbackRate === "number" && i.playbackRate !== rate) { rate = i.playbackRate; spd.textContent = rate + "x"; }
       if (typeof i.currentTime === "number" && dur) {
         time.textContent = fmt(i.currentTime) + " / " + fmt(dur);
         if (!seeking) range.value = Math.round((i.currentTime / dur) * 1000);
@@ -393,7 +416,8 @@
         rule.stop();
         rule = null;
       }
-      slot.classList.remove("vp-panel", "is-locked", "vp-yt");
+      slot.classList.remove("vp-panel", "is-locked", "vp-yt", "vp-fs");
+      document.documentElement.classList.remove("vp-fs-lock");
       while (slot.firstChild) slot.removeChild(slot.firstChild);
     }
 
@@ -420,10 +444,11 @@
           "?controls=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&cc_load_policy=0" +
           "&enablejsapi=1&origin=" + encodeURIComponent(location.origin);
       }
+      var touch = !!(window.matchMedia && matchMedia("(pointer:coarse)").matches);
       function play() {
         slot.classList.add("vp-yt");
         var frame = el("iframe", {
-          src: src + (isYT ? "&autoplay=1" : ""),
+          src: src + (isYT ? "&autoplay=1" + (touch ? "&mute=1" : "") : ""),
           title: titleText(),
           allow: "autoplay; encrypted-media; picture-in-picture",
           referrerpolicy: "strict-origin-when-cross-origin",
@@ -503,8 +528,13 @@
           }
         });
         box.appendChild(el("div", { class: "vp-icon", "aria-hidden": "true" }, [LOCK]));
-        box.appendChild(el("p", { class: "vp-title" }, [data.no_video ? "This lesson is for enrolled students" : "This video is for enrolled students"]));
-        box.appendChild(el("p", { class: "vp-text" }, [data.no_video ? "Sign in with your phone number to get access." : "Sign in with your phone number to watch it."]));
+        if (data.session_replaced) {
+          box.appendChild(el("p", { class: "vp-title" }, ["You were signed out"]));
+          box.appendChild(el("p", { class: "vp-text" }, ["This account was signed in on another device, or its password was reset. Only one device can be signed in at a time \u2014 sign in again to keep watching here."]));
+        } else {
+          box.appendChild(el("p", { class: "vp-title" }, [data.no_video ? "This lesson is for enrolled students" : "This video is for enrolled students"]));
+          box.appendChild(el("p", { class: "vp-text" }, [data.no_video ? "Sign in with your phone number to get access." : "Sign in with your phone number to watch it."]));
+        }
         payBlock(box, data);
         box.appendChild(btn);
       });

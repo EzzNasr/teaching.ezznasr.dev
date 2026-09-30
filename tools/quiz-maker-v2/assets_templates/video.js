@@ -41,9 +41,8 @@
 (function () {
   "use strict";
 
-  if (window.VideoSlot) return;
-  window.__videoJsVersion = "v3-cover-crop-wm"; // check in DevTools console to confirm the new file is live
- // loaded twice — the first copy already did the work
+  if (window.VideoSlot) return; // loaded twice — the first copy already did the work
+  window.__videoJsVersion = "v5-mobile-fs-autoplay";
 
   var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
   var SESSION_KEY = "teaching_session";
@@ -174,18 +173,23 @@
       'html[data-theme="dark"] .vp-btn.vp-ghost{color:var(--accent,#72a5ff)}' +
       ".vp-btn[disabled]{opacity:.6;cursor:default}" +
       ".vp-btn.vp-ghost{background:transparent;color:var(--accent,#2f6fed)}" +
+      ".vp-poster{position:absolute;inset:0;z-index:2;cursor:pointer;background-size:cover;background-position:center;" +
+      "background-color:#0a0e18;display:flex;align-items:center;justify-content:center;border:0;padding:0}" +
+      ".vp-poster:after{content:'';position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.05),rgba(0,0,0,.28))}" +
+      ".vp-poster-play{position:relative;z-index:1;width:64px;height:64px;border-radius:50%;background:rgba(20,24,34,.72);" +
+      "display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;transition:transform .15s ease,background .15s ease}" +
+      ".vp-poster:hover .vp-poster-play{transform:scale(1.08);background:rgba(30,90,220,.88)}" +
+      ".media-slot.vp-yt iframe{position:absolute;left:0;top:-64px;width:100%;height:calc(100% + 128px)}" +
       ".vp-shield{position:absolute;inset:0;z-index:2;cursor:pointer;background:transparent}" +
       ".vp-bar{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;align-items:center;gap:10px;padding:8px 12px;" +
       "background:linear-gradient(transparent,rgba(8,12,22,.85));color:#fff;font:12px var(--mono,monospace);user-select:none}" +
       ".vp-bar button{background:none;border:0;color:#fff;font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}" +
       ".vp-bar input[type=range]{flex:1;accent-color:#fff;cursor:pointer}" +
-      ".vp-bar .vp-speed{font:600 12px var(--mono,monospace);min-width:40px;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:2px 6px}" +
-      ".media-slot.is-locked .vp-shield,.media-slot.is-locked .vp-bar,.media-slot.is-locked .vp-cover{display:none}" +
+      ".media-slot.is-locked .vp-shield,.media-slot.is-locked .vp-bar,.media-slot.is-locked .vp-poster{display:none}" +
       ".media-slot:fullscreen{border-radius:0;margin:0;background:#000}" +
-      ".media-slot.vp-yt iframe{position:absolute;left:0;top:-64px;width:100%;height:calc(100% + 128px)}" +
-      ".vp-cover{position:absolute;inset:0;z-index:2;background:#000;display:flex;align-items:center;justify-content:center;" +
-      "color:rgba(255,255,255,.85);font-size:54px;cursor:pointer}" +
-      ".vp-cover.vp-off{display:none}" +
+      ".media-slot.vp-fs{position:fixed!important;inset:0;width:100vw;height:100vh;height:100dvh;max-width:none;margin:0;border-radius:0;z-index:2147483000;background:#000;aspect-ratio:auto}" +
+      ".media-slot.vp-fs iframe{top:0;height:100%}" +
+      "html.vp-fs-lock,html.vp-fs-lock body{overflow:hidden}" +
       ".vp-wm{position:absolute;z-index:5;pointer-events:none;user-select:none;white-space:nowrap;padding:3px 10px;border-radius:999px;" +
       "background:rgba(0,0,0,.26);color:rgba(255,255,255,.5);font:600 12px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;" +
       "font-variant-numeric:tabular-nums;letter-spacing:.08em;transition:left 9s linear,top 9s linear}" +
@@ -285,6 +289,11 @@
 
   // Click-shield + custom controls over a YouTube iframe: the visitor never gets
   // YouTube's title bar, logo, "Watch on YouTube", share/copy-link or right-click menu.
+  function ytId(embedUrl) {
+    var m = /\/embed\/([A-Za-z0-9_-]{6,})/.exec(embedUrl);
+    return m ? m[1] : null;
+  }
+
   function attachControls(slot, frame) {
     var playing = false, dur = 0, seeking = false;
     function cmd(func, args) {
@@ -292,33 +301,43 @@
     }
     function fmt(t) { t = Math.max(0, t | 0); return ((t / 60) | 0) + ":" + ("0" + (t % 60)).slice(-2); }
     var shield = el("div", { class: "vp-shield" });
-    var cover = el("div", { class: "vp-cover" }, ["\u25B6"]);
     var btn = el("button", { type: "button", "aria-label": "Play/pause" }, ["\u25B6"]);
     var range = el("input", { type: "range", min: "0", max: "1000", value: "0", "aria-label": "Seek" });
     var time = el("span", {}, ["0:00"]);
     var fs = el("button", { type: "button", "aria-label": "Fullscreen" }, ["\u26F6"]);
-    var rates = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2], rate = 1;
-    var spd = el("button", { type: "button", class: "vp-speed", "aria-label": "Playback speed" }, ["1x"]);
-    var bar = el("div", { class: "vp-bar" }, [btn, range, time, spd, fs]);
-    function toggle() { cmd(playing ? "pauseVideo" : "playVideo"); }
+    var bar = el("div", { class: "vp-bar" }, [btn, range, time, fs]);
+    var startedAt = Date.now(), unmuted = false, gaveUp = false;
+    function toggle() { cmd("unMute"); cmd(playing ? "pauseVideo" : "playVideo"); }
+    // If the phone blocked autoplay, YouTube shows its own red play button under our shield.
+    // Let the next tap go straight through to it (a tap inside the iframe always counts as a gesture).
+    var giveUpTimer = setTimeout(function () {
+      if (!playing) { gaveUp = true; shield.style.pointerEvents = "none"; }
+    }, 2500);
     shield.addEventListener("click", toggle);
-    cover.addEventListener("click", toggle);
-    cover.addEventListener("contextmenu", function (e) { e.preventDefault(); });
     shield.addEventListener("contextmenu", function (e) { e.preventDefault(); });
     btn.addEventListener("click", toggle);
-    spd.addEventListener("click", function () {
-      var i = rates.indexOf(rate);
-      rate = rates[(i + 1) % rates.length];
-      spd.textContent = rate + "x";
-      cmd("setPlaybackRate", [rate]);
-    });
     range.addEventListener("input", function () { seeking = true; });
     range.addEventListener("change", function () { cmd("seekTo", [(range.value / 1000) * dur, true]); seeking = false; });
+    // iPhone Safari has no element fullscreen, and some Android browsers refuse it:
+    // fall back to a CSS fixed overlay covering the viewport.
+    function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
+    function cssFs(on) {
+      slot.classList.toggle("vp-fs", on);
+      document.documentElement.classList.toggle("vp-fs-lock", on);
+    }
     fs.addEventListener("click", function () {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else if (slot.requestFullscreen) slot.requestFullscreen();
+      if (slot.classList.contains("vp-fs")) { cssFs(false); return; }
+      if (fsElement()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+      var req = slot.requestFullscreen || slot.webkitRequestFullscreen;
+      if (!req) { cssFs(true); return; }
+      var r;
+      try { r = req.call(slot); } catch (e) { cssFs(true); return; }
+      if (r && r.then) {
+        r.then(function () {
+          try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(function () {}); } catch (e) {}
+        }, function () { cssFs(true); });
+      }
     });
-    slot.appendChild(cover);
     slot.appendChild(shield);
     slot.appendChild(bar);
     function onMsg(e) {
@@ -326,9 +345,16 @@
       var d; try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch (x) { return; }
       if (!d || d.event !== "infoDelivery" || !d.info) return;
       var i = d.info;
-      if (typeof i.playerState === "number") { playing = i.playerState === 1; cover.classList.toggle("vp-off", i.playerState === 1 || i.playerState === 3); btn.textContent = playing ? "\u275A\u275A" : "\u25B6"; }
+      if (typeof i.playerState === "number") {
+        playing = i.playerState === 1;
+        btn.textContent = playing ? "\u275A\u275A" : "\u25B6";
+        if (playing) {
+          clearTimeout(giveUpTimer);
+          if (gaveUp) { gaveUp = false; shield.style.pointerEvents = ""; }
+          if (!unmuted) { unmuted = true; cmd("unMute"); cmd("setVolume", [100]); }
+        }
+      }
       if (i.duration) dur = i.duration;
-      if (typeof i.playbackRate === "number" && i.playbackRate !== rate) { rate = i.playbackRate; spd.textContent = rate + "x"; }
       if (typeof i.currentTime === "number" && dur) {
         time.textContent = fmt(i.currentTime) + " / " + fmt(dur);
         if (!seeking) range.value = Math.round((i.currentTime / dur) * 1000);
@@ -390,7 +416,8 @@
         rule.stop();
         rule = null;
       }
-      slot.classList.remove("vp-panel", "is-locked", "vp-yt");
+      slot.classList.remove("vp-panel", "is-locked", "vp-yt", "vp-fs");
+      document.documentElement.classList.remove("vp-fs-lock");
       while (slot.firstChild) slot.removeChild(slot.firstChild);
     }
 
@@ -410,21 +437,42 @@
       state = "video";
       var isYT = /youtube/.test(data.embed_url);
       var src = data.embed_url;
+      var vid = isYT ? ytId(data.embed_url) : null;
       if (isYT) {
         // nocookie host, no YouTube UI, no related videos, no keyboard/fullscreen buttons
         src = src.split("?")[0].replace("www.youtube.com", "www.youtube-nocookie.com") +
           "?controls=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&cc_load_policy=0" +
           "&enablejsapi=1&origin=" + encodeURIComponent(location.origin);
       }
-      var frame = el("iframe", {
-        src: src,
-        title: titleText(),
-        allow: "autoplay; encrypted-media; picture-in-picture",
-        referrerpolicy: "strict-origin-when-cross-origin",
-      });
-      if (isYT) slot.classList.add("vp-yt");
-      slot.appendChild(frame);
-      if (isYT) attachControls(slot, frame);
+      var touch = !!(window.matchMedia && matchMedia("(pointer:coarse)").matches);
+      function play() {
+        slot.classList.add("vp-yt");
+        var frame = el("iframe", {
+          src: src + (isYT ? "&autoplay=1" + (touch ? "&mute=1" : "") : ""),
+          title: titleText(),
+          allow: "autoplay; encrypted-media; picture-in-picture",
+          referrerpolicy: "strict-origin-when-cross-origin",
+        });
+        slot.appendChild(frame);
+        if (isYT) attachControls(slot, frame);
+      }
+      if (isYT && vid) {
+        // Our own thumbnail + play button \u2014 nothing YouTube-branded shows
+        // until the visitor actually presses play.
+        var poster = el("button", {
+          type: "button",
+          class: "vp-poster",
+          "aria-label": "Play video",
+          style: "background-image:url(https://i.ytimg.com/vi/" + vid + "/hqdefault.jpg)",
+        }, [el("span", { class: "vp-poster-play" }, ["\u25B6"])]);
+        poster.addEventListener("click", function () {
+          poster.remove();
+          play();
+        });
+        slot.appendChild(poster);
+      } else {
+        play();
+      }
       if (session && session.student_id) attachWatermark(slot, session.student_id);
       if (data.locked && session && session.is_admin) {
         slot.appendChild(el("div", { class: "vp-badge" }, [LOCK + " Locked for students \u2014 you're previewing"]));
@@ -481,8 +529,6 @@
         });
         box.appendChild(el("div", { class: "vp-icon", "aria-hidden": "true" }, [LOCK]));
         if (data.session_replaced) {
-          // The token in this browser was replaced: the account signed in on another
-          // device (one active session per account), or the password was reset.
           box.appendChild(el("p", { class: "vp-title" }, ["You were signed out"]));
           box.appendChild(el("p", { class: "vp-text" }, ["This account was signed in on another device, or its password was reset. Only one device can be signed in at a time \u2014 sign in again to keep watching here."]));
         } else {
