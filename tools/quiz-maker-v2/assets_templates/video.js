@@ -179,6 +179,7 @@
       "background:linear-gradient(transparent,rgba(8,12,22,.85));color:#fff;font:12px var(--mono,monospace);user-select:none}" +
       ".vp-bar button{background:none;border:0;color:#fff;font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}" +
       ".vp-bar input[type=range]{flex:1;accent-color:#fff;cursor:pointer}" +
+      ".vp-bar .vp-speed{font:600 12px var(--mono,monospace);min-width:40px;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:2px 6px}" +
       ".media-slot.is-locked .vp-shield,.media-slot.is-locked .vp-bar,.media-slot.is-locked .vp-cover{display:none}" +
       ".media-slot:fullscreen{border-radius:0;margin:0;background:#000}" +
       ".media-slot.vp-yt iframe{position:absolute;left:0;top:-64px;width:100%;height:calc(100% + 128px)}" +
@@ -296,13 +297,21 @@
     var range = el("input", { type: "range", min: "0", max: "1000", value: "0", "aria-label": "Seek" });
     var time = el("span", {}, ["0:00"]);
     var fs = el("button", { type: "button", "aria-label": "Fullscreen" }, ["\u26F6"]);
-    var bar = el("div", { class: "vp-bar" }, [btn, range, time, fs]);
+    var rates = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2], rate = 1;
+    var spd = el("button", { type: "button", class: "vp-speed", "aria-label": "Playback speed" }, ["1x"]);
+    var bar = el("div", { class: "vp-bar" }, [btn, range, time, spd, fs]);
     function toggle() { cmd(playing ? "pauseVideo" : "playVideo"); }
     shield.addEventListener("click", toggle);
     cover.addEventListener("click", toggle);
     cover.addEventListener("contextmenu", function (e) { e.preventDefault(); });
     shield.addEventListener("contextmenu", function (e) { e.preventDefault(); });
     btn.addEventListener("click", toggle);
+    spd.addEventListener("click", function () {
+      var i = rates.indexOf(rate);
+      rate = rates[(i + 1) % rates.length];
+      spd.textContent = rate + "x";
+      cmd("setPlaybackRate", [rate]);
+    });
     range.addEventListener("input", function () { seeking = true; });
     range.addEventListener("change", function () { cmd("seekTo", [(range.value / 1000) * dur, true]); seeking = false; });
     fs.addEventListener("click", function () {
@@ -319,6 +328,7 @@
       var i = d.info;
       if (typeof i.playerState === "number") { playing = i.playerState === 1; cover.classList.toggle("vp-off", i.playerState === 1 || i.playerState === 3); btn.textContent = playing ? "\u275A\u275A" : "\u25B6"; }
       if (i.duration) dur = i.duration;
+      if (typeof i.playbackRate === "number" && i.playbackRate !== rate) { rate = i.playbackRate; spd.textContent = rate + "x"; }
       if (typeof i.currentTime === "number" && dur) {
         time.textContent = fmt(i.currentTime) + " / " + fmt(dur);
         if (!seeking) range.value = Math.round((i.currentTime / dur) * 1000);
