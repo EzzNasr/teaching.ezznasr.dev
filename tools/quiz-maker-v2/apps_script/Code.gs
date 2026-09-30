@@ -265,6 +265,14 @@
  *   admin_grant_access / admin_revoke_access to every member of a group in one
  *   call. Revoking is quiet about members who don't hold that access — it
  *   skips them rather than failing the whole batch.
+ * - Groups are RETROACTIVE: a grant made to a group is also remembered in a
+ *   "GroupGrants" tab (group_key | group | kind | target | expires_at | granted_at;
+ *   kind = access (target = scope) or quiz (target = lesson)). Adding a student to
+ *   the group later applies every live group grant to them, ending on the SAME date
+ *   the group's grant ends (an already-ended grant is skipped). Revoking from the
+ *   group deletes the remembered grant too. Removing a student does NOT take their
+ *   access away (revoke it by hand if you want that). A group that loses its last
+ *   member forgets its grants.
  * - Group names are matched without regard to case/spacing ("Grade 2" and
  *   "grade  2" are the same group); the first spelling used is kept for
  *   display so every row of one group reads the same way.
@@ -442,6 +450,8 @@ var PLAIN_TEXT_HEADERS = {
   payment_id: 1, reference: 1, status: 1, decided_at: 1,
   // Groups
   group: 1, added_at: 1,
+  // GroupGrants
+  group_key: 1, kind: 1, target: 1,
 };
 // Of those, the ones that hold phone numbers (a leading 0 is easily lost).
 var PHONE_HEADERS = { phone: 1, parent_phone: 1, student_id: 1 };
@@ -2666,7 +2676,7 @@ function handleAdminAccessOverview(payload) {
   });
   var groupSpellings = _groupSpellings(gSheet);
   var groups = Object.keys(groupsByKey).map(function (k) {
-    var g = groupsByKey[k]; g.group = groupSpellings[k] || g.group; return g;
+    var g = groupsByKey[k]; g.group = groupSpellings[k] || g.group; g.grants = _groupGrantsForApi(ss, k); return g;
   }).sort(function (a, b) { return a.group.toLowerCase() < b.group.toLowerCase() ? -1 : 1; });
 
   var pSheet = ss.getSheetByName("Payments");
@@ -3070,8 +3080,9 @@ function handleAdminGroupGrantQuizAccess(payload) {
       expiresAt = g.expires_at;
       return { phone: m.phone, name: who(m.phone).name };
     });
+    var groupEndsQ = _rememberGroupGrant(ss, key, spelling || payload.group, "quiz", lesson, explicit, days);
     return { ok: true, group: spelling || payload.group, lesson: lesson,
-             expires_at: expiresAt, granted: granted, count: granted.length };
+             expires_at: groupEndsQ, granted: granted, count: granted.length };
   });
 }
 
@@ -3102,7 +3113,8 @@ function handleAdminGroupRevokeQuizAccess(payload) {
       rows.sort(function (a, b) { return b - a; }).forEach(function (r) { qaSheet.deleteRows(r, 1); });
       removed++;
     });
-    return { ok: true, group: spelling || payload.group, lesson: lesson, removed_students: removed };
+    var forgotQ = _forgetGroupGrants(ss, key, "quiz", lesson);
+    return { ok: true, group: spelling || payload.group, lesson: lesson, removed_students: removed, group_rule_removed: forgotQ > 0 };
   });
 }
 
@@ -3121,6 +3133,76 @@ function _cleanGroupName(raw) {
   var name = String(raw == null ? "" : raw).trim().replace(/\s+/g, " ");
   if (!GROUP_NAME_RE.test(name)) throw new Error("Group names can use letters, numbers, spaces, \".\" and \"-\" (1-60 characters).");
   return name;
+}
+
+// -- Group grants: what a group has been given, so a student who joins later gets it too ----
+var GROUP_GRANT_HEADERS = ["group_key", "group", "kind", "target", "expires_at", "granted_at"];
+
+// Rows of the GroupGrants tab for one group key ("" = every group). Each row:
+// {row, key, group, kind, target, ymd}  (ymd: "yyyy-MM-dd", "" = never ends, null = unreadable).
+function _groupGrantRows(ss, key) {
+  var sheet = ss.getSheetByName("GroupGrants");
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  var c = _needCols(sheet, "GroupGrants", GROUP_GRANT_HEADERS);
+  var tz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  var out = [];
+  for (var i = 0; i < values.length; i++) {
+    var k = String(values[i][c.group_key - 1] || "").trim();
+    if (!k || (key && k !== key)) continue;
+    out.push({ row: i + 2, key: k, group: String(values[i][c.group - 1] || ""),
+               kind: String(values[i][c.kind - 1] || "").trim().toLowerCase(),
+               target: String(values[i][c.target - 1] || "").trim().toLowerCase(),
+               ymd: _ymdOf(values[i][c.expires_at - 1], tz),
+               granted_at: String(values[i][c.granted_at - 1] || "") });
+  }
+  return out;
+}
+
+// INSIDE the lock. Remember (or extend, never shorten) one group grant.
+function _rememberGroupGrant(ss, key, spelling, kind, target, explicitYmd, days) {
+  var sheet = _sheetByName(ss, "GroupGrants", GROUP_GRANT_HEADERS);
+  _ensureColumns(sheet, GROUP_GRANT_HEADERS);
+  var c = _needCols(sheet, "GroupGrants", GROUP_GRANT_HEADERS);
+  var today = _todayCairo();
+  var now = _fmt(new Date(), TZ, true);
+  var found = _groupGrantRows(ss, key).filter(function (r) { return r.kind === kind && r.target === target; })[0];
+  var t = explicitYmd ? explicitYmd : (days ? _addDays(today, days) : "");
+  if (found) {
+    if (found.ymd === "") t = "";
+    else if (found.ymd && t !== "" && found.ymd > t) t = found.ymd;
+    sheet.getRange(found.row, c.expires_at).setNumberFormat("@").setValue(t);
+    sheet.getRange(found.row, c.granted_at).setNumberFormat("@").setValue(now);
+  } else {
+    _appendByHeader(sheet, { group_key: key, group: spelling, kind: kind, target: target, expires_at: t, granted_at: now });
+  }
+  return t;
+}
+
+// INSIDE the lock. Forget one remembered group grant (or all of a group's, when kind is "").
+function _forgetGroupGrants(ss, key, kind, target) {
+  var sheet = ss.getSheetByName("GroupGrants");
+  if (!sheet) return 0;
+  var rows = _groupGrantRows(ss, key).filter(function (r) { return !kind || (r.kind === kind && r.target === target); })
+    .map(function (r) { return r.row; });
+  rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
+  return rows.length;
+}
+
+// INSIDE the lock. Give newly-added phones everything the group currently gives.
+// Returns [{kind, target, expires_at}] that were applied.
+function _applyGroupGrantsTo(ss, key, spelling, phones) {
+  var today = _todayCairo();
+  var live = _groupGrantRows(ss, key).filter(function (r) {
+    return r.ymd !== null && (r.ymd === "" || r.ymd >= today);
+  });
+  live.forEach(function (r) {
+    phones.forEach(function (phone) {
+      if (r.kind === "quiz") _grantQuizRaw(ss, phone, r.target, r.ymd, 0, "group:" + spelling);
+      else _grantRaw(ss, phone, r.target, r.ymd, 0, "group:" + spelling);
+    });
+  });
+  return live.map(function (r) { return { kind: r.kind, target: r.target, expires_at: r.ymd }; });
 }
 
 // Every existing group's key -> the exact spelling first used for it, so every
@@ -3166,6 +3248,13 @@ function _groupMembers(sheet, groupKey, who) {
   return out;
 }
 
+// What a group currently gives new members: live grants only (an ended one gives nothing).
+function _groupGrantsForApi(ss, key) {
+  var today = _todayCairo();
+  return _groupGrantRows(ss, key).filter(function (r) { return r.ymd !== null && (r.ymd === "" || r.ymd >= today); })
+    .map(function (r) { return { kind: r.kind, target: r.target, expires_at: r.ymd, granted_at: r.granted_at }; });
+}
+
 function handleAdminListGroups(payload) {
   _requireAdminAny(payload);
   var ss = _ss();
@@ -3179,7 +3268,7 @@ function handleAdminListGroups(payload) {
     if (!byKey[k]) byKey[k] = { group: spellings[k] || m.group, members: [] };
     byKey[k].members.push({ phone: m.phone, name: m.name, known_student: m.known_student });
   });
-  var groups = Object.keys(byKey).map(function (k) { return byKey[k]; })
+  var groups = Object.keys(byKey).map(function (k) { byKey[k].grants = _groupGrantsForApi(ss, k); return byKey[k]; })
     .sort(function (a, b) { return a.group.toLowerCase() < b.group.toLowerCase() ? -1 : 1; });
   return { ok: true, groups: groups };
 }
@@ -3217,7 +3306,8 @@ function handleAdminGroupAdd(payload) {
         _appendByHeader(sheet, { group: spelling, phone: phone, name: w.name, added_at: _fmt(new Date(), TZ, true) });
         added.push({ phone: phone, name: w.name, known_student: w.known });
       });
-      return { ok: true, group: spelling, added: added, already: already, count: added.length };
+      var inherited = added.length ? _applyGroupGrantsTo(ss, key, spelling, added.map(function (a) { return a.phone; })) : [];
+      return { ok: true, group: spelling, added: added, already: already, count: added.length, inherited: inherited };
     });
   }
 
@@ -3234,7 +3324,8 @@ function handleAdminGroupAdd(payload) {
     var name = stu ? String(stu.display_name == null ? "" : stu.display_name) : "";
     if (existing.length) return { ok: true, group: spelling, phone: phone, name: name, known_student: !!stu, already: true };
     _appendByHeader(sheet, { group: spelling, phone: phone, name: name, added_at: _fmt(new Date(), TZ, true) });
-    return { ok: true, group: spelling, phone: phone, name: name, known_student: !!stu, already: false };
+    var inheritedOne = _applyGroupGrantsTo(ss, key, spelling, [phone]);
+    return { ok: true, group: spelling, phone: phone, name: name, known_student: !!stu, already: false, inherited: inheritedOne };
   });
 }
 
@@ -3258,6 +3349,7 @@ function handleAdminGroupRemove(payload) {
       }).map(function (m) { return m.row; });
       if (!rows.length) throw new Error("None of those students are in that group.");
       rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
+      if (members.length === rows.length) _forgetGroupGrants(_ss(), key, "", "");   // group is gone: forget what it gave
       return { ok: true, removed: rows.length };
     });
   }
@@ -3271,6 +3363,7 @@ function handleAdminGroupRemove(payload) {
     var rows = members.filter(function (m) { return _phonesMatch(m.phone, phone); }).map(function (m) { return m.row; });
     if (!rows.length) throw new Error("That student isn't in that group.");
     rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
+    if (members.length === rows.length) _forgetGroupGrants(_ss(), key, "", "");
     return { ok: true, removed: rows.length };
   });
 }
@@ -3296,8 +3389,10 @@ function handleAdminGroupGrantAccess(payload) {
       expiresAt = g.expires_at;
       return { phone: m.phone, name: who(m.phone).name };
     });
+    // Remember it, so students added to the group later get the same access.
+    var groupEnds = _rememberGroupGrant(ss, key, spelling || payload.group, "access", scope, explicit, days);
     return { ok: true, group: spelling || payload.group, scope: scope,
-             expires_at: expiresAt, granted: granted, count: granted.length };
+             expires_at: groupEnds, granted: granted, count: granted.length };
   });
 }
 
@@ -3349,7 +3444,8 @@ function handleAdminGroupRevokeAccess(payload) {
         paymentsRevoked.push(id);
       }
     });
-    return { ok: true, group: spelling || payload.group, scope: scope, removed_students: removedStudents, payments_revoked: paymentsRevoked };
+    var forgot = _forgetGroupGrants(ss, key, "access", scope);   // later joiners no longer get it
+    return { ok: true, group: spelling || payload.group, scope: scope, removed_students: removedStudents, payments_revoked: paymentsRevoked, group_rule_removed: forgot > 0 };
   });
 }
 

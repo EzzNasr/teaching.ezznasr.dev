@@ -337,6 +337,114 @@
   .ac-hint { margin: 0; padding: 8px 0; color: var(--ink-dim); font: 12px var(--sans); }
   .ac-mono { font-family: var(--mono); }
   @media (max-width: 640px) { .ac-fields { grid-template-columns: 1fr; } .ac-input { min-width: 0; width: 100%; } .ac-row label { width: 100%; } }
+
+  /* ---- Access page v2: year filter, grouping, compact rows ---- */
+  .dash-stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .dash-stat { min-height: 96px; padding: 16px 18px; }
+  .dash-stat b { font-size: 26px; }
+  .dash-stat small { position: relative; z-index: 1; display: block; margin-top: 6px; color: var(--ink-dim); font: 600 10px var(--mono); }
+  html:not([data-theme="dark"]) .dash-stat:nth-child(5) { border-top-color: #7567e8; }
+  html:not([data-theme="dark"]) .dash-stat:nth-child(6) { border-top-color: #e080b6; }
+  html:not([data-theme="dark"]) .dash-stat:nth-child(7) { border-top-color: #e6a052; }
+
+  /* segmented controls (year bar, group-by) */
+  .ac-seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-soft); }
+  .ac-seg-btn { border: 0; border-radius: 9px; padding: 8px 14px; color: var(--ink-dim); background: transparent; font: 700 12px var(--mono); cursor: pointer; transition: all .15s ease; }
+  .ac-seg-btn:hover { color: var(--accent); background: var(--surface-soft); }
+  .ac-seg-btn.is-active { color: #fff; background: var(--accent); box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 30%, transparent); }
+  html[data-theme="dark"] .ac-seg-btn.is-active { color: #0d1120; }
+  .ac-seg-btn small { margin-left: 7px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, currentColor 16%, transparent); font: 700 10px var(--mono); }
+  .ac-yearbar { margin: 0 0 16px; }
+  .ac-yearbar .ac-seg-btn[data-year="Senior 2"].is-active { background: #d9772b; color: #fff; }
+  .ac-yearbar .ac-seg-btn[data-year="__none__"].is-active { background: var(--ink-dim); color: #fff; }
+  html[data-theme="dark"] .ac-yearbar .ac-seg-btn[data-year="Senior 2"].is-active { background: #f0a15a; color: #1a1005; }
+  html[data-theme="dark"] .ac-yearbar .ac-seg-btn[data-year="__none__"].is-active { color: #0d1120; }
+  .dash-filters .ac-seg { padding: 3px; box-shadow: none; }
+  .dash-filters .ac-seg-btn { padding: 6px 12px; }
+  .ac-fgroup { display: flex; flex-direction: column; gap: 5px; color: var(--ink-dim); font: 600 10px var(--mono); letter-spacing: .04em; }
+
+  /* year sections */
+  .ac-sec-h { --sc: var(--accent); display: flex; align-items: center; gap: 10px; margin: 24px 0 12px; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--sc) 30%, var(--line)); border-left: 5px solid var(--sc); border-radius: 12px; background: color-mix(in srgb, var(--sc) 11%, var(--surface-strong)); color: var(--ink); font: 800 14px var(--sans); letter-spacing: -.01em; }
+  .ac-sec-h:first-of-type { margin-top: 10px; }
+  .ac-sec-h em { color: var(--ink-dim); font: 500 11px var(--mono); font-style: normal; }
+  .ac-sec-h .ac-count { margin-left: auto; }
+  .ac-sec-h[data-sec="Senior 2"] { --sc: #d9772b; }
+  .ac-sec-h[data-sec="Wide access"] { --sc: #168c79; }
+  .ac-sec-h[data-sec="Other lessons"] { --sc: #8b88a3; }
+  html[data-theme="dark"] .ac-sec-h[data-sec="Senior 2"] { --sc: #f0a15a; }
+
+  .ac-tools { display: flex; gap: 8px; margin: 0 0 6px; justify-content: flex-end; }
+
+  /* boxed cards everywhere */
+  .ac-card { margin: 0 0 12px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-strong); }
+  .ac-card:last-child { border-bottom: 1px solid var(--line); }
+  .ac-fields { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: 12px; }
+
+  /* collapsible groups */
+  .ac-grp { margin: 0 0 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-strong); }
+  .ac-grp > summary { display: flex; align-items: center; gap: 12px; padding: 12px 16px; list-style: none; cursor: pointer; border-radius: 14px; }
+  .ac-grp > summary::-webkit-details-marker { display: none; }
+  .ac-grp > summary:hover { background: var(--surface-soft); }
+  .ac-grp[open] > summary { border-bottom: 1px solid var(--line); border-radius: 14px 14px 0 0; }
+  .ac-grp-caret { color: var(--ink-dim); font-size: 12px; transition: transform .15s ease; }
+  .ac-grp[open] .ac-grp-caret { transform: rotate(90deg); }
+  .ac-grp-title { flex: 1; min-width: 0; }
+  .ac-grp-title b { display: block; color: var(--ink); font: 800 14px var(--sans); }
+  .ac-grp-title small { display: block; margin-top: 2px; color: var(--ink-dim); font: 11px var(--mono); overflow-wrap: anywhere; }
+  .ac-grp-meta { text-align: right; color: var(--ink-dim); font: 600 11px/1.5 var(--mono); }
+  .ac-grp-meta b { color: var(--ink); font-weight: 700; }
+  .ac-grp .ac-lines { border: 0; border-radius: 0 0 14px 14px; }
+
+  /* row lists */
+  .ac-lines { border: 1px solid var(--line); border-radius: 14px; background: var(--surface-strong); overflow: hidden; margin-bottom: 10px; }
+  .ac-lines-head, .ac-line { display: grid; grid-template-columns: var(--cols); gap: 6px 16px; align-items: center; padding: 12px 16px; }
+  .ac-lines-head { padding-top: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); background: var(--surface-soft); color: var(--ink-dim); font: 700 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+  .ac-item { border-bottom: 1px solid var(--line); }
+  .ac-item:last-child { border-bottom: 0; }
+  .ac-item:hover > .ac-line { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+  .ac-cell b { display: block; color: var(--ink); font: 700 13px/1.35 var(--sans); overflow-wrap: anywhere; }
+  .ac-cell small { display: block; margin-top: 2px; color: var(--ink-dim); font: 11px/1.4 var(--mono); overflow-wrap: anywhere; }
+  .ac-line .ac-who b { font: 800 14px var(--sans); }
+  .ac-line-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  .ac-line-actions .ac-btn { padding: 6px 10px; }
+  .ac-item > .ac-panel, .ac-item > .ac-note { margin: 0 16px 14px; }
+  .is-access { --cols: minmax(0, 2.2fr) 92px minmax(0, 1.3fr) minmax(0, 1.5fr) 220px; }
+  .is-history { --cols: minmax(0, 1.5fr) minmax(0, 1.7fr) 92px minmax(0, 1.1fr) minmax(0, 1.1fr) 150px; }
+  .is-quiz { --cols: minmax(0, 2.4fr) 92px minmax(0, 1.2fr) 220px; }
+  .ac-lines-headonly { margin-bottom: 10px; border-radius: 10px; }
+  .ac-lines-headonly .ac-lines-head { border-bottom: 0; }
+
+  /* lessons: chips */
+  .ac-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .ac-chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink); background: var(--surface-soft); font: 600 11px var(--mono); }
+  .ac-chip i { color: var(--ink-dim); font-style: normal; font-weight: 500; }
+  .ac-chip.is-good { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--line-strong)); }
+  .ac-chip.is-warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, var(--line-strong)); }
+  .ac-chip.is-bad { color: var(--low); border-color: color-mix(in srgb, var(--low) 45%, var(--line-strong)); }
+
+  /* groups: member chips */
+  .ac-members { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .ac-member { padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-soft); color: var(--ink); font: 600 12px var(--sans); }
+  .ac-member small { margin-left: 6px; color: var(--ink-dim); font: 400 10px var(--mono); }
+  .ac-mh { margin: 14px 0 0; color: var(--ink-dim); font: 700 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+  .ac-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 20px; align-items: end; margin: 12px 0; }
+  .ac-form-row label { display: flex; flex-direction: column; gap: 5px; color: var(--ink-dim); font: 600 10px var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+  .ac-form-row .ac-input { width: 100%; min-width: 0; }
+
+  @media (max-width: 640px) {
+    .ac-lines-head { display: none; }
+    .ac-line { grid-template-columns: 1fr auto; }
+    .ac-line > .ac-cell-badge { grid-column: 2; grid-row: 1; }
+    .ac-line > .ac-cell[data-label] { grid-column: 1 / -1; display: flex; gap: 10px; align-items: baseline; }
+    .ac-line > .ac-cell[data-label]::before { content: attr(data-label); flex: 0 0 74px; color: var(--ink-dim); font: 700 10px var(--mono); letter-spacing: .05em; text-transform: uppercase; }
+    .ac-line-actions { grid-column: 1 / -1; justify-content: flex-start; }
+    .ac-grp > summary { flex-wrap: wrap; }
+    .ac-grp-meta { width: 100%; text-align: left; }
+    .ac-seg { width: 100%; }
+    .ac-seg-btn { flex: 1; padding: 8px 6px; }
+  }
+
+  .ac-chip em { color: var(--ink-dim); font-style: normal; font-weight: 400; }
 </style>
 </head>
 <body>
@@ -392,6 +500,9 @@
     session: null,
     data: null,
     tab: null,
+    year: "",                   // Senior 1 / Senior 2 filter shared by every tab: "" all | "Senior 1" | "Senior 2" | "__none__"
+    view: { access: "lesson" }, // Who-has-access grouping: "lesson" | "person"
+    collapsed: {},              // folded groups, by key
     open: null,                 // which inline panel is open: "<kind>:<id>"
     toast: null,                // { ok: true|false, text }
     filters: { access: { q: "", status: "active" }, history: { q: "", status: "all" }, quizAdd: { track: "", q: "", year: "" }, lessons: { track: "", q: "", year: "" }, grant: { year: "" }, groupScope: { year: "" } },
@@ -588,6 +699,97 @@
     return el("dl", { class: "ac-field" }, [el("dt", {}, [label]), el("dd", {}, [main, sub ? el("small", {}, [sub]) : null])]);
   }
 
+  // ---- sections: Senior 1 / Senior 2 / wide access / other -----------------------------------------
+  var SECTION_ORDER = ["Senior 1", "Senior 2", "Wide access", "Other lessons"];
+  var SECTION_NOTE = { "Wide access": "a whole folder or the whole site, so it covers several years", "Other lessons": "not tied to Senior 1 or Senior 2" };
+  function isWide(scope) { return scope === "*" || /\/\*$/.test(String(scope || "")); }
+  function sectionOf(path) { return yearOf(path) || (isWide(path) ? "Wide access" : "Other lessons"); }
+  // Which sections a wide scope actually reaches (so a "*" grant shows up under Senior 1 AND Senior 2 when filtering).
+  function coveredSections(d, scope) {
+    var seen = {};
+    if (scope === "*") { seen["Senior 1"] = 1; seen["Senior 2"] = 1; seen["Other lessons"] = 1; return seen; }
+    allLessonsList(d).forEach(function (l) { if (scopeCovers(scope, l.lesson)) seen[yearOf(l.lesson) || "Other lessons"] = 1; });
+    return seen;
+  }
+  // filter: "" all | "Senior 1" | "Senior 2" | "__none__" (other lessons)
+  function sectionPass(d, filter, scope) {
+    if (!filter) return true;
+    var want = filter === "__none__" ? "Other lessons" : filter;
+    var sec = sectionOf(scope);
+    if (sec === want) return true;
+    return sec === "Wide access" && !!coveredSections(d, scope)[want];
+  }
+  function yearCounts(list, pass) {
+    var out = {};
+    ["", "Senior 1", "Senior 2", "__none__"].forEach(function (f) { out[f] = list.filter(function (x) { return pass(f, x); }).length; });
+    return out;
+  }
+  function bySection(items, secFn) {
+    var m = {};
+    items.forEach(function (x) { var s = secFn(x); (m[s] = m[s] || []).push(x); });
+    return SECTION_ORDER.filter(function (s) { return m[s]; }).map(function (s) { return { name: s, items: m[s] }; });
+  }
+  function sectionHead(name, countText) {
+    return el("h3", { class: "ac-sec-h", "data-sec": name, "data-year-group": name }, [
+      el("span", {}, [name]),
+      SECTION_NOTE[name] ? el("em", {}, [SECTION_NOTE[name]]) : null,
+      el("span", { class: "ac-count" }, [countText]),
+    ]);
+  }
+  function segmented(opts, current, onPick, attr, label) {
+    return el("div", { class: "ac-seg", role: "group", "aria-label": label || "Options" }, opts.map(function (o) {
+      var attrs = { class: "ac-seg-btn" + (current === o[0] ? " is-active" : ""), type: "button", "aria-pressed": String(current === o[0]) };
+      attrs[attr] = o[0] === "" ? "all" : o[0];
+      var b = el("button", attrs, [o[1], o[2] === undefined ? null : el("small", {}, [String(o[2])])]);
+      b.addEventListener("click", function () { onPick(o[0]); });
+      return b;
+    }));
+  }
+  function setYear(v) {
+    STATE.year = v;
+    STATE.open = null;
+    STATE.filters.quizAdd.year = v; STATE.filters.grant.year = v; STATE.filters.groupScope.year = v; STATE.filters.lessons.year = v;
+    render();
+  }
+  function yearBar(counts) {
+    var opts = [["", "All years", counts[""]], ["Senior 1", "Senior 1", counts["Senior 1"]], ["Senior 2", "Senior 2", counts["Senior 2"]]];
+    if (counts["__none__"] || STATE.year === "__none__") opts.push(["__none__", "Other", counts["__none__"]]);
+    var bar = segmented(opts, STATE.year, setYear, "data-year", "Year");
+    bar.className += " ac-yearbar";
+    return bar;
+  }
+  // A group that can be folded away. Fold state survives re-renders; a group holding an open panel stays open.
+  function collapsible(key, headKids, bodyKids, forceOpen, keys) {
+    keys.push(key);
+    var det = el("details", { class: "ac-grp", "data-grp": key });
+    if (forceOpen || !STATE.collapsed[key]) det.setAttribute("open", "");
+    det.appendChild(el("summary", { class: "ac-grp-h" }, headKids));
+    det.appendChild(el("div", { class: "ac-grp-body" }, bodyKids));
+    det.addEventListener("toggle", function () { STATE.collapsed[key] = !det.open; });
+    return det;
+  }
+  function expandTools(keys) {
+    var open = el("button", { class: "ac-btn", type: "button" }, ["Expand all"]);
+    var shut = el("button", { class: "ac-btn", type: "button" }, ["Collapse all"]);
+    open.addEventListener("click", function () { keys.forEach(function (k) { STATE.collapsed[k] = false; }); render(); });
+    shut.addEventListener("click", function () { keys.forEach(function (k) { STATE.collapsed[k] = true; }); STATE.open = null; render(); });
+    return el("div", { class: "ac-tools" }, [open, shut]);
+  }
+  function linesHead(labels) {
+    return el("div", { class: "ac-lines-head", "aria-hidden": "true" }, labels.map(function (t) { return el("span", {}, [t]); }));
+  }
+  function lineCell(label, main, sub) {
+    return el("div", { class: "ac-cell", "data-label": label }, [el("div", {}, [el("b", {}, [main]), sub ? el("small", {}, [sub]) : null])]);
+  }
+  function scopeBlock(scope) {
+    var si = scopeInfo(scope);
+    return el("div", { class: "ac-who" }, [el("b", {}, [si.title]), el("span", {}, [si.sub])]);
+  }
+  function chip(label, value, cls, extra) {
+    return el("span", { class: "ac-chip " + (cls || "") }, [el("i", {}, [label]), value, extra ? el("em", {}, [extra]) : null]);
+  }
+  function countLabel(n, one, many) { return n + " " + (n === 1 ? one : many); }
+
   // ---- talking to the server -------------------------------------------------------------------
 
   function setToast(ok, text) { STATE.toast = { ok: ok, text: text }; }
@@ -690,7 +892,7 @@
     return el("div", { class: "ac-toast " + (STATE.toast.ok ? "is-ok" : "is-err"), role: "status", "aria-live": "polite" }, [STATE.toast.text]);
   }
 
-  function statCard(n, label) { return el("div", { class: "dash-stat" }, [el("b", {}, [n]), el("span", {}, [label])]); }
+  function statCard(n, label, sub) { return el("div", { class: "dash-stat" }, [el("b", {}, [n]), el("span", {}, [label]), sub ? el("small", {}, [sub]) : null]); }
 
   function helpBlock() {
     return el("details", { class: "ac-help" }, [
@@ -703,7 +905,8 @@
         el("li", {}, [el("b", {}, ["Lock a lesson"]), " (Lessons tab) and every video in it needs access, whether or not that video exists yet; leave it open and each video still follows its own lock if you set one."]),
         el("li", {}, [el("b", {}, ["Quiz gate"]), " is separate from the lesson lock and always wins for the quiz itself \u2014 lock a quiz and it stays locked even if the lesson is open; leave it ungated and it stays open even if the lesson is locked."]),
         el("li", {}, [el("b", {}, ["Groups remember what they give."]), " Give a group access and anyone you add to it later gets the same access, ending on the group\u2019s end date. Revoking from the group stops that too. Removing a student never takes their access away."]),
-        el("li", {}, [el("b", {}, ["Senior 1 / Senior 2"]), " \u2014 lessons under a grade-1 / grade-2 folder are labelled by year. Every lesson list has a Year filter, and the Lessons tab splits them under a heading per year. Student lists (Groups) can be filtered by the year on each student's account, so \u201cSelect all shown\u201d picks a whole year at once."]),
+        el("li", {}, [el("b", {}, ["Senior 1 / Senior 2"]), " \u2014 every tab has a year bar at the top (All years / Senior 1 / Senior 2) with a count on each button, and lists are split under a coloured heading per year. Access that covers a whole folder or the whole site sits under \u201cWide access\u201d, and also shows when you pick a year it reaches. Student lists (Groups) follow the year on each student's account."]),
+        el("li", {}, [el("b", {}, ["Who has access"]), " can be grouped by ", el("b", {}, ["lesson"]), " (who can watch each lesson) or by ", el("b", {}, ["person"]), " (what each student can watch). Click a group to fold it, or use Expand all / Collapse all."]),
         el("li", {}, ["Revoking stops new views. Someone who already saved the video's link could still use it \u2014 that can't be taken back."]),
       ]),
     ]);
@@ -814,50 +1017,58 @@
     ]);
   }
 
+  function requestCard(d, p) {
+    var have = activeAccessFor(d, p.phone, p.scope);
+    var si = scopeInfo(p.scope);
+    var card = el("div", { class: "ac-card", "data-payment": p.payment_id }, [
+      el("div", { class: "ac-top" }, [whoBlock(p.name, p.phone, p.known_student), badge(payBadge("pending"))]),
+      el("div", { class: "ac-fields" }, [
+        field("Wants to watch", si.title, si.sub),
+        field("Payment reference", dash(p.reference)),
+        p.note ? field(subScope(p.scope) ? "Amount" : "Note from the student", p.note) : null,
+        field("Asked", dash(p.created_at)),
+        field("Access right now", have ? "Already has access (renewal)" : "None", have ? (have.expires_at ? "until " + have.expires_at : "never expires") : "this would be their first"),
+        field("Request id", p.payment_id),
+      ]),
+    ]);
+    var key = "req:" + p.payment_id;
+    var approve = el("button", { class: "ac-btn primary", type: "button", "data-open": "approve" }, ["Approve\u2026"]);
+    var reject = el("button", { class: "ac-btn danger", type: "button", "data-open": "reject" }, ["Reject\u2026"]);
+    approve.addEventListener("click", function () { openPanel(key + ":approve"); });
+    reject.addEventListener("click", function () { openPanel(key + ":reject"); });
+    var sub = subScope(p.scope);
+    if (sub) {
+      if (STATE.open === key + ":reject") card.appendChild(rejectPanel(p));
+      else card.appendChild(subApproveBlock(d, p, sub, reject));
+    } else if (STATE.open === key + ":approve") card.appendChild(approvePanel(d, p));
+    else if (STATE.open === key + ":reject") card.appendChild(rejectPanel(p));
+    else card.appendChild(el("div", { class: "ac-actions" }, [approve, reject]));
+    return card;
+  }
+
   function requestsPanel(d) {
     var pending = d.payments.filter(function (p) { return p.status === "pending"; });
+    var counts = yearCounts(pending, function (flt, p) { return sectionPass(d, flt, p.scope); });
+    var shown = pending.filter(function (p) { return sectionPass(d, STATE.year, p.scope); });
     var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, ["Payment requests waiting for you", el("span", { class: "ac-count" }, [String(pending.length)])]),
-      el("p", { class: "dash-section-note" }, ["Newest first. Nothing is unlocked until you approve."]),
+      el("h2", {}, ["Payment requests waiting for you", el("span", { class: "ac-count" }, [STATE.year ? shown.length + " of " + pending.length : String(pending.length)])]),
+      el("p", { class: "dash-section-note" }, ["Newest first, split by year. Nothing is unlocked until you approve."]),
     ]);
-    if (!pending.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, ["No requests waiting. A new one appears here when a student presses \u201cI paid\u201d on a locked video."]));
-      return section;
+    if (!shown.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, [pending.length
+        ? "No requests waiting for this year."
+        : "No requests waiting. A new one appears here when a student presses \u201cI paid\u201d on a locked video."]));
     }
-    pending.forEach(function (p) {
-      var have = activeAccessFor(d, p.phone, p.scope);
-      var si = scopeInfo(p.scope);
-      var card = el("div", { class: "ac-card", "data-payment": p.payment_id }, [
-        el("div", { class: "ac-top" }, [whoBlock(p.name, p.phone, p.known_student), badge(payBadge("pending"))]),
-        el("div", { class: "ac-fields" }, [
-          field("Wants to watch", si.title, si.sub),
-          field("Payment reference", dash(p.reference)),
-          p.note ? field(subScope(p.scope) ? "Amount" : "Note from the student", p.note) : null,
-          field("Asked", dash(p.created_at)),
-          field("Access right now", have ? "Already has access (renewal)" : "None", have ? (have.expires_at ? "until " + have.expires_at : "never expires") : "this would be their first"),
-          field("Request id", p.payment_id),
-        ]),
-      ]);
-      var key = "req:" + p.payment_id;
-      var approve = el("button", { class: "ac-btn primary", type: "button", "data-open": "approve" }, ["Approve\u2026"]);
-      var reject = el("button", { class: "ac-btn danger", type: "button", "data-open": "reject" }, ["Reject\u2026"]);
-      approve.addEventListener("click", function () { openPanel(key + ":approve"); });
-      reject.addEventListener("click", function () { openPanel(key + ":reject"); });
-      var sub = subScope(p.scope);
-      if (sub) {
-        if (STATE.open === key + ":reject") card.appendChild(rejectPanel(p));
-        else card.appendChild(subApproveBlock(d, p, sub, reject));
-      } else if (STATE.open === key + ":approve") card.appendChild(approvePanel(d, p));
-      else if (STATE.open === key + ":reject") card.appendChild(rejectPanel(p));
-      else card.appendChild(el("div", { class: "ac-actions" }, [approve, reject]));
-      section.appendChild(card);
+    bySection(shown, function (p) { return sectionOf(p.scope); }).forEach(function (sec) {
+      section.appendChild(sectionHead(sec.name, countLabel(sec.items.length, "request", "requests")));
+      sec.items.forEach(function (p) { section.appendChild(requestCard(d, p)); });
     });
-    return section;
+    return el("div", {}, [yearBar(counts), section]);
   }
 
   // ---- WHO HAS ACCESS --------------------------------------------------------------------------------
 
-  function filtersNode(which, statusOptions, placeholder) {
+  function filtersNode(which, statusOptions, placeholder, extra) {
     var f = STATE.filters[which];
     var search = el("input", { class: "dash-search", type: "search", placeholder: placeholder, "aria-label": "Search", "data-search": which, value: f.q });
     var select = el("select", { class: "dash-select", "aria-label": "Status", "data-status": which },
@@ -871,7 +1082,7 @@
       if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
     });
     select.addEventListener("change", function () { f.status = select.value; render(); });
-    return el("div", { class: "dash-filters" }, [el("label", {}, ["Search", search]), el("label", {}, ["Show", select])]);
+    return el("div", { class: "dash-filters" }, [el("label", {}, ["Search", search]), el("label", {}, ["Show", select]), extra || null]);
   }
   function matches(q, parts) {
     q = q.trim().toLowerCase();
@@ -923,43 +1134,88 @@
     ]);
   }
 
-  function accessCard(d, a) {
-    var si = scopeInfo(a.scope), u = untilText(a), key = "acc:" + a.phone + "|" + a.scope;
-    var how, howSub;
+  function howOf(d, a) {
     if (a.payment_id) {
       var p = d.payments.filter(function (x) { return x.payment_id === a.payment_id; })[0];
-      how = "Payment " + a.payment_id + " (" + (a.payment_status || "no longer in the Payments sheet") + ")";
-      howSub = p ? "reference: " + dash(p.reference) : "";
-    } else {
-      how = a.source === "manual" ? "Added by hand (no payment)" : dash(a.source);
-      howSub = "";
+      return { main: "Payment " + a.payment_id + " (" + (a.payment_status || "no longer in the Payments sheet") + ")", sub: p ? "reference: " + dash(p.reference) : "" };
     }
-    var card = el("div", { class: "ac-card", "data-access": a.phone + "|" + a.scope }, [
-      el("div", { class: "ac-top" }, [whoBlock(a.name, a.phone, a.known_student), badge(accessBadge(a))]),
-      el("div", { class: "ac-fields" }, [
-        field("Can watch", si.title, si.sub),
-        field("Until", u.main, u.sub),
-        field("Given", dash(a.granted_at)),
-        field("How", how, howSub),
-      ]),
-    ]);
-    if (a.state === "cancelled") card.appendChild(el("div", { class: "ac-note" }, ["This access is switched off because payment " + a.payment_id + " is now \u201c" + a.payment_status + "\u201d. The student cannot watch. You can leave the row or remove it."]));
-    if (a.state === "invalid") card.appendChild(el("div", { class: "ac-note" }, ["The end date in the Entitlements sheet can't be read, so this row gives no access. Fix the date there, or extend it here."]));
+    return { main: a.source === "manual" ? "Added by hand (no payment)" : dash(a.source), sub: a.granted_at ? "given " + a.granted_at : "" };
+  }
+
+  function accessRow(d, a, mode) {
+    var u = untilText(a), h = howOf(d, a), key = "acc:" + a.phone + "|" + a.scope;
+    var item = el("div", { class: "ac-item", "data-access": a.phone + "|" + a.scope });
     var renew = el("button", { class: "ac-btn primary", type: "button", "data-open": "renew" }, [a.state === "expired" ? "Renew\u2026" : a.state === "cancelled" ? "Grant again\u2026" : "Extend\u2026"]);
     var revoke = el("button", { class: "ac-btn danger", type: "button", "data-open": "revoke" }, [a.state === "cancelled" ? "Remove row\u2026" : "Revoke\u2026"]);
     renew.addEventListener("click", function () { openPanel(key + ":renew"); });
     revoke.addEventListener("click", function () { openPanel(key + ":revoke"); });
-    if (STATE.open === key + ":renew") card.appendChild(renewPanel(d, a));
-    else if (STATE.open === key + ":revoke") card.appendChild(revokePanel(a));
-    else card.appendChild(el("div", { class: "ac-actions" }, a.state === "cancelled" ? [revoke, renew] : [renew, revoke]));
-    return card;
+    item.appendChild(el("div", { class: "ac-line" }, [
+      el("div", { class: "ac-cell ac-cell-main" }, [mode === "person" ? scopeBlock(a.scope) : whoBlock(a.name, a.phone, a.known_student)]),
+      el("div", { class: "ac-cell ac-cell-badge" }, [badge(accessBadge(a))]),
+      lineCell("Until", u.main, u.sub),
+      lineCell("How", h.main, h.sub),
+      el("div", { class: "ac-line-actions" }, a.state === "cancelled" ? [revoke, renew] : [renew, revoke]),
+    ]));
+    if (a.state === "cancelled") item.appendChild(el("div", { class: "ac-note" }, ["This access is switched off because payment " + a.payment_id + " is now \u201c" + a.payment_status + "\u201d. The student cannot watch. You can leave the row or remove it."]));
+    if (a.state === "invalid") item.appendChild(el("div", { class: "ac-note" }, ["The end date in the Entitlements sheet can't be read, so this row gives no access. Fix the date there, or extend it here."]));
+    if (STATE.open === key + ":renew") item.appendChild(renewPanel(d, a));
+    else if (STATE.open === key + ":revoke") item.appendChild(revokePanel(a));
+    return item;
+  }
+
+  function scopeRank(scope) { return scope === "*" ? 0 : isWide(scope) ? 1 : subScope(scope) ? 2 : 3; }
+  function lowName(a) { return String(a.name || "\uffff").toLowerCase(); }
+
+  function groupAccessRows(rows, mode) {
+    var m = {}, order = [];
+    rows.forEach(function (a) {
+      var gk = mode === "person" ? keyOf(a.phone) : a.scope;
+      if (!m[gk]) { m[gk] = { gk: gk, rows: [], sample: a }; order.push(gk); }
+      m[gk].rows.push(a);
+    });
+    var groups = order.map(function (k) { return m[k]; });
+    if (mode === "person") {
+      groups.sort(function (x, y) { return lowName(x.sample) < lowName(y.sample) ? -1 : lowName(x.sample) > lowName(y.sample) ? 1 : (x.gk < y.gk ? -1 : 1); });
+      groups.forEach(function (g) { g.rows.sort(function (x, y) { return scopeRank(x.scope) - scopeRank(y.scope) || (x.scope < y.scope ? -1 : 1); }); });
+    } else {
+      groups.sort(function (x, y) { return scopeRank(x.gk) - scopeRank(y.gk) || (x.gk < y.gk ? -1 : 1); });
+      groups.forEach(function (g) { g.rows.sort(function (x, y) { return lowName(x) < lowName(y) ? -1 : lowName(x) > lowName(y) ? 1 : (x.phone < y.phone ? -1 : 1); }); });
+    }
+    return groups;
+  }
+
+  function accessGroupHead(d, g, mode) {
+    var n = function (fn) { return g.rows.filter(fn).length; };
+    var active = n(function (a) { return a.state === "active"; });
+    var soon = n(function (a) { return a.state === "active" && a.days_left !== null && a.days_left <= 7; });
+    var ended = n(function (a) { return a.state === "expired"; });
+    var fix = n(function (a) { return a.state === "cancelled" || a.state === "invalid"; });
+    var bits = [];
+    if (active) bits.push(active + " active");
+    if (soon) bits.push(soon + " ending soon");
+    if (ended) bits.push(ended + " expired");
+    if (fix) bits.push(fix + " to fix");
+    var title, sub;
+    if (mode === "person") {
+      var yr = yearForPhone(d, g.sample.phone);
+      title = g.sample.name || "Unknown student";
+      sub = g.sample.phone + (yr ? "  \u00b7  " + yr : "") + (g.sample.known_student === false ? "  \u00b7  no account with this number yet" : "");
+    } else {
+      var si = scopeInfo(g.gk);
+      title = si.title; sub = si.sub;
+    }
+    var total = mode === "person" ? countLabel(g.rows.length, "grant", "grants") : (g.rows.length === 1 ? "1 person" : g.rows.length + " people");
+    return [
+      el("span", { class: "ac-grp-caret", "aria-hidden": "true" }, ["\u25B8"]),
+      el("span", { class: "ac-grp-title" }, [el("b", {}, [title]), el("small", {}, [sub])]),
+      el("span", { class: "ac-grp-meta" }, [el("b", {}, [total]), bits.length ? el("div", {}, [bits.join("  \u00b7  ")]) : null]),
+    ];
   }
 
   function accessPanel(d) {
     var f = STATE.filters.access;
-    var wrap = el("div", {});
-    wrap.appendChild(filtersNode("access", [["active", "Active now"], ["ending", "Ending within 7 days"], ["expired", "Expired"], ["problem", "Cancelled / needs fixing"], ["all", "Everything"]], "Name, phone or lesson"));
-    var list = d.access.filter(function (a) {
+    var mode = STATE.view.access;
+    var base = d.access.filter(function (a) {
       var ok = f.status === "all" ||
         (f.status === "active" && a.state === "active") ||
         (f.status === "ending" && a.state === "active" && a.days_left !== null && a.days_left <= 7) ||
@@ -967,67 +1223,104 @@
         (f.status === "problem" && (a.state === "cancelled" || a.state === "invalid"));
       return ok && matches(f.q, [a.name, a.phone, a.scope, a.payment_id, a.source]);
     });
+    var counts = yearCounts(base, function (flt, a) { return sectionPass(d, flt, a.scope); });
+    var list = base.filter(function (a) { return sectionPass(d, STATE.year, a.scope); });
+
+    var wrap = el("div", {});
+    wrap.appendChild(yearBar(counts));
+    var groupBy = el("div", { class: "ac-fgroup" }, ["Group by", segmented([["lesson", "Lesson"], ["person", "Person"]], mode, function (v) { STATE.view.access = v; STATE.open = null; render(); }, "data-view", "Group by")]);
+    wrap.appendChild(filtersNode("access", [["active", "Active now"], ["ending", "Ending within 7 days"], ["expired", "Expired"], ["problem", "Cancelled / needs fixing"], ["all", "Everything"]], "Name, phone or lesson", groupBy));
+
     var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, ["Who can watch what", el("span", { class: "ac-count" }, [String(list.length) + " of " + d.access.length])]),
-      el("p", { class: "dash-section-note" }, ["Every grant, with its end date and where it came from. Newest first."]),
+      el("h2", {}, [mode === "person" ? "Each student and what they can watch" : "Each lesson and who can watch it", el("span", { class: "ac-count" }, [String(list.length) + " of " + d.access.length])]),
+      el("p", { class: "dash-section-note" }, ["Split by year, then grouped by " + (mode === "person" ? "student" : "lesson") + ". Click a group to fold it."]),
     ]);
-    if (!list.length) section.appendChild(el("div", { class: "dash-empty" }, [d.access.length ? "Nothing matches this filter." : "Nobody has been given access yet."]));
-    list.forEach(function (a) { section.appendChild(accessCard(d, a)); });
+    if (!list.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, [d.access.length ? "Nothing matches this filter." : "Nobody has been given access yet."]));
+      wrap.appendChild(section);
+      return wrap;
+    }
+    var keys = [], body = [];
+    bySection(list, function (a) { return sectionOf(a.scope); }).forEach(function (sec) {
+      var groups = groupAccessRows(sec.items, mode);
+      body.push(sectionHead(sec.name, (mode === "person" ? countLabel(groups.length, "student", "students") + "  \u00b7  " : "") + countLabel(sec.items.length, "grant", "grants")));
+      body.push(el("div", { class: "ac-lines is-access ac-lines-headonly" }, [linesHead([mode === "person" ? "Lesson" : "Student", "Status", "Until", "How", ""])]));
+      groups.forEach(function (g) {
+        var hasOpen = !!STATE.open && g.rows.some(function (a) { return STATE.open.indexOf("acc:" + a.phone + "|" + a.scope + ":") === 0; });
+        var lines = el("div", { class: "ac-lines is-access" }, g.rows.map(function (a) { return accessRow(d, a, mode); }));
+        body.push(collapsible("acc:" + mode + ":" + sec.name + ":" + g.gk, accessGroupHead(d, g, mode), [lines], hasOpen, keys));
+      });
+    });
+    if (keys.length > 1) section.appendChild(expandTools(keys));
+    body.forEach(function (n) { section.appendChild(n); });
     wrap.appendChild(section);
     return wrap;
   }
 
   // ---- HISTORY ----------------------------------------------------------------------------------------
 
+  function historyRow(d, p) {
+    var si = scopeInfo(p.scope), key = "pay:" + p.payment_id;
+    var accessText = null, accessSub = "";
+    if (p.status === "approved" || p.status === "revoked" || p.access_state) {
+      if (p.access_until) { accessText = p.access_until === "never" ? "Never expires" : "until " + p.access_until; accessSub = p.access_state === "active" ? "currently active" : p.access_state === "expired" ? "expired" : p.access_state; }
+      else accessText = p.status === "revoked" ? "Access removed" : "No access row found";
+    }
+    var asked = el("div", { class: "ac-who" }, [
+      el("b", {}, [si.title]),
+      el("span", {}, ["ref " + dash(p.reference) + (p.note ? "  \u00b7  " + (subScope(p.scope) ? "amount " : "") + p.note : "") + "  \u00b7  #" + p.payment_id]),
+    ]);
+    var item = el("div", { class: "ac-item", "data-history": p.payment_id });
+    var actions = el("div", { class: "ac-line-actions" }, []);
+    var canRevoke = p.status === "approved" && p.access_state === "active";
+    if (canRevoke) {
+      var rv = el("button", { class: "ac-btn danger", type: "button", "data-open": "revoke-pay" }, ["Revoke\u2026"]);
+      rv.addEventListener("click", function () { openPanel(key + ":revoke"); });
+      actions.appendChild(rv);
+    }
+    item.appendChild(el("div", { class: "ac-line" }, [
+      el("div", { class: "ac-cell ac-cell-main" }, [whoBlock(p.name, p.phone, p.known_student)]),
+      el("div", { class: "ac-cell" }, [asked]),
+      el("div", { class: "ac-cell ac-cell-badge" }, [badge(payBadge(p.status))]),
+      lineCell("Timeline", "Asked " + dash(p.created_at), p.status === "pending" ? "not decided yet" : "decided " + dash(p.decided_at)),
+      accessText ? lineCell("Access it gave", accessText, accessSub) : lineCell("Access it gave", "\u2014", ""),
+      actions,
+    ]));
+    if (canRevoke && STATE.open === key + ":revoke") {
+      var yes = el("button", { class: "ac-btn danger solid", type: "button", "data-do": "revoke" }, ["Yes, revoke access"]);
+      yes.addEventListener("click", function () {
+        yes.disabled = true;
+        run({ action: "admin_revoke_access", payment_id: p.payment_id }, "Revoked the access from payment " + p.payment_id + " (" + (p.name || p.phone) + ").", yes);
+      });
+      item.appendChild(el("div", { class: "ac-panel", "data-panel": "revoke" }, [
+        el("p", {}, [el("b", {}, ["Revoke the access this payment gave?"]), " " + (p.name || p.phone) + " loses it on their next page load. The request stays here, marked revoked."]),
+        el("div", { class: "ac-actions" }, [yes, cancelBtn()]),
+      ]));
+    } else if (p.status === "pending") {
+      item.appendChild(el("div", { class: "ac-note" }, ["Waiting for you \u2014 decide it under Requests."]));
+    }
+    return item;
+  }
+
   function historyPanel(d) {
     var f = STATE.filters.history;
-    var wrap = el("div", {});
-    wrap.appendChild(filtersNode("history", [["all", "All requests"], ["pending", "Waiting"], ["approved", "Approved"], ["rejected", "Rejected"], ["revoked", "Revoked"]], "Name, phone, reference or lesson"));
-    var list = d.payments.filter(function (p) {
+    var base = d.payments.filter(function (p) {
       return (f.status === "all" || p.status === f.status) && matches(f.q, [p.name, p.phone, p.reference, p.scope, p.payment_id, p.note]);
     });
+    var counts = yearCounts(base, function (flt, p) { return sectionPass(d, flt, p.scope); });
+    var list = base.filter(function (p) { return sectionPass(d, STATE.year, p.scope); });
+    var wrap = el("div", {});
+    wrap.appendChild(yearBar(counts));
+    wrap.appendChild(filtersNode("history", [["all", "All requests"], ["pending", "Waiting"], ["approved", "Approved"], ["rejected", "Rejected"], ["revoked", "Revoked"]], "Name, phone, reference or lesson"));
     var section = el("div", { class: "dash-section" }, [
       el("h2", {}, ["Every payment request", el("span", { class: "ac-count" }, [String(list.length) + " of " + d.payments.length])]),
-      el("p", { class: "dash-section-note" }, ["The full record: who asked, what they wrote, what you decided and when."]),
+      el("p", { class: "dash-section-note" }, ["The full record, split by year: who asked, what they wrote, what you decided and when. Newest first."]),
     ]);
     if (!list.length) section.appendChild(el("div", { class: "dash-empty" }, [d.payments.length ? "Nothing matches this filter." : "No payment requests yet."]));
-    list.forEach(function (p) {
-      var si = scopeInfo(p.scope), key = "pay:" + p.payment_id;
-      var accessText = null, accessSub = "";
-      if (p.status === "approved" || p.status === "revoked" || p.access_state) {
-        if (p.access_until) { accessText = p.access_until === "never" ? "Never expires" : "until " + p.access_until; accessSub = p.access_state === "active" ? "currently active" : p.access_state === "expired" ? "expired" : p.access_state; }
-        else accessText = p.status === "revoked" ? "Access removed" : "No access row found";
-      }
-      var card = el("div", { class: "ac-card", "data-history": p.payment_id }, [
-        el("div", { class: "ac-top" }, [whoBlock(p.name, p.phone, p.known_student), badge(payBadge(p.status))]),
-        el("div", { class: "ac-fields" }, [
-          field("Asked for", si.title, si.sub),
-          field("Payment reference", dash(p.reference)),
-          p.note ? field(subScope(p.scope) ? "Amount" : "Note from the student", p.note) : null,
-          field("Asked", dash(p.created_at)),
-          field("Decided", p.status === "pending" ? "Not yet" : dash(p.decided_at)),
-          accessText ? field("Access it gave", accessText, accessSub) : null,
-          field("Request id", p.payment_id),
-        ]),
-      ]);
-      if (p.status === "approved" && p.access_state === "active") {
-        var rv = el("button", { class: "ac-btn danger", type: "button", "data-open": "revoke-pay" }, ["Revoke this access\u2026"]);
-        rv.addEventListener("click", function () { openPanel(key + ":revoke"); });
-        if (STATE.open === key + ":revoke") {
-          var yes = el("button", { class: "ac-btn danger solid", type: "button", "data-do": "revoke" }, ["Yes, revoke access"]);
-          yes.addEventListener("click", function () {
-            yes.disabled = true;
-            run({ action: "admin_revoke_access", payment_id: p.payment_id }, "Revoked the access from payment " + p.payment_id + " (" + (p.name || p.phone) + ").", yes);
-          });
-          card.appendChild(el("div", { class: "ac-panel", "data-panel": "revoke" }, [
-            el("p", {}, [el("b", {}, ["Revoke the access this payment gave?"]), " " + (p.name || p.phone) + " loses it on their next page load. The request stays here, marked revoked."]),
-            el("div", { class: "ac-actions" }, [yes, cancelBtn()]),
-          ]));
-        } else card.appendChild(el("div", { class: "ac-actions" }, [rv]));
-      } else if (p.status === "pending") {
-        card.appendChild(el("div", { class: "ac-note" }, ["Waiting for you \u2014 decide it under Requests."]));
-      }
-      section.appendChild(card);
+    bySection(list, function (p) { return sectionOf(p.scope); }).forEach(function (sec) {
+      section.appendChild(sectionHead(sec.name, countLabel(sec.items.length, "request", "requests")));
+      section.appendChild(el("div", { class: "ac-lines is-history" }, [linesHead(["Student", "Asked for", "Status", "Timeline", "Access it gave", ""])]
+        .concat(sec.items.map(function (p) { return historyRow(d, p); }))));
     });
     wrap.appendChild(section);
     return wrap;
@@ -1106,30 +1399,40 @@
     ]);
   }
 
+  function quizRow(q) {
+    var key = "qz:" + q.lesson;
+    var item = el("div", { class: "ac-item", "data-quiz": q.lesson });
+    var toggle = el("button", { class: "ac-btn " + (q.locked ? "primary" : "danger"), type: "button" }, [q.locked ? "Open it\u2026" : "Lock it\u2026"]);
+    toggle.addEventListener("click", function () { openPanel(key); });
+    item.appendChild(el("div", { class: "ac-line" }, [
+      el("div", { class: "ac-cell ac-cell-main" }, [el("div", { class: "ac-who" }, [el("b", {}, [pretty(q.lesson)]), el("span", {}, [q.lesson])])]),
+      el("div", { class: "ac-cell ac-cell-badge" }, [badge(q.locked ? { text: "Locked", cls: "is-good" } : { text: "Open", cls: "is-warn" })]),
+      lineCell("Last changed", dash(q.updated_at), ""),
+      el("div", { class: "ac-line-actions" }, [toggle]),
+    ]));
+    if (STATE.open === key) item.appendChild(quizLockPanel(q.lesson, false));
+    return item;
+  }
+
   function quizzesPanel(d) {
+    var counts = yearCounts(d.quizzes, function (flt, q) { return yearPass(flt, q.lesson); });
+    var shown = d.quizzes.filter(function (q) { return yearPass(STATE.year, q.lesson); })
+      .sort(function (a, b) { return a.lesson < b.lesson ? -1 : 1; });
     var section = el("div", { class: "dash-section" }, [
       el("h2", {}, ["Quiz gate", el("span", { class: "ac-count" }, [String(d.counts.quizzes_locked) + " locked of " + d.quizzes.length])]),
-      el("p", { class: "dash-section-note" }, ["Separate from the video lock \\u2014 this controls whether the QUIZ ITSELF can be opened and submitted. Most useful right at test time."]),
+      el("p", { class: "dash-section-note" }, ["Separate from the video lock \u2014 this controls whether the QUIZ ITSELF can be opened and submitted. Most useful right at test time."]),
     ]);
     if (!d.quizzes.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, ["No quiz has been gated yet. Every quiz is open by default \\u2014 add a gate below only for the ones you want to control."]));
+      section.appendChild(el("div", { class: "dash-empty" }, ["No quiz has been gated yet. Every quiz is open by default \u2014 add a gate below only for the ones you want to control."]));
+    } else if (!shown.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, ["No gated quizzes for this year."]));
     }
-    d.quizzes.slice().sort(function (a, b) { return a.lesson < b.lesson ? -1 : 1; }).forEach(function (q) {
-      var key = "qz:" + q.lesson;
-      var card = el("div", { class: "ac-card", "data-quiz": q.lesson }, [
-        el("div", { class: "ac-top" }, [
-          el("div", { class: "ac-who" }, [el("b", {}, [pretty(q.lesson)]), el("span", {}, [q.lesson])]),
-          badge(q.locked ? { text: "Locked", cls: "is-good" } : { text: "Open", cls: "is-warn" }),
-        ]),
-        el("div", { class: "ac-fields" }, [field("Last changed", dash(q.updated_at))]),
-      ]);
-      var toggle = el("button", { class: "ac-btn " + (q.locked ? "primary" : "danger"), type: "button" }, [q.locked ? "Open it\u2026" : "Lock it\u2026"]);
-      toggle.addEventListener("click", function () { openPanel(key); });
-      if (STATE.open === key) card.appendChild(quizLockPanel(q.lesson, false));
-      else card.appendChild(el("div", { class: "ac-actions" }, [toggle]));
-      section.appendChild(card);
+    bySection(shown, function (q) { return sectionOf(q.lesson); }).forEach(function (sec) {
+      var locked = sec.items.filter(function (q) { return q.locked; }).length;
+      section.appendChild(sectionHead(sec.name, locked + " locked of " + sec.items.length));
+      section.appendChild(el("div", { class: "ac-lines is-quiz" }, [linesHead(["Quiz", "Gate", "Last changed", ""])].concat(sec.items.map(quizRow))));
     });
-    return el("div", {}, [section, quizAddForm(d)]);
+    return el("div", {}, [yearBar(counts), section, quizAddForm(d)]);
   }
 
   // ---- GROUPS -------------------------------------------------------------------------------------------
@@ -1285,17 +1588,9 @@
   function groupCard(d, g) {
     var key = "grp:" + g.group;
     var card = el("div", { class: "ac-card", "data-group": g.group }, [
-      el("div", { class: "ac-top" }, [el("div", { class: "ac-who" }, [el("b", {}, [g.group]), el("span", {}, [plural(g.members.length, "student")])])]),
+      el("div", { class: "ac-top" }, [el("div", { class: "ac-who" }, [el("b", {}, [g.group]), el("span", {}, [memberSummary(d, g)])])]),
     ]);
-    var memberList = el("div", { class: "ac-fields" }, g.members.map(function (m) {
-      var row = el("dl", { class: "ac-field" }, [
-        el("dt", {}, ["\u00a0"]),
-        el("dd", {}, [(m.name || "Unknown") + "  \u00b7  " + m.phone + (yearForPhone(d, m.phone) ? "  \u00b7  " + yearForPhone(d, m.phone) : "") + (m.known_student === false ? "  (no account yet)" : "")]),
-      ]);
-      return row;
-    }));
-    if (!g.members.length) memberList = el("div", { class: "ac-fields" }, [el("p", { class: "ac-hint" }, ["No members yet."])]);
-    card.appendChild(memberList);
+    card.appendChild(memberBlock(d, g));
 
     // What this group gives. Anyone added to the group from now on gets all of it automatically.
     var gives;
@@ -1391,14 +1686,49 @@
     ]);
   }
 
+  function memberYearPass(d, flt, m) {
+    if (!flt) return true;
+    var y = yearForPhone(d, m.phone);
+    return flt === "__none__" ? !y : y === flt;
+  }
+  function memberSummary(d, g) {
+    var by = {};
+    g.members.forEach(function (m) { var y = yearForPhone(d, m.phone) || "No year set"; by[y] = (by[y] || 0) + 1; });
+    var ys = orderedYears(Object.keys(by).filter(function (k) { return k !== "No year set"; })).concat(by["No year set"] ? ["No year set"] : []);
+    return countLabel(g.members.length, "student", "students") + (ys.length ? "  \u00b7  " + ys.map(function (y) { return y + ": " + by[y]; }).join("  \u00b7  ") : "");
+  }
+  function memberBlock(d, g) {
+    if (!g.members.length) return el("p", { class: "ac-hint" }, ["No members yet."]);
+    var by = {};
+    g.members.forEach(function (m) {
+      if (!memberYearPass(d, STATE.year, m)) return;
+      var y = yearForPhone(d, m.phone) || "No year set";
+      (by[y] = by[y] || []).push(m);
+    });
+    var order = orderedYears(Object.keys(by).filter(function (k) { return k !== "No year set"; })).concat(by["No year set"] ? ["No year set"] : []);
+    if (!order.length) return el("p", { class: "ac-hint" }, ["No members from this year in this group."]);
+    var kids = [];
+    order.forEach(function (y) {
+      if (order.length > 1 || STATE.year) kids.push(el("div", { class: "ac-mh" }, [y + "  \u00b7  " + by[y].length]));
+      kids.push(el("div", { class: "ac-members" }, by[y].map(function (m) {
+        return el("span", { class: "ac-member" }, [m.name || "Unknown", el("small", {}, [m.phone + (m.known_student === false ? "  \u00b7  no account yet" : "")])]);
+      })));
+    });
+    return el("div", {}, kids);
+  }
+
   function groupsPanel(d) {
+    var pass = function (flt, g) { return !flt || g.members.some(function (m) { return memberYearPass(d, flt, m); }); };
+    var counts = yearCounts(d.groups, pass);
+    var shown = d.groups.filter(function (g) { return pass(STATE.year, g); });
     var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, ["Groups", el("span", { class: "ac-count" }, [String(d.groups.length)])]),
-      el("p", { class: "dash-section-note" }, ["Classify students, then grant or revoke access for the whole group in one action."]),
+      el("h2", {}, ["Groups", el("span", { class: "ac-count" }, [STATE.year ? shown.length + " of " + d.groups.length : String(d.groups.length)])]),
+      el("p", { class: "dash-section-note" }, ["Classify students, then grant or revoke access for the whole group in one action. Members are split by the year on their account."]),
     ]);
     if (!d.groups.length) section.appendChild(el("div", { class: "dash-empty" }, ["No groups yet \u2014 create one below."]));
-    d.groups.forEach(function (g) { section.appendChild(groupCard(d, g)); });
-    return el("div", {}, [section, groupCreateForm(d)]);
+    else if (!shown.length) section.appendChild(el("div", { class: "dash-empty" }, ["No group has members from this year."]));
+    shown.forEach(function (g) { section.appendChild(groupCard(d, g)); });
+    return el("div", {}, [yearBar(counts), section, groupCreateForm(d)]);
   }
 
   // ---- LESSONS ------------------------------------------------------------------------------------------
@@ -1469,9 +1799,7 @@
       [el("option", { value: "" }, ["All tracks"])].concat(tracks.map(function (t) { return el("option", { value: t }, [pretty(t)]); })));
     trackSel.value = f.track;
     var search = el("input", { class: "ac-input", type: "text", placeholder: "Filter by name or path\u2026", "aria-label": "Filter lessons", "data-search": "lessons", value: f.q });
-    var yearSel = lessonYearSelect(f.year);
     trackSel.addEventListener("change", function () { f.track = trackSel.value; render(); });
-    yearSel.addEventListener("change", function () { f.year = yearSel.value; render(); });
     search.addEventListener("input", function () {
       f.q = search.value;
       var pos = search.selectionStart;
@@ -1480,84 +1808,79 @@
       if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
     });
 
-    var all = sortLessonsByYear(all0.filter(function (l) {
+    var pre = all0.filter(function (l) {
       if (f.track && l.track !== f.track) return false;
-      if (!yearPass(f.year, l.lesson)) return false;
       var q = f.q.trim().toLowerCase();
       if (q && l.lesson.indexOf(q) === -1 && pretty(l.lesson).toLowerCase().indexOf(q) === -1) return false;
       return true;
-    }));
+    });
+    var counts = yearCounts(pre, function (flt, l) { return yearPass(flt, l.lesson); });
+    var all = sortLessonsByYear(pre.filter(function (l) { return yearPass(STATE.year, l.lesson); }));
 
     var section = el("div", { class: "dash-section" }, [
       el("h2", {}, ["Lessons", el("span", { class: "ac-count" }, [String(d.counts.lessons_locked) + " locked of " + all0.length])]),
       el("p", { class: "dash-section-note" }, [d.lessons_error
         ? "Couldn't read the full lesson list from GitHub (" + d.lessons_error + ") \u2014 showing only lessons already known here."
         : "Locking a lesson closes every video in it, whether or not a video exists yet. The quiz gate on each card is separate and overrides this \u2014 a quiz can stay locked while its lesson is open, or open while its lesson is locked."]),
-      el("div", { class: "ac-row" }, [el("label", {}, ["Track", trackSel]), el("label", {}, ["Year", yearSel]), el("label", {}, ["Search", search])]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Track", trackSel]), el("label", {}, ["Search", search])]),
     ]);
 
     if (!all.length) {
       section.appendChild(el("div", { class: "dash-empty" }, [all0.length ? "Nothing matches this filter." : "No lessons found."]));
-      return section;
+      return el("div", {}, [yearBar(counts), section]);
     }
 
-    // With more than one year on screen, split the list under Senior 1 / Senior 2 / Other headings.
-    var yearCounts = {}, lastYear = null;
-    all.forEach(function (l) { var y = yearOf(l.lesson); yearCounts[y] = (yearCounts[y] || 0) + 1; });
-    var showGroups = Object.keys(yearCounts).length > 1;
+    bySection(all, function (l) { return sectionOf(l.lesson); }).forEach(function (sec) {
+      var lockedN = sec.items.filter(function (l) { var k = lockByLesson[l.lesson]; return k && k.locked; }).length;
+      section.appendChild(sectionHead(sec.name, lockedN + " locked of " + sec.items.length));
+      sec.items.forEach(function (l) {
+        var lock = lockByLesson[l.lesson];
+        var locked = !!(lock && lock.locked);
+        var quiz = quizByLesson[l.lesson];
+        var quizLocked = !!(quiz && quiz.locked);
+        var vids = (videosByLesson[l.lesson] || []).slice().sort(function (a, b) { return a.slot < b.slot ? -1 : 1; });
+        var key = "lsn:" + l.lesson;
+        var qkey = "qz:" + l.lesson;
 
-    all.forEach(function (l) {
-      var ly = yearOf(l.lesson);
-      if (showGroups && ly !== lastYear) {
-        section.appendChild(el("h3", { class: "ac-group-h", "data-year-group": ly || "other" }, [ly || "Other lessons (not tied to a year)", el("span", { class: "ac-count" }, [plural(yearCounts[ly], "lesson")])]));
-      }
-      lastYear = ly;
-      var lock = lockByLesson[l.lesson];
-      var locked = !!(lock && lock.locked);
-      var quiz = quizByLesson[l.lesson];
-      var quizLocked = !!(quiz && quiz.locked);
-      var vids = (videosByLesson[l.lesson] || []).slice().sort(function (a, b) { return a.slot < b.slot ? -1 : 1; });
-      var key = "lsn:" + l.lesson;
-      var qkey = "qz:" + l.lesson;
+        var card = el("div", { class: "ac-card", "data-lesson": l.lesson }, [
+          el("div", { class: "ac-top" }, [
+            el("div", { class: "ac-who" }, [el("b", {}, [pretty(l.lesson)]), el("span", {}, [l.lesson])]),
+            badge(locked ? { text: "Lesson locked", cls: "is-good" } : { text: "Lesson open", cls: "is-warn" }),
+          ]),
+        ]);
 
-      var card = el("div", { class: "ac-card", "data-lesson": l.lesson }, [
-        el("div", { class: "ac-top" }, [
-          el("div", { class: "ac-who" }, [el("b", {}, [pretty(l.lesson)]), el("span", {}, [l.lesson])]),
-          badge(locked ? { text: "Lesson locked", cls: "is-good" } : { text: "Lesson open", cls: "is-warn" }),
-        ]),
-      ]);
+        var chips = vids.length
+          ? vids.map(function (v) {
+              var effLocked = v.locked || locked;
+              var extra = v.locked ? (locked ? "" : "locked on its own \u2014 the lesson being open doesn't open it") : (locked ? "via lesson lock" : "");
+              return chip(SLOT_LABEL[v.slot] || v.slot, effLocked ? "Locked" : "Open to everyone", effLocked ? "is-good" : "is-warn", extra);
+            })
+          : [chip("Videos", "None yet", "", "added from the Quiz Maker \u2014 locking the lesson now means one added later starts locked too")];
+        chips.push(chip("Quiz gate", quiz ? (quizLocked ? "Locked" : "Open") : "No gate (open)", quiz ? (quizLocked ? "is-good" : "is-warn") : "", "separate \u2014 overrides the lesson lock for the quiz itself"));
+        card.appendChild(el("div", { class: "ac-chips" }, chips));
 
-      var fields = vids.length
-        ? vids.map(function (v) {
-            var effLocked = v.locked || locked;
-            var why = v.locked ? (locked ? "" : " (locked on its own \u2014 the lesson being open doesn't open it)") : (locked ? " (via lesson lock)" : "");
-            return field(SLOT_LABEL[v.slot] || v.slot, effLocked ? "Locked" + why : "Open to everyone");
-          })
-        : [field("Videos", "None yet", "added from the Quiz Maker \u2014 locking the lesson now means one added later starts locked too")];
-      fields.push(field("Quiz gate", quiz ? (quizLocked ? "Locked" : "Open") : "No gate (open)", "separate \u2014 overrides the lesson lock for the quiz itself"));
-      card.appendChild(el("div", { class: "ac-fields" }, fields));
+        var lockToggle = el("button", { class: "ac-btn " + (locked ? "" : "primary"), type: "button" }, [lock ? (locked ? "Open it\u2026" : "Lock it\u2026") : "Lock this lesson\u2026"]);
+        lockToggle.addEventListener("click", function () { openPanel(key); });
+        var quizToggle = el("button", { class: "ac-btn " + (quizLocked ? "" : "danger"), type: "button" }, [quiz ? (quizLocked ? "Open the quiz\u2026" : "Lock the quiz\u2026") : "Gate this quiz\u2026"]);
+        quizToggle.addEventListener("click", function () { openPanel(qkey); });
 
-      var lockToggle = el("button", { class: "ac-btn " + (locked ? "" : "primary"), type: "button" }, [lock ? (locked ? "Open it\u2026" : "Lock it\u2026") : "Lock this lesson\u2026"]);
-      lockToggle.addEventListener("click", function () { openPanel(key); });
-      var quizToggle = el("button", { class: "ac-btn " + (quizLocked ? "" : "danger"), type: "button" }, [quiz ? (quizLocked ? "Open the quiz\u2026" : "Lock the quiz\u2026") : "Gate this quiz\u2026"]);
-      quizToggle.addEventListener("click", function () { openPanel(qkey); });
+        var ownLocked = vids.filter(function (v) { return v.locked; });
+        var videoToggles = vids.map(function (v) {
+          var b = el("button", { class: "ac-btn " + (v.locked ? "primary" : ""), type: "button", "data-video-toggle": v.slot }, [(v.locked ? "Open " : "Lock ") + (SLOT_LABEL[v.slot] || v.slot).toLowerCase() + "\u2026"]);
+          b.addEventListener("click", function () { openPanel("vid:" + l.lesson + ":" + v.slot); });
+          return b;
+        });
+        var openVideo = vids.filter(function (v) { return STATE.open === "vid:" + l.lesson + ":" + v.slot; })[0];
 
-      var ownLocked = vids.filter(function (v) { return v.locked; });
-      var videoToggles = vids.map(function (v) {
-        var b = el("button", { class: "ac-btn " + (v.locked ? "primary" : ""), type: "button", "data-video-toggle": v.slot }, [(v.locked ? "Open " : "Lock ") + (SLOT_LABEL[v.slot] || v.slot).toLowerCase() + "\u2026"]);
-        b.addEventListener("click", function () { openPanel("vid:" + l.lesson + ":" + v.slot); });
-        return b;
+        if (STATE.open === key) card.appendChild(lessonLockPanel(l.lesson, !lock, ownLocked));
+        else if (STATE.open === qkey) card.appendChild(quizLockPanel(l.lesson, !quiz));
+        else if (openVideo) card.appendChild(videoLockPanel(l.lesson, openVideo, locked));
+        else card.appendChild(el("div", { class: "ac-actions" }, [lockToggle, quizToggle].concat(videoToggles)));
+
+        section.appendChild(card);
       });
-      var openVideo = vids.filter(function (v) { return STATE.open === "vid:" + l.lesson + ":" + v.slot; })[0];
-
-      if (STATE.open === key) card.appendChild(lessonLockPanel(l.lesson, !lock, ownLocked));
-      else if (STATE.open === qkey) card.appendChild(quizLockPanel(l.lesson, !quiz));
-      else if (openVideo) card.appendChild(videoLockPanel(l.lesson, openVideo, locked));
-      else card.appendChild(el("div", { class: "ac-actions" }, [lockToggle, quizToggle].concat(videoToggles)));
-
-      section.appendChild(card);
     });
-    return section;
+    return el("div", {}, [yearBar(counts), section]);
   }
 
   // ---- GIVE ACCESS ------------------------------------------------------------------------------------
@@ -1606,7 +1929,7 @@
     return el("div", { class: "dash-section" }, [
       el("h2", {}, ["Give access by hand"]),
       el("p", { class: "dash-section-note" }, ["For a cash payment, a scholarship, or fixing a mistake \u2014 no request needed. Works for a number that hasn't registered yet."]),
-      el("div", { class: "ac-row" }, [el("label", {}, ["Student's phone", phone]), el("label", {}, ["Year", yearSel]), el("label", {}, ["What it covers", scopeSel, custom])]),
+      el("div", { class: "ac-form-row" }, [el("label", {}, ["Student's phone", phone]), el("label", {}, ["Year", yearSel]), el("label", {}, ["What it covers", scopeSel, custom])]),
       term.node, preview, el("div", { class: "ac-actions" }, [go]),
     ]);
   }
@@ -1629,13 +1952,19 @@
     var t = toastNode();
     if (t) root.appendChild(t);
     root.appendChild(helpBlock());
+    var perYear = function (fn) { return "S1: " + fn("Senior 1") + "  \u00b7  S2: " + fn("Senior 2"); };
+    var pendingBy = function (y) { return d.payments.filter(function (p) { return p.status === "pending" && sectionPass(d, y, p.scope); }).length; };
+    var peopleBy = function (y) { var s = {}; d.access.forEach(function (a) { if (a.state === "active" && sectionPass(d, y, a.scope)) s[keyOf(a.phone)] = 1; }); return Object.keys(s).length; };
+    var soonBy = function (y) { return d.access.filter(function (a) { return a.state === "active" && a.days_left !== null && a.days_left <= 7 && sectionPass(d, y, a.scope); }).length; };
+    var lessonsLockedBy = function (y) { return (d.lesson_locks || []).filter(function (l) { return l.locked && yearPass(y, l.lesson); }).length; };
+    var quizzesLockedBy = function (y) { return d.quizzes.filter(function (q) { return q.locked && yearPass(q.lesson ? y : "", q.lesson); }).length; };
     root.appendChild(el("div", { class: "dash-stats" }, [
-      statCard(c.pending, "requests waiting for you"),
-      statCard(Object.keys(people).length, "students with active access"),
-      statCard(c.ending_soon, "ending within 7 days"),
-      statCard(c.lessons_locked, "lessons locked"),
+      statCard(c.pending, "requests waiting for you", perYear(pendingBy)),
+      statCard(Object.keys(people).length, "students with active access", perYear(peopleBy)),
+      statCard(c.ending_soon, "ending within 7 days", perYear(soonBy)),
+      statCard(c.lessons_locked, "lessons locked", perYear(lessonsLockedBy)),
       statCard(c.videos_locked + " / " + c.videos_open, "videos locked / open"),
-      statCard(c.quizzes_locked, "quizzes currently locked"),
+      statCard(c.quizzes_locked, "quizzes currently locked", perYear(quizzesLockedBy)),
       statCard(c.groups, "groups"),
     ]));
     root.appendChild(tabsNode(d));
