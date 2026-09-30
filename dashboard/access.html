@@ -326,6 +326,7 @@
   .ac-pickitem[hidden] { display: none; }
   .ac-pickpanel .ac-input + .ac-input { margin-top: 6px; }
   .ac-group-h { display: flex; align-items: center; gap: 10px; margin: 26px 0 2px; padding: 9px 12px; border-radius: 10px; color: var(--accent); background: var(--accent-soft); font: 800 13px var(--sans); letter-spacing: -.01em; }
+  .ac-gives { margin: 0 0 10px; padding-left: 18px; color: var(--ink); font: 600 13px/1.7 var(--sans); }
   .ac-group-h:first-of-type { margin-top: 10px; }
   .ac-group-h .ac-count { margin-left: auto; }
 
@@ -698,6 +699,7 @@
         el("li", {}, ["Changing a payment's status in the Google Sheet to anything but \u201capproved\u201d also switches its access off. Deleting the payment row does not."]),
         el("li", {}, [el("b", {}, ["Lock a lesson"]), " (Lessons tab) and every video in it needs access, whether or not that video exists yet; leave it open and each video still follows its own lock if you set one."]),
         el("li", {}, [el("b", {}, ["Quiz gate"]), " is separate from the lesson lock and always wins for the quiz itself \u2014 lock a quiz and it stays locked even if the lesson is open; leave it ungated and it stays open even if the lesson is locked."]),
+        el("li", {}, [el("b", {}, ["Groups remember what they give."]), " Give a group access and anyone you add to it later gets the same access, ending on the group\u2019s end date. Revoking from the group stops that too. Removing a student never takes their access away."]),
         el("li", {}, [el("b", {}, ["Senior 1 / Senior 2"]), " \u2014 lessons under a grade-1 / grade-2 folder are labelled by year. Every lesson list has a Year filter, and the Lessons tab splits them under a heading per year. Student lists (Groups) can be filtered by the year on each student's account, so \u201cSelect all shown\u201d picks a whole year at once."]),
         el("li", {}, ["Revoking stops new views. Someone who already saved the video's link could still use it \u2014 that can't be taken back."]),
       ]),
@@ -1181,7 +1183,7 @@
     }
     update();
     return el("div", { class: "ac-panel" }, [
-      el("p", {}, [el("b", {}, [isGrant ? "Give the whole group " + (isQuiz ? "quiz access." : "access.") : "Revoke the whole group's " + (isQuiz ? "quiz access." : "access.")]), isGrant ? " Applies to every current member." : " A member who doesn't have this is simply skipped."]),
+      el("p", {}, [el("b", {}, [isGrant ? "Give the whole group " + (isQuiz ? "quiz access." : "access.") : "Revoke the whole group's " + (isQuiz ? "quiz access." : "access.")]), isGrant ? " Applies to every current member, and to anyone you add to the group later (ending on the same date)." : " A member who doesn't have this is simply skipped. Students added later won\u2019t get it either."]),
       el("div", { class: "ac-row" }, [el("label", {}, ["Year", yearSel]), el("label", {}, [isQuiz ? "Which quiz" : "What", scopeSel])]),
       isGrant ? term.node : null, preview,
       el("div", { class: "ac-actions" }, [go, cancelBtn()]),
@@ -1259,6 +1261,14 @@
       .map(function (r) { return { phone: r.phone, name: r.name, sub: r.year, year: r.year || "" }; });
   }
   function keyOf(phone) { return String(phone || "").replace(/\D/g, "").slice(-10); }
+  // One remembered group grant -> words. g: { kind: "access"|"quiz", target, expires_at ("" = never) }
+  function grantText(g) {
+    var what = g.kind === "quiz" ? "Quiz: " + pretty(g.target) : scopeInfo(g.target).title;
+    return what + (g.expires_at ? " until " + g.expires_at : ", no end date");
+  }
+  function inheritedText(list) {
+    return list && list.length ? " They also got what the group already has: " + list.map(grantText).join("; ") + "." : "";
+  }
   function yearForPhone(d, phone) {
     var k = keyOf(phone);
     var r = (d.roster || []).filter(function (x) { return keyOf(x.phone) === k; })[0];
@@ -1280,6 +1290,21 @@
     if (!g.members.length) memberList = el("div", { class: "ac-fields" }, [el("p", { class: "ac-hint" }, ["No members yet."])]);
     card.appendChild(memberList);
 
+    // What this group gives. Anyone added to the group from now on gets all of it automatically.
+    var gives;
+    if (g.grants === undefined) {
+      gives = el("div", { class: "ac-note" }, ["This page can\u2019t see what the group gives yet. Paste the newest Code.gs into Apps Script and deploy a New version, then reload."]);
+    } else if (!g.grants.length) {
+      gives = el("div", { class: "ac-note" }, ["This group doesn\u2019t give anything to new members yet. Use \u201cGive this group access\u201d below; anyone you add afterwards gets it too."]);
+    } else {
+      gives = el("div", { class: "ac-panel", "data-group-gives": g.group }, [
+        el("p", {}, [el("b", {}, ["Anyone added to this group gets:"])]),
+        el("ul", { class: "ac-gives" }, g.grants.map(function (x) { return el("li", {}, [grantText(x)]); })),
+        el("p", {}, ["Each ends on the same date as the group\u2019s own. Removing a student from the group does not take away access they already have \u2014 revoke it under \u201cWho has access\u201d."]),
+      ]);
+    }
+    card.appendChild(gives);
+
     // Add: pick from the roster (students not already in this group), or type a phone for someone without an account yet.
     var addPick = studentPicker(rosterOptions(d, g.members.map(function (m) { return m.phone; })), {
       placeholder: "Choose students to add\u2026", empty: rosterEmptyText(d, "Everyone in the roster is already in this group."),
@@ -1295,7 +1320,7 @@
       if (!phones.length) return;
       addBtn.disabled = true;
       run({ action: "admin_group_add", group: g.group, phones: phones },
-        function (r) { return "Added " + plural(r.count, "student") + " to \u201c" + g.group + "\u201d" + (r.already.length ? " (" + r.already.length + " already in it)" : "") + "."; }, addBtn);
+        function (r) { return "Added " + plural(r.count, "student") + " to \u201c" + g.group + "\u201d" + (r.already.length ? " (" + r.already.length + " already in it)" : "") + "." + inheritedText(r.count ? r.inherited : null); }, addBtn);
     });
 
     // Remove: tick any number of current members.
@@ -1350,7 +1375,7 @@
       if (!name.value.trim() || !phones.length) return;
       go.disabled = true;
       run({ action: "admin_group_add", group: name.value.trim(), phones: phones },
-        function (r) { return "Created \u201c" + r.group + "\u201d with " + plural(r.count, "student") + "."; }, go);
+        function (r) { return "Created \u201c" + r.group + "\u201d with " + plural(r.count, "student") + "." + inheritedText(r.count ? r.inherited : null); }, go);
     });
     return el("div", { class: "dash-section" }, [
       el("h2", {}, ["New group"]),
