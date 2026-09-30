@@ -1150,6 +1150,11 @@
     };
   }
 
+  function rosterEmptyText(d, fallback) {
+    return d.roster === undefined
+      ? "The student list didn\u2019t come from the server. Paste the new Code.gs into Apps Script, deploy a New version, then reload this page."
+      : fallback;
+  }
   function rosterOptions(d, exceptPhones) {
     var skip = {};
     (exceptPhones || []).forEach(function (p) { skip[keyOf(p)] = 1; });
@@ -1175,7 +1180,7 @@
 
     // Add: pick from the roster (students not already in this group), or type a phone for someone without an account yet.
     var addPick = studentPicker(rosterOptions(d, g.members.map(function (m) { return m.phone; })), {
-      placeholder: "Choose students to add\u2026", empty: "Everyone in the roster is already in this group.",
+      placeholder: "Choose students to add\u2026", empty: rosterEmptyText(d, "Everyone in the roster is already in this group."),
       onChange: function (n) { addBtn.disabled = !n && !phoneIn.value.trim(); addBtn.textContent = n ? "Add " + n : "Add"; },
     });
     var phoneIn = el("input", { class: "ac-input", type: "tel", placeholder: "or type a phone number", "aria-label": "Phone to add" });
@@ -1227,12 +1232,16 @@
   function groupCreateForm(d) {
     var name = el("input", { class: "ac-input", type: "text", placeholder: "e.g. Grade 2 \u2014 Section A", "aria-label": "New group name" });
     var go = el("button", { class: "ac-btn primary", type: "button" }, ["Create group"]);
-    function sync() { go.disabled = !name.value.trim() || !pick.selected().length; go.textContent = pick.selected().length ? "Create group with " + pick.selected().length : "Create group"; }
-    var pick = studentPicker(rosterOptions(d), { placeholder: "Choose students\u2026", empty: "No registered students yet.", onChange: sync });
+    var phone = el("input", { class: "ac-input", type: "tel", placeholder: "or type a phone number", "aria-label": "Phone to add" });
+    function count() { return pick.selected().length + (phone.value.trim() ? 1 : 0); }
+    function sync() { var n = count(); go.disabled = !name.value.trim() || !n; go.textContent = n ? "Create group with " + n : "Create group"; }
+    var pick = studentPicker(rosterOptions(d), { placeholder: "Choose students\u2026", empty: rosterEmptyText(d, "No registered students yet."), onChange: sync });
     name.addEventListener("input", sync);
+    phone.addEventListener("input", sync);
     go.disabled = true;
     go.addEventListener("click", function () {
       var phones = pick.selected();
+      if (phone.value.trim()) phones.push(phone.value.trim());
       if (!name.value.trim() || !phones.length) return;
       go.disabled = true;
       run({ action: "admin_group_add", group: name.value.trim(), phones: phones },
@@ -1241,7 +1250,7 @@
     return el("div", { class: "dash-section" }, [
       el("h2", {}, ["New group"]),
       el("p", { class: "dash-section-note" }, ["Name it, tick the students from your roster, and create. You can add or remove students later from the group's own card."]),
-      el("div", { class: "ac-row" }, [el("label", {}, ["Group name", name]), el("div", { class: "ac-pickwrap" }, ["Students", pick.node]), go]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Group name", name]), el("div", { class: "ac-pickwrap" }, ["Students", pick.node]), el("label", {}, ["\u00a0", phone]), go]),
     ]);
   }
 
