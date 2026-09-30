@@ -324,6 +324,10 @@
   .ac-pickitem input { margin-top: 3px; accent-color: var(--accent); }
   .ac-pickitem small { display: block; color: var(--ink-dim); font: 400 11px var(--mono); }
   .ac-pickitem[hidden] { display: none; }
+  .ac-pickpanel .ac-input + .ac-input { margin-top: 6px; }
+  .ac-group-h { display: flex; align-items: center; gap: 10px; margin: 26px 0 2px; padding: 9px 12px; border-radius: 10px; color: var(--accent); background: var(--accent-soft); font: 800 13px var(--sans); letter-spacing: -.01em; }
+  .ac-group-h:first-of-type { margin-top: 10px; }
+  .ac-group-h .ac-count { margin-left: auto; }
 
   .ac-count { margin-left: 8px; color: var(--ink-dim); font: 600 11px var(--mono); }
   .ac-hint { margin: 0; padding: 8px 0; color: var(--ink-dim); font: 12px var(--sans); }
@@ -386,7 +390,7 @@
     tab: null,
     open: null,                 // which inline panel is open: "<kind>:<id>"
     toast: null,                // { ok: true|false, text }
-    filters: { access: { q: "", status: "active" }, history: { q: "", status: "all" }, quizAdd: { track: "", q: "" }, lessons: { track: "", q: "" } },
+    filters: { access: { q: "", status: "active" }, history: { q: "", status: "all" }, quizAdd: { track: "", q: "", year: "" }, lessons: { track: "", q: "", year: "" }, grant: { year: "" }, groupScope: { year: "" } },
   };
 
   function el(tag, attrs, children) {
@@ -443,6 +447,83 @@
   function parentOf(path) {
     var i = String(path).lastIndexOf("/");
     return i > 0 ? path.slice(0, i) : "";
+  }
+
+  // ---- year (Senior 1 / Senior 2) -------------------------------------------------------------
+  // A lesson belongs to a year when it sits under a ".../grade-N-secondary/..." folder (the same
+  // rule the master dashboard uses). Anything else (English, Math, "other") is not year-specific.
+  var YEAR_LABELS = { "1": "Senior 1", "2": "Senior 2" };
+  function yearOf(path) {
+    var m = /(?:^|\/)grade-(\d+)-secondary(?:\/|#|$)/.exec(String(path || ""));
+    return m ? (YEAR_LABELS[m[1]] || "Grade " + m[1]) : "";
+  }
+  function orderedYears(years) {
+    return years.slice().sort(function (a, b) {
+      if (a === b) return 0;
+      if (!a) return 1;
+      if (!b) return -1;
+      return a < b ? -1 : 1;
+    });
+  }
+  // filter: "" = all years | "Senior 1" | "Senior 2" | "__none__" = lessons not tied to a year
+  function yearPass(filter, path) {
+    if (!filter) return true;
+    var y = yearOf(path);
+    return filter === "__none__" ? !y : y === filter;
+  }
+  function lessonYearSelect(current) {
+    var s = el("select", { class: "ac-input", "aria-label": "Filter by year", "data-year-filter": "" }, [
+      el("option", { value: "" }, ["All years"]),
+      el("option", { value: "Senior 1" }, ["Senior 1"]),
+      el("option", { value: "Senior 2" }, ["Senior 2"]),
+      el("option", { value: "__none__" }, ["Not year-specific"]),
+    ]);
+    s.value = current || "";
+    return s;
+  }
+  function sortLessonsByYear(list) {
+    var seen = {};
+    list.forEach(function (l) { seen[yearOf(l.lesson)] = 1; });
+    return orderedYears(Object.keys(seen)).reduce(function (acc, y) {
+      return acc.concat(list.filter(function (l) { return yearOf(l.lesson) === y; }));
+    }, []);
+  }
+  // <optgroup>s of lesson <option>s, one group per year.
+  function lessonOptionGroups(list) {
+    var by = {};
+    list.forEach(function (l) { var y = yearOf(l.lesson); (by[y] = by[y] || []).push(l); });
+    return orderedYears(Object.keys(by)).map(function (y) {
+      return el("optgroup", { label: (y || "Other lessons") + " (" + by[y].length + ")" }, by[y].map(function (l) {
+        return el("option", { value: l.lesson }, [pretty(l.lesson) + "  (" + l.lesson + ")"]);
+      }));
+    });
+  }
+  // Everything a "what does this cover" dropdown offers, narrowed to one year if asked.
+  // opts: { lessonsOnly, custom, placeholder }
+  function scopeOptionNodes(d, yearFilter, opts) {
+    opts = opts || {};
+    var all = allLessonsList(d);
+    var nodes = [el("option", { value: "" }, [opts.placeholder || "Choose\u2026"])];
+    lessonOptionGroups(all.filter(function (l) { return yearPass(yearFilter, l.lesson); })).forEach(function (g) { nodes.push(g); });
+    if (!opts.lessonsOnly) {
+      var folders = {};
+      all.forEach(function (l) { var p = parentOf(l.lesson); if (p && yearPass(yearFilter, p)) folders[p] = 1; });
+      var fk = Object.keys(folders).sort();
+      if (fk.length) nodes.push(el("optgroup", { label: "A whole folder" }, fk.map(function (f) {
+        return el("option", { value: f + "/*" }, ["All lessons in " + pretty(f) + (yearOf(f) ? " \u00b7 " + yearOf(f) : "") + "  (" + f + "/*)"]);
+      })));
+      if (!yearFilter) nodes.push(el("optgroup", { label: "Everything" }, [el("option", { value: "*" }, ["Every lesson on the site"])]));
+    }
+    if (opts.custom) nodes.push(el("optgroup", { label: "Other" }, [el("option", { value: "__custom" }, ["Type a path\u2026"])]));
+    return nodes;
+  }
+  // Swap a <select>'s options in place (keeps the rest of the form as the teacher left it).
+  function refillSelect(sel, nodes) {
+    var keep = sel.value;
+    sel.innerHTML = "";
+    nodes.forEach(function (n) { sel.appendChild(n); });
+    sel.value = keep;
+    if (sel.value !== keep) sel.value = "";
   }
 
   // The real "every lesson on the site" list (from GitHub), falling back to whatever
@@ -617,6 +698,7 @@
         el("li", {}, ["Changing a payment's status in the Google Sheet to anything but \u201capproved\u201d also switches its access off. Deleting the payment row does not."]),
         el("li", {}, [el("b", {}, ["Lock a lesson"]), " (Lessons tab) and every video in it needs access, whether or not that video exists yet; leave it open and each video still follows its own lock if you set one."]),
         el("li", {}, [el("b", {}, ["Quiz gate"]), " is separate from the lesson lock and always wins for the quiz itself \u2014 lock a quiz and it stays locked even if the lesson is open; leave it ungated and it stays open even if the lesson is locked."]),
+        el("li", {}, [el("b", {}, ["Senior 1 / Senior 2"]), " \u2014 lessons under a grade-1 / grade-2 folder are labelled by year. Every lesson list has a Year filter, and the Lessons tab splits them under a heading per year. Student lists (Groups) can be filtered by the year on each student's account, so \u201cSelect all shown\u201d picks a whole year at once."]),
         el("li", {}, ["Revoking stops new views. Someone who already saved the video's link could still use it \u2014 that can't be taken back."]),
       ]),
     ]);
@@ -980,18 +1062,21 @@
     var search = el("input", { class: "ac-input", type: "text", placeholder: "Filter by name or path\u2026", "aria-label": "Filter lessons", "data-search": "quizAdd" });
     search.value = f.q;
 
+    var yearSel = lessonYearSelect(f.year);
     var visible = all.filter(function (l) {
       if (f.track && l.track !== f.track) return false;
+      if (!yearPass(f.year, l.lesson)) return false;
       if (f.q && l.lesson.indexOf(f.q.toLowerCase()) === -1) return false;
       return true;
     });
     var sel = el("select", { class: "ac-input", id: "qz-lesson-sel" }, [el("option", { value: "" }, [visible.length ? "Choose a lesson\u2026" : "No lessons match this filter"])]
-      .concat(visible.map(function (l) { return el("option", { value: l.lesson }, [pretty(l.lesson) + "  (" + l.lesson + ")"]); }))
+      .concat(lessonOptionGroups(visible))
       .concat([el("option", { value: "__custom" }, ["Type a path\u2026"])]));
     var custom = el("input", { class: "ac-input", type: "text", placeholder: "programming/other/some-lesson", hidden: "" });
     var go = el("button", { class: "ac-btn primary", type: "button" }, ["Gate this quiz\u2026"]);
     function value() { return sel.value === "__custom" ? custom.value.trim() : sel.value; }
     trackSel.addEventListener("change", function () { f.track = trackSel.value; render(); });
+    yearSel.addEventListener("change", function () { f.year = yearSel.value; render(); });
     search.addEventListener("input", function () {
       f.q = search.value;
       var pos = search.selectionStart;
@@ -1010,7 +1095,7 @@
     return el("div", { class: "dash-section" }, [
       el("h2", {}, ["Gate another quiz"]),
       el("p", { class: "dash-section-note" }, [note]),
-      el("div", { class: "ac-row" }, [el("label", {}, ["Track", trackSel]), el("label", {}, ["Search", search])]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Track", trackSel]), el("label", {}, ["Year", yearSel]), el("label", {}, ["Search", search])]),
       el("div", { class: "ac-row" }, [el("label", {}, ["Lesson", sel, custom]), go]),
       STATE.open && STATE.open.slice(0, 3) === "qz:" && STATE.open.slice(-4) === ":new" ? quizLockPanel(STATE.open.slice(3, -4), true) : null,
     ]);
@@ -1048,20 +1133,17 @@
     var isQuiz = mode === "quiz-grant" || mode === "quiz-revoke";
     var isGrant = mode === "grant" || mode === "quiz-grant";
 
-    var scopeSel;
-    if (isQuiz) {
-      // Quiz gate is per-lesson only (no folder/site-wide wildcard) \u2014 mirrors the Quizzes sheet.
-      var lessons = allLessonsList(d);
-      scopeSel = el("select", { class: "ac-input" }, [el("option", { value: "" }, ["Choose a lesson\u2026"])]
-        .concat(lessons.map(function (l) { return el("option", { value: l.lesson }, [pretty(l.lesson) + "  (" + l.lesson + ")"]); })));
-    } else {
-      var vLessons = {}, folders = {};
-      allLessonsList(d).forEach(function (l) { vLessons[l.lesson] = 1; var p = parentOf(l.lesson); if (p) folders[p] = 1; });
-      scopeSel = el("select", { class: "ac-input" }, [el("option", { value: "" }, ["Choose\u2026"])]
-        .concat([el("optgroup", { label: "One lesson" }, Object.keys(vLessons).sort().map(function (l) { return el("option", { value: l }, [pretty(l) + "  (" + l + ")"]); }))])
-        .concat([el("optgroup", { label: "A whole folder" }, Object.keys(folders).sort().map(function (f) { return el("option", { value: f + "/*" }, ["All lessons in " + pretty(f)]); }))])
-        .concat([el("optgroup", { label: "Everything" }, [el("option", { value: "*" }, ["Every lesson on the site"])])]));
-    }
+    // Year filter narrows the dropdown in place, so the duration etc. the teacher already set survives.
+    var gy = STATE.filters.groupScope;
+    // Quiz gate is per-lesson only (no folder/site-wide wildcard) \u2014 mirrors the Quizzes sheet.
+    var scopeOpts = { lessonsOnly: isQuiz, placeholder: isQuiz ? "Choose a lesson\u2026" : "Choose\u2026" };
+    var scopeSel = el("select", { class: "ac-input" }, scopeOptionNodes(d, gy.year, scopeOpts));
+    var yearSel = lessonYearSelect(gy.year);
+    yearSel.addEventListener("change", function () {
+      gy.year = yearSel.value;
+      refillSelect(scopeSel, scopeOptionNodes(d, gy.year, scopeOpts));
+      update();
+    });
     var preview = el("div", { class: "ac-preview" });
     var go, term;
     function describeWhat(scope) { return isQuiz ? "the \u201c" + pretty(scope) + "\u201d quiz" : scopeInfo(scope).title; }
@@ -1100,7 +1182,7 @@
     update();
     return el("div", { class: "ac-panel" }, [
       el("p", {}, [el("b", {}, [isGrant ? "Give the whole group " + (isQuiz ? "quiz access." : "access.") : "Revoke the whole group's " + (isQuiz ? "quiz access." : "access.")]), isGrant ? " Applies to every current member." : " A member who doesn't have this is simply skipped."]),
-      el("div", { class: "ac-row" }, [el("label", {}, [isQuiz ? "Which quiz" : "What", scopeSel])]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Year", yearSel]), el("label", {}, [isQuiz ? "Which quiz" : "What", scopeSel])]),
       isGrant ? term.node : null, preview,
       el("div", { class: "ac-actions" }, [go, cancelBtn()]),
     ]);
@@ -1122,7 +1204,7 @@
       var row = el("label", { class: "ac-pickitem", "data-q": ((o.name || "") + " " + o.phone + " " + (o.sub || "")).toLowerCase() },
         [box, el("span", {}, [o.name || "No name", el("small", {}, [o.phone + (o.sub ? "  \u00b7  " + o.sub : "")])])]);
       box.addEventListener("change", function () { if (box.checked) chosen[o.phone] = 1; else delete chosen[o.phone]; refresh(); });
-      return { row: row, box: box, phone: o.phone };
+      return { row: row, box: box, phone: o.phone, year: o.year || "" };
     });
     function refresh() {
       count = Object.keys(chosen).length;
@@ -1131,17 +1213,32 @@
       if (opts.onChange) opts.onChange(count);
     }
     function shown() { return rows.filter(function (r) { return !r.row.hidden; }); }
-    search.addEventListener("input", function () {
-      var q = search.value.trim().toLowerCase();
-      rows.forEach(function (r) { r.row.hidden = !!q && r.row.getAttribute("data-q").indexOf(q) === -1; });
-    });
+    // Year filter (Senior 1 / Senior 2 / ...), built from the years that actually occur in this list.
+    var yc = {}, noneCount = 0;
+    options.forEach(function (o) { if (o.year) yc[o.year] = (yc[o.year] || 0) + 1; else noneCount++; });
+    var yearKeys = Object.keys(yc).sort();
+    var yearSel = options.length && (yearKeys.length || noneCount)
+      ? el("select", { class: "ac-input", "aria-label": "Filter students by year", "data-roster-year": "" },
+          [el("option", { value: "" }, ["All years (" + options.length + ")"])]
+            .concat(yearKeys.map(function (y) { return el("option", { value: y }, [y + " (" + yc[y] + ")"]); }))
+            .concat(noneCount ? [el("option", { value: "__none__" }, ["No year set (" + noneCount + ")"])] : []))
+      : null;
+    function applyFilter() {
+      var q = search.value.trim().toLowerCase(), yf = yearSel ? yearSel.value : "";
+      rows.forEach(function (r) {
+        var hide = (q && r.row.getAttribute("data-q").indexOf(q) === -1) || (yf && (yf === "__none__" ? r.year : r.year !== yf));
+        r.row.hidden = !!hide;
+      });
+    }
+    search.addEventListener("input", applyFilter);
+    if (yearSel) yearSel.addEventListener("change", applyFilter);
     var all = el("button", { class: "ac-btn", type: "button" }, ["Select all shown"]);
     var none = el("button", { class: "ac-btn", type: "button" }, ["Clear"]);
     all.addEventListener("click", function () { shown().forEach(function (r) { r.box.checked = true; chosen[r.phone] = 1; }); refresh(); });
     none.addEventListener("click", function () { rows.forEach(function (r) { r.box.checked = false; }); chosen = {}; refresh(); });
     var list = el("div", { class: "ac-picklist" }, rows.length ? rows.map(function (r) { return r.row; })
       : [el("p", { class: "ac-hint" }, [opts.empty || "No students to show."])]);
-    var panel = el("div", { class: "ac-pickpanel" }, [search, el("div", { class: "ac-picktools" }, [all, none, counter]), list]);
+    var panel = el("div", { class: "ac-pickpanel" }, [search, yearSel, el("div", { class: "ac-picktools" }, [all, none, counter]), list]);
     var box = el("details", { class: "ac-pick" }, [summary, panel]);
     return {
       node: box,
@@ -1159,9 +1256,14 @@
     var skip = {};
     (exceptPhones || []).forEach(function (p) { skip[keyOf(p)] = 1; });
     return (d.roster || []).filter(function (r) { return !skip[keyOf(r.phone)]; })
-      .map(function (r) { return { phone: r.phone, name: r.name, sub: r.year }; });
+      .map(function (r) { return { phone: r.phone, name: r.name, sub: r.year, year: r.year || "" }; });
   }
   function keyOf(phone) { return String(phone || "").replace(/\D/g, "").slice(-10); }
+  function yearForPhone(d, phone) {
+    var k = keyOf(phone);
+    var r = (d.roster || []).filter(function (x) { return keyOf(x.phone) === k; })[0];
+    return r ? (r.year || "") : "";
+  }
 
   function groupCard(d, g) {
     var key = "grp:" + g.group;
@@ -1171,7 +1273,7 @@
     var memberList = el("div", { class: "ac-fields" }, g.members.map(function (m) {
       var row = el("dl", { class: "ac-field" }, [
         el("dt", {}, ["\u00a0"]),
-        el("dd", {}, [(m.name || "Unknown") + "  \u00b7  " + m.phone + (m.known_student === false ? "  (no account yet)" : "")]),
+        el("dd", {}, [(m.name || "Unknown") + "  \u00b7  " + m.phone + (yearForPhone(d, m.phone) ? "  \u00b7  " + yearForPhone(d, m.phone) : "") + (m.known_student === false ? "  (no account yet)" : "")]),
       ]);
       return row;
     }));
@@ -1197,7 +1299,10 @@
     });
 
     // Remove: tick any number of current members.
-    var rmPick = studentPicker(g.members.map(function (m) { return { phone: m.phone, name: m.name || "Unknown", sub: m.known_student === false ? "no account yet" : "" }; }), {
+    var rmPick = studentPicker(g.members.map(function (m) {
+      var yr = yearForPhone(d, m.phone);
+      return { phone: m.phone, name: m.name || "Unknown", year: yr, sub: [yr, m.known_student === false ? "no account yet" : ""].filter(Boolean).join("  \u00b7  ") };
+    }), {
       placeholder: "Choose members to remove\u2026", empty: "No members yet.",
       onChange: function (n) { rmBtn.disabled = !n; rmBtn.textContent = n ? "Remove " + n : "Remove"; },
     });
@@ -1332,7 +1437,9 @@
       [el("option", { value: "" }, ["All tracks"])].concat(tracks.map(function (t) { return el("option", { value: t }, [pretty(t)]); })));
     trackSel.value = f.track;
     var search = el("input", { class: "ac-input", type: "text", placeholder: "Filter by name or path\u2026", "aria-label": "Filter lessons", "data-search": "lessons", value: f.q });
+    var yearSel = lessonYearSelect(f.year);
     trackSel.addEventListener("change", function () { f.track = trackSel.value; render(); });
+    yearSel.addEventListener("change", function () { f.year = yearSel.value; render(); });
     search.addEventListener("input", function () {
       f.q = search.value;
       var pos = search.selectionStart;
@@ -1341,19 +1448,20 @@
       if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
     });
 
-    var all = all0.filter(function (l) {
+    var all = sortLessonsByYear(all0.filter(function (l) {
       if (f.track && l.track !== f.track) return false;
+      if (!yearPass(f.year, l.lesson)) return false;
       var q = f.q.trim().toLowerCase();
       if (q && l.lesson.indexOf(q) === -1 && pretty(l.lesson).toLowerCase().indexOf(q) === -1) return false;
       return true;
-    });
+    }));
 
     var section = el("div", { class: "dash-section" }, [
       el("h2", {}, ["Lessons", el("span", { class: "ac-count" }, [String(d.counts.lessons_locked) + " locked of " + all0.length])]),
       el("p", { class: "dash-section-note" }, [d.lessons_error
         ? "Couldn't read the full lesson list from GitHub (" + d.lessons_error + ") \u2014 showing only lessons already known here."
         : "Locking a lesson closes every video in it, whether or not a video exists yet. The quiz gate on each card is separate and overrides this \u2014 a quiz can stay locked while its lesson is open, or open while its lesson is locked."]),
-      el("div", { class: "ac-row" }, [el("label", {}, ["Track", trackSel]), el("label", {}, ["Search", search])]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Track", trackSel]), el("label", {}, ["Year", yearSel]), el("label", {}, ["Search", search])]),
     ]);
 
     if (!all.length) {
@@ -1361,7 +1469,17 @@
       return section;
     }
 
+    // With more than one year on screen, split the list under Senior 1 / Senior 2 / Other headings.
+    var yearCounts = {}, lastYear = null;
+    all.forEach(function (l) { var y = yearOf(l.lesson); yearCounts[y] = (yearCounts[y] || 0) + 1; });
+    var showGroups = Object.keys(yearCounts).length > 1;
+
     all.forEach(function (l) {
+      var ly = yearOf(l.lesson);
+      if (showGroups && ly !== lastYear) {
+        section.appendChild(el("h3", { class: "ac-group-h", "data-year-group": ly || "other" }, [ly || "Other lessons (not tied to a year)", el("span", { class: "ac-count" }, [plural(yearCounts[ly], "lesson")])]));
+      }
+      lastYear = ly;
       var lock = lockByLesson[l.lesson];
       var locked = !!(lock && lock.locked);
       var quiz = quizByLesson[l.lesson];
@@ -1413,16 +1531,17 @@
   // ---- GIVE ACCESS ------------------------------------------------------------------------------------
 
   function grantPanel(d) {
-    var lessons = {}, folders = {};
-    allLessonsList(d).forEach(function (l) { lessons[l.lesson] = 1; var p = parentOf(l.lesson); if (p) folders[p] = 1; });
+    var gy = STATE.filters.grant;
+    var grantOpts = { custom: true };
     var phone = el("input", { class: "ac-input", type: "tel", id: "gr-phone", placeholder: "01xxxxxxxxx", "aria-label": "Student phone", autocomplete: "off" });
-    var scopeSel = el("select", { class: "ac-input", id: "gr-scope", "aria-label": "What it covers" }, [
-      el("option", { value: "" }, ["Choose\u2026"]),
-      el("optgroup", { label: "One lesson" }, Object.keys(lessons).sort().map(function (l) { return el("option", { value: l }, [pretty(l) + "  (" + l + ")"]); })),
-      el("optgroup", { label: "A whole folder" }, Object.keys(folders).sort().map(function (f) { return el("option", { value: f + "/*" }, ["All lessons in " + pretty(f) + "  (" + f + "/*)"]); })),
-      el("optgroup", { label: "Everything" }, [el("option", { value: "*" }, ["Every lesson on the site"])]),
-      el("optgroup", { label: "Other" }, [el("option", { value: "__custom" }, ["Type a path\u2026"])]),
-    ]);
+    var scopeSel = el("select", { class: "ac-input", id: "gr-scope", "aria-label": "What it covers" }, scopeOptionNodes(d, gy.year, grantOpts));
+    var yearSel = lessonYearSelect(gy.year);
+    yearSel.id = "gr-year";
+    yearSel.addEventListener("change", function () {
+      gy.year = yearSel.value;
+      refillSelect(scopeSel, scopeOptionNodes(d, gy.year, grantOpts));
+      update();
+    });
     var custom = el("input", { class: "ac-input", type: "text", id: "gr-custom", placeholder: "programming/other/some-lesson", "aria-label": "Lesson path", hidden: "" });
     var preview = el("div", { class: "ac-preview", "aria-live": "polite" });
     var term;
@@ -1455,7 +1574,7 @@
     return el("div", { class: "dash-section" }, [
       el("h2", {}, ["Give access by hand"]),
       el("p", { class: "dash-section-note" }, ["For a cash payment, a scholarship, or fixing a mistake \u2014 no request needed. Works for a number that hasn't registered yet."]),
-      el("div", { class: "ac-row" }, [el("label", {}, ["Student's phone", phone]), el("label", {}, ["What it covers", scopeSel, custom])]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Student's phone", phone]), el("label", {}, ["Year", yearSel]), el("label", {}, ["What it covers", scopeSel, custom])]),
       term.node, preview, el("div", { class: "ac-actions" }, [go]),
     ]);
   }
