@@ -28,6 +28,7 @@ sign-in modal. Nothing touches the live site.
 pip install playwright
 playwright install chromium
 python tests/e2e_video.py         # the locked-video box on a lesson page
+python tests/e2e_groups.py        # the roster picker on the Groups tab: create, add, remove, grant/revoke
 python tests/e2e_dashboard.py     # the video-access admin dashboard (requests/access/history/videos/grant)
 python tests/e2e_step4b.py        # the quiz gate on the quiz page, and the new Quiz-gate/Groups dashboard tabs
 python tests/e2e_lesson_video_lock.py   # Lessons tab: open a video that is locked on its own, and 'also open its videos'

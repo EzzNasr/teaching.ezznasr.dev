@@ -129,5 +129,41 @@ setVideo(L1, 'AAAAAAAAAAA'); setVideo(L2, 'BBBBBBBBBBB');
   t('reading the list needs no lock and still works while busy would have blocked writes', list().ok);
 }
 
+// 8. roster picker: bulk add / bulk remove / roster in the overview --------------------------------------------------------------
+{
+  const addMany = (group, phones, creds = TOK) => post(Object.assign({ action: 'admin_group_add', group, phones }, creds));
+  const removeMany = (group, phones, creds = TOK) => post(Object.assign({ action: 'admin_group_remove', group, phones }, creds));
+
+  let ov = post(Object.assign({ action: 'admin_access_overview' }, TOK));
+  t('overview carries the roster (name + phone + year) for the picker',
+    ov.ok && Array.isArray(ov.roster) && ov.roster.length === 3 && ov.roster.some(x => x.name === 'Sara' && x.phone.replace(/\D/g, '').endsWith('1000000002') && x.year === 'Senior 1'), JSON.stringify(ov.roster));
+  t('...sorted by name', ov.roster.map(x => x.name).join(',') === 'Omar,Sara,Teacher', ov.roster.map(x => x.name).join(','));
+  t('roster is not readable by a student', !post(Object.assign({ action: 'admin_access_overview' }, SA)).ok);
+
+  t('bulk add: a student cannot', !addMany('Class Z', ['01000000002'], SA).ok);
+  t('bulk add: empty list is refused', !addMany('Class Z', []).ok);
+  t('bulk add: a bad phone refuses the whole batch and writes nothing', !addMany('Class Z', ['01000000002', '123']).ok && !list().groups.some(g => g.group === 'Class Z'));
+  let r = addMany('Class Z', ['01000000002', '01000000003', '01000000002']);
+  t('bulk add: adds both once (duplicate in the request ignored)', r.ok && r.count === 2 && r.added.length === 2 && r.already.length === 0 && r.group === 'Class Z', JSON.stringify(r));
+  t('...names come from the roster', r.added.some(x => x.name === 'Sara') && r.added.some(x => x.name === 'Omar'));
+  r = addMany('class   z', ['01000000002', '01000000001']);
+  t('bulk add: re-adding skips existing members, adds the new one, keeps the first spelling', r.ok && r.count === 1 && r.already.length === 1 && r.group === 'Class Z', JSON.stringify(r));
+  t('...group now has 3 members in one group', list().groups.find(g => g.group === 'Class Z').members.length === 3);
+
+  // permissions apply identically to everyone picked, and revoke takes them all back
+  setVideo('programming/other/if-conditional', 'CCCCCCCCCCC');
+  r = groupGrant({ group: 'Class Z', scope: 'programming/other/if-conditional', days: 7 });
+  t('group grant reaches every picked student', r.ok && r.count === 3 && canWatch(SA, 'programming/other/if-conditional') && canWatch(SB, 'programming/other/if-conditional'), JSON.stringify(r));
+  r = groupRevoke({ group: 'Class Z', scope: 'programming/other/if-conditional' });
+  t('group revoke takes it from all of them', r.ok && !canWatch(SA, 'programming/other/if-conditional') && !canWatch(SB, 'programming/other/if-conditional'), JSON.stringify(r));
+
+  t('bulk remove: a student cannot', !removeMany('Class Z', ['01000000002'], SA).ok);
+  r = removeMany('Class Z', ['01000000002', '01000000003', '01099999999']);
+  t('bulk remove: removes those in the group, skips strangers', r.ok && r.removed === 2, JSON.stringify(r));
+  t('...one member left', list().groups.find(g => g.group === 'Class Z').members.length === 1);
+  t('bulk remove: none of them in the group is an error', !removeMany('Class Z', ['01000000002']).ok);
+  t('single-phone add/remove still work exactly as before', add('Class Y', '01000000002').already === false && remove('Class Y', '01000000002').removed === 1);
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

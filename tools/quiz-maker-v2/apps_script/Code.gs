@@ -2634,6 +2634,13 @@ function handleAdminAccessOverview(payload) {
     return { known: nameByKey.hasOwnProperty(k), name: nameByKey.hasOwnProperty(k) ? nameByKey[k] : "" };
   }
 
+  // Roster for the group picker: every registered student (admin-only endpoint).
+  var roster = _sheetValuesAsObjects(_students()).map(function (r) {
+    return { phone: String(r.phone == null ? "" : r.phone), name: String(r.display_name == null ? "" : r.display_name),
+             year: String(r.year == null ? "" : r.year) };
+  }).filter(function (r) { return _phoneKey(r.phone); })
+    .sort(function (a, b) { return (a.name || a.phone).toLowerCase() < (b.name || b.phone).toLowerCase() ? -1 : 1; });
+
   var vSheet = ss.getSheetByName("Videos");
   var videos = (vSheet && vSheet.getLastRow() >= 2 ? _sheetValuesAsObjects(vSheet) : []).map(function (r) {
     return { lesson: String(r.lesson || ""), slot: String(r.slot || ""), embed_url: String(r.embed_url || ""),
@@ -2740,7 +2747,7 @@ function handleAdminAccessOverview(payload) {
     try { yearEnds[base] = _gradeYearEnd(GRADE_SCOPE_FOLDERS[base]); } catch (e) { yearEnds[base] = ""; }
   });
 
-  return { ok: true, today: today, counts: counts, videos: videos, quizzes: quizzes, groups: groups,
+  return { ok: true, today: today, counts: counts, videos: videos, quizzes: quizzes, groups: groups, roster: roster,
            payments: payments.reverse().slice(0, 500), access: access.reverse().slice(0, 1000),
            all_lessons: allLessons, tracks: tracks, lessons_error: lessonsError,
            quiz_access: quizAccess.reverse().slice(0, 1000), lesson_locks: lessonLocks, year_ends: yearEnds };
@@ -3180,9 +3187,42 @@ function handleAdminListGroups(payload) {
 function handleAdminGroupAdd(payload) {
   _requireAdminAny(payload);
   var group = _cleanGroupName(payload.group);
+  var key = _groupKey(group);
+
+  // Bulk form: { phones: [...] } adds several students in one lock (the roster picker
+  // on the access dashboard uses this). Single form { phone } is unchanged.
+  if (payload.phones !== undefined && payload.phones !== null) {
+    if (!Array.isArray(payload.phones) || !payload.phones.length) throw new Error("Choose at least one student.");
+    if (payload.phones.length > 500) throw new Error("Too many students at once (500 max).");
+    var wanted = [];
+    payload.phones.forEach(function (p) {
+      if (_normalizePhone(p).length < 10) throw new Error("Enter the student's full phone number.");
+      var cp = _canonicalPhone(p);
+      if (!wanted.some(function (w) { return _phonesMatch(w, cp); })) wanted.push(cp);
+    });
+    return _withLock(function () {
+      var ss = _ss();
+      var sheet = _sheetByName(ss, "Groups", GROUP_HEADERS);
+      _ensureColumns(sheet, GROUP_HEADERS);
+      var spelling = _groupSpellings(sheet)[key] || group;
+      var members = _groupMembers(sheet, key);
+      var who = _nameLookup();
+      var added = [], already = [];
+      wanted.forEach(function (phone) {
+        var w = who(phone);
+        if (members.some(function (m) { return _phonesMatch(m.phone, phone); })) {
+          already.push({ phone: phone, name: w.name });
+          return;
+        }
+        _appendByHeader(sheet, { group: spelling, phone: phone, name: w.name, added_at: _fmt(new Date(), TZ, true) });
+        added.push({ phone: phone, name: w.name, known_student: w.known });
+      });
+      return { ok: true, group: spelling, added: added, already: already, count: added.length };
+    });
+  }
+
   if (_normalizePhone(payload.phone).length < 10) throw new Error("Enter the student's full phone number.");
   var phone = _canonicalPhone(payload.phone);
-  var key = _groupKey(group);
 
   return _withLock(function () {
     var ss = _ss();
@@ -3201,6 +3241,27 @@ function handleAdminGroupAdd(payload) {
 function handleAdminGroupRemove(payload) {
   _requireAdminAny(payload);
   var key = _groupKey(payload.group);
+
+  // Bulk form: { phones: [...] } removes several members in one lock. Members who
+  // aren't in the group are skipped. Single form { phone } is unchanged (errors if absent).
+  if (payload.phones !== undefined && payload.phones !== null) {
+    if (!Array.isArray(payload.phones) || !payload.phones.length) throw new Error("Choose at least one student.");
+    var list = payload.phones.map(function (p) {
+      if (_normalizePhone(p).length < 10) throw new Error("Enter the student's full phone number.");
+      return _canonicalPhone(p);
+    });
+    return _withLock(function () {
+      var sheet = _ss().getSheetByName("Groups");
+      var members = sheet ? _groupMembers(sheet, key) : [];
+      var rows = members.filter(function (m) {
+        return list.some(function (p) { return _phonesMatch(m.phone, p); });
+      }).map(function (m) { return m.row; });
+      if (!rows.length) throw new Error("None of those students are in that group.");
+      rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
+      return { ok: true, removed: rows.length };
+    });
+  }
+
   if (_normalizePhone(payload.phone).length < 10) throw new Error("Enter the student's full phone number.");
   var phone = _canonicalPhone(payload.phone);
 

@@ -309,6 +309,22 @@
   .ac-input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); outline-offset: 1px; }
   .ac-preview { margin: 12px 0 2px; padding: 10px 12px; border-radius: 10px; color: var(--ink); background: var(--accent-soft); font: 600 12px/1.55 var(--sans); }
 
+  .ac-pickwrap { display: flex; flex-direction: column; gap: 5px; color: var(--ink-dim); font: 600 10px var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+  .ac-pick { position: relative; }
+  .ac-pick > summary { list-style: none; cursor: pointer; min-width: 240px; }
+  .ac-pick > summary::-webkit-details-marker { display: none; }
+  .ac-pick > summary::after { content: "\25BE"; float: right; margin-left: 10px; color: var(--ink-dim); }
+  .ac-pick[open] > summary::after { content: "\25B4"; }
+  .ac-pickpanel { position: absolute; z-index: 20; left: 0; top: calc(100% + 4px); width: min(440px, 88vw); padding: 10px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface-strong); box-shadow: 0 12px 32px rgba(0,0,0,.22); text-transform: none; letter-spacing: 0; }
+  .ac-pickpanel .ac-input { width: 100%; min-width: 0; box-sizing: border-box; }
+  .ac-picktools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 4px; }
+  .ac-picktools span { margin-left: auto; color: var(--ink-dim); font: 600 11px var(--mono); }
+  .ac-picklist { max-height: 260px; overflow: auto; margin-top: 4px; border-top: 1px solid var(--line); }
+  .ac-pickitem { display: flex; gap: 9px; align-items: flex-start; padding: 7px 4px; border-bottom: 1px solid var(--line); color: var(--ink); font: 600 13px/1.35 var(--sans); cursor: pointer; }
+  .ac-pickitem input { margin-top: 3px; accent-color: var(--accent); }
+  .ac-pickitem small { display: block; color: var(--ink-dim); font: 400 11px var(--mono); }
+  .ac-pickitem[hidden] { display: none; }
+
   .ac-count { margin-left: 8px; color: var(--ink-dim); font: 600 11px var(--mono); }
   .ac-hint { margin: 0; padding: 8px 0; color: var(--ink-dim); font: 12px var(--sans); }
   .ac-mono { font-family: var(--mono); }
@@ -1090,6 +1106,58 @@
     ]);
   }
 
+  // A dropdown checklist of students: search, tick any number, "select all shown".
+  // options: [{ phone, name, sub }]. Selection lives in the closure, so typing in the
+  // search box never loses ticks. onChange(count) fires on every change.
+  function studentPicker(options, opts) {
+    opts = opts || {};
+    var chosen = {};
+    var count = 0;
+    var summaryLabel = el("span", {}, [opts.placeholder || "Choose students\u2026"]);
+    var summary = el("summary", { class: "ac-input" }, [summaryLabel]);
+    var search = el("input", { class: "ac-input", type: "search", placeholder: "Search name, phone or year\u2026", "aria-label": "Search students" });
+    var counter = el("span", {}, ["0 selected"]);
+    var rows = options.map(function (o) {
+      var box = el("input", { type: "checkbox", value: o.phone });
+      var row = el("label", { class: "ac-pickitem", "data-q": ((o.name || "") + " " + o.phone + " " + (o.sub || "")).toLowerCase() },
+        [box, el("span", {}, [o.name || "No name", el("small", {}, [o.phone + (o.sub ? "  \u00b7  " + o.sub : "")])])]);
+      box.addEventListener("change", function () { if (box.checked) chosen[o.phone] = 1; else delete chosen[o.phone]; refresh(); });
+      return { row: row, box: box, phone: o.phone };
+    });
+    function refresh() {
+      count = Object.keys(chosen).length;
+      counter.textContent = count + " selected";
+      summaryLabel.textContent = count ? plural(count, "student") + " selected" : (opts.placeholder || "Choose students\u2026");
+      if (opts.onChange) opts.onChange(count);
+    }
+    function shown() { return rows.filter(function (r) { return !r.row.hidden; }); }
+    search.addEventListener("input", function () {
+      var q = search.value.trim().toLowerCase();
+      rows.forEach(function (r) { r.row.hidden = !!q && r.row.getAttribute("data-q").indexOf(q) === -1; });
+    });
+    var all = el("button", { class: "ac-btn", type: "button" }, ["Select all shown"]);
+    var none = el("button", { class: "ac-btn", type: "button" }, ["Clear"]);
+    all.addEventListener("click", function () { shown().forEach(function (r) { r.box.checked = true; chosen[r.phone] = 1; }); refresh(); });
+    none.addEventListener("click", function () { rows.forEach(function (r) { r.box.checked = false; }); chosen = {}; refresh(); });
+    var list = el("div", { class: "ac-picklist" }, rows.length ? rows.map(function (r) { return r.row; })
+      : [el("p", { class: "ac-hint" }, [opts.empty || "No students to show."])]);
+    var panel = el("div", { class: "ac-pickpanel" }, [search, el("div", { class: "ac-picktools" }, [all, none, counter]), list]);
+    var box = el("details", { class: "ac-pick" }, [summary, panel]);
+    return {
+      node: box,
+      selected: function () { return Object.keys(chosen); },
+      reset: function () { rows.forEach(function (r) { r.box.checked = false; }); chosen = {}; refresh(); },
+    };
+  }
+
+  function rosterOptions(d, exceptPhones) {
+    var skip = {};
+    (exceptPhones || []).forEach(function (p) { skip[keyOf(p)] = 1; });
+    return (d.roster || []).filter(function (r) { return !skip[keyOf(r.phone)]; })
+      .map(function (r) { return { phone: r.phone, name: r.name, sub: r.year }; });
+  }
+  function keyOf(phone) { return String(phone || "").replace(/\D/g, "").slice(-10); }
+
   function groupCard(d, g) {
     var key = "grp:" + g.group;
     var card = el("div", { class: "ac-card", "data-group": g.group }, [
@@ -1105,21 +1173,37 @@
     if (!g.members.length) memberList = el("div", { class: "ac-fields" }, [el("p", { class: "ac-hint" }, ["No members yet."])]);
     card.appendChild(memberList);
 
-    var phoneIn = el("input", { class: "ac-input", type: "tel", placeholder: "01xxxxxxxxx", "aria-label": "Phone to add" });
-    var addBtn = el("button", { class: "ac-btn", type: "button" }, ["Add"]);
-    addBtn.addEventListener("click", function () {
-      if (!phoneIn.value.trim()) return;
-      addBtn.disabled = true;
-      run({ action: "admin_group_add", group: g.group, phone: phoneIn.value.trim() },
-        function (r) { return "Added " + (r.name || r.phone) + " to \u201c" + g.group + "\u201d."; }, addBtn);
+    // Add: pick from the roster (students not already in this group), or type a phone for someone without an account yet.
+    var addPick = studentPicker(rosterOptions(d, g.members.map(function (m) { return m.phone; })), {
+      placeholder: "Choose students to add\u2026", empty: "Everyone in the roster is already in this group.",
+      onChange: function (n) { addBtn.disabled = !n && !phoneIn.value.trim(); addBtn.textContent = n ? "Add " + n : "Add"; },
     });
-    var removeSel = el("select", { class: "ac-input", "aria-label": "Remove a member" }, [el("option", { value: "" }, ["Remove\u2026"])]
-      .concat(g.members.map(function (m) { return el("option", { value: m.phone }, [(m.name || m.phone) + " (" + m.phone + ")"]); })));
-    removeSel.addEventListener("change", function () {
-      if (!removeSel.value) return;
-      var phone = removeSel.value;
-      removeSel.disabled = true;
-      run({ action: "admin_group_remove", group: g.group, phone: phone }, "Removed " + phone + " from \u201c" + g.group + "\u201d.", removeSel);
+    var phoneIn = el("input", { class: "ac-input", type: "tel", placeholder: "or type a phone number", "aria-label": "Phone to add" });
+    var addBtn = el("button", { class: "ac-btn primary", type: "button" }, ["Add"]);
+    addBtn.disabled = true;
+    phoneIn.addEventListener("input", function () { addBtn.disabled = !addPick.selected().length && !phoneIn.value.trim(); });
+    addBtn.addEventListener("click", function () {
+      var phones = addPick.selected();
+      if (phoneIn.value.trim()) phones.push(phoneIn.value.trim());
+      if (!phones.length) return;
+      addBtn.disabled = true;
+      run({ action: "admin_group_add", group: g.group, phones: phones },
+        function (r) { return "Added " + plural(r.count, "student") + " to \u201c" + g.group + "\u201d" + (r.already.length ? " (" + r.already.length + " already in it)" : "") + "."; }, addBtn);
+    });
+
+    // Remove: tick any number of current members.
+    var rmPick = studentPicker(g.members.map(function (m) { return { phone: m.phone, name: m.name || "Unknown", sub: m.known_student === false ? "no account yet" : "" }; }), {
+      placeholder: "Choose members to remove\u2026", empty: "No members yet.",
+      onChange: function (n) { rmBtn.disabled = !n; rmBtn.textContent = n ? "Remove " + n : "Remove"; },
+    });
+    var rmBtn = el("button", { class: "ac-btn danger", type: "button" }, ["Remove"]);
+    rmBtn.disabled = true;
+    rmBtn.addEventListener("click", function () {
+      var phones = rmPick.selected();
+      if (!phones.length) return;
+      rmBtn.disabled = true;
+      run({ action: "admin_group_remove", group: g.group, phones: phones },
+        function (r) { return "Removed " + plural(r.removed, "student") + " from \u201c" + g.group + "\u201d."; }, rmBtn);
     });
 
     var grantBtn = el("button", { class: "ac-btn primary", type: "button" }, ["Give this group access\u2026"]);
@@ -1131,7 +1215,8 @@
     quizGrantBtn.addEventListener("click", function () { openPanel(key + ":quiz-grant"); });
     quizRevokeBtn.addEventListener("click", function () { openPanel(key + ":quiz-revoke"); });
 
-    card.appendChild(el("div", { class: "ac-row" }, [el("label", {}, ["Add a student", phoneIn]), addBtn, el("label", {}, ["Remove", removeSel])]));
+    card.appendChild(el("div", { class: "ac-row" }, [el("div", { class: "ac-pickwrap" }, ["Add students", addPick.node]), el("label", {}, ["\u00a0", phoneIn]), addBtn]));
+    if (g.members.length) card.appendChild(el("div", { class: "ac-row" }, [el("div", { class: "ac-pickwrap" }, ["Remove students", rmPick.node]), rmBtn]));
     var openMode = STATE.open === key + ":grant" ? "grant" : STATE.open === key + ":revoke" ? "revoke"
       : STATE.open === key + ":quiz-grant" ? "quiz-grant" : STATE.open === key + ":quiz-revoke" ? "quiz-revoke" : null;
     if (openMode) card.appendChild(groupApplyPanel(d, g, openMode));
@@ -1139,20 +1224,24 @@
     return card;
   }
 
-  function groupCreateForm() {
+  function groupCreateForm(d) {
     var name = el("input", { class: "ac-input", type: "text", placeholder: "e.g. Grade 2 \u2014 Section A", "aria-label": "New group name" });
-    var phone = el("input", { class: "ac-input", type: "tel", placeholder: "01xxxxxxxxx (first student)", "aria-label": "First student's phone" });
     var go = el("button", { class: "ac-btn primary", type: "button" }, ["Create group"]);
+    function sync() { go.disabled = !name.value.trim() || !pick.selected().length; go.textContent = pick.selected().length ? "Create group with " + pick.selected().length : "Create group"; }
+    var pick = studentPicker(rosterOptions(d), { placeholder: "Choose students\u2026", empty: "No registered students yet.", onChange: sync });
+    name.addEventListener("input", sync);
+    go.disabled = true;
     go.addEventListener("click", function () {
-      if (!name.value.trim() || !phone.value.trim()) return;
+      var phones = pick.selected();
+      if (!name.value.trim() || !phones.length) return;
       go.disabled = true;
-      run({ action: "admin_group_add", group: name.value.trim(), phone: phone.value.trim() },
-        function (r) { return "Created \u201c" + r.group + "\u201d with " + (r.name || r.phone) + "."; }, go);
+      run({ action: "admin_group_add", group: name.value.trim(), phones: phones },
+        function (r) { return "Created \u201c" + r.group + "\u201d with " + plural(r.count, "student") + "."; }, go);
     });
     return el("div", { class: "dash-section" }, [
       el("h2", {}, ["New group"]),
-      el("p", { class: "dash-section-note" }, ["Add more students to it afterward from the group's own card."]),
-      el("div", { class: "ac-row" }, [el("label", {}, ["Group name", name]), el("label", {}, ["First student", phone]), go]),
+      el("p", { class: "dash-section-note" }, ["Name it, tick the students from your roster, and create. You can add or remove students later from the group's own card."]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Group name", name]), el("div", { class: "ac-pickwrap" }, ["Students", pick.node]), go]),
     ]);
   }
 
@@ -1163,7 +1252,7 @@
     ]);
     if (!d.groups.length) section.appendChild(el("div", { class: "dash-empty" }, ["No groups yet \u2014 create one below."]));
     d.groups.forEach(function (g) { section.appendChild(groupCard(d, g)); });
-    return el("div", {}, [section, groupCreateForm()]);
+    return el("div", {}, [section, groupCreateForm(d)]);
   }
 
   // ---- LESSONS ------------------------------------------------------------------------------------------
