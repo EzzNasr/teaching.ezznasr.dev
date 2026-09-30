@@ -325,6 +325,9 @@
   .ac-pickitem small { display: block; color: var(--ink-dim); font: 400 11px var(--mono); }
   .ac-pickitem[hidden] { display: none; }
   .ac-pickpanel .ac-input + .ac-input { margin-top: 6px; }
+  /* Each .dash-section is its own stacking context (backdrop-filter), so a later section paints over an
+     earlier one's open dropdown. Lift the section that holds an open picker above its neighbours. */
+  .dash-section.has-open-pick, .dash-section:has(details.ac-pick[open]) { position: relative; z-index: 30; }
   .ac-group-h { display: flex; align-items: center; gap: 10px; margin: 26px 0 2px; padding: 9px 12px; border-radius: 10px; color: var(--accent); background: var(--accent-soft); font: 800 13px var(--sans); letter-spacing: -.01em; }
   .ac-gives { margin: 0 0 10px; padding-left: 18px; color: var(--ink); font: 600 13px/1.7 var(--sans); }
   .ac-group-h:first-of-type { margin-top: 10px; }
@@ -1242,6 +1245,10 @@
       : [el("p", { class: "ac-hint" }, [opts.empty || "No students to show."])]);
     var panel = el("div", { class: "ac-pickpanel" }, [search, yearSel, el("div", { class: "ac-picktools" }, [all, none, counter]), list]);
     var box = el("details", { class: "ac-pick" }, [summary, panel]);
+    box.addEventListener("toggle", function () {
+      var sec = box.closest ? box.closest(".dash-section") : null;
+      if (sec) sec.classList.toggle("has-open-pick", box.open);
+    });
     return {
       node: box,
       selected: function () { return Object.keys(chosen); },
