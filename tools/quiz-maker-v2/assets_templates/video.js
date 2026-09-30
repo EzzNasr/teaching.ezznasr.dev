@@ -42,7 +42,7 @@
   "use strict";
 
   if (window.VideoSlot) return; // loaded twice — the first copy already did the work
-  window.__videoJsVersion = "v5-mobile-fs-autoplay";
+  window.__videoJsVersion = "v6-speed-mobile";
 
   var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
   var SESSION_KEY = "teaching_session";
@@ -185,6 +185,13 @@
       "background:linear-gradient(transparent,rgba(8,12,22,.85));color:#fff;font:12px var(--mono,monospace);user-select:none}" +
       ".vp-bar button{background:none;border:0;color:#fff;font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}" +
       ".vp-bar input[type=range]{flex:1;accent-color:#fff;cursor:pointer}" +
+      ".vp-speed{position:relative;display:flex}" +
+      ".vp-bar .vp-speed-btn{font-size:13px;font-weight:600;min-width:38px;padding:3px 6px;border-radius:6px;background:rgba(255,255,255,.14)}" +
+      ".vp-speed-menu{position:absolute;right:0;bottom:calc(100% + 10px);z-index:6;display:none;flex-direction:column;padding:4px;" +
+      "border-radius:10px;background:rgba(20,24,34,.94);box-shadow:0 8px 24px rgba(0,0,0,.4);max-height:calc(var(--vp-slot-h,220px) - 64px);overflow:auto}" +
+      ".vp-speed-menu.vp-open{display:flex}" +
+      ".vp-bar .vp-speed-menu button{font-size:13px;text-align:center;padding:6px 14px;border-radius:6px;white-space:nowrap}" +
+      ".vp-bar .vp-speed-menu button.vp-on{background:rgba(255,255,255,.22);font-weight:700}" +
       ".media-slot.is-locked .vp-shield,.media-slot.is-locked .vp-bar,.media-slot.is-locked .vp-poster{display:none}" +
       ".media-slot:fullscreen{border-radius:0;margin:0;background:#000}" +
       ".media-slot.vp-fs{position:fixed!important;inset:0;width:100vw;height:100vh;height:100dvh;max-width:none;margin:0;border-radius:0;z-index:2147483000;background:#000;aspect-ratio:auto}" +
@@ -295,7 +302,7 @@
   }
 
   function attachControls(slot, frame) {
-    var playing = false, dur = 0, seeking = false;
+    var playing = false, dur = 0, seeking = false, rateApplied = false;
     function cmd(func, args) {
       try { frame.contentWindow.postMessage(JSON.stringify({ event: "command", func: func, args: args || [] }), "*"); } catch (e) {}
     }
@@ -305,7 +312,42 @@
     var range = el("input", { type: "range", min: "0", max: "1000", value: "0", "aria-label": "Seek" });
     var time = el("span", {}, ["0:00"]);
     var fs = el("button", { type: "button", "aria-label": "Fullscreen" }, ["\u26F6"]);
-    var bar = el("div", { class: "vp-bar" }, [btn, range, time, fs]);
+    var RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+    var RATE_KEY = "teaching_video_rate";
+    var rate = 1;
+    try { var saved = parseFloat(localStorage.getItem(RATE_KEY)); if (RATES.indexOf(saved) !== -1) rate = saved; } catch (e) {}
+    function rateLabel(r) { return r + "\u00D7"; }
+    var speedBtn = el("button", { type: "button", class: "vp-speed-btn", "aria-label": "Playback speed", "aria-haspopup": "true" }, [rateLabel(rate)]);
+    var menu = el("div", { class: "vp-speed-menu", role: "menu" });
+    var items = RATES.map(function (r) {
+      var b = el("button", { type: "button", role: "menuitemradio" }, [rateLabel(r)]);
+      b.addEventListener("click", function (e) { e.stopPropagation(); setRate(r); closeMenu(); });
+      menu.appendChild(b);
+      return b;
+    });
+    var speed = el("div", { class: "vp-speed" }, [speedBtn, menu]);
+    function closeMenu() { menu.classList.remove("vp-open"); }
+    function setRate(r, fromPlayer) {
+      rate = r;
+      speedBtn.textContent = rateLabel(r);
+      items.forEach(function (b, i) {
+        var on = RATES[i] === r;
+        b.classList.toggle("vp-on", on);
+        b.setAttribute("aria-checked", on ? "true" : "false");
+      });
+      if (!fromPlayer) {
+        cmd("setPlaybackRate", [r]);
+        try { localStorage.setItem(RATE_KEY, String(r)); } catch (e) {}
+      }
+    }
+    setRate(rate, true);
+    speedBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      slot.style.setProperty("--vp-slot-h", slot.clientHeight + "px");
+      menu.classList.toggle("vp-open");
+    });
+    slot.addEventListener("click", function (e) { if (!speed.contains(e.target)) closeMenu(); });
+    var bar = el("div", { class: "vp-bar" }, [btn, range, time, speed, fs]);
     var startedAt = Date.now(), unmuted = false, gaveUp = false;
     function toggle() { cmd("unMute"); cmd(playing ? "pauseVideo" : "playVideo"); }
     // If the phone blocked autoplay, YouTube shows its own red play button under our shield.
@@ -352,8 +394,10 @@
           clearTimeout(giveUpTimer);
           if (gaveUp) { gaveUp = false; shield.style.pointerEvents = ""; }
           if (!unmuted) { unmuted = true; cmd("unMute"); cmd("setVolume", [100]); }
+          if (!rateApplied) { rateApplied = true; if (rate !== 1) cmd("setPlaybackRate", [rate]); }
         }
       }
+      if (typeof i.playbackRate === "number" && i.playbackRate !== rate && RATES.indexOf(i.playbackRate) !== -1) setRate(i.playbackRate, true);
       if (i.duration) dur = i.duration;
       if (typeof i.currentTime === "number" && dur) {
         time.textContent = fmt(i.currentTime) + " / " + fmt(dur);
