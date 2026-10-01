@@ -190,7 +190,7 @@
     var mode = root.getAttribute("data-mode") || "text";
 
     if (!window.AuthEngine) {
-      root.textContent = "Sign-in couldn't load. Please refresh the page.";
+      root.textContent = "Sign-in couldn't load. Refresh the page to try again.";
       return;
     }
 

@@ -233,7 +233,7 @@
     quiz.questions = null;
 
     if (!window.AuthEngine) {
-      root.textContent = "Sign-in couldn't load. Please refresh the page.";
+      root.textContent = "Sign-in couldn't load. Refresh the page to try again.";
       return;
     }
 
@@ -300,7 +300,7 @@
         el("span", { class: "tick-br" }),
         el("span", { class: "tick-bl" }),
         el("p", { class: "qz-question" }, ["Quiz locked"]),
-        el("p", { class: "qz-lede" }, ["This quiz is locked."]),
+        el("p", { class: "qz-lede" }, ["This quiz isn't open yet. Your teacher will unlock it when it's time."]),
         el("div", { class: "qz-actions" }, [retry]),
       ]));
       // Nothing about the solution video is requested from the server while the
@@ -309,9 +309,11 @@
         mediaSlot.setAttribute("data-vp-mounted", "1"); // keeps video.js from mounting it later on this load
         mediaSlot.innerHTML = "";
         mediaSlot.classList.add("vp-panel", "is-locked");
+        var lockIcon = window.VideoSlot && window.VideoSlot.icon ? window.VideoSlot.icon("lock") : null;
         mediaSlot.appendChild(el("div", { class: "vp-box" }, [
-          el("p", { class: "vp-title" }, ["Quiz locked"]),
-          el("p", { class: "vp-text" }, ["This quiz is locked."]),
+          lockIcon ? el("div", { class: "vp-icon-badge", "aria-hidden": "true" }, [lockIcon]) : null,
+          el("p", { class: "vp-title" }, ["Solution video locked"]),
+          el("p", { class: "vp-text" }, ["It becomes available once this quiz is open and you\u2019ve finished it."]),
         ]));
       }
     }

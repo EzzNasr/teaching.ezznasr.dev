@@ -42,7 +42,7 @@
   "use strict";
 
   if (window.VideoSlot) return; // loaded twice — the first copy already did the work
-  window.__videoJsVersion = "v6-speed-mobile";
+  window.__videoJsVersion = "v7-polish";
 
   var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
   var SESSION_KEY = "teaching_session";
@@ -66,6 +66,35 @@
       node.appendChild(c.nodeType ? c : document.createTextNode(String(c)));
     });
     return node;
+  }
+
+  // Line icons (Feather-style) built as real SVG so they look the same on every phone,
+  // unlike emoji. 24x24 viewBox, stroke follows the text colour.
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var ICONS = {
+    lock: [["rect", { x: 3, y: 11, width: 18, height: 11, rx: 2 }], ["path", { d: "M7 11V7a5 5 0 0 1 10 0v4" }]],
+    clock: [["circle", { cx: 12, cy: 12, r: 10 }], ["polyline", { points: "12 6 12 12 16 14" }]],
+    play: [["polygon", { points: "7 4 20 12 7 20 7 4" }]],
+    alert: [["circle", { cx: 12, cy: 12, r: 10 }], ["line", { x1: 12, y1: 8, x2: 12, y2: 12 }], ["line", { x1: 12, y1: 16, x2: 12.01, y2: 16 }]],
+  };
+  function icon(name) {
+    var svg = document.createElementNS(SVGNS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+    (ICONS[name] || []).forEach(function (part) {
+      var n = document.createElementNS(SVGNS, part[0]);
+      Object.keys(part[1]).forEach(function (k) { n.setAttribute(k, part[1][k]); });
+      svg.appendChild(n);
+    });
+    return svg;
+  }
+  function badge(name) {
+    return el("div", { class: "vp-icon-badge", "aria-hidden": "true" }, [icon(name)]);
   }
 
   // -- talking to Code.gs -------------------------------------------------------
@@ -146,14 +175,28 @@
     if (document.getElementById("vp-style")) return;
     var css =
       ".media-slot{position:relative}" +
-      ".media-slot.vp-panel{display:block;aspect-ratio:auto;min-height:0;padding:0;overflow:visible;text-align:left;" +
+      ".media-slot.vp-panel{display:flex;align-items:center;justify-content:center;aspect-ratio:auto;min-height:220px;padding:8px;overflow:visible;text-align:center;" +
+      "font-family:var(--sans,system-ui,sans-serif);font-size:14px;color:var(--ink,#10233f);border-style:solid;border-color:var(--line,#d6e1ef);" +
+      "background:linear-gradient(180deg,var(--panel,#fff),var(--panel-soft,#eef4fb))}" +
+      ".media-slot.vp-panel.vp-empty{min-height:150px}" +
+      ".media-slot.vp-panel.vp-empty .vp-icon-badge{width:46px;height:46px}" +
+      ".media-slot.vp-panel.vp-empty .vp-icon-badge svg{width:21px;height:21px}" +
+      ".media-slot.vp-loading{border-style:solid;border-color:var(--line,#d6e1ef);background:var(--panel-soft,#eef4fb)}" +
+      ".vp-loading-box{display:flex;flex-direction:column;align-items:center;gap:12px;font:500 13px var(--sans,system-ui,sans-serif);color:var(--ink-dim,#63738a)}" +
+      ".vp-spinner{width:28px;height:28px;border-radius:50%;border:3px solid var(--line,#d6e1ef);border-top-color:var(--accent,#2f6fed);animation:vp-spin .8s linear infinite}" +
+      "@keyframes vp-spin{to{transform:rotate(360deg)}}" +
+      "@media (prefers-reduced-motion:reduce){.vp-spinner{animation-duration:2.4s}}" +
       "font-family:var(--sans,system-ui,sans-serif);font-size:14px;color:var(--ink,#10233f);border-style:solid}" +
-      ".vp-box{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:22px;max-width:560px;margin:0 auto}" +
+      ".vp-box{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:24px 22px;width:100%;box-sizing:border-box;max-width:520px;margin:0 auto}" +
       ".vp-icon{font-size:26px;line-height:1}" +
-      ".vp-icon-badge{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;" +
+      ".vp-icon-badge{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 2px;flex:0 0 auto;" +
+      "color:var(--accent-strong,#2056bd);background:var(--accent-soft,rgba(47,111,237,.12));" +
+      "border:1px solid color-mix(in srgb,var(--accent,#2f6fed) 28%,transparent);box-shadow:0 0 0 6px color-mix(in srgb,var(--accent,#2f6fed) 8%,transparent)}" +
+      ".vp-icon-badge svg{width:26px;height:26px}" +
       "font-size:28px;margin:0 auto 4px;background:var(--accent-soft,rgba(47,111,237,.12));border:1px solid var(--line,#d6e1ef)}" +
-      ".vp-title{margin:0;font-size:17px;font-weight:800;line-height:1.3}" +
-      ".vp-text,.vp-status{margin:0;line-height:1.5;color:var(--ink-dim,#63738a)}" +
+      ".vp-title{margin:0;font-size:18px;font-weight:800;line-height:1.3;letter-spacing:-.01em}" +
+      ".vp-text,.vp-status{margin:0;line-height:1.55;color:var(--ink-dim,#63738a)}" +
+      ".vp-text{max-width:44ch}" +
       ".vp-status:empty{display:none}" +
       ".vp-hint{margin:-4px 0 0;font-size:12px;line-height:1.4;color:var(--ink-dim,#63738a)}" +
       ".vp-status.vp-error{color:var(--status-fail,#e2574c)}" +
@@ -167,8 +210,13 @@
       ".vp-form{display:flex;gap:8px;flex-wrap:wrap;width:100%}" +
       ".vp-input{flex:1 1 220px;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid var(--line-strong,#b8c9df);" +
       "background:var(--panel,#fff);color:var(--ink,#10233f);font:inherit}" +
-      ".vp-btn{padding:10px 16px;border-radius:10px;border:1px solid var(--accent,#2f6fed);background:var(--accent,#2f6fed);" +
-      "color:#fff;font:inherit;font-weight:700;cursor:pointer}" +
+      ".vp-btn{padding:11px 24px;border-radius:999px;border:1px solid var(--accent,#2f6fed);background:var(--accent,#2f6fed);" +
+      "color:#fff;font:inherit;font-weight:700;cursor:pointer;box-shadow:0 6px 16px -6px color-mix(in srgb,var(--accent,#2f6fed) 80%,transparent);" +
+      "transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}" +
+      ".vp-box .vp-btn{margin-top:4px}" +
+      ".media-slot.is-locked:not(.vp-panel){border-style:solid;border-color:transparent}" +
+      ".vp-btn:hover:not([disabled]){transform:translateY(-1px);filter:brightness(1.06)}" +
+      ".vp-btn.vp-ghost{box-shadow:none}" +
       'html[data-theme="dark"] .vp-btn{color:#0a1a32}' +
       'html[data-theme="dark"] .vp-btn.vp-ghost{color:var(--accent,#72a5ff)}' +
       ".vp-btn[disabled]{opacity:.6;cursor:default}" +
@@ -192,6 +240,16 @@
       ".vp-speed-menu.vp-open{display:flex}" +
       ".vp-bar .vp-speed-menu button{font-size:13px;text-align:center;padding:6px 14px;border-radius:6px;white-space:nowrap}" +
       ".vp-bar .vp-speed-menu button.vp-on{background:rgba(255,255,255,.22);font-weight:700}" +
+      ".media-slot .video-lock{gap:10px;padding:20px 24px;background:radial-gradient(120% 120% at 50% 0%,rgba(44,76,140,.55),rgba(8,12,22,.92));" +
+      "-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}" +
+      ".media-slot .video-lock__icon{display:flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;color:#fff;" +
+      "background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.24);box-shadow:0 0 0 6px rgba(255,255,255,.05);filter:none;transition:transform .2s ease,background .2s ease}" +
+      ".media-slot .video-lock__icon svg{width:26px;height:26px}" +
+      ".media-slot .video-lock:hover .video-lock__icon{transform:scale(1.06)}" +
+      ".media-slot .video-lock__title{font:800 17px/1.3 var(--sans,system-ui,sans-serif);color:#fff;letter-spacing:-.01em}" +
+      ".media-slot .video-lock__msg,.media-slot .video-lock.is-tapped .video-lock__msg{font:500 13px/1.5 var(--sans,system-ui,sans-serif);color:rgba(232,236,246,.82);" +
+      "max-width:340px;opacity:1;max-height:none;margin:0;overflow:visible}" +
+      ".media-slot .video-lock.is-tapped .video-lock__icon{background:rgba(255,255,255,.2)}" +
       ".media-slot.is-locked .vp-shield,.media-slot.is-locked .vp-bar,.media-slot.is-locked .vp-poster{display:none}" +
       ".media-slot:fullscreen{border-radius:0;margin:0;background:#000}" +
       ".media-slot.vp-fs{position:fixed!important;inset:0;width:100vw;height:100vh;height:100dvh;max-width:none;margin:0;border-radius:0;z-index:2147483000;background:#000;aspect-ratio:auto}" +
@@ -232,7 +290,8 @@
       } catch (e) {}
       return {
         key: "teaching_last_attempt:" + (quiz.subject || "?") + ":" + (quiz.lesson || "?"),
-        msg: "Finish the quiz below to unlock this video.",
+        title: "Finish the quiz to unlock",
+        msg: "Complete the quiz below and the video opens right away.",
         watch: document.getElementById("quiz-root"),
       };
     }
@@ -243,7 +302,8 @@
           "teaching_last_submission:" +
           ((root && root.getAttribute("data-subject")) || "?") + ":" +
           ((root && root.getAttribute("data-lesson")) || "?"),
-        msg: "Submit the assignment below to unlock this video.",
+        title: "Submit your work to unlock",
+        msg: "Submit the assignment below and the video opens right away.",
         watch: root,
       };
     }
@@ -255,7 +315,8 @@
     var rule = finishRule(kind);
     if (!rule) return null;
     var overlay = el("div", { class: "video-lock" }, [
-      el("span", { class: "video-lock__icon", "aria-hidden": "true" }, [LOCK]),
+      el("span", { class: "video-lock__icon", "aria-hidden": "true" }, [icon("lock")]),
+      el("span", { class: "video-lock__title" }, [rule.title]),
       el("span", { class: "video-lock__msg" }, [rule.msg]),
     ]);
     function done() {
@@ -460,7 +521,7 @@
         rule.stop();
         rule = null;
       }
-      slot.classList.remove("vp-panel", "is-locked", "vp-yt", "vp-fs");
+      slot.classList.remove("vp-panel", "vp-empty", "vp-loading", "is-locked", "vp-yt", "vp-fs");
       document.documentElement.classList.remove("vp-fs-lock");
       while (slot.firstChild) slot.removeChild(slot.firstChild);
     }
@@ -474,7 +535,7 @@
 
     function showVideo(data, session) {
       if (!EMBED_OK.test(data.embed_url)) {
-        showProblem("This video can't be shown. Please tell your teacher.");
+        showProblem("This video can't be shown right now. Please let your teacher know.");
         return;
       }
       clear();
@@ -519,7 +580,7 @@
       }
       if (session && session.student_id) attachWatermark(slot, session.student_id);
       if (data.locked && session && session.is_admin) {
-        slot.appendChild(el("div", { class: "vp-badge" }, [LOCK + " Locked for students \u2014 you're previewing"]));
+        slot.appendChild(el("div", { class: "vp-badge" }, ["Admin preview \u00B7 locked for students"]));
       }
       rule = applyFinishRule(slot, info.kind);
     }
@@ -547,6 +608,8 @@
           say("Loading\u2026");
           load();
         });
+        box.appendChild(badge("alert"));
+        box.appendChild(el("p", { class: "vp-title" }, ["Couldn't load the video"]));
         box.appendChild(el("p", { class: "vp-text" }, [message]));
         box.appendChild(retry);
       });
@@ -567,44 +630,55 @@
           if (window.AuthEngine && typeof window.AuthEngine.openSignIn === "function") {
             window.AuthEngine.openSignIn();
           } else {
-            btn.textContent = "Use the sign-in button in the corner of the page";
+            btn.textContent = "Use the Sign in button at the top of the page";
             btn.disabled = true;
           }
         });
-        box.appendChild(el("div", { class: "vp-icon", "aria-hidden": "true" }, [LOCK]));
+        box.appendChild(badge("lock"));
         if (data.session_replaced) {
-          box.appendChild(el("p", { class: "vp-title" }, ["You were signed out"]));
-          box.appendChild(el("p", { class: "vp-text" }, ["This account was signed in on another device, or its password was reset. Only one device can be signed in at a time \u2014 sign in again to keep watching here."]));
+          box.appendChild(el("p", { class: "vp-title" }, ["You've been signed out"]));
+          box.appendChild(el("p", { class: "vp-text" }, ["Your account was signed in on another device, or its password was reset. Only one device can be signed in at a time, so sign in again to keep watching here."]));
         } else {
-          box.appendChild(el("p", { class: "vp-title" }, [data.no_video ? "This lesson is for enrolled students" : "This video is for enrolled students"]));
-          box.appendChild(el("p", { class: "vp-text" }, [data.no_video ? "Sign in with your phone number to get access." : "Sign in with your phone number to watch it."]));
+          box.appendChild(el("p", { class: "vp-title" }, [data.no_video ? "Sign in to open this lesson" : "Sign in to watch this video"]));
+          box.appendChild(el("p", { class: "vp-text" }, [data.no_video ? "This lesson is for enrolled students. Sign in with your phone number to continue." : "This video is for enrolled students. Sign in with your phone number to continue."]));
         }
         payBlock(box, data);
         box.appendChild(btn);
       });
     }
 
+    // The old "Video placeholder \u2014 add a YouTube embed URL" box, redrawn for students.
+    function showEmpty() {
+      var titles = { quiz: "Solution video coming soon", assignment: "Walkthrough video coming soon" };
+      panel(function (box) {
+        box.appendChild(badge("play"));
+        box.appendChild(el("p", { class: "vp-title" }, [titles[info.kind] || "Lesson video coming soon"]));
+        box.appendChild(el("p", { class: "vp-text" }, ["It hasn't been added yet \u2014 check back soon."]));
+      });
+      slot.classList.add("vp-empty");
+    }
+
     function showNoVideoYet() {
       panel(function (box) {
-        box.appendChild(el("div", { class: "vp-icon", "aria-hidden": "true" }, ["\u23F3"]));
-        box.appendChild(el("p", { class: "vp-title" }, ["Nothing here yet"]));
-        box.appendChild(el("p", { class: "vp-text" }, ["This lesson is unlocked for you \u2014 the video just hasn't been added yet. Check back soon."]));
+        box.appendChild(badge("clock"));
+        box.appendChild(el("p", { class: "vp-title" }, ["Video coming soon"]));
+        box.appendChild(el("p", { class: "vp-text" }, ["You're all set \u2014 this lesson is unlocked for you. The video just hasn't been added yet, so check back soon."]));
       });
     }
 
     function showPending(data) {
       panel(function (box, say) {
-        var again = el("button", { class: "vp-btn vp-ghost", type: "button" }, ["Check again"]);
+        var again = el("button", { class: "vp-btn vp-ghost", type: "button" }, ["Check status"]);
         again.addEventListener("click", function () {
           again.disabled = true;
           say("Checking\u2026");
           load();
         });
-        box.appendChild(el("div", { class: "vp-icon", "aria-hidden": "true" }, ["\u23F3"]));
-        box.appendChild(el("p", { class: "vp-title" }, ["Waiting for approval"]));
+        box.appendChild(badge("clock"));
+        box.appendChild(el("p", { class: "vp-title" }, ["Payment note received"]));
         box.appendChild(
           el("p", { class: "vp-text" }, [
-            "We got your payment note. This video unlocks as soon as your teacher confirms it.",
+            "Thanks! Your teacher will confirm your payment, and this video unlocks as soon as they do.",
           ]),
         );
         box.appendChild(again);
@@ -677,7 +751,7 @@
           if (e.key === "Enter") submit();
         });
 
-        box.appendChild(el("div", { class: "vp-icon vp-icon-badge", "aria-hidden": "true" }, [LOCK]));
+        box.appendChild(badge("lock"));
         box.appendChild(el("p", { class: "vp-title" }, [title]));
         box.appendChild(el("p", { class: "vp-text" }, [intro]));
         payBlock(box, data, true);
@@ -688,9 +762,12 @@
 
     function render(data, session) {
       if (!data.found) {
+        // No video for this slot. The page's baked-in dev placeholder is redrawn as a
+        // proper "coming soon" panel; anything else the page put there is restored as-is.
+        if (!original.trim() || /placeholder|loading video|coming soon/i.test(original)) return showEmpty();
         clear();
         state = "none";
-        slot.innerHTML = original; // no video for this slot: exactly what the page had before
+        slot.innerHTML = original;
         return;
       }
       if (data.embed_url) return showVideo(data, session);
@@ -706,7 +783,12 @@
       lastCheck = Date.now();
       var session = getSession();
       if (state === "init") {
-        slot.textContent = "Loading video\u2026";
+        slot.textContent = "";
+        slot.classList.add("vp-loading");
+        slot.appendChild(el("div", { class: "vp-loading-box", role: "status", "aria-live": "polite" }, [
+          el("div", { class: "vp-spinner" }),
+          el("span", {}, ["Loading video\u2026"]),
+        ]));
       }
       var payload = { action: "get_video", lesson: info.lesson, slot: info.kind };
       if (session) {
@@ -748,7 +830,7 @@
     }
   }
 
-  window.VideoSlot = { mountAll: mountAll, mountSlot: mountSlot, slotInfo: slotInfo };
+  window.VideoSlot = { mountAll: mountAll, mountSlot: mountSlot, slotInfo: slotInfo, icon: icon };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mountAll);
   else mountAll();

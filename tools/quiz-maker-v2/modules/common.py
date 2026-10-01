@@ -73,7 +73,7 @@ SUBMIT_MODES = [
 # --------------------------------------------------------------------------
 
 MEDIA_SLOT_RE = re.compile(r'(<div class="media-slot">)(.*?)(</div>)', re.DOTALL)
-VIDEO_PLACEHOLDER = "Video placeholder &mdash; add a YouTube embed URL to replace this box."
+VIDEO_PLACEHOLDER = "Video coming soon"
 # Baked into a backend-managed slot instead of VIDEO_PLACEHOLDER: a video DOES
 # exist there, video.js just hasn't fetched it yet, so the "add a URL" text
 # would be actively wrong for the split second (or the JS-disabled case)

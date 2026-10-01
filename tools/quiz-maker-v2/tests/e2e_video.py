@@ -182,8 +182,8 @@ def run(browser):
     s = Site(browser)
     pg = s.open()
     pg.wait_for_function("document.querySelector('.media-slot').textContent.indexOf('Loading') === -1")
-    check("no video row: the original placeholder text comes back", "Video placeholder" in pg.inner_text(".media-slot"), pg.inner_text(".media-slot"))
-    check("no video row: no iframe and no locked box", pg.locator("iframe").count() == 0 and pg.locator(".vp-box").count() == 0)
+    check("no video row: the dev placeholder is redrawn as a 'coming soon' panel", "coming soon" in pg.inner_text(".media-slot") and pg.locator(".media-slot.vp-empty").count() == 1, pg.inner_text(".media-slot"))
+    check("no video row: no iframe and no sign-in/payment box", pg.locator("iframe").count() == 0 and pg.locator(".vp-box button, .vp-box input").count() == 0)
     check("the page asked for slot 'lesson' of the right lesson", any(c.get("action") == "get_video" and c.get("lesson") == LESSON and c.get("slot") == "lesson" for c in s.calls), s.calls)
     s.close()
 
@@ -258,17 +258,17 @@ def run(browser):
     check("'I paid' with an empty reference is stopped on the page", "reference" in pg.inner_text(".vp-status").lower() and not any(c.get("action") == "request_access" for c in s.calls), s.calls)
     pg.fill(".vp-input", "wallet 01099998888 / 200")
     pg.click(".vp-form button:has-text('I paid')")
-    pg.wait_for_selector("text=Waiting for approval")
-    check("'I paid' shows 'Waiting for approval' and unlocks nothing", pg.locator("iframe").count() == 0)
+    pg.wait_for_selector("text=Payment note received")
+    check("'I paid' shows 'Payment note received' and unlocks nothing", pg.locator("iframe").count() == 0)
     queue = api(dict(TOK, action="admin_list_payments"))["payments"]
     mine = [q for q in queue if q["phone"] == "01000000010" and q["scope"] == LESSON]
     check("the teacher's queue has the request with the reference", len(mine) == 1 and "wallet" in mine[0]["reference"] and mine[0]["name"] == "Mona", queue)
 
     pg.reload()
-    pg.wait_for_selector("text=Waiting for approval")
+    pg.wait_for_selector("text=Payment note received")
     check("after a reload the page still says waiting (the server remembers)", True)
     pg.click("button:has-text('Check again')")
-    pg.wait_for_selector("text=Waiting for approval")
+    pg.wait_for_selector("text=Payment note received")
     check("'Check again' while still pending stays pending", pg.locator("iframe").count() == 0)
 
     api(dict(TOK, action="admin_decide_payment", payment_id=mine[0]["payment_id"], decision="approve", days=30))

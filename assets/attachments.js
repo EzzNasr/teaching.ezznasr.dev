@@ -84,7 +84,7 @@
       if (!items.length) {
         if (stamp) { stamp.textContent = "Coming soon"; stamp.className = "stamp planned"; }
         listWrap.appendChild(el("div", { class: "attach-empty frame" }, [
-          "No attachments for this lesson yet.",
+          "No files have been added to this lesson yet.",
         ]));
         return;
       }
