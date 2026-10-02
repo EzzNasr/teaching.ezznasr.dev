@@ -339,6 +339,36 @@ function _prettyLesson(path) {
   }).join(" \u203a ") || String(path || "");
 }
 
+// Telegram pings for a finished homework / quiz. Called OUTSIDE the lock, only for a
+// freshly saved attempt (never a duplicate). _notifyAdmin never throws.
+function _notifySubmission(payload, res) {
+  try {
+    if (!res || !res.ok || res.duplicate) return;
+    var lesson = _prettyLesson(payload.lesson_path || payload.lesson);
+    var score = typeof payload.score === "number" && typeof payload.total === "number"
+      ? "\n\ud83c\udfaf " + payload.score + "/" + payload.total : "";
+    var kind = "\ud83d\udcdd <b>Homework submitted</b>";
+    var how = payload.submission_type ? "\n\ud83d\udce6 " + _esc(payload.submission_type) : "";
+    _notifyAdmin(kind + "\n\n\ud83d\udc64 " + _esc(payload.name || payload.student_id) +
+      "\n\ud83d\udcd8 " + _esc(lesson) + score + how);
+  } catch (err) {
+    console.error("notifySubmission failed: " + err);
+  }
+}
+
+function _notifyQuiz(payload, res) {
+  try {
+    if (!res || !res.ok || res.duplicate) return;
+    var lesson = _prettyLesson(payload.lesson_path || payload.lesson);
+    var score = typeof payload.score === "number" && typeof payload.total === "number"
+      ? "\n\ud83c\udfaf " + payload.score + "/" + payload.total : "";
+    _notifyAdmin("\ud83e\udde0 <b>Quiz completed</b>\n\n\ud83d\udc64 " + _esc(payload.name || payload.student_id) +
+      "\n\ud83d\udcd8 " + _esc(lesson) + (payload.quiz_title ? " \u2014 " + _esc(payload.quiz_title) : "") + score);
+  } catch (err) {
+    console.error("notifyQuiz failed: " + err);
+  }
+}
+
 function _tgAdminIds() {
   return String(_props().getProperty("TELEGRAM_ADMIN_CHAT_ID") || "")
     .split(",").map(function (x) { return x.trim(); }).filter(Boolean);
@@ -1415,6 +1445,7 @@ function handleUploadSubmission(payload) {
     }, UPLOAD_LOCK_WAIT_MS);
 
     if (result.duplicate) _trashQuietly(made);   // saved by a parallel request while we worked
+    _notifySubmission(payload, result);
     return result;
   } catch (err) {
     _trashQuietly(made);                          // no row was written — don't leave the files behind
@@ -1502,6 +1533,7 @@ function handleUploadQuizResult(payload) {
     }, UPLOAD_LOCK_WAIT_MS);
 
     if (result.duplicate) _trashQuietly(made);
+    _notifyQuiz(payload, result);
     return result;
   } catch (err) {
     _trashQuietly(made);
