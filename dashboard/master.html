@@ -15,254 +15,32 @@
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/base.css">
 <link rel="stylesheet" href="/assets/forms.css">
+<link rel="stylesheet" href="/assets/dashboard.css">
+<style>:root { --d-w: 1180px; --d-kpis: 4; }</style>
 <script src="/assets/theme.js" defer></script>
-<style>
-  :root {
-    color-scheme: light;
-    --bg: #fbf9ff;
-    --bg-glow: rgba(111, 93, 235, .16);
-    --surface: rgba(255, 255, 255, .94);
-    --surface-strong: #ffffff;
-    --surface-soft: #f5f1ff;
-    --ink: #25223d;
-    --ink-dim: #6e6b86;
-    --line: #e8e3f5;
-    --line-strong: #d5cbea;
-    --accent: #6256d9;
-    --accent-2: #a052d8;
-    --accent-soft: #f0eaff;
-    --good: #168c79;
-    --low: #d45b65;
-    --shadow: 0 24px 60px rgba(83, 61, 139, .12);
-    --shadow-soft: 0 8px 24px rgba(83, 61, 139, .085);
-    --sans: 'Manrope', system-ui, sans-serif;
-    --mono: 'DM Mono', ui-monospace, monospace;
-  }
-
-  html[data-theme="dark"] {
-    color-scheme: dark;
-    --bg: #0d1120;
-    --bg-glow: rgba(129, 140, 248, .16);
-    --surface: rgba(25, 31, 52, .86);
-    --surface-strong: #1a2035;
-    --surface-soft: #171d31;
-    --ink: #f1f4ff;
-    --ink-dim: #9da7c0;
-    --line: #2a334d;
-    --line-strong: #39435f;
-    --accent: #9b9cff;
-    --accent-2: #c084fc;
-    --accent-soft: #29274d;
-    --good: #50d3a9;
-    --low: #ff858d;
-    --shadow: 0 24px 70px rgba(0, 0, 0, .34);
-    --shadow-soft: 0 10px 30px rgba(0, 0, 0, .22);
-  }
-
-  * { box-sizing: border-box; }
-  html { min-height: 100%; background: var(--bg); transition: background .25s ease; }
-  body {
-    min-height: 100vh;
-    margin: 0;
-    color: var(--ink);
-    background:
-      radial-gradient(circle at 12% 0%, var(--bg-glow), transparent 32rem),
-      radial-gradient(circle at 95% 18%, rgba(255, 167, 112, .13), transparent 27rem),
-      var(--bg);
-    font-family: var(--sans);
-    transition: color .25s ease, background .25s ease;
-  }
-
-  .dash-shell { width: min(100% - 32px, 1180px); margin: 0 auto; padding: 34px 0 72px; }
-  .dash-topbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom: 44px; }
-  .dash-back { display:inline-flex; align-items:center; gap:8px; color:var(--ink-dim); font: 600 12px/1 var(--mono); text-decoration:none; letter-spacing:.01em; transition:color .2s ease, transform .2s ease; }
-  .dash-back:hover { color:var(--accent); transform:translateX(-2px); }
-  .theme-toggle { display:inline-flex; align-items:center; gap:9px; border:1px solid var(--line); border-radius:999px; padding:8px 12px; color:var(--ink-dim); background:var(--surface); box-shadow:var(--shadow-soft); font:600 11px var(--mono); cursor:pointer; transition:all .2s ease; }
-  .theme-toggle:hover { color:var(--accent); border-color:var(--accent); transform:translateY(-1px); }
-  .theme-toggle:focus-visible { outline:3px solid color-mix(in srgb, var(--accent) 30%, transparent); outline-offset:3px; }
-  .theme-toggle-icon { font-size:15px; line-height:1; }
-
-  #dashboard { animation: dash-in .45s ease both; }
-  @keyframes dash-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-  .dash-head { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:26px; }
-  .dash-head h1 { margin:0; color:var(--ink); font:800 clamp(28px, 5vw, 42px)/1.08 var(--sans); letter-spacing:-.045em; }
-  .dash-head p { margin:10px 0 0; color:var(--ink-dim); font: 13px/1.6 var(--mono); }
-  .dash-head:after { content:'MASTER PORTAL'; color:var(--accent); font:700 10px var(--mono); letter-spacing:.16em; white-space:nowrap; }
-
-  .dash-stats { display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-bottom:32px; }
-  .dash-stat { position:relative; overflow:hidden; min-height:112px; padding:20px; border:1px solid var(--line); border-radius:18px; background:var(--surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(14px); }
-  .dash-stat:after { content:''; position:absolute; width:72px; height:72px; right:-22px; bottom:-30px; border-radius:50%; background:var(--accent-soft); }
-  .dash-stat b { position:relative; z-index:1; display:block; color:var(--ink); font:800 30px/1 var(--sans); letter-spacing:-.04em; }
-  .dash-stat span { position:relative; z-index:1; display:block; margin-top:9px; color:var(--ink-dim); font:11px var(--mono); }
-
-  .dash-filters { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:24px; padding:16px 18px; border:1px solid var(--line); border-radius:16px; background:var(--surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(14px); }
-  .dash-filters label { display:flex; flex-direction:column; gap:5px; color:var(--ink-dim); font:600 10px var(--mono); letter-spacing:.04em; }
-  .dash-select, .dash-search { border:1px solid var(--line-strong); border-radius:9px; padding:8px 10px; color:var(--ink); background:var(--surface-strong); font:13px var(--sans); min-width:150px; }
-  .dash-select:focus, .dash-search:focus { outline:2px solid color-mix(in srgb, var(--accent) 35%, transparent); outline-offset:1px; }
-  .dash-search { min-width:220px; }
-  .dash-clear { align-self:flex-end; border:1px solid var(--line-strong); border-radius:9px; padding:8px 12px; color:var(--ink-dim); background:var(--surface-soft); font:600 11px var(--mono); cursor:pointer; }
-  .dash-clear:hover { color:var(--accent); border-color:var(--accent); }
-
-  .dash-section { margin-bottom:28px; padding:22px 24px; border:1px solid var(--line); border-radius:20px; background:var(--surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(14px); }
-  .dash-section h2 { display:flex; align-items:center; gap:10px; margin:0 0 8px; padding:0 0 15px; border-bottom:1px solid var(--line); color:var(--ink); font:800 16px var(--sans); letter-spacing:-.02em; }
-  .dash-section h2:before { content:''; width:8px; height:8px; border-radius:3px; background:linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow:0 0 0 5px var(--accent-soft); }
-  .dash-section-note { margin:-4px 0 14px; color:var(--ink-dim); font:11px var(--mono); }
-  .dash-empty { padding:20px 0 6px; color:var(--ink-dim); font:13px/1.6 var(--mono); }
-
-  .dash-row { display:flex; align-items:center; gap:16px; min-height:66px; padding:14px 2px; border-bottom:1px solid var(--line); }
-  .dash-row:last-child { border-bottom:0; }
-  .dash-row.is-clickable { cursor:pointer; border-radius:10px; transition:background .15s ease; }
-  .dash-row.is-clickable:hover { background:var(--surface-soft); }
-  .dash-row.is-selected { background:var(--accent-soft); }
-  .dash-row-main { flex:1; min-width:0; }
-  .dash-row-title { overflow:hidden; color:var(--ink); font:700 14px var(--sans); text-overflow:ellipsis; white-space:nowrap; }
-  .dash-row-sub { margin-top:5px; overflow:hidden; color:var(--ink-dim); font:11px var(--mono); text-overflow:ellipsis; white-space:nowrap; }
-  .dash-score { flex-shrink:0; min-width:84px; text-align:right; font:600 12px var(--mono); }
-  .dash-score.is-good { color:var(--good); } .dash-score.is-mid { color:var(--ink); } .dash-score.is-low { color:var(--low); }
-  .dash-badge { flex-shrink:0; padding:5px 8px; border:1px solid var(--line-strong); border-radius:7px; color:var(--ink-dim); background:var(--surface-soft); font:10px var(--mono); letter-spacing:.03em; }
-  .dash-link { flex-shrink:0; color:var(--accent); font:600 11px var(--mono); text-decoration:none; }
-  .dash-link:hover { text-decoration:underline; }
-  .dash-chapter { padding:14px 2px 8px; }
-  .dash-chapter-top { display:flex; justify-content:space-between; gap:14px; margin-bottom:9px; color:var(--ink-dim); font:12px var(--mono); }
-  .dash-chapter-top b { overflow:hidden; color:var(--ink); font:700 13px var(--sans); text-overflow:ellipsis; white-space:nowrap; }
-  .dash-bar { height:9px; overflow:hidden; border-radius:999px; background:var(--line); }
-  .dash-bar-fill { height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--accent), var(--accent-2)); transition:width .5s ease; }
-  .dash-bar-fill.is-low { background:var(--low); } .dash-bar-fill.is-good { background:var(--good); }
-  .dash-sub-text { max-height:4.5em; overflow:hidden; margin-top:8px; color:var(--ink-dim); font:12px/1.5 var(--sans); white-space:pre-wrap; }
-  .dash-err { padding:18px 0; color:var(--low); font:13px/1.6 var(--mono); }
-  .dash-loadbar { width:100%; max-width:260px; height:5px; margin-top:16px; overflow:hidden; border-radius:999px; background:var(--line); }
-  .dash-loadbar-fill { width:42%; height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--accent), var(--accent-2)); animation:dash-loadbar-slide 1.1s ease-in-out infinite; }
-  @keyframes dash-loadbar-slide { 0% { transform:translateX(-120%); } 50% { transform:translateX(85%); } 100% { transform:translateX(260%); } }
-  .dash-loading-state { display:grid; place-items:center; min-height:calc(100vh - 190px); padding:28px 0 54px; }
-  .dash-loading-card { position:relative; width:min(100%, 520px); overflow:hidden; padding:42px 34px 36px; border:1px solid var(--line); border-radius:26px; background:var(--surface); box-shadow:var(--shadow); text-align:center; backdrop-filter:blur(18px); }
-  .dash-loading-card:before, .dash-loading-card:after { content:""; position:absolute; pointer-events:none; border-radius:50%; }
-  .dash-loading-card:before { width:190px; height:190px; top:-112px; left:-88px; background:var(--accent-soft); opacity:.7; }
-  .dash-loading-card:after { width:150px; height:150px; right:-74px; bottom:-92px; background:rgba(255, 167, 112, .16); }
-  .dash-loading-art { position:relative; z-index:1; display:grid; place-items:center; width:104px; height:104px; margin:0 auto 26px; }
-  .dash-loading-ring, .dash-loading-ring:before, .dash-loading-ring:after { position:absolute; display:block; border-radius:50%; content:""; }
-  .dash-loading-ring { inset:0; border:1px solid color-mix(in srgb, var(--accent) 28%, transparent); animation:dash-loading-spin 4s linear infinite; }
-  .dash-loading-ring:before { inset:10px; border:2px dashed color-mix(in srgb, var(--accent-2) 65%, transparent); animation:dash-loading-spin-reverse 2.8s linear infinite; }
-  .dash-loading-ring:after { inset:25px; border:7px solid var(--accent-soft); border-top-color:var(--accent); border-right-color:var(--accent-2); animation:dash-loading-spin 1.25s cubic-bezier(.4,0,.2,1) infinite; }
-  .dash-loading-core { position:relative; z-index:2; display:grid; place-items:center; width:31px; height:31px; border-radius:11px; color:#fff; background:linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow:0 7px 18px color-mix(in srgb, var(--accent) 32%, transparent); animation:dash-loading-pulse 1.6s ease-in-out infinite; }
-  .dash-loading-core:before { width:10px; height:10px; border:2px solid rgba(255,255,255,.82); border-radius:50%; content:""; }
-  .dash-loading-copy { position:relative; z-index:1; }
-  .dash-loading-title { margin:0; color:var(--ink); font:800 clamp(20px, 3vw, 25px)/1.2 var(--sans); letter-spacing:-.035em; }
-  .dash-loading-note { margin:10px 0 0; color:var(--ink-dim); font:12px/1.6 var(--mono); }
-  .dash-loading-dots { display:inline-flex; gap:4px; margin-left:3px; vertical-align:middle; }
-  .dash-loading-dots i { width:4px; height:4px; border-radius:50%; background:var(--accent); animation:dash-loading-dot 1.2s ease-in-out infinite; }
-  .dash-loading-dots i:nth-child(2) { animation-delay:.15s; }
-  .dash-loading-dots i:nth-child(3) { animation-delay:.3s; }
-  .dash-loading-meter { position:relative; z-index:1; width:min(100%, 310px); margin:24px auto 0; }
-  .dash-loading-meter-label { display:flex; justify-content:space-between; color:var(--ink-dim); font:10px var(--mono); letter-spacing:.06em; text-transform:uppercase; }
-  .dash-loading-meter .dash-loadbar { max-width:none; height:7px; margin-top:9px; }
-  @keyframes dash-loading-spin { to { transform:rotate(360deg); } }
-  @keyframes dash-loading-spin-reverse { to { transform:rotate(-360deg); } }
-  @keyframes dash-loading-pulse { 0%, 100% { transform:scale(.92); } 50% { transform:scale(1.08); } }
-  @keyframes dash-loading-dot { 0%, 60%, 100% { opacity:.25; transform:translateY(0); } 30% { opacity:1; transform:translateY(-3px); } }
-  .qz-next { border:0; border-radius:10px; padding:11px 15px; color:#fff; background:var(--accent); font:700 12px var(--mono); cursor:pointer; box-shadow:var(--shadow-soft); }
-  .qz-next:hover { filter:brightness(1.08); }
-
-  .dash-rank { flex-shrink:0; width:26px; color:var(--ink-dim); font:700 13px var(--mono); text-align:center; }
-  .dash-missed-q { overflow:hidden; color:var(--ink); font:600 13px/1.4 var(--sans); text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; }
-
-
-  .dash-tabs { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 18px; }
-  .dash-tab { border:1px solid var(--line-strong); border-radius:999px; padding:8px 14px; color:var(--ink-dim); background:var(--surface); font:700 12px var(--mono); cursor:pointer; transition:all .15s ease; }
-  .dash-tab:hover { color:var(--accent); border-color:var(--accent); }
-  .dash-tab.is-active { color:#fff; background:var(--accent); border-color:var(--accent); }
-  .dash-tab small { margin-left:6px; opacity:.75; font:600 11px var(--mono); }
-  .dash-note { margin:-14px 0 22px; color:var(--ink-dim); font:11px/1.6 var(--mono); }
-  .dash-attempt { border-bottom:1px solid var(--line); }
-  .dash-attempt:last-child { border-bottom:0; }
-  .dash-attempt > .dash-row { border-bottom:0; }
-  .dash-toggle { flex-shrink:0; color:var(--accent); font:600 11px var(--mono); white-space:nowrap; }
-  .dash-detail { margin:0 0 14px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--surface-soft); }
-  .dash-detail-h { margin:0 0 6px; color:var(--ink-dim); font:600 11px var(--mono); }
-  .dash-q { padding:10px 0; border-top:1px solid var(--line); }
-  .dash-detail-h + .dash-q { border-top:0; }
-  .dash-q-text { color:var(--ink); font:600 13px/1.45 var(--sans); }
-  .dash-q-group { margin:12px 0 2px; color:var(--ink-dim); font:600 11px/1.5 var(--mono); }
-  .dash-q-ch { margin-left:6px; color:var(--ink-dim); font:600 10px var(--mono); }
-  .dash-q-a { margin-top:5px; font:12px/1.5 var(--mono); white-space:pre-wrap; }
-  .dash-q-a.your { color:var(--low); }
-  .dash-q-a.correct { color:var(--good); }
-  .dash-ok-list { margin-top:10px; }
-  .dash-ok-list summary { cursor:pointer; color:var(--ink-dim); font:600 11px var(--mono); }
-  .dash-more { display:block; margin:14px auto 0; border:1px solid var(--line-strong); border-radius:9px; padding:9px 16px; color:var(--accent); background:var(--surface-soft); font:700 11px var(--mono); cursor:pointer; }
-  .dash-more[hidden] { display:none; }
-
-  /* Light-only visual polish: colorful, information-dense master view. */
-  html:not([data-theme="dark"]) .dash-stat,
-  html:not([data-theme="dark"]) .dash-filters,
-  html:not([data-theme="dark"]) .dash-section,
-  html:not([data-theme="dark"]) .theme-toggle {
-    border-color: rgba(207, 201, 230, .82);
-    box-shadow: 0 10px 28px rgba(83, 61, 139, .07), 0 2px 5px rgba(83, 61, 139, .035);
-  }
-  html:not([data-theme="dark"]) .dash-stat,
-  html:not([data-theme="dark"]) .dash-section,
-  html:not([data-theme="dark"]) .dash-filters {
-    background: rgba(255, 255, 255, .9);
-  }
-  html:not([data-theme="dark"]) .dash-stat {
-    border-top-width: 3px;
-    background-image: linear-gradient(145deg, rgba(255,255,255,.98), rgba(248,246,255,.92));
-  }
-  html:not([data-theme="dark"]) .dash-stat:nth-child(1) { border-top-color: #7567e8; }
-  html:not([data-theme="dark"]) .dash-stat:nth-child(2) { border-top-color: #e080b6; }
-  html:not([data-theme="dark"]) .dash-stat:nth-child(3) { border-top-color: #e6a052; }
-  html:not([data-theme="dark"]) .dash-stat:nth-child(4) { border-top-color: #57b99c; }
-  html:not([data-theme="dark"]) .dash-stat:nth-child(1):after { background: linear-gradient(135deg, #e4dfff, #f1eaff); }
-  html:not([data-theme="dark"]) .dash-stat:nth-child(2):after { background: linear-gradient(135deg, #ffe1ef, #ffeedb); }
-  html:not([data-theme="dark"]) .dash-stat:nth-child(3):after { background: linear-gradient(135deg, #ffedc9, #ffe0d0); }
-  html:not([data-theme="dark"]) .dash-stat:nth-child(4):after { background: linear-gradient(135deg, #d7f5e9, #dceffc); }
-  html:not([data-theme="dark"]) .dash-filters { background: linear-gradient(105deg, rgba(246,242,255,.94), rgba(255,248,242,.9)); }
-  html:not([data-theme="dark"]) .dash-select,
-  html:not([data-theme="dark"]) .dash-search { background: rgba(255,255,255,.92); border-color: #d8d0ea; }
-  html:not([data-theme="dark"]) .dash-section h2:before { box-shadow: 0 0 0 5px rgba(238,234,255,.9); }
-  html:not([data-theme="dark"]) .dash-section:nth-of-type(2) h2:before { background: linear-gradient(135deg, #e080b6, #f4a261); box-shadow: 0 0 0 5px rgba(255,232,237,.9); }
-  html:not([data-theme="dark"]) .dash-section:nth-of-type(3) h2:before { background: linear-gradient(135deg, #e6a052, #e080b6); box-shadow: 0 0 0 5px rgba(255,240,218,.9); }
-  html:not([data-theme="dark"]) .dash-section:nth-of-type(4) h2:before { background: linear-gradient(135deg, #42b997, #62b6e8); box-shadow: 0 0 0 5px rgba(222,248,240,.9); }
-  html:not([data-theme="dark"]) .dash-row.is-clickable:hover { background: linear-gradient(90deg, rgba(240,235,255,.72), rgba(255,247,242,.5)); }
-  html:not([data-theme="dark"]) .dash-row.is-selected { background: linear-gradient(90deg, rgba(236,231,255,.95), rgba(255,239,247,.68)); }
-  html:not([data-theme="dark"]) .dash-bar { background: #ebe6f3; }
-
-  @media (max-width: 900px) {
-    .dash-stats { grid-template-columns:repeat(2, 1fr); }
-  }
-  @media (max-width: 640px) {
-    .dash-shell { width:min(100% - 24px, 1180px); padding-top:20px; }
-    .dash-topbar { margin-bottom:34px; }
-    .dash-head { display:block; }
-    .dash-head:after { display:block; margin-top:18px; }
-    .dash-stats { grid-template-columns:1fr; gap:10px; margin-bottom:24px; }
-    .dash-stat { min-height:0; padding:16px; }
-    .dash-filters { flex-direction:column; align-items:stretch; }
-    .dash-select, .dash-search { min-width:0; width:100%; }
-    .dash-clear { align-self:stretch; }
-    .dash-section { padding:18px 16px; border-radius:16px; }
-    .dash-row { align-items:flex-start; gap:10px; }
-    .dash-score { min-width:72px; padding-top:2px; font-size:11px; }
-    .dash-badge { padding:4px 6px; }
-    .theme-toggle-label { display:none; }
-    .dash-loading-state { min-height:calc(100vh - 150px); padding:10px 0 34px; }
-    .dash-loading-card { padding:34px 20px 30px; border-radius:22px; }
-  }
-  @media (prefers-reduced-motion: reduce) { *, *:before, *:after { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
-</style>
 </head>
 <body>
 
-<div class="dash-shell">
-  <div class="dash-topbar">
-    <a class="dash-back" href="/">&larr; Back to teaching.ezznasr.dev</a>
-    <a class="dash-back" href="access.html" style="margin-left:14px">Video access &rarr;</a>
+<div class="d-bar" role="banner">
+  <div class="d-bar-in">
+    <a class="d-brand" href="/" aria-label="Teaching Portal home">
+      <span class="d-brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 5l9 4.5-9 4.5-9-4.5Z"/><path d="M7 12v4.2c0 1 2.2 2.3 5 2.3s5-1.3 5-2.3V12"/></svg></span>
+      Teaching Portal<small>Admin</small>
+    </a>
+    <nav class="d-nav" aria-label="Admin">
+      <a href="master.html" aria-current="page">Results</a>
+      <a href="access.html">Video access</a>
+      <a href="/">Back to site</a>
+    </nav>
+    <span class="d-spacer"></span>
     <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
-      <span class="theme-toggle-icon" aria-hidden="true">☾</span><span class="theme-toggle-label">Dark mode</span>
+      <span class="theme-toggle-icon" aria-hidden="true"></span><span class="theme-toggle-label">Dark mode</span>
     </button>
   </div>
+</div>
 
-  <div id="authgate" style="margin-top:20px;"></div>
+<div class="dash-shell">
+  <div id="authgate"></div>
   <div id="dashboard" hidden></div>
 </div>
 
@@ -270,6 +48,8 @@
 (function () {
   "use strict";
   var key = "master-dashboard-theme";
+  var ICON_MOON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.4A8.5 8.5 0 1 1 9.6 3.5a7 7 0 0 0 10.9 10.9Z"/></svg>';
+  var ICON_SUN = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/></svg>';
   var root = document.documentElement;
   var button = document.getElementById("themeToggle");
   var saved = null;
@@ -282,7 +62,7 @@
     var dark = next === "dark";
     button.setAttribute("aria-pressed", String(dark));
     button.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
-    button.querySelector(".theme-toggle-icon").textContent = dark ? "☀" : "☾";
+    button.querySelector(".theme-toggle-icon").innerHTML = dark ? ICON_SUN : ICON_MOON;
     button.querySelector(".theme-toggle-label").textContent = dark ? "Light mode" : "Dark mode";
   }
   apply(theme);
@@ -294,6 +74,7 @@
 })();
 </script>
 <script src="/assets/auth.js"></script>
+<script src="/assets/dash-review.js"></script>
 <script>
 (function () {
   "use strict";
@@ -479,6 +260,8 @@
     return { rows: out, dup: dup, blank: blank };
   }
 
+  var R = window.DashReview.create({ el: el, fmtWhen: fmtWhen, whenMs: whenMs, isTruthyFlag: isTruthyFlag });
+
   // -- Per-question detail ---------------------------------------------------
   // Quizzes store {question, your_answer, correct_answer, is_correct,
   // chapter}; graded assignments store {prompt, chosen, correct_answer,
@@ -514,32 +297,16 @@
     }
   }
 
-  function questionItem(q, showCorrect) {
-    function ans(v) {
-      var t = (v === undefined || v === null || v === "") ? "\u2014" : String(v);
-      return q.type === "match" ? t.split("; ").join("\n") : t;
-    }
-    var isMatch = !!q.label;
-    var box = el("div", { class: "dash-q" }, [
-      el("div", { class: "dash-q-text" }, [isMatch ? q.label : q.question, q.chapter ? el("span", { class: "dash-q-ch" }, ["Ch " + q.chapter]) : null]),
-    ]);
-    if (!q.ok) {
-      box.appendChild(el("div", { class: "dash-q-a your" }, [(isMatch ? "Matched to: " : "Answered: ") + ans(q.chosen)]));
-      box.appendChild(el("div", { class: "dash-q-a correct" }, [(isMatch ? "Should be matched to: " : "Correct answer: ") + ans(q.correct)]));
-    } else {
-      box.appendChild(el("div", { class: "dash-q-a correct" }, [(isMatch ? "Matched to (correct): " : "Answered (correct): ") + ans(q.chosen)]));
-    }
-    return box;
-  }
 
   // Appends items, printing a matching question's shared instruction once
   // above its rows instead of repeating it on every row.
   function appendItems(container, list) {
     var lastGroup = null;
     list.forEach(function (q) {
-      if (q.label && q.group !== lastGroup) container.appendChild(el("div", { class: "dash-q-group" }, [q.group]));
+      if (q.label && q.group !== lastGroup) container.appendChild(el("div", { class: "dash-q-group", dir: "auto" }, [q.group]));
       lastGroup = q.label ? q.group : null;
-      container.appendChild(questionItem(q));
+      q.suppressInstr = !!q.label;
+      container.appendChild(R.attemptQuestion(q));
     });
   }
 
@@ -564,28 +331,60 @@
 
   // One quiz attempt / graded submission: the row itself plus a detail panel
   // (built on first open, so hundreds of rows stay cheap).
+  function trail(parts) {
+    var kids = [];
+    parts.filter(function (p) { return p !== null && p !== undefined && p !== ""; }).forEach(function (p, i) {
+      if (i) kids.push(el("i", { "aria-hidden": "true" }));
+      kids.push(typeof p === "object" ? p : el("span", {}, [p]));
+    });
+    return el("div", { class: "at-trail" }, kids);
+  }
+
+  // The chapter an attempt belongs to: the first tagged question, else the
+  // chapter named in the lesson's folder/title.
+  function attemptChapter(list, slug) {
+    var tagged = "";
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i].chapter;
+      if (c !== undefined && c !== null && String(c) !== "") { tagged = c; break; }
+    }
+    return R.chapterOf(tagged, slug);
+  }
+
+  function lessonTrail(subject, slug, chapter) {
+    var info = R.lessonInfo(slug);
+    var where = [chapter ? "Chapter " + chapter : "", info.num ? "Lesson " + info.num : ""].filter(Boolean).join(" \u00b7 ");
+    return [R.subjectName(subject), where];
+  }
+
+  // One quiz attempt / graded submission: the row itself plus a detail panel
+  // (built on first open, so hundreds of rows stay cheap).
   function attemptRow(o) {
     var wrongCount = o.total ? Math.max(0, o.total - o.score) : 0;
-    var toggle = el("div", { class: "dash-toggle" }, [(o.total ? (wrongCount ? wrongCount + " wrong" : "all correct") + " " : "") + "\u25BE"]);
-    var row = el("div", { class: "dash-row is-clickable" }, [
+    var toggle = el("div", { class: "dash-toggle" }, [o.total ? (wrongCount ? wrongCount + " wrong" : "All correct") : "Details"]);
+    var row = el("div", { class: "dash-row is-clickable", role: "button", tabindex: "0", "aria-expanded": "false" }, [
       el("div", { class: "dash-row-main" }, [
-        el("div", { class: "dash-row-title" }, [o.title]),
-        el("div", { class: "dash-row-sub" }, [o.sub]),
+        el("div", { class: "at-title" }, [el("div", { class: "dash-row-title", dir: "auto" }, [o.title])]),
+        trail(o.trail),
       ]),
-      el("div", { class: "dash-score " + scoreClass(o.score, o.total) }, [o.score + "/" + o.total + " (" + fmtPct(o.score, o.total) + ")"]),
+      el("div", { class: "dash-score " + scoreClass(o.score, o.total) }, [o.score + "/" + o.total, el("small", {}, [fmtPct(o.score, o.total)])]),
       toggle,
     ]);
     var wrap = el("div", { class: "dash-attempt" }, [row]);
     var detail = null;
-    row.addEventListener("click", function () {
+    function flip() {
       if (!detail) {
         detail = buildDetail(o.items().map(normQ).map(splitMatch), o.total);
         wrap.appendChild(detail);
       } else {
         detail.hidden = !detail.hidden;
       }
-      var base = toggle.textContent.replace(/\s*[\u25BE\u25B4]$/, "");
-      toggle.textContent = base + (base ? " " : "") + (detail.hidden ? "\u25BE" : "\u25B4");
+      toggle.className = "dash-toggle" + (detail.hidden ? "" : " is-open");
+      row.setAttribute("aria-expanded", String(!detail.hidden));
+    }
+    row.addEventListener("click", flip);
+    row.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); }
     });
     return wrap;
   }
@@ -593,7 +392,7 @@
   var PAGE_SIZE = 40;
   function appendPaged(section, rows, buildRow) {
     var shown = 0;
-    var holder = el("div", {});
+    var holder = el("div", { class: "d-list" });
     var more = el("button", { class: "dash-more", type: "button" });
     function showMore() {
       rows.slice(shown, shown + PAGE_SIZE).forEach(function (r) { holder.appendChild(buildRow(r)); });
@@ -654,7 +453,10 @@
       parseQuestions(row).forEach(function (q) {
         var key = (row.lesson || "") + "||" + (q.question || "");
         if (!byKey[key]) {
-          byKey[key] = { question: q.question || "(untitled question)", lesson: row.lesson || "", subject: row.subject || "", wrong: 0, total: 0 };
+          byKey[key] = {
+            question: q.question || "(untitled question)", lesson: row.lesson || "", subject: row.subject || "",
+            chapter: R.chapterOf(q.chapter, row.lesson), type: q.type || "", wrong: 0, total: 0,
+          };
         }
         byKey[key].total += 1;
         if (!isTruthyFlag(q.is_correct)) byKey[key].wrong += 1;
@@ -665,6 +467,17 @@
       .filter(function (x) { return x.wrong > 0; })
       .sort(function (a, b) { return b.wrong - a.wrong; })
       .slice(0, 15);
+  }
+
+  // Which course a lesson belongs to ("Senior 1" / "Senior 2"), read from the
+  // assignment catalog's folder layout. "" when the catalog hasn't loaded or
+  // the lesson sits outside the year split.
+  function yearForLesson(subject, lesson) {
+    for (var i = 0; i < STATE.catalog.length; i++) {
+      var c = STATE.catalog[i];
+      if (c.subject === subject && c.lesson === lesson) return c.year || "";
+    }
+    return "";
   }
 
   function buildRoster(students, quizRows, subRows) {
@@ -941,12 +754,15 @@
     var quiz = yearScopedQuiz();
     var totalScore = 0, totalMax = 0;
     quiz.forEach(function (r) { totalScore += Number(r.score) || 0; totalMax += Number(r.total) || 0; });
-    var avgPct = totalMax ? Math.round((totalScore / totalMax) * 100) + "%" : "\u2014";
+    var avg = totalMax ? Math.round((totalScore / totalMax) * 100) : null;
+    function stat(label, value, hint, cls) {
+      return el("div", { class: "dash-stat" }, [el("span", {}, [label]), el("b", { class: cls || "" }, [value]), el("em", {}, [hint])]);
+    }
     return el("div", { class: "dash-stats" }, [
-      el("div", { class: "dash-stat" }, [el("b", {}, [String(yearScopedStudents().length)]), el("span", {}, ["Students"])]),
-      el("div", { class: "dash-stat" }, [el("b", {}, [String(quiz.length)]), el("span", {}, ["Quiz attempts (all-time)"])]),
-      el("div", { class: "dash-stat" }, [el("b", {}, [avgPct]), el("span", {}, ["Average score (all-time)"])]),
-      el("div", { class: "dash-stat" }, [el("b", {}, [String(yearScopedSubs().length)]), el("span", {}, ["Submissions (all-time)"])]),
+      stat("Students", String(yearScopedStudents().length), "registered"),
+      stat("Quiz attempts", String(quiz.length), "all time"),
+      stat("Average score", avg === null ? "\u2014" : avg + "%", "all time", avg === null ? "" : (avg >= 80 ? "is-good" : (avg < 50 ? "is-low" : ""))),
+      stat("Submissions", String(yearScopedSubs().length), "all time"),
     ]);
   }
 
@@ -1038,41 +854,44 @@
 
   function renderRoster(onChange) {
     var roster = buildRoster(yearScopedStudents(), STATE.quizRows, STATE.subRows);
-    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Roster"])]);
+    var section = el("details", { class: "dash-section rv-roster", open: "open" }, [
+      el("summary", {}, [el("div", { class: "d-sec-head" }, [el("h2", {}, ["Roster", el("span", { class: "d-count" }, [String(roster.length)])])]),
+        el("span", { class: "rv-caret", "aria-hidden": "true" })]),
+      el("p", { class: "dash-section-note" }, ["Select a student to filter every section below. Select again to clear."]),
+    ]);
     if (!roster.length) {
       section.appendChild(el("div", { class: "dash-empty" }, ["No registered students yet."]));
       return section;
     }
+    var list = el("div", { class: "d-list d-scroll" });
     roster.forEach(function (r) {
       var rowClass = "dash-row is-clickable" + (STATE.filterPhone === r.digits ? " is-selected" : "");
-      var row = el("div", { class: rowClass }, [
+      var row = el("div", { class: rowClass, role: "button", tabindex: "0", "aria-pressed": String(STATE.filterPhone === r.digits) }, [
         el("div", { class: "dash-row-main" }, [
-          el("div", { class: "dash-row-title" }, [r.display_name]),
-          el("div", { class: "dash-row-sub" }, [maskPhone(r.phone) + (r.created_at ? " \u00b7 joined " + r.created_at : "")]),
+          el("div", { class: "dash-row-title", dir: "auto" }, [r.display_name]),
+          el("div", { class: "dash-row-sub" }, [maskPhone(r.phone) + (r.created_at ? " \u00b7 joined " + fmtWhen(r.created_at) : "")]),
         ]),
-        el("div", { class: "dash-badge" }, [r.year || "no year on file"]),
+        el("div", { class: "dash-badge" }, [r.year || "No year"]),
         el("div", { class: "dash-badge" }, [r.quizzes + " quiz" + (r.quizzes === 1 ? "" : "zes")]),
         el("div", { class: "dash-score " + (r.avgPct === "\u2014" ? "is-mid" : "") }, [r.avgPct]),
         el("div", { class: "dash-badge" }, [r.submissions + " sub" + (r.submissions === 1 ? "" : "s")]),
       ]);
-      row.addEventListener("click", function () {
+      function pick() {
         STATE.filterPhone = (STATE.filterPhone === r.digits) ? "" : r.digits;
         onChange();
-      });
-      section.appendChild(row);
+      }
+      row.addEventListener("click", pick);
+      row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
+      list.appendChild(row);
     });
+    section.appendChild(list);
     return section;
   }
 
   function renderAssignmentCompletion() {
-    var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, ["Assignment completion"]),
-      el("div", { class: "dash-section-note" }, [
-        "Programming lessons under a grade-N-secondary folder count only toward that year; " +
-        "everything else is tagged by subject instead (English, Math, or Other Programming). " +
-        "Catalog is read live from GitHub, so a lesson with zero submissions still shows up."
-      ]),
-    ]);
+    var section = el("section", { class: "dash-section", id: "sec-completion" }, sectionHead("Assignment completion", null,
+      "Programming lessons in a grade folder count only toward that year; everything else is tagged by subject. " +
+      "The catalog is read live from GitHub, so a lesson with no submissions still shows up."));
 
     if (STATE.catalogError) {
       section.appendChild(el("div", { class: "dash-empty" }, [
@@ -1103,19 +922,21 @@
         section.appendChild(el("div", { class: "dash-empty" }, ["No applicable assignments found for this filter."]));
         return section;
       }
+      var list = el("div", { class: "d-list" });
       perStudent.forEach(function (a) {
         var main = [
-          el("div", { class: "dash-row-title" }, [a.lesson]),
+          el("div", { class: "dash-row-title", dir: "auto" }, [R.lessonLabel(a.lesson)]),
           el("div", { class: "dash-row-sub" }, [a.year ? (a.subject + " \u00b7 " + a.year) : catalogTag(a)]),
         ];
         if (a.submitted && a.when) {
           main.push(el("div", { class: "dash-row-sub" }, ["Submitted " + fmtWhen(a.when) + (a.attempts > 1 ? " \u00b7 " + a.attempts + " attempts" : "")]));
         }
         var right = !a.submitted ? el("div", { class: "dash-score is-low" }, ["Not yet"])
-          : a.total ? el("div", { class: "dash-score " + scoreClass(a.score, a.total) }, [a.score + "/" + a.total + " (" + fmtPct(a.score, a.total) + ")"])
+          : a.total ? el("div", { class: "dash-score " + scoreClass(a.score, a.total) }, [a.score + "/" + a.total, el("small", {}, [fmtPct(a.score, a.total)])])
           : el("div", { class: "dash-score is-good" }, ["Submitted"]);
-        section.appendChild(el("div", { class: "dash-row" }, [el("div", { class: "dash-row-main" }, main), right]));
+        list.appendChild(el("div", { class: "dash-row" }, [el("div", { class: "dash-row-main" }, main), right]));
       });
+      section.appendChild(list);
       return section;
     }
 
@@ -1128,12 +949,13 @@
       section.appendChild(el("div", { class: "dash-empty" }, ["No applicable assignments found for this filter."]));
       return section;
     }
+    var agg = el("div", { class: "d-list" });
     aggregate.forEach(function (a) {
       var pct = a.pool ? a.submitted / a.pool : 1;
       var barClass = pct >= 0.8 ? "is-good" : (pct < 0.5 ? "is-low" : "");
-      section.appendChild(el("div", { class: "dash-chapter" }, [
+      agg.appendChild(el("div", { class: "dash-chapter" }, [
         el("div", { class: "dash-chapter-top" }, [
-          el("b", {}, [a.lesson]),
+          el("b", { dir: "auto" }, [R.lessonLabel(a.lesson)]),
           document.createTextNode((a.year ? (a.subject + " \u00b7 " + a.year) : catalogTag(a)) + " \u00b7 " + a.submitted + "/" + a.pool),
         ]),
         el("div", { class: "dash-bar" }, [
@@ -1141,103 +963,105 @@
         ]),
       ]));
     });
+    section.appendChild(agg);
     return section;
   }
 
   function renderMostMissed(quizRows) {
-    var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, ["Most missed questions"]),
-      el("div", { class: "dash-section-note" }, ["Ranked by wrong-answer count \u2014 respects the filters above."]),
-    ]);
+    var section = el("section", { class: "dash-section", id: "sec-missed" }, sectionHead("Most missed questions", null,
+      "The 15 questions with the most wrong answers in the current view."));
     var ranked = aggregateMostMissed(quizRows);
     if (!ranked.length) {
       section.appendChild(el("div", { class: "dash-empty" }, ["No missed questions in the current view."]));
       return section;
     }
+    var list = el("div", { class: "d-list" });
     ranked.forEach(function (q, i) {
-      section.appendChild(el("div", { class: "dash-row" }, [
+      var info = R.lessonInfo(q.lesson);
+      var text = q.question;
+      if (q.type === "match") { var k = text.lastIndexOf(" \u2014 "); if (k > 0) text = text.slice(k + 3) + "  (" + text.slice(0, k) + ")"; }
+      list.appendChild(el("div", { class: "dash-row" }, [
         el("div", { class: "dash-rank" }, [String(i + 1)]),
         el("div", { class: "dash-row-main" }, [
-          el("div", { class: "dash-missed-q" }, [q.question]),
-          el("div", { class: "dash-row-sub" }, [(q.subject || "") + (q.lesson ? " \u00b7 " + q.lesson : "")]),
+          el("div", { class: "dash-missed-q", dir: "auto" }, [text]),
+          trail([R.subjectName(q.subject), q.chapter ? "Chapter " + q.chapter : "", info.num ? "Lesson " + info.num : "", info.name, "Quiz"]),
         ]),
-        el("div", { class: "dash-score is-low" }, [q.wrong + "/" + q.total + " missed"]),
+        el("div", { class: "dash-score is-low" }, [q.wrong + "/" + q.total, el("small", {}, ["missed"])]),
       ]));
     });
+    section.appendChild(list);
     return section;
   }
 
-  function renderChapterSection(quizRows) {
-    var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, ["By chapter"]),
-      el("div", { class: "dash-section-note" }, ["Aggregated across the current view."]),
-    ]);
-    var chapters = aggregateChapters(quizRows);
-    if (!chapters.length) {
+  function renderChapterSection(quizRows, subRows) {
+    var section = el("section", { class: "dash-section", id: "sec-chapters" }, sectionHead("Chapters and lessons", null,
+      "Missed questions grouped by chapter and lesson. Bars show quiz accuracy across the current view."));
+    var tree = R.buildTree(quizRows, subRows, { groupOf: function (r) { return yearForLesson(r.subject, r.lesson); } });
+    if (!tree.length) {
       section.appendChild(el("div", { class: "dash-empty" }, ["No chapter-tagged questions in the current view."]));
       return section;
     }
-    chapters.forEach(function (c) {
-      var pctLabel = Math.round(c.pct * 100) + "%";
-      var barClass = c.pct >= 0.8 ? "is-good" : (c.pct < 0.5 ? "is-low" : "");
-      section.appendChild(el("div", { class: "dash-chapter" }, [
-        el("div", { class: "dash-chapter-top" }, [
-          el("b", {}, [c.chapter]),
-          document.createTextNode(c.correct + "/" + c.total + " \u00b7 " + pctLabel),
-        ]),
-        el("div", { class: "dash-bar" }, [
-          el("div", { class: "dash-bar-fill " + barClass, style: "width:" + Math.max(3, Math.round(c.pct * 100)) + "%" }),
-        ]),
-      ]));
-    });
+    section.appendChild(R.renderChapters(tree, { mode: "master" }));
     return section;
   }
 
+  function sectionHead(title, count, note) {
+    var out = [el("div", { class: "d-sec-head" }, [el("h2", {}, [title, count === null ? null : el("span", { class: "d-count" }, [String(count)])])])];
+    if (note) out.push(el("p", { class: "dash-section-note" }, [note]));
+    return out;
+  }
+
   function renderQuizSection(quizRows) {
-    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Quiz attempts (" + quizRows.length + ")"])]);
-    section.appendChild(el("div", { class: "dash-section-note" }, ["Tap an attempt to see exactly what the student got wrong."]));
+    var section = el("section", { class: "dash-section", id: "sec-quizzes" }, sectionHead("Quiz attempts", quizRows.length,
+      "Select an attempt to see exactly what the student got wrong."));
     if (!quizRows.length) {
       section.appendChild(el("div", { class: "dash-empty" }, ["No quiz attempts match the current filters."]));
       return section;
     }
     appendPaged(section, newestFirst(quizRows), function (r) {
       var score = Number(r.score) || 0, total = Number(r.total) || 0;
+      var qs = parseQuestions(r);
+      var slug = r.lesson || "";
+      var info = R.lessonInfo(slug);
+      var took = durationLabel(r.start_time, r.end_time);
       return attemptRow({
-        title: (r.name || "Unknown") + " \u2014 " + (r.quiz_title || r.lesson || "Quiz"),
-        sub: (r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.start_time || r.date ? " \u00b7 " + fmtWhen(r.start_time || r.date) : "") +
-          (durationLabel(r.start_time, r.end_time) ? " \u00b7 took " + durationLabel(r.start_time, r.end_time) : ""),
+        title: (r.name || "Unknown") + " \u2014 " + (info.name || r.quiz_title || "Quiz"),
+        trail: [R.chip("quiz", "Quiz")].concat(lessonTrail(r.subject, slug, attemptChapter(qs, slug)),
+          [fmtWhen(r.start_time || r.date), took ? "took " + took : ""]),
         score: score, total: total,
-        items: function () { return parseQuestions(r); },
+        items: function () { return qs; },
       });
     });
     return section;
   }
 
+  var SUB_LABEL = { text: "Written answer", url: "Link", file: "File", both: "Answer + file", graded: "Graded" };
+
   function renderSubmissionsSection(subRows) {
-    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Submissions (" + subRows.length + ")"])]);
+    var section = el("section", { class: "dash-section", id: "sec-submissions" }, sectionHead("Submissions", subRows.length));
     if (!subRows.length) {
       section.appendChild(el("div", { class: "dash-empty" }, ["No submissions match the current filters."]));
       return section;
     }
     appendPaged(section, newestFirst(subRows), function (r) {
       var when = fmtWhen(r.submitted_time || r.date);
+      var slug = r.lesson || "";
+      var info = R.lessonInfo(slug);
+      var answers = r.submission_type === "graded" ? parseJsonList(r.answers_json) : [];
+      var title = (r.name || "Unknown") + " \u2014 " + (info.name || r.lesson || "Assignment");
+      var tr = [R.chip("assign", "Assignment")].concat(lessonTrail(r.subject, slug, attemptChapter(answers, slug)), [when]);
       if (r.submission_type === "graded" && Number(r.total) > 0) {
-        return attemptRow({
-          title: (r.name || "Unknown") + " \u2014 " + (r.lesson || "Assignment"),
-          sub: (r.subject || "") + (when ? " \u00b7 " + when : ""),
-          score: Number(r.score) || 0, total: Number(r.total),
-          items: function () { return parseJsonList(r.answers_json); },
-        });
+        return attemptRow({ title: title, trail: tr, score: Number(r.score) || 0, total: Number(r.total), items: function () { return answers; } });
       }
       var main = el("div", { class: "dash-row-main" }, [
-        el("div", { class: "dash-row-title" }, [(r.name || "Unknown") + " \u2014 " + (r.lesson || "Assignment")]),
-        el("div", { class: "dash-row-sub" }, [(r.subject || "") + (when ? " \u00b7 " + when : "")]),
+        el("div", { class: "at-title" }, [el("div", { class: "dash-row-title", dir: "auto" }, [title])]),
+        trail(tr),
       ]);
       if (r.submission_type === "text" && r.text) {
         var truncNote = isTruthyFlag(r.text_truncated) ? " (preview only \u2014 full text saved)" : "";
-        main.appendChild(el("div", { class: "dash-sub-text" }, [r.text + truncNote]));
+        main.appendChild(el("div", { class: "dash-sub-text", dir: "auto" }, [r.text + truncNote]));
       }
-      var row = el("div", { class: "dash-row" }, [main, el("div", { class: "dash-badge" }, [r.submission_type || ""])]);
+      var row = el("div", { class: "dash-row" }, [main, el("div", { class: "dash-badge" }, [SUB_LABEL[r.submission_type] || r.submission_type || "Submission"])]);
       if (r.submission_type === "url" && r.url) {
         row.insertBefore(el("a", { class: "dash-link", href: r.url, target: "_blank", rel: "noopener" }, ["Open link"]), row.lastChild);
       }
@@ -1257,27 +1081,54 @@
       if (STATE.search && !(matchesSearch(r.display_name) || matchesPhoneSearch(r.phone) || matchesPhoneSearch(r.parent_phone))) return false;
       return true;
     });
-    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Students (" + roster.length + ")"])]);
-    section.appendChild(el("div", { class: "dash-section-note" }, ["Contact details and totals for each registered student."]));
+    var section = el("section", { class: "dash-section", id: "sec-students" }, sectionHead("Students", roster.length,
+      "Contact details and totals for each registered student."));
     if (!roster.length) {
       section.appendChild(el("div", { class: "dash-empty" }, ["No students match the current filters."]));
       return section;
     }
+    var list = el("div", { class: "d-list" });
     roster.forEach(function (r) {
-      section.appendChild(el("div", { class: "dash-row" }, [
+      list.appendChild(el("div", { class: "dash-row" }, [
         el("div", { class: "dash-row-main" }, [
-          el("div", { class: "dash-row-title" }, [r.display_name]),
-          el("div", { class: "dash-row-sub" }, ["Phone " + (displayPhone(r.phone) || "\u2014")]),
-          el("div", { class: "dash-row-sub" }, ["Parent " + (displayPhone(r.parent_phone) || "not on file")]),
-          r.created_at ? el("div", { class: "dash-row-sub" }, ["Joined " + fmtWhen(r.created_at)]) : null,
+          el("div", { class: "dash-row-title", dir: "auto" }, [r.display_name]),
+          trail(["Phone " + (displayPhone(r.phone) || "\u2014"), "Parent " + (displayPhone(r.parent_phone) || "not on file"), r.created_at ? "Joined " + fmtWhen(r.created_at) : ""]),
         ]),
-        el("div", { class: "dash-badge" }, [r.year || "no year on file"]),
+        el("div", { class: "dash-badge" }, [r.year || "No year"]),
         el("div", { class: "dash-badge" }, [r.quizzes + " quiz" + (r.quizzes === 1 ? "" : "zes")]),
         el("div", { class: "dash-score" }, [r.avgPct]),
         el("div", { class: "dash-badge" }, [r.submissions + " sub" + (r.submissions === 1 ? "" : "s")]),
       ]));
     });
+    section.appendChild(list);
     return section;
+  }
+
+  function jumpNav(items) {
+    var links = items.map(function (it, i) {
+      return el("a", { href: "#" + it[0], class: i === 0 ? "is-on" : "" }, [it[1]]);
+    });
+    return el("div", { class: "d-tabs-wrap" }, [el("nav", { class: "d-tabs", "aria-label": "Sections" }, links)]);
+  }
+
+  // Highlights the jump link of the section currently under the sticky bars.
+  // Sections are rebuilt on every filter change, so this looks them up fresh.
+  function watchSections(ids) {
+    var queued = false;
+    function update() {
+      queued = false;
+      var current = ids[0];
+      ids.forEach(function (id) {
+        var n = document.getElementById(id);
+        if (n && n.getBoundingClientRect().top <= 150) current = id;
+      });
+      Array.prototype.forEach.call(document.querySelectorAll(".d-tabs a"), function (a) {
+        a.classList.toggle("is-on", a.getAttribute("href") === "#" + current);
+      });
+    }
+    window.addEventListener("scroll", function () {
+      if (!queued) { queued = true; requestAnimationFrame(update); }
+    }, { passive: true });
   }
 
   function renderDashboard(session) {
@@ -1288,7 +1139,7 @@
     root.appendChild(el("div", { class: "dash-head" }, [
       el("div", {}, [
         el("h1", {}, ["Master dashboard"]),
-        el("p", {}, ["Signed in as " + (session.student_name || "admin") + " \u2014 every student's quiz history and submissions."]),
+        el("p", { dir: "auto" }, ["Signed in as " + (session.student_name || "admin") + ". Every student's quiz history and submissions."]),
       ]),
     ]));
 
@@ -1298,13 +1149,20 @@
     var below = el("div", {}, []);
     [tabsSlot, statsSlot, filtersSlot, below].forEach(function (n) { root.appendChild(n); });
 
+    var SECTION_IDS = ["sec-chapters", "sec-missed", "sec-completion", "sec-quizzes", "sec-submissions", "sec-students"];
+    watchSections(SECTION_IDS);
+
     function rerenderFiltered() {
       var filteredQuiz = getFilteredQuiz();
       var filteredSubs = getFilteredSubs();
       below.innerHTML = "";
-      below.appendChild(renderAssignmentCompletion());
+      below.appendChild(jumpNav([
+        ["sec-chapters", "Chapters and lessons"], ["sec-missed", "Most missed"], ["sec-completion", "Assignment completion"],
+        ["sec-quizzes", "Quiz attempts"], ["sec-submissions", "Submissions"], ["sec-students", "Students"],
+      ]));
+      below.appendChild(renderChapterSection(filteredQuiz, filteredSubs));
       below.appendChild(renderMostMissed(filteredQuiz));
-      below.appendChild(renderChapterSection(filteredQuiz));
+      below.appendChild(renderAssignmentCompletion());
       below.appendChild(renderQuizSection(filteredQuiz));
       below.appendChild(renderSubmissionsSection(filteredSubs));
       below.appendChild(renderStudentsSection());
@@ -1332,7 +1190,7 @@
     var root = document.getElementById("dashboard");
     root.innerHTML = "";
     root.hidden = false;
-    root.appendChild(el("div", { class: "dash-err" }, [message]));
+    root.appendChild(el("div", { class: "dash-err", role: "alert" }, [message]));
   }
 
   function renderNeedsRelogin() {
@@ -1423,6 +1281,7 @@
         STATE.dupSubs = sb.dup;
         STATE.blankRows = q.blank + sb.blank;
         STATE.catalog = results[1];
+        R.registerLessons(STATE.quizRows);
         renderDashboard(session);
       })
       .catch(function (err) {

@@ -15,197 +15,28 @@
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/base.css">
 <link rel="stylesheet" href="/assets/forms.css">
+<link rel="stylesheet" href="/assets/dashboard.css">
+<style>:root { --d-w: 960px; --d-kpis: 4; }</style>
 <script src="/assets/theme.js" defer></script>
-<style>
-  :root {
-    color-scheme: light;
-    --bg: #f5f7fb;
-    --bg-glow: rgba(99, 102, 241, .14);
-    --surface: rgba(255, 255, 255, .86);
-    --surface-strong: #ffffff;
-    --surface-soft: #f8f9fd;
-    --ink: #172033;
-    --ink-dim: #68738a;
-    --line: #e4e8f1;
-    --line-strong: #d7ddea;
-    --accent: #5b5ce2;
-    --accent-2: #8b5cf6;
-    --accent-soft: #eeedff;
-    --good: #159a72;
-    --low: #d04d57;
-    --shadow: 0 20px 55px rgba(30, 41, 72, .10);
-    --shadow-soft: 0 8px 24px rgba(30, 41, 72, .07);
-    --sans: 'Manrope', system-ui, sans-serif;
-    --mono: 'DM Mono', ui-monospace, monospace;
-  }
-
-  html[data-theme="dark"] {
-    color-scheme: dark;
-    --bg: #0d1120;
-    --bg-glow: rgba(129, 140, 248, .16);
-    --surface: rgba(25, 31, 52, .86);
-    --surface-strong: #1a2035;
-    --surface-soft: #171d31;
-    --ink: #f1f4ff;
-    --ink-dim: #9da7c0;
-    --line: #2a334d;
-    --line-strong: #39435f;
-    --accent: #9b9cff;
-    --accent-2: #c084fc;
-    --accent-soft: #29274d;
-    --good: #50d3a9;
-    --low: #ff858d;
-    --shadow: 0 24px 70px rgba(0, 0, 0, .34);
-    --shadow-soft: 0 10px 30px rgba(0, 0, 0, .22);
-  }
-
-  * { box-sizing: border-box; }
-  html { min-height: 100%; background: var(--bg); transition: background .25s ease; }
-  body {
-    min-height: 100vh;
-    margin: 0;
-    color: var(--ink);
-    background:
-      radial-gradient(circle at 12% 0%, var(--bg-glow), transparent 32rem),
-      radial-gradient(circle at 95% 18%, rgba(139, 92, 246, .08), transparent 28rem),
-      var(--bg);
-    font-family: var(--sans);
-    transition: color .25s ease, background .25s ease;
-  }
-
-  .dash-shell { width: min(100% - 32px, 1040px); margin: 0 auto; padding: 34px 0 72px; }
-  .dash-topbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom: 44px; }
-  .dash-back { display:inline-flex; align-items:center; gap:8px; color:var(--ink-dim); font: 600 12px/1 var(--mono); text-decoration:none; letter-spacing:.01em; transition:color .2s ease, transform .2s ease; }
-  .dash-back:hover { color:var(--accent); transform:translateX(-2px); }
-  .theme-toggle { display:inline-flex; align-items:center; gap:9px; border:1px solid var(--line); border-radius:999px; padding:8px 12px; color:var(--ink-dim); background:var(--surface); box-shadow:var(--shadow-soft); font:600 11px var(--mono); cursor:pointer; transition:all .2s ease; }
-  .theme-toggle:hover { color:var(--accent); border-color:var(--accent); transform:translateY(-1px); }
-  .theme-toggle:focus-visible { outline:3px solid color-mix(in srgb, var(--accent) 30%, transparent); outline-offset:3px; }
-  .theme-toggle-icon { font-size:15px; line-height:1; }
-
-  #dashboard { animation: dash-in .45s ease both; }
-  @keyframes dash-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-  .dash-head { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:26px; }
-  .dash-head h1 { margin:0; color:var(--ink); font:800 clamp(28px, 5vw, 42px)/1.08 var(--sans); letter-spacing:-.045em; }
-  .dash-head p { margin:10px 0 0; color:var(--ink-dim); font: 13px/1.6 var(--mono); }
-  .dash-head:after { content:'STUDENT PORTAL'; color:var(--accent); font:700 10px var(--mono); letter-spacing:.16em; white-space:nowrap; }
-
-  .dash-stats { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; margin-bottom:46px; }
-  .dash-stat { position:relative; overflow:hidden; min-height:112px; padding:20px; border:1px solid var(--line); border-radius:18px; background:var(--surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(14px); }
-  .dash-stat:after { content:''; position:absolute; width:72px; height:72px; right:-22px; bottom:-30px; border-radius:50%; background:var(--accent-soft); }
-  .dash-stat b { position:relative; z-index:1; display:block; color:var(--ink); font:800 30px/1 var(--sans); letter-spacing:-.04em; }
-  .dash-stat span { position:relative; z-index:1; display:block; margin-top:9px; color:var(--ink-dim); font:11px var(--mono); }
-
-  .dash-section { margin-bottom:34px; padding:22px 24px; border:1px solid var(--line); border-radius:20px; background:var(--surface); box-shadow:var(--shadow-soft); backdrop-filter:blur(14px); }
-  .dash-section h2 { display:flex; align-items:center; gap:10px; margin:0 0 8px; padding:0 0 15px; border-bottom:1px solid var(--line); color:var(--ink); font:800 16px var(--sans); letter-spacing:-.02em; }
-  .dash-section h2:before { content:''; width:8px; height:8px; border-radius:3px; background:linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow:0 0 0 5px var(--accent-soft); }
-  .dash-empty { padding:20px 0 6px; color:var(--ink-dim); font:13px/1.6 var(--mono); }
-  .dash-row { display:flex; align-items:center; gap:16px; min-height:66px; padding:14px 2px; border-bottom:1px solid var(--line); }
-  .dash-row:last-child { border-bottom:0; }
-  .dash-row-main { flex:1; min-width:0; }
-  .dash-row-title { overflow:hidden; color:var(--ink); font:700 14px var(--sans); text-overflow:ellipsis; white-space:nowrap; }
-  .dash-row-sub { margin-top:5px; overflow:hidden; color:var(--ink-dim); font:11px var(--mono); text-overflow:ellipsis; white-space:nowrap; }
-  .dash-score { flex-shrink:0; min-width:84px; text-align:right; font:600 12px var(--mono); }
-  .dash-score.is-good { color:var(--good); } .dash-score.is-mid { color:var(--ink); } .dash-score.is-low { color:var(--low); }
-  .dash-badge { flex-shrink:0; padding:5px 8px; border:1px solid var(--line-strong); border-radius:7px; color:var(--ink-dim); background:var(--surface-soft); font:10px var(--mono); letter-spacing:.03em; }
-  .dash-link { flex-shrink:0; color:var(--accent); font:600 11px var(--mono); text-decoration:none; }
-  .dash-link:hover { text-decoration:underline; }
-  .dash-chapter { padding:14px 2px 8px; }
-  .dash-chapter-top { display:flex; justify-content:space-between; gap:14px; margin-bottom:9px; color:var(--ink-dim); font:12px var(--mono); }
-  .dash-chapter-top b { overflow:hidden; color:var(--ink); font:700 13px var(--sans); text-overflow:ellipsis; white-space:nowrap; }
-  .dash-bar { height:9px; overflow:hidden; border-radius:999px; background:var(--line); }
-  .dash-bar-fill { height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--accent), var(--accent-2)); transition:width .5s ease; }
-  .dash-bar-fill.is-low { background:var(--low); } .dash-bar-fill.is-good { background:var(--good); }
-  .dash-sub-text { max-height:4.5em; overflow:hidden; margin-top:8px; color:var(--ink-dim); font:12px/1.5 var(--sans); white-space:pre-wrap; }
-  .dash-wrong-group { display:grid; gap:8px; margin-top:12px; }
-  .dash-wrong { overflow:hidden; border:1px solid var(--line); border-radius:12px; background:var(--surface-soft); }
-  .dash-wrong summary { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; color:var(--ink); font:700 12px var(--mono); list-style:none; cursor:pointer; }
-  .dash-wrong summary::-webkit-details-marker { display:none; }
-  .dash-wrong summary:before { content:'\25b8'; margin-right:8px; color:var(--ink-dim); transition:transform .2s ease; display:inline-block; }
-  .dash-wrong[open] summary:before { transform:rotate(90deg); }
-  .dash-wrong-count.is-nonzero { color:var(--low); }
-  .dash-wrong-count.is-zero { color:var(--good); }
-  .dash-wrong-count.is-correct { color:var(--good); }
-  .dash-wrong-counts { display:flex; gap:8px; }
-  .dash-wrong-body { display:grid; gap:8px; padding:0 14px 12px; }
-  .dash-wrong-item { padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface-strong); }
-  .dash-wrong-q { margin-bottom:6px; color:var(--ink); font:700 13px/1.4 var(--sans); }
-  .dash-wrong-a { font:12px/1.6 var(--mono); }
-  .dash-wrong-a.your { color:var(--low); }
-  .dash-wrong-a.correct { color:var(--good); }
-  .dash-wrong-ctx { margin-top:5px; color:var(--ink-dim); font:11px var(--mono); }
-  .dash-wrong-empty { padding:10px 14px 14px; color:var(--ink-dim); font:12px var(--mono); }
-  .dash-attempt { border-bottom:1px solid var(--line); }
-  .dash-attempt:last-child { border-bottom:0; }
-  .dash-attempt > .dash-row { border-bottom:0; cursor:pointer; }
-  .dash-toggle { flex-shrink:0; color:var(--accent); font:600 11px var(--mono); white-space:nowrap; }
-  .dash-detail { margin:0 0 14px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--surface-soft); }
-  .dash-detail-h { margin:0 0 6px; color:var(--ink-dim); font:600 11px var(--mono); }
-  .dash-q { padding:10px 0; border-top:1px solid var(--line); }
-  .dash-detail-h + .dash-q { border-top:0; }
-  .dash-q-text { color:var(--ink); font:600 13px/1.45 var(--sans); }
-  .dash-q-ch { margin-left:6px; color:var(--ink-dim); font:600 10px var(--mono); }
-  .dash-q-a { margin-top:5px; font:12px/1.5 var(--mono); white-space:pre-wrap; }
-  .dash-q-a.your { color:var(--low); }
-  .dash-q-a.correct { color:var(--good); }
-  .dash-q-group { margin:12px 0 2px; color:var(--ink-dim); font:600 11px/1.5 var(--mono); }
-  .dash-ok-list { margin-top:10px; }
-  .dash-ok-list summary { cursor:pointer; color:var(--ink-dim); font:600 11px var(--mono); }
-  .dash-err { padding:18px 0; color:var(--low); font:13px/1.6 var(--mono); }
-  .dash-loadbar { width:100%; max-width:260px; height:5px; margin-top:16px; overflow:hidden; border-radius:999px; background:var(--line); }
-  .dash-loadbar-fill { width:42%; height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--accent), var(--accent-2)); animation:dash-loadbar-slide 1.1s ease-in-out infinite; }
-  @keyframes dash-loadbar-slide { 0% { transform:translateX(-120%); } 50% { transform:translateX(85%); } 100% { transform:translateX(260%); } }
-  .dash-loading { display:grid; place-items:center; min-height:clamp(430px, 62vh, 620px); padding:24px 0 56px; }
-  .dash-loading-card { position:relative; isolation:isolate; width:min(100%, 620px); overflow:hidden; padding:42px clamp(22px, 5vw, 52px) 34px; border:1px solid var(--line); border-radius:28px; background:var(--surface); box-shadow:var(--shadow); text-align:center; backdrop-filter:blur(18px); }
-  .dash-loading-card:before, .dash-loading-card:after { content:''; position:absolute; z-index:-1; border-radius:50%; pointer-events:none; }
-  .dash-loading-card:before { width:240px; height:240px; top:-150px; left:-80px; background:var(--accent-soft); filter:blur(4px); opacity:.75; }
-  .dash-loading-card:after { width:220px; height:220px; right:-105px; bottom:-145px; background:color-mix(in srgb, var(--accent-2) 18%, transparent); filter:blur(5px); }
-  .dash-loader-orbit { position:relative; display:grid; place-items:center; width:92px; height:92px; margin:0 auto 25px; border:1px solid color-mix(in srgb, var(--accent) 22%, transparent); border-radius:50%; background:color-mix(in srgb, var(--accent-soft) 72%, transparent); }
-  .dash-loader-orbit:before, .dash-loader-orbit:after { content:''; position:absolute; border-radius:50%; }
-  .dash-loader-orbit:before { inset:7px; border:2px dashed color-mix(in srgb, var(--accent) 42%, transparent); animation:dash-orbit-spin 3.2s linear infinite; }
-  .dash-loader-orbit:after { width:15px; height:15px; background:linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow:0 0 0 8px var(--accent-soft), 0 0 26px color-mix(in srgb, var(--accent) 45%, transparent); animation:dash-loader-pulse 1.5s ease-in-out infinite; }
-  @keyframes dash-orbit-spin { to { transform:rotate(360deg); } }
-  @keyframes dash-loader-pulse { 50% { transform:scale(1.22); opacity:.72; } }
-  .dash-loading-title { margin:0; color:var(--ink); font:800 clamp(20px, 4vw, 26px)/1.2 var(--sans); letter-spacing:-.035em; }
-  .dash-loading-copy { margin:9px auto 0; color:var(--ink-dim); font:12px/1.6 var(--mono); }
-  .dash-loading .dash-loadbar { max-width:360px; height:7px; margin:24px auto 0; }
-  .dash-loading-skeleton { display:grid; gap:10px; margin-top:30px; text-align:left; opacity:.72; }
-  .dash-skeleton-line { height:10px; border-radius:999px; background:linear-gradient(90deg, var(--line) 20%, color-mix(in srgb, var(--accent) 17%, var(--line)) 50%, var(--line) 80%); background-size:220% 100%; animation:dash-skeleton-shimmer 1.8s ease-in-out infinite; }
-  .dash-skeleton-line:nth-child(1) { width:92%; height:13px; }
-  .dash-skeleton-line:nth-child(2) { width:68%; }
-  .dash-skeleton-line:nth-child(3) { width:82%; }
-  @keyframes dash-skeleton-shimmer { 0% { background-position:120% 0; } 100% { background-position:-120% 0; } }
-  .qz-next { border:0; border-radius:10px; padding:11px 15px; color:#fff; background:var(--accent); font:700 12px var(--mono); cursor:pointer; box-shadow:var(--shadow-soft); }
-  .qz-next:hover { filter:brightness(1.08); }
-
-  @media (max-width: 640px) {
-    .dash-shell { width:min(100% - 24px, 1040px); padding-top:20px; }
-    .dash-topbar { margin-bottom:34px; }
-    .dash-head { display:block; }
-    .dash-head:after { display:block; margin-top:18px; }
-    .dash-stats { grid-template-columns:1fr; gap:10px; margin-bottom:28px; }
-    .dash-stat { min-height:0; padding:16px; }
-    .dash-section { padding:18px 16px; border-radius:16px; }
-    .dash-loading { min-height:calc(100vh - 150px); padding:12px 0 32px; }
-    .dash-loading-card { border-radius:22px; padding:34px 20px 28px; }
-    .dash-row { align-items:flex-start; gap:10px; }
-    .dash-score { min-width:72px; padding-top:2px; font-size:11px; }
-    .dash-badge { padding:4px 6px; }
-    .theme-toggle-label { display:none; }
-  }
-  @media (prefers-reduced-motion: reduce) { *, *:before, *:after { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
-</style>
 </head>
 <body>
 
-<div class="dash-shell">
-  <div class="dash-topbar">
-    <a class="dash-back" href="/">&larr; Back to teaching.ezznasr.dev</a>
+<div class="d-bar" role="banner">
+  <div class="d-bar-in">
+    <a class="d-brand" href="/" aria-label="Teaching Portal home">
+      <span class="d-brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 5l9 4.5-9 4.5-9-4.5Z"/><path d="M7 12v4.2c0 1 2.2 2.3 5 2.3s5-1.3 5-2.3V12"/></svg></span>
+      Teaching Portal<small>Student</small>
+    </a>
+    <nav class="d-nav" aria-label="Site"><a class="dash-back" href="/">Back to site</a></nav>
+    <span class="d-spacer"></span>
     <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
-      <span class="theme-toggle-icon" aria-hidden="true">☾</span><span class="theme-toggle-label">Dark mode</span>
+      <span class="theme-toggle-icon" aria-hidden="true"></span><span class="theme-toggle-label">Dark mode</span>
     </button>
   </div>
+</div>
 
-  <div id="authgate" style="margin-top:20px;"></div>
+<div class="dash-shell">
+  <div id="authgate"></div>
   <div id="dashboard" hidden></div>
 </div>
 
@@ -213,6 +44,8 @@
 (function () {
   "use strict";
   var key = "student-dashboard-theme";
+  var ICON_MOON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.4A8.5 8.5 0 1 1 9.6 3.5a7 7 0 0 0 10.9 10.9Z"/></svg>';
+  var ICON_SUN = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/></svg>';
   var root = document.documentElement;
   var button = document.getElementById("themeToggle");
   var saved = null;
@@ -225,7 +58,7 @@
     var dark = next === "dark";
     button.setAttribute("aria-pressed", String(dark));
     button.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
-    button.querySelector(".theme-toggle-icon").textContent = dark ? "☀" : "☾";
+    button.querySelector(".theme-toggle-icon").innerHTML = dark ? ICON_SUN : ICON_MOON;
     button.querySelector(".theme-toggle-label").textContent = dark ? "Light mode" : "Dark mode";
   }
   apply(theme);
@@ -237,6 +70,7 @@
 })();
 </script>
 <script src="/assets/auth.js"></script>
+<script src="/assets/dash-review.js"></script>
 <script>
 (function () {
   "use strict";
@@ -344,17 +178,6 @@
     return m + "m " + (r < 10 ? "0" : "") + r + "s";
   }
 
-  // "8m 03s" between a quiz's start and end time; "" if either is missing.
-  function durationLabel(start, end) {
-    var a = whenMs(start), b = whenMs(end);
-    if (isNaN(a) || isNaN(b) || b < a) return "";
-    var sec = Math.round((b - a) / 1000);
-    if (sec >= 86400) return "";
-    var h = Math.floor(sec / 3600), mi = Math.floor((sec % 3600) / 60), r = sec % 60;
-    if (h) return h + "h " + (mi < 10 ? "0" : "") + mi + "m";
-    return mi + "m " + (r < 10 ? "0" : "") + r + "s";
-  }
-
   // -- Duplicate / blank row handling ---------------------------------------
   function phoneKey(s) { return normalizePhone(s).slice(-10); }
   function isBlankRow(r) { return !normalizePhone(r.student_id) && !r.lesson; }
@@ -412,7 +235,9 @@
     return (rows || []).slice().reverse();
   }
 
-  // -- Per-question detail ---------------------------------------------------
+  var R = window.DashReview.create({ el: el, fmtWhen: fmtWhen, whenMs: whenMs, isTruthyFlag: isTruthyFlag });
+
+  // -- Per-question detail (one attempt) -------------------------------------
   // Quizzes store {question, your_answer, correct_answer, is_correct,
   // chapter}; graded assignments store {prompt, chosen, correct_answer,
   // is_correct, chapter}. One shape for both. A row saved by the very old
@@ -429,7 +254,7 @@
     };
   }
 
-  // A matching row is saved as "<instruction> \u2014 <the item>". Split it so the
+  // A matching row is saved as "<instruction> — <the item>". Split it so the
   // item is what's shown, with the shared instruction printed once above.
   function splitMatch(n) {
     if (n.type !== "match") return n;
@@ -446,33 +271,18 @@
       return [];
     }
   }
-
-  function questionItem(q, showCorrect) {
-    function ans(v) {
-      var t = (v === undefined || v === null || v === "") ? "\u2014" : String(v);
-      return q.type === "match" ? t.split("; ").join("\n") : t;
-    }
-    var isMatch = !!q.label;
-    var box = el("div", { class: "dash-q" }, [
-      el("div", { class: "dash-q-text" }, [isMatch ? q.label : q.question, q.chapter ? el("span", { class: "dash-q-ch" }, ["Ch " + q.chapter]) : null]),
-    ]);
-    if (!q.ok) {
-      box.appendChild(el("div", { class: "dash-q-a your" }, [(isMatch ? "Matched to: " : "Answered: ") + ans(q.chosen)]));
-      box.appendChild(el("div", { class: "dash-q-a correct" }, [(isMatch ? "Should be matched to: " : "Correct answer: ") + ans(q.correct)]));
-    } else {
-      box.appendChild(el("div", { class: "dash-q-a correct" }, [(isMatch ? "Matched to (correct): " : "Answered (correct): ") + ans(q.chosen)]));
-    }
-    return box;
-  }
+  function parseQuestions(row) { return parseJsonList(row.questions_json); }
+  function parseAnswers(row) { return parseJsonList(row.answers_json); }
 
   // Appends items, printing a matching question's shared instruction once
   // above its rows instead of repeating it on every row.
   function appendItems(container, list) {
     var lastGroup = null;
     list.forEach(function (q) {
-      if (q.label && q.group !== lastGroup) container.appendChild(el("div", { class: "dash-q-group" }, [q.group]));
+      if (q.label && q.group !== lastGroup) container.appendChild(el("div", { class: "dash-q-group", dir: "auto" }, [q.group]));
       lastGroup = q.label ? q.group : null;
-      container.appendChild(questionItem(q));
+      q.suppressInstr = !!q.label;
+      container.appendChild(R.attemptQuestion(q));
     });
   }
 
@@ -495,332 +305,202 @@
     return box;
   }
 
-  // One quiz attempt / graded submission: the row itself plus a detail panel
-  // (built on first open, so hundreds of rows stay cheap).
-  function attemptRow(o) {
-    var wrongCount = o.total ? Math.max(0, o.total - o.score) : 0;
-    var toggle = el("div", { class: "dash-toggle" }, [(o.total ? (wrongCount ? wrongCount + " wrong" : "all correct") + " " : "") + "\u25BE"]);
-    var row = el("div", { class: "dash-row is-clickable" }, [
-      el("div", { class: "dash-row-main" }, [
-        el("div", { class: "dash-row-title" }, [o.title]),
-        el("div", { class: "dash-row-sub" }, [o.sub]),
-      ]),
-      el("div", { class: "dash-score " + scoreClass(o.score, o.total) }, [o.score + "/" + o.total + " (" + fmtPct(o.score, o.total) + ")"]),
-      toggle,
-    ]);
-    var wrap = el("div", { class: "dash-attempt" }, [row]);
-    var detail = null;
-    row.addEventListener("click", function () {
-      if (!detail) {
-        detail = buildDetail(o.items().map(normQ).map(splitMatch), o.total);
-        wrap.appendChild(detail);
-      } else {
-        detail.hidden = !detail.hidden;
-      }
-      var base = toggle.textContent.replace(/\s*[\u25BE\u25B4]$/, "");
-      toggle.textContent = base + (base ? " " : "") + (detail.hidden ? "\u25BE" : "\u25B4");
+  function trail(parts) {
+    var kids = [];
+    parts.filter(function (p) { return p !== null && p !== undefined && p !== ""; }).forEach(function (p, i) {
+      if (i) kids.push(el("i", { "aria-hidden": "true" }));
+      kids.push(typeof p === "object" ? p : el("span", {}, [p]));
     });
-    return wrap;
+    return el("div", { class: "at-trail" }, kids);
   }
 
   // One quiz attempt / graded submission: the row itself plus a detail panel
   // (built on first open, so hundreds of rows stay cheap).
   function attemptRow(o) {
     var wrongCount = o.total ? Math.max(0, o.total - o.score) : 0;
-    var toggle = el("div", { class: "dash-toggle" }, [(o.total ? (wrongCount ? wrongCount + " wrong" : "all correct") + " " : "") + "\u25BE"]);
-    var row = el("div", { class: "dash-row is-clickable" }, [
+    var toggle = el("div", { class: "dash-toggle" }, [o.total ? (wrongCount ? wrongCount + " wrong" : "All correct") : "Details"]);
+    var row = el("div", { class: "dash-row is-clickable", role: "button", tabindex: "0", "aria-expanded": "false" }, [
       el("div", { class: "dash-row-main" }, [
-        el("div", { class: "dash-row-title" }, [o.title]),
-        el("div", { class: "dash-row-sub" }, [o.sub]),
+        el("div", { class: "at-title" }, [el("div", { class: "dash-row-title", dir: "auto" }, [o.title])]),
+        trail(o.trail),
       ]),
-      el("div", { class: "dash-score " + scoreClass(o.score, o.total) }, [o.score + "/" + o.total + " (" + fmtPct(o.score, o.total) + ")"]),
+      el("div", { class: "dash-score " + scoreClass(o.score, o.total) }, [o.score + "/" + o.total, el("small", {}, [fmtPct(o.score, o.total)])]),
       toggle,
     ]);
     var wrap = el("div", { class: "dash-attempt" }, [row]);
     var detail = null;
-    row.addEventListener("click", function () {
+    function flip() {
       if (!detail) {
         detail = buildDetail(o.items().map(normQ).map(splitMatch), o.total);
         wrap.appendChild(detail);
       } else {
         detail.hidden = !detail.hidden;
       }
-      var base = toggle.textContent.replace(/\s*[\u25BE\u25B4]$/, "");
-      toggle.textContent = base + (base ? " " : "") + (detail.hidden ? "\u25BE" : "\u25B4");
+      toggle.className = "dash-toggle" + (detail.hidden ? "" : " is-open");
+      row.setAttribute("aria-expanded", String(!detail.hidden));
+    }
+    row.addEventListener("click", flip);
+    row.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); }
     });
     return wrap;
   }
 
-  function parseQuestions(row) {
-    try {
-      var parsed = JSON.parse(row.questions_json || "[]");
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      return [];
+  // The chapter an attempt belongs to: the first tagged question, else the
+  // chapter named in the lesson's folder/title.
+  function attemptChapter(list, slug) {
+    var tagged = "";
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i].chapter;
+      if (c !== undefined && c !== null && String(c) !== "") { tagged = c; break; }
     }
+    return R.chapterOf(tagged, slug);
   }
 
-  // Graded assignments store their per-question breakdown the same way
-  // quizzes do, just under a different column (answers_json, in the
-  // Submissions sheet instead of QuizResults).
-  function parseAnswers(row) {
-    try {
-      var parsed = JSON.parse(row.answers_json || "[]");
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      return [];
-    }
+  function lessonTrail(subject, slug, chapter) {
+    var info = R.lessonInfo(slug);
+    var where = [chapter ? "Chapter " + chapter : "", info.num ? "Lesson " + info.num : ""].filter(Boolean).join(" \u00b7 ");
+    return [R.subjectName(subject), where];
   }
 
-  function chapterKey(chapter) {
-    return (chapter === undefined || chapter === null || chapter === "") ? "Unlabeled" : String(chapter);
-  }
-
-  function contextLabel(row) {
-    return [row.subject, row.lesson || row.quiz_title, fmtWhen(row.start_time || row.submitted_time || row.date)].filter(Boolean).join(" \u00b7 ");
-  }
-
-  // Every wrong answer the student has ever given, grouped by chapter and
-  // then by where it came from (quiz vs. graded assignment) — this is
-  // what powers the two sub-toggles under each chapter heading.
-  function collectWrongByChapter(quizRows, subRows) {
-    var byChapter = {};
-    function bucket(chapter) {
-      var key = chapterKey(chapter);
-      if (!byChapter[key]) byChapter[key] = { quiz: [], assignment: [], quizTotal: 0, assignmentTotal: 0 };
-      return byChapter[key];
-    }
-
-    quizRows.forEach(function (row) {
-      var ctx = contextLabel(row);
-      parseQuestions(row).forEach(function (q) {
-        var b = bucket(q.chapter);
-        b.quizTotal += 1;
-        var isCorrect = q.is_correct === true || String(q.is_correct).toUpperCase() === "TRUE";
-        if (isCorrect) return;
-        b.quiz.push({
-          question: q.question, your_answer: q.your_answer, correct_answer: q.correct_answer, context: ctx, type: q.type,
-        });
-      });
-    });
-
-    subRows.forEach(function (row) {
-      if (!row.answers_json) return; // only graded assignments carry per-question detail
-      var ctx = contextLabel(row);
-      parseAnswers(row).forEach(function (a) {
-        var b = bucket(a.chapter);
-        b.assignmentTotal += 1;
-        var isCorrect = a.is_correct === true || String(a.is_correct).toUpperCase() === "TRUE";
-        if (isCorrect) return;
-        b.assignment.push({
-          question: a.prompt, your_answer: a.chosen, correct_answer: a.correct_answer, context: ctx, type: a.type,
-        });
-      });
-    });
-
-    return byChapter;
-  }
-
-  // Chapter aggregation across every attempt this student has ever taken.
-  // Defensive about the answer-field name since the field has gone by
-  // "chosen" (v1) and "your_answer" (v2 record shape) at different points.
-  function aggregateChapters(quizRows) {
-    var byChapter = {};
-    quizRows.forEach(function (row) {
-      parseQuestions(row).forEach(function (q) {
-        var chapter = q.chapter || "Unlabeled";
-        if (!byChapter[chapter]) byChapter[chapter] = { correct: 0, total: 0 };
-        byChapter[chapter].total += 1;
-        if (q.is_correct === true || String(q.is_correct).toUpperCase() === "TRUE") {
-          byChapter[chapter].correct += 1;
-        }
-      });
-    });
-    return Object.keys(byChapter)
-      .map(function (chapter) {
-        var c = byChapter[chapter];
-        return { chapter: chapter, correct: c.correct, total: c.total, pct: c.total ? c.correct / c.total : 0 };
-      })
-      // Weakest chapters first — that's the useful ordering for a student
-      // deciding what to review.
-      .sort(function (a, b) { return a.pct - b.pct; });
-  }
-
-  function renderStats(quizRows, subRows) {
-    var attempted = quizRows.length;
+  function renderStats(quizRows, subRows, toReview) {
     var totalScore = 0, totalMax = 0;
     quizRows.forEach(function (r) {
       totalScore += Number(r.score) || 0;
       totalMax += Number(r.total) || 0;
     });
-    var avgPct = totalMax ? Math.round((totalScore / totalMax) * 100) + "%" : "\u2014";
-
-    var stats = el("div", { class: "dash-stats" }, [
-      el("div", { class: "dash-stat" }, [el("b", {}, [String(attempted)]), el("span", {}, ["Quizzes taken"])]),
-      el("div", { class: "dash-stat" }, [el("b", {}, [avgPct]), el("span", {}, ["Average score"])]),
-      el("div", { class: "dash-stat" }, [el("b", {}, [String(subRows.length)]), el("span", {}, ["Assignments submitted"])]),
+    var avg = totalMax ? Math.round((totalScore / totalMax) * 100) : null;
+    function stat(label, value, cls) {
+      return el("div", { class: "dash-stat" }, [el("span", {}, [label]), el("b", { class: cls || "" }, [value])]);
+    }
+    return el("div", { class: "dash-stats" }, [
+      stat("Quizzes taken", String(quizRows.length)),
+      stat("Average score", avg === null ? "\u2014" : avg + "%", avg === null ? "" : (avg >= 80 ? "is-good" : (avg < 50 ? "is-low" : ""))),
+      stat("Assignments submitted", String(subRows.length)),
+      stat("Questions to review", String(toReview), toReview ? "is-low" : "is-good"),
     ]);
-    return stats;
+  }
+
+  function sectionHead(title, count, note) {
+    var h = el("div", { class: "d-sec-head" }, [el("h2", {}, [title, count === null ? null : el("span", { class: "d-count" }, [String(count)])])]);
+    var out = [h];
+    if (note) out.push(el("p", { class: "dash-section-note" }, [note]));
+    return out;
+  }
+
+  function renderReviewSection(tree) {
+    var section = el("section", { class: "dash-section", id: "sec-review" }, sectionHead("Review by chapter", null,
+      "Every question you missed, grouped by chapter and lesson. The bar shows your quiz accuracy across all attempts."));
+    if (!tree.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, ["No results yet. Finish a quiz and the questions you miss will be grouped here by chapter and lesson."]));
+      return section;
+    }
+    section.appendChild(R.renderChapters(tree, { mode: "student" }));
+    return section;
   }
 
   function renderQuizSection(quizRows) {
-    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Quiz history"])]);
+    var section = el("section", { class: "dash-section", id: "sec-quizzes" }, sectionHead("Quiz history", quizRows.length));
     if (!quizRows.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, ["No quizzes taken yet \u2014 they'll show up here as soon as you finish one."]));
+      section.appendChild(el("div", { class: "dash-empty" }, ["No quizzes taken yet. They show up here as soon as you finish one."]));
       return section;
     }
+    var list = el("div", { class: "d-list" });
     newestFirst(quizRows).forEach(function (r) {
       var score = Number(r.score) || 0, total = Number(r.total) || 0;
       var took = durationLabel(r.start_time, r.end_time);
-      section.appendChild(attemptRow({
-        title: r.quiz_title || r.lesson || "Quiz",
-        sub: (r.subject || "") + (r.lesson ? " \u00b7 " + r.lesson : "") + (r.start_time || r.date ? " \u00b7 " + fmtWhen(r.start_time || r.date) : "") + (took ? " \u00b7 took " + took : ""),
+      var qs = parseQuestions(r);
+      var slug = r.lesson || "";
+      var info = R.lessonInfo(slug);
+      list.appendChild(attemptRow({
+        title: info.name || r.quiz_title || r.lesson || "Quiz",
+        trail: [R.chip("quiz", "Quiz")].concat(lessonTrail(r.subject, slug, attemptChapter(qs, slug)),
+          [fmtWhen(r.start_time || r.date), took ? "took " + took : ""]),
         score: score, total: total,
-        items: function () { return parseQuestions(r); },
+        items: function () { return qs; },
       }));
     });
+    section.appendChild(list);
     return section;
   }
 
-  function renderWrongItems(items) {
-    if (!items.length) {
-      return el("div", { class: "dash-wrong-empty" }, ["No wrong answers here \u2014 nice work."]);
-    }
-    var body = el("div", { class: "dash-wrong-body" });
-    var lastGroup = null;
-    items.forEach(function (it) {
-      var n = splitMatch({ question: it.question || "Question", type: it.type || "" });
-      var isMatch = !!n.label;
-      if (isMatch && n.group !== lastGroup) body.appendChild(el("div", { class: "dash-q-group" }, [n.group]));
-      lastGroup = isMatch ? n.group : null;
-      var card = el("div", { class: "dash-wrong-item" }, [
-        el("div", { class: "dash-wrong-q" }, [isMatch ? n.label : (it.question || "Question")]),
-        el("div", { class: "dash-wrong-a your" }, [(isMatch ? "Matched to: " : "Your answer: ") + (it.your_answer || "\u2014")]),
-        el("div", { class: "dash-wrong-a correct" }, [(isMatch ? "Should be matched to: " : "Correct answer: ") + (it.correct_answer || "\u2014")]),
-      ]);
-      if (it.context) card.appendChild(el("div", { class: "dash-wrong-ctx" }, [it.context]));
-      body.appendChild(card);
-    });
-    return body;
-  }
-
-  function renderWrongToggle(label, items, total) {
-    var count = items.length;
-    var correctCount = Math.max(0, (total || 0) - count);
-    var attrs = { class: "dash-wrong" };
-    if (count) attrs.open = "open";
-    var details = el("details", attrs, [
-      el("summary", {}, [
-        el("span", {}, [label]),
-        el("span", { class: "dash-wrong-counts" }, [
-          el("span", { class: "dash-wrong-count is-correct" }, [correctCount + " correct"]),
-          el("span", { class: "dash-wrong-count " + (count ? "is-nonzero" : "is-zero") }, [count + " wrong"]),
-        ]),
-      ]),
-    ]);
-    details.appendChild(renderWrongItems(items));
-    return details;
-  }
-
-  // Chapter labels are usually numbers ("1", "2", ...) with "Unlabeled"
-  // as a catch-all — sort numerically and push Unlabeled to the end.
-  function sortChapterLabels(keys) {
-    return keys.slice().sort(function (a, b) {
-      var an = Number(a), bn = Number(b);
-      var aIsNum = a !== "Unlabeled" && !isNaN(an);
-      var bIsNum = b !== "Unlabeled" && !isNaN(bn);
-      if (aIsNum && bIsNum) return an - bn;
-      if (aIsNum) return -1;
-      if (bIsNum) return 1;
-      return a.localeCompare(b);
-    });
-  }
-
-  function renderChapterSection(quizRows, subRows) {
-    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["By chapter"])]);
-    var chapters = aggregateChapters(quizRows);
-    var wrongByChapter = collectWrongByChapter(quizRows, subRows);
-
-    // Accuracy is quiz-based (unchanged), but a chapter can also show up
-    // only via a graded assignment miss — make sure it still gets a
-    // heading so those wrong answers are visible somewhere.
-    var accuracyChapters = {};
-    chapters.forEach(function (c) { accuracyChapters[c.chapter] = true; });
-    var extraChapters = sortChapterLabels(
-      Object.keys(wrongByChapter).filter(function (k) { return !accuracyChapters[k]; })
-    );
-    extraChapters.forEach(function (k) {
-      chapters.push({ chapter: k, correct: null, total: null, pct: null });
-    });
-
-    if (!chapters.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, ["No chapter-tagged questions yet."]));
-      return section;
-    }
-
-    chapters.forEach(function (c) {
-      var top = [el("b", {}, [c.chapter])];
-      var bar = null;
-      if (c.pct !== null) {
-        var pctLabel = Math.round(c.pct * 100) + "%";
-        var barClass = c.pct >= 0.8 ? "is-good" : (c.pct < 0.5 ? "is-low" : "");
-        top.push(document.createTextNode(c.correct + "/" + c.total + " \u00b7 " + pctLabel));
-        bar = el("div", { class: "dash-bar" }, [
-          el("div", { class: "dash-bar-fill " + barClass, style: "width:" + Math.max(3, Math.round(c.pct * 100)) + "%" }),
-        ]);
-      } else {
-        top.push(document.createTextNode("from assignments only"));
-      }
-
-      var wrongData = wrongByChapter[c.chapter] || { quiz: [], assignment: [], quizTotal: 0, assignmentTotal: 0 };
-      var wrap = el("div", { class: "dash-chapter" }, [
-        el("div", { class: "dash-chapter-top" }, top),
-      ]);
-      if (bar) wrap.appendChild(bar);
-      wrap.appendChild(el("div", { class: "dash-wrong-group" }, [
-        renderWrongToggle("Quizzes", wrongData.quiz, wrongData.quizTotal),
-        renderWrongToggle("Assignments", wrongData.assignment, wrongData.assignmentTotal),
-      ]));
-      section.appendChild(wrap);
-    });
-    return section;
-  }
+  var SUB_LABEL = { text: "Written answer", url: "Link", file: "File", both: "Answer + file", graded: "Graded" };
 
   function renderSubmissionsSection(subRows) {
-    var section = el("div", { class: "dash-section" }, [el("h2", {}, ["Assignments submitted"])]);
+    var section = el("section", { class: "dash-section", id: "sec-assignments" }, sectionHead("Assignments", subRows.length));
     if (!subRows.length) {
       section.appendChild(el("div", { class: "dash-empty" }, ["No assignments submitted yet."]));
       return section;
     }
+    var list = el("div", { class: "d-list" });
     newestFirst(subRows).forEach(function (r) {
       var when = fmtWhen(r.submitted_time || r.date);
+      var slug = r.lesson || "";
+      var info = R.lessonInfo(slug);
+      var answers = r.submission_type === "graded" ? parseAnswers(r) : [];
+      var chapter = attemptChapter(answers, slug);
+      var tr = [R.chip("assign", "Assignment")].concat(lessonTrail(r.subject, slug, chapter), [when]);
       if (r.submission_type === "graded" && Number(r.total) > 0) {
-        section.appendChild(attemptRow({
-          title: r.lesson || "Assignment",
-          sub: (r.subject || "") + (when ? " \u00b7 " + when : ""),
+        list.appendChild(attemptRow({
+          title: info.name || r.lesson || "Assignment",
+          trail: tr,
           score: Number(r.score) || 0, total: Number(r.total),
-          items: function () { return parseAnswers(r); },
+          items: function () { return answers; },
         }));
         return;
       }
       var main = el("div", { class: "dash-row-main" }, [
-        el("div", { class: "dash-row-title" }, [(r.lesson || "Assignment")]),
-        el("div", { class: "dash-row-sub" }, [(r.subject || "") + (when ? " \u00b7 " + when : "")]),
+        el("div", { class: "at-title" }, [el("div", { class: "dash-row-title", dir: "auto" }, [info.name || r.lesson || "Assignment"])]),
+        trail(tr),
       ]);
       if (r.submission_type === "text" && r.text) {
         var truncNote = isTruthyFlag(r.text_truncated) ? " (preview only \u2014 full text saved)" : "";
-        main.appendChild(el("div", { class: "dash-sub-text" }, [r.text + truncNote]));
+        main.appendChild(el("div", { class: "dash-sub-text", dir: "auto" }, [r.text + truncNote]));
       }
-      var row = el("div", { class: "dash-row" }, [main, el("div", { class: "dash-badge" }, [r.submission_type || ""])]);
+      var row = el("div", { class: "dash-row" }, [main, el("div", { class: "dash-badge" }, [SUB_LABEL[r.submission_type] || r.submission_type || "Submission"])]);
       if (r.submission_type === "url" && r.url) {
         row.insertBefore(el("a", { class: "dash-link", href: r.url, target: "_blank", rel: "noopener" }, ["Open link"]), row.lastChild);
       }
       if (r.submission_type === "file" && r.file_id) {
         row.insertBefore(el("a", { class: "dash-link", href: "https://drive.google.com/file/d/" + r.file_id + "/view", target: "_blank", rel: "noopener" }, ["Open file"]), row.lastChild);
       }
-      section.appendChild(row);
+      list.appendChild(row);
     });
+    section.appendChild(list);
     return section;
+  }
+
+  function initials(name) {
+    var parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    var first = Array.from(parts[0])[0] || "";
+    var second = parts.length > 1 ? (Array.from(parts[1])[0] || "") : "";
+    return (first + second).toUpperCase();
+  }
+
+  // Jump links under the stats. The highlighted one follows the scroll.
+  function renderTabs(counts) {
+    var items = [
+      ["sec-review", "Review by chapter", counts.review],
+      ["sec-quizzes", "Quiz history", counts.quizzes],
+      ["sec-assignments", "Assignments", counts.assignments],
+    ];
+    var links = items.map(function (it, i) {
+      return el("a", { href: "#" + it[0], class: i === 0 ? "is-on" : "" }, [it[1], el("small", {}, [String(it[2])])]);
+    });
+    var wrap = el("div", { class: "d-tabs-wrap" }, [el("nav", { class: "d-tabs", "aria-label": "Sections" }, links)]);
+    if ("IntersectionObserver" in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          links.forEach(function (a) { a.classList.toggle("is-on", a.getAttribute("href") === "#" + e.target.id); });
+        });
+      }, { rootMargin: "-120px 0px -60% 0px" });
+      setTimeout(function () {
+        items.forEach(function (it) { var n = document.getElementById(it[0]); if (n) io.observe(n); });
+      }, 0);
+    }
+    return wrap;
   }
 
   function renderDashboard(session, rawData) {
@@ -830,40 +510,49 @@
       quiz_results: dedupeQuiz(rawData.quiz_results).rows.filter(function (r) { return !isExcluded(r.lesson); }),
       submissions: dedupeSubs(rawData.submissions).rows.filter(function (r) { return !isExcluded(r.lesson); }),
     };
+    var quizRows = data.quiz_results || [], subRows = data.submissions || [];
+    R.registerLessons(quizRows);
+    var tree = R.buildTree(quizRows, subRows);
+
     var root = document.getElementById("dashboard");
     root.innerHTML = "";
     root.hidden = false;
 
+    var name = session.student_name || "there";
     root.appendChild(el("div", { class: "dash-head" }, [
-      el("div", {}, [
-        el("h1", {}, ["Hey, " + (session.student_name || "there")]),
-        el("p", {}, ["Your quiz history and submissions, all in one place."]),
+      el("div", { class: "dash-head-id" }, [
+        el("div", { class: "d-avatar", "aria-hidden": "true" }, [initials(session.student_name)]),
+        el("div", {}, [
+          el("h1", { dir: "auto" }, ["Hi, " + name]),
+          el("p", {}, ["Your progress, and the questions worth another look."]),
+        ]),
       ]),
     ]));
 
-    root.appendChild(renderStats(data.quiz_results || [], data.submissions || []));
-    root.appendChild(renderQuizSection(data.quiz_results || []));
-    root.appendChild(renderChapterSection(data.quiz_results || [], data.submissions || []));
-    root.appendChild(renderSubmissionsSection(data.submissions || []));
+    root.appendChild(renderStats(quizRows, subRows, R.totalToReview(tree)));
+    root.appendChild(renderTabs({ review: R.totalToReview(tree), quizzes: quizRows.length, assignments: subRows.length }));
+    root.appendChild(renderReviewSection(tree));
+    root.appendChild(renderQuizSection(quizRows));
+    root.appendChild(renderSubmissionsSection(subRows));
   }
 
   function renderError(message) {
     var root = document.getElementById("dashboard");
     root.innerHTML = "";
     root.hidden = false;
-    root.appendChild(el("div", { class: "dash-err" }, [message]));
+    root.appendChild(el("div", { class: "dash-err", role: "alert" }, [message]));
   }
 
   function renderNeedsRelogin() {
     var root = document.getElementById("dashboard");
     root.innerHTML = "";
     root.hidden = false;
-    var btn = el("button", { class: "qz-next", type: "button" }, ["Log out & sign in again \u2192"]);
+    var btn = el("button", { class: "qz-next", type: "button" }, ["Log out and sign in again"]);
     btn.addEventListener("click", function () {
       window.AuthEngine.clearSession();
       location.reload();
     });
-    root.appendChild(el("div", { class: "dash-err" }, [
+    root.appendChild(el("div", { class: "dash-err", role: "alert", style: "margin-bottom:14px" }, [
       "Your saved sign-in is missing a session token \u2014 this happens once, for anyone " +
       "who logged in before the dashboard system existed. Log in again to fix it (your " +
       "phone/password stay the same, this just refreshes your session)."
@@ -880,7 +569,6 @@
         el("div", { class: "dash-loader-orbit", "aria-hidden": "true" }),
         el("h1", { class: "dash-loading-title" }, ["Loading your dashboard"]),
         el("p", { class: "dash-loading-copy" }, ["Gathering your quizzes, progress, and submissions\u2026"]),
-        el("div", { class: "dash-loadbar", "aria-hidden": "true" }, [el("div", { class: "dash-loadbar-fill" })]),
         el("div", { class: "dash-loading-skeleton", "aria-hidden": "true" }, [
           el("div", { class: "dash-skeleton-line" }),
           el("div", { class: "dash-skeleton-line" }),
