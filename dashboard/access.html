@@ -334,7 +334,7 @@
   var CHAPTER_OVERRIDES = {};
   var LESSON_RE = /^(?:chap(?:t)?er-(\d+)-)?(?:lesson-(\d+)-)?(.+)$/i;
   function slugOf(p) { return String(p || "").split("/").pop(); }
-  function sentence(t) { t = String(t).replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim(); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
+  function sentence(t) { t = String(t).replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim(); t = t.replace(/\bai\b/gi, "AI"); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
   function lessonParts(path) {
     var m = LESSON_RE.exec(slugOf(path));
     var o = { chapter: (m && m[1]) || CHAPTER_OVERRIDES[path] || "", num: (m && m[2]) || "", name: sentence(m ? m[3] : slugOf(path)) };
@@ -1446,6 +1446,14 @@
     return r ? (r.year || "") : "";
   }
 
+  // Wide scopes first, then lessons in chapter/lesson order, each lesson's quiz right under its video access.
+  function sortGrants(list) {
+    var wide = function (x) { return isWide(x.target) || subScope(x.target) ? 0 : 1; };
+    return list.slice().sort(function (a, b) {
+      return wide(a) - wide(b) || (wide(a) ? cmpLessons(a.target, b.target) : (a.target < b.target ? -1 : a.target > b.target ? 1 : 0)) || (a.kind === b.kind ? 0 : a.kind === "quiz" ? 1 : -1);
+    });
+  }
+
   function groupCard(d, g) {
     var key = "grp:" + g.group;
     var card = el("div", { class: "ac-card", "data-group": g.group }, [
@@ -1462,7 +1470,7 @@
     } else {
       gives = el("div", { class: "ac-panel", "data-group-gives": g.group }, [
         el("p", {}, [el("b", {}, ["Anyone added to this group gets:"])]),
-        el("ul", { class: "ac-gives" }, g.grants.map(function (x) { return el("li", {}, [grantText(x)]); })),
+        el("ul", { class: "ac-gives" }, sortGrants(g.grants).map(function (x) { return el("li", x.kind === "quiz" ? { style: "margin-left:18px;list-style:circle;font-weight:500" } : {}, [grantText(x)]); })),
         el("p", {}, ["Each ends on the same date as the group\u2019s own. Removing a student from the group does not take away access they already have \u2014 revoke it under \u201cWho has access\u201d."]),
       ]);
     }
