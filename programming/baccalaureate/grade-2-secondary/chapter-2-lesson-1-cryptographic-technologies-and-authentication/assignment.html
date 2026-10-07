@@ -59,7 +59,7 @@
 <main>
   <div class="wrap page-head">
     <h1>Chapter 2 Lesson 1 | Cryptographic Technologies and Authentication — assignment</h1>
-    <p class="lede">Paste your completed HomeWork below.</p>
+    <p class="lede">Same homework as booklet</p>
   </div>
 
   <div class="wrap">
@@ -67,14 +67,14 @@
       Video coming soon
     </div>
 
-    <div id="assign-root" data-subject="programming" data-lesson="chapter-2-lesson-1-cryptographic-technologies-and-authentication" data-mode="text" aria-live="polite"></div>
+    <div id="assign-root" data-subject="programming" data-lesson="chapter-2-lesson-1-cryptographic-technologies-and-authentication" data-mode="graded" aria-live="polite"></div>
   </div>
 </main>
 
 <footer><div class="wrap"><p class="footer-note">teaching.ezznasr.dev/programming/baccalaureate/grade-2-secondary/chapter-2-lesson-1-cryptographic-technologies-and-authentication/assignment</p></div></footer>
 
 <script type="application/json" id="assign-questions">
-{"items": []}
+{"items": [{"id": "g1", "type": "mcq", "prompt": "Which method safely shares a common key during HTTPS setup?", "options": ["Public-key cryptography", "Common-key cryptography", "MFA", "Digital signature"], "correct": [0], "explain": "Public-key cryptography safely shares the common key.", "chapter": 2}, {"id": "g2", "type": "mcq", "prompt": "Which method is used for fast data communication after the key is shared?", "options": ["Public-key", "Common-key", "Certificate", "Biometric"], "correct": [1], "explain": "Common-key cryptography quickly protects the data.", "chapter": 2}, {"id": "g3", "type": "mcq", "prompt": "What does a digital certificate verify?", "options": ["Data speed", "Partner/site authenticity", "User age", "File size"], "correct": [1], "explain": "A certificate verifies partner/site authenticity.", "chapter": 2}, {"id": "g4", "type": "mcq", "prompt": "Which item is a possession factor?", "options": ["Password", "Secret question", "One-time password on a phone", "Fingerprint"], "correct": [2], "explain": "An OTP on a phone is possession.", "chapter": 2}, {"id": "g5", "type": "mcq", "prompt": "Which is true MFA?", "options": ["Password + secret question", "Password + one-time password", "Two passwords", "Two PINs"], "correct": [1], "explain": "Password + OTP combines knowledge and possession.", "chapter": 2}, {"id": "g6", "type": "mcq", "prompt": "Which technology detects data tampering and supports non-repudiation?", "options": ["Encryption", "Digital signature", "Digital certificate", "MFA"], "correct": [1], "explain": "Digital signatures detect tampering and support non-repudiation.", "chapter": 2}, {"id": "g7", "type": "mcq", "prompt": "Which threat is primarily addressed by encryption?", "options": ["Eavesdropping/readable content", "Fake website", "Unauthorized login", "Same-factor authentication"], "correct": [0], "explain": "Encryption prevents intercepted content being read.", "chapter": 2}, {"id": "g8", "type": "mcq", "prompt": "Which statement about HTTPS is correct?", "options": ["It uses only public-key cryptography for all data.", "It combines public-key and common-key cryptography.", "It removes the need for authentication.", "It only checks passwords."], "correct": [1], "explain": "HTTPS combines public-key and common-key cryptography.", "chapter": 2}, {"id": "g9", "type": "mcq", "prompt": "Which service example is biometric + possession?", "options": ["Password + OTP", "Password + fingerprint", "Face recognition + smart card", "Password + SMS"], "correct": [2], "explain": "Face recognition is biometric; a smart card is possession.", "chapter": 2}, {"id": "g10", "type": "mcq", "prompt": "What does a certificate authority do?", "options": ["Vouches that a certificate/site is genuine", "Generates every password", "Encrypts every data byte", "Replaces the browser"], "correct": [0], "explain": "A CA vouches that a certificate/site is genuine.", "chapter": 2}, {"id": "g11", "type": "mcq", "prompt": "Current TLS versions use which key-agreement approach in the source note?", "options": ["Diffie\u2013Hellman", "Secret question", "3-D Secure only", "Face recognition"], "correct": [0], "explain": "The source notes name Diffie\u2013Hellman key agreement.", "chapter": 2}, {"id": "g12", "type": "mcq", "prompt": "Why are technologies combined?", "options": ["To address several threats while keeping communication practical", "To make all keys public", "To avoid checking the site", "To use only one factor"], "correct": [0], "explain": "Layering addresses multiple threats while keeping communication practical.", "chapter": 2}]}
 </script>
 <script src="/assets/auth.js"></script>
 <script src="/assets/video.js?v=3"></script>
