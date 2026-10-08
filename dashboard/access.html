@@ -588,7 +588,7 @@
   function collapsible(key, headKids, bodyKids, forceOpen, keys) {
     keys.push(key);
     var det = el("details", { class: "ac-grp", "data-grp": key });
-    if (forceOpen || !STATE.collapsed[key]) det.setAttribute("open", "");
+    if (forceOpen || STATE.collapsed[key] === false) det.setAttribute("open", "");
     det.appendChild(el("summary", { class: "ac-grp-h" }, headKids));
     det.appendChild(el("div", { class: "ac-grp-body" }, bodyKids));
     det.addEventListener("toggle", function () { STATE.collapsed[key] = !det.open; });
@@ -675,7 +675,7 @@
     return api({ action: "admin_access_overview" }).then(
       function (data) {
         STATE.data = data;
-        if (!STATE.tab) STATE.tab = data.counts.pending > 0 ? "requests" : "access";
+        if (!STATE.tab) { var t0 = null; try { t0 = sessionStorage.getItem("access-tab"); } catch (e) {} STATE.tab = t0 || (data.counts.pending > 0 ? "requests" : "access"); }
         render();
       },
       function (err) {
@@ -754,7 +754,7 @@
     return el("div", { class: "dash-tabs ac-tabs", role: "group", "aria-label": "Sections" }, list.map(function (t) {
       var b = el("button", { class: "dash-tab" + (STATE.tab === t[0] ? " is-active" : ""), type: "button", "data-tab": t[0], "aria-pressed": String(STATE.tab === t[0]) },
         [t[1], t[2] === null ? null : el("small", {}, [t[2]])]);
-      b.addEventListener("click", function () { STATE.tab = t[0]; STATE.open = null; STATE.toast = null; render(); });
+      b.addEventListener("click", function () { STATE.tab = t[0]; try { sessionStorage.setItem("access-tab", t[0]); } catch (e) {} STATE.open = null; STATE.toast = null; render(); });
       return b;
     }));
   }
@@ -1825,6 +1825,7 @@
     ])]));
     var t = toastNode();
     if (t) root.appendChild(t);
+    if (d.lessons_error) root.appendChild(el("div", { class: "ac-note", style: "margin:0 0 16px" }, [el("b", {}, ["The full lesson list didn\u2019t load, so dropdowns only show lessons already known here. "]), d.lessons_error]));
     root.appendChild(helpBlock());
     var perYear = function (fn) { return "S1: " + fn("Senior 1") + "  \u00b7  S2: " + fn("Senior 2"); };
     var pendingBy = function (y) { return d.payments.filter(function (p) { return p.status === "pending" && sectionPass(d, y, p.scope); }).length; };

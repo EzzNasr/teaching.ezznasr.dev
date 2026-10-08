@@ -854,7 +854,7 @@
 
   function renderRoster(onChange) {
     var roster = buildRoster(yearScopedStudents(), STATE.quizRows, STATE.subRows);
-    var section = el("details", { class: "dash-section rv-roster", open: "open" }, [
+    var section = el("details", { class: "dash-section rv-roster" }, [
       el("summary", {}, [el("div", { class: "d-sec-head" }, [el("h2", {}, ["Roster", el("span", { class: "d-count" }, [String(roster.length)])])]),
         el("span", { class: "rv-caret", "aria-hidden": "true" })]),
       el("p", { class: "dash-section-note" }, ["Select a student to filter every section below. Select again to clear."]),

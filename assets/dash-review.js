@@ -24,12 +24,26 @@
     var fmtWhen = h.fmtWhen || String;
     var whenMs = h.whenMs || function () { return NaN; };
     var truthy = h.isTruthyFlag || function (v) { return v === true || String(v).toUpperCase() === "TRUE"; };
+    // Wording. Pass h.t to translate any of these (the student page does, in Arabic); master keeps English.
+    var T = {
+      chapter: "Chapter", lesson: "Lesson", quiz: "Quiz", assign: "Assignment", other: "Other lessons", subjects: SUBJECTS,
+      srcQuiz: "Quiz", srcAssign: "Assignment",
+      srcHead: function (w, a, mode) { return w ? plural(w, "question") + (mode === "master" ? " missed" : " to review") + " \u00b7 from " + plural(a, "attempt") : plural(a, "attempt") + (mode === "master" ? " \u00b7 no misses" : " \u00b7 nothing to review"); },
+      noMistakes: function (mode) { return mode === "master" ? "No missed questions in this view." : "No mistakes here \u2014 nice work."; },
+      chip: function (n, mode) { return n ? n + (mode === "master" ? " missed" : " to review") : (mode === "master" ? "No misses" : "All clear"); },
+      lastMissed: "Last missed ", yourAnswer: T.yourAnswer, correctAnswer: T.correctAnswer,
+      missedTimes: function (n) { return "Missed " + n + " times"; },
+      quizPct: function (p) { return "Quiz " + p + "%"; }, assignScore: function (c, t) { return "Assignment " + c + "/" + t; },
+      meterTitle: function (c, t) { return c + " of " + t + " quiz answers correct"; },
+      assignOnly: "Assignments only", noChapter: "no chapter", lessons: function (n) { return plural(n, "lesson"); }
+    };
+    Object.keys(h.t || {}).forEach(function (k) { T[k] = h.t[k]; });
 
     // ---- Names ------------------------------------------------------------
 
     function subjectName(s) {
       s = String(s || "");
-      return SUBJECTS[s.toLowerCase()] || (s ? s.charAt(0).toUpperCase() + s.slice(1) : "");
+      return T.subjects[s.toLowerCase()] || (s ? s.charAt(0).toUpperCase() + s.slice(1) : "");
     }
 
     function sentence(s) {
@@ -80,7 +94,7 @@
 
     function lessonLabel(slug) {
       var i = lessonInfo(slug);
-      return (i.num ? "Lesson " + i.num + " \u00b7 " : "") + i.name;
+      return (i.num ? T.lesson + " " + i.num + " \u00b7 " : "") + i.name;
     }
 
     function chapterOf(tagged, slug) {
@@ -245,20 +259,20 @@
     function tone(p) { return p === null ? "" : (p >= 80 ? "is-good" : (p < 50 ? "is-low" : "is-mid")); }
     function plural(n, one, many) { return n + " " + (n === 1 ? one : (many || one + "s")); }
     function chapterTitle(c) {
-      if (c.key !== "") return "Chapter " + c.key;
-      return subjectName(c.lessons[0] && c.lessons[0].subject) || "Other lessons";
+      if (c.key !== "") return T.chapter + " " + c.key;
+      return subjectName(c.lessons[0] && c.lessons[0].subject) || T.other;
     }
 
     function chip(cls, text) { return el("span", { class: "d-chip " + cls }, [text]); }
     function reviewChip(n, mode) {
-      return n ? chip("bad", n + (mode === "master" ? " missed" : " to review")) : chip("good", mode === "master" ? "No misses" : "All clear");
+      return n ? chip("bad", T.chip(n, mode)) : chip("good", T.chip(0, mode));
     }
 
     function whereLine(L, chKey, source, extra) {
       // The lesson header above the card already carries the full lesson
       // name, so the location line only repeats its number (or the name for
       // lessons that have no number).
-      var parts = [subjectName(L.subject), L.group, chKey === "" ? "" : "Chapter " + chKey, L.num ? "Lesson " + L.num : "", source === "quiz" ? "Quiz" : "Assignment"]
+      var parts = [subjectName(L.subject), L.group, chKey === "" ? "" : T.chapter + " " + chKey, L.num ? T.lesson + " " + L.num : "", source === "quiz" ? T.quiz : T.assign]
         .filter(Boolean);
       var kids = [];
       parts.forEach(function (p, i) {
@@ -284,7 +298,7 @@
 
     function questionCard(L, chKey, source, it, mode) {
       var card = el("div", { class: "q-card" });
-      var when = it.lastWhen ? (mode === "master" ? "Latest " : "Last missed ") + fmtWhen(it.lastWhen) : "";
+      var when = it.lastWhen ? (mode === "master" ? "Latest " : T.lastMissed) + fmtWhen(it.lastWhen) : "";
       card.appendChild(whereLine(L, chKey, source, when));
       if (it.instr) card.appendChild(el("p", { class: "q-instr", dir: "auto" }, [it.instr]));
       card.appendChild(el("p", { class: "q-text", dir: "auto" }, [it.text]));
@@ -292,16 +306,16 @@
         var top = topAnswer(it.answers);
         card.appendChild(answerRow("is-your", top.n > 1 ? "Common mistake" : "Wrong answer", top.text || "\u2014"));
       } else {
-        card.appendChild(answerRow("is-your", "Your answer", it.lastAnswer || "\u2014"));
+        card.appendChild(answerRow("is-your", T.yourAnswer, it.lastAnswer || "\u2014"));
       }
-      card.appendChild(answerRow("is-right", "Correct answer", cleanAns(it.correct, it.type)));
+      card.appendChild(answerRow("is-right", T.correctAnswer, cleanAns(it.correct, it.type)));
       var foot = el("div", { class: "q-foot" });
       if (mode === "master") {
         foot.appendChild(chip("bad", "Missed " + it.wrong + " of " + plural(it.total, "attempt")));
         var ns = Object.keys(it.students).length;
         if (ns) foot.appendChild(chip("", plural(ns, "student")));
       } else if (it.wrong > 1) {
-        foot.appendChild(chip("bad", "Missed " + it.wrong + " times"));
+        foot.appendChild(chip("bad", T.missedTimes(it.wrong)));
       }
       if (foot.childNodes.length) card.appendChild(foot);
       return card;
@@ -313,18 +327,14 @@
       var wrongItems = Object.keys(L.items[source]).map(function (k) { return L.items[source][k]; })
         .filter(function (it) { return it.wrong > 0; })
         .sort(function (a, b) { return b.wrong - a.wrong || b.lastMs - a.lastMs; });
-      var label = source === "quiz" ? "Quiz" : "Assignment";
+      var label = source === "quiz" ? T.srcQuiz : T.srcAssign;
       var head = el("div", { class: "rv-src-head" }, [
         chip(source === "quiz" ? "quiz" : "assign", label),
-        el("span", {}, [
-          wrongItems.length
-            ? plural(wrongItems.length, "question") + (mode === "master" ? " missed" : " to review") + " \u00b7 from " + plural(side.attempts, "attempt")
-            : plural(side.attempts, "attempt") + (mode === "master" ? " \u00b7 no misses" : " \u00b7 nothing to review"),
-        ]),
+        el("span", {}, [T.srcHead(wrongItems.length, side.attempts, mode)]),
       ]);
       var box = el("div", { class: "rv-src" }, [head]);
       if (!wrongItems.length) {
-        box.appendChild(el("div", { class: "rv-empty" }, [mode === "master" ? "No missed questions in this view." : "No mistakes here \u2014 nice work."]));
+        box.appendChild(el("div", { class: "rv-empty" }, [T.noMistakes(mode)]));
       } else {
         wrongItems.forEach(function (it) { box.appendChild(questionCard(L, chKey, source, it, mode)); });
       }
@@ -334,12 +344,12 @@
     function lessonBlock(L, chKey, mode, open) {
       var qp = pct(L.quiz.correct, L.quiz.total);
       var meta = el("div", { class: "rv-ls-meta" });
-      if (qp !== null) meta.appendChild(chip("quiz", "Quiz " + qp + "%"));
-      if (L.assign.total) meta.appendChild(chip("assign", "Assignment " + L.assign.correct + "/" + L.assign.total));
+      if (qp !== null) meta.appendChild(chip("quiz", T.quizPct(qp)));
+      if (L.assign.total) meta.appendChild(chip("assign", T.assignScore(L.assign.correct, L.assign.total)));
       meta.appendChild(reviewChip(L.toReview, mode));
 
       var nameKids = [];
-      if (L.num) nameKids.push(el("span", { class: "rv-ls-num" }, ["Lesson " + L.num]));
+      if (L.num) nameKids.push(el("span", { class: "rv-ls-num" }, [T.lesson + " " + L.num]));
       nameKids.push(el("b", { dir: "auto" }, [L.name]));
 
       var attrs = { class: "rv-lesson" };
@@ -360,19 +370,19 @@
       var p = pct(c.quizCorrect, c.quizTotal);
       var stats = el("div", { class: "rv-ch-stats" });
       if (p !== null) {
-        stats.appendChild(el("div", { class: "rv-meter", title: c.quizCorrect + " of " + c.quizTotal + " quiz answers correct" }, [
+        stats.appendChild(el("div", { class: "rv-meter", title: T.meterTitle(c.quizCorrect, c.quizTotal) }, [
           el("div", { class: "dash-bar" }, [el("div", { class: "dash-bar-fill " + tone(p), style: "width:" + Math.max(3, p) + "%" })]),
           el("strong", { class: tone(p) }, [p + "%"]),
         ]));
       } else {
-        stats.appendChild(el("span", { class: "rv-sub", style: "color:var(--d-ink-3);font-size:13px;font-weight:600" }, ["Assignments only"]));
+        stats.appendChild(el("span", { class: "rv-sub", style: "color:var(--d-ink-3);font-size:13px;font-weight:600" }, [T.assignOnly]));
       }
       stats.appendChild(reviewChip(c.toReview, mode));
 
       var titleKids = [
         el("span", { class: "rv-caret", "aria-hidden": "true" }),
         el("b", {}, [chapterTitle(c)]),
-        el("span", { class: "rv-sub" }, [[c.group, plural(c.lessons.length, "lesson"), c.key === "" ? "no chapter" : ""].filter(Boolean).join(" \u00b7 ")]),
+        el("span", { class: "rv-sub" }, [[c.group, T.lessons(c.lessons.length), c.key === "" ? T.noChapter : ""].filter(Boolean).join(" \u00b7 ")]),
       ];
       var attrs = { class: "rv-chapter" };
       if (open) attrs.open = "open";
@@ -407,14 +417,14 @@
       var sp = splitMatch(q.question, q.type);
       var ok = !!q.ok;
       var card = el("div", { class: "q-card" + (ok ? " is-ok" : "") });
-      if (q.chapter) card.appendChild(el("div", { class: "q-where" }, [el("span", {}, ["Chapter " + q.chapter])]));
+      if (q.chapter) card.appendChild(el("div", { class: "q-where" }, [el("span", {}, [T.chapter + " " + q.chapter])]));
       if (sp.instr && !q.suppressInstr) card.appendChild(el("p", { class: "q-instr", dir: "auto" }, [sp.instr]));
       card.appendChild(el("p", { class: "q-text", dir: "auto" }, [q.label || sp.text]));
       if (!ok) {
-        card.appendChild(answerRow("is-your", "Your answer", cleanAns(q.chosen, q.type)));
-        card.appendChild(answerRow("is-right", "Correct answer", cleanAns(q.correct, q.type)));
+        card.appendChild(answerRow("is-your", T.yourAnswer, cleanAns(q.chosen, q.type)));
+        card.appendChild(answerRow("is-right", T.correctAnswer, cleanAns(q.correct, q.type)));
       } else {
-        card.appendChild(answerRow("is-right", "Your answer", cleanAns(q.chosen, q.type)));
+        card.appendChild(answerRow("is-right", T.yourAnswer, cleanAns(q.chosen, q.type)));
       }
       return card;
     }
