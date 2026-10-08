@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    dash-review.js — shared by dashboard/student.html and dashboard/master.html
 
    Turns quiz attempts + graded assignments into one tree:
@@ -31,7 +31,7 @@
       srcHead: function (w, a, mode) { return w ? plural(w, "question") + (mode === "master" ? " missed" : " to review") + " \u00b7 from " + plural(a, "attempt") : plural(a, "attempt") + (mode === "master" ? " \u00b7 no misses" : " \u00b7 nothing to review"); },
       noMistakes: function (mode) { return mode === "master" ? "No missed questions in this view." : "No mistakes here \u2014 nice work."; },
       chip: function (n, mode) { return n ? n + (mode === "master" ? " missed" : " to review") : (mode === "master" ? "No misses" : "All clear"); },
-      lastMissed: "Last missed ", yourAnswer: T.yourAnswer, correctAnswer: T.correctAnswer,
+      lastMissed: "Last missed ", yourAnswer: "Your answer", correctAnswer: "Correct answer",
       missedTimes: function (n) { return "Missed " + n + " times"; },
       quizPct: function (p) { return "Quiz " + p + "%"; }, assignScore: function (c, t) { return "Assignment " + c + "/" + t; },
       meterTitle: function (c, t) { return c + " of " + t + " quiz answers correct"; },

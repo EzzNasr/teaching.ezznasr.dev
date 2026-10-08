@@ -42,7 +42,7 @@
       <span class="theme-toggle-label">English</span>
     </button>
     <button class="theme-toggle" id="themeToggle" type="button" aria-label="التبديل للوضع الداكن" aria-pressed="false">
-      <span class="theme-toggle-icon" aria-hidden="true"></span><span class="theme-toggle-label">الوضع الداكن</span>
+      <span class="theme-toggle-icon" aria-hidden="true"></span><span class="theme-toggle-label">Dark mode</span>
     </button>
   </div>
 </div>
@@ -97,7 +97,7 @@ window.PageLang = (function () {
     button.setAttribute("aria-pressed", String(dark));
     button.setAttribute("aria-label", ar ? (dark ? "التبديل للوضع الفاتح" : "التبديل للوضع الداكن") : (dark ? "Switch to light mode" : "Switch to dark mode"));
     button.querySelector(".theme-toggle-icon").innerHTML = dark ? ICON_SUN : ICON_MOON;
-    button.querySelector(".theme-toggle-label").textContent = ar ? (dark ? "الوضع الفاتح" : "الوضع الداكن") : (dark ? "Light mode" : "Dark mode");
+    button.querySelector(".theme-toggle-label").textContent = dark ? "Light mode" : "Dark mode";
   }
   window.PageLang.on(function () { apply(theme); });
   apply(theme);
@@ -621,8 +621,8 @@ window.PageLang = (function () {
     root.appendChild(el("div", { class: "dash-loading", role: "status", "aria-live": "polite", "aria-label": x("جاري تحميل لوحتك", "Loading your dashboard") }, [
       el("div", { class: "dash-loading-card" }, [
         el("div", { class: "dash-loader-orbit", "aria-hidden": "true" }),
-        el("h1", { class: "dash-loading-title" }, [x("جاري تحميل لوحتك", "Loading your dashboard")]),
-        el("p", { class: "dash-loading-copy" }, [x("بنجمّع الكويزات والتقدّم والواجبات بتاعتك…", "Gathering your quizzes, progress and assignments…")]),
+        el("h1", { class: "dash-loading-title" }, ["Loading your dashboard"]),
+        el("p", { class: "dash-loading-copy" }, [x("بنجمّع الكويزات والواجبات بتاعتك…", "Gathering your quizzes, progress and assignments…")]),
         el("div", { class: "dash-loading-skeleton", "aria-hidden": "true" }, [
           el("div", { class: "dash-skeleton-line" }),
           el("div", { class: "dash-skeleton-line" }),
