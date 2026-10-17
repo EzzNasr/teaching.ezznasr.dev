@@ -1,0 +1,165 @@
+/* followup-templates.css — styles for FollowupTemplates.mountEditor() and the
+   WhatsApp-style preview bubble. Everything is scoped under .ft-editor / .ft-bubble,
+   uses the theme.css colour tokens (so dark mode follows html[data-theme="dark"]),
+   and is built for a 390 px phone: single column, tap targets >= 48 px. */
+
+.ft-editor {
+  direction: rtl;
+  font-family: var(--arabic, "Cairo", system-ui, sans-serif);
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--ink, #10233f);
+  display: block;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.ft-editor *, .ft-bubble { box-sizing: border-box; }
+
+.ft-h {
+  display: block;
+  margin: 18px 0 8px;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+/* tabs: one horizontally scrollable row */
+.ft-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.ft-tab {
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 24px;
+  border: 1.5px solid var(--line, #d6e1ef);
+  background: var(--panel, #fff);
+  color: var(--ink-dim, #63738a);
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ft-tab.on { background: var(--sage, #397b75); border-color: var(--sage, #397b75); color: #fff; }
+.ft-tab.dirty::after { content: " ●"; color: var(--honey, #e5a94f); }
+.ft-tab.on.dirty::after { color: #fff; }
+
+.ft-ta {
+  display: block;
+  width: 100%;
+  min-height: 190px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--line, #d6e1ef);
+  background: var(--panel, #fff);
+  color: inherit;
+  font: inherit;
+  line-height: 1.8;
+  resize: vertical;
+  unicode-bidi: plaintext;
+}
+.ft-ta:focus-visible, .ft-tab:focus-visible, .ft-tool:focus-visible, .ft-chip:focus-visible,
+.ft-btn:focus-visible, .ft-emoji:focus-visible {
+  outline: 3px solid var(--accent, #2f6fed);
+  outline-offset: 2px;
+}
+
+.ft-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.ft-tool {
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 24px;
+  border: 0;
+  background: var(--panel-soft, #eef4fb);
+  color: var(--ink-dim, #63738a);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.ft-tool[aria-expanded="true"] { background: var(--accent-soft, #dce9ff); color: var(--ink, #10233f); }
+
+.ft-emojis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 14px;
+  background: var(--panel-soft, #eef4fb);
+}
+.ft-emojis[hidden] { display: none; }
+.ft-emoji {
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ft-emoji:active { background: var(--accent-soft, #dce9ff); }
+
+/* placeholder chips: LTR text inside an RTL page */
+.ft-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ft-chip {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 24px;
+  background: var(--accent-soft, #dce9ff);
+  color: var(--ink, #10233f);
+  font-family: var(--mono, ui-monospace, Menlo, monospace);
+  font-size: 15px;
+  direction: ltr;
+  unicode-bidi: isolate;
+  cursor: pointer;
+}
+
+/* WhatsApp-style bubble (also usable by the message sheet: add class "ft-bubble") */
+.ft-bubble {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--mint, #1fae6b);
+  background: var(--mint-soft, #d7f5e6);
+  color: var(--ink, #10233f);
+  font-size: 17px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  unicode-bidi: plaintext;
+  max-width: 100%;
+}
+.ft-bubble b { font-weight: 800; }
+
+.ft-info { margin-top: 8px; font-size: 15px; color: var(--ink-dim, #63738a); }
+.ft-info.warn { color: var(--status-fail, #e2574c); }
+
+.ft-actions { display: flex; gap: 10px; margin-top: 18px; }
+.ft-btn {
+  flex: 1 1 0;
+  min-height: 52px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--sage, #397b75);
+  background: var(--panel, #fff);
+  color: var(--sage, #397b75);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.ft-btn.primary { background: var(--sage, #397b75); color: #fff; }
+.ft-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.ft-status { min-height: 28px; margin-top: 10px; font-size: 15px; color: var(--ink-dim, #63738a); }
+.ft-status.ok { color: var(--status-shipped, #2f9e6f); }
+.ft-status.err { color: var(--status-fail, #e2574c); }
+
+@media (min-width: 700px) {
+  .ft-editor { max-width: 760px; }
+}

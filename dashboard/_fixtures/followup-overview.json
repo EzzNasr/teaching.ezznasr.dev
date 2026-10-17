@@ -1,0 +1,788 @@
+{
+ "ok": true,
+ "today": "2026-10-16",
+ "now": "2026-10-16T05:19:00+03:00",
+ "settings": {
+  "watch_done_pct": 80,
+  "praise_quiz_pct": 90,
+  "watch_days_before": 3,
+  "hw_days_before": 1
+ },
+ "groups": [
+  {
+   "group": "Sat 6pm",
+   "key": "sat 6pm",
+   "settings": {
+    "weekday": 6,
+    "time": "18:00",
+    "current_lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions",
+    "review_lessons": [
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables"
+    ],
+    "note": "",
+    "parents_contacted": false,
+    "watch_deadline_override": "",
+    "hw_deadline_override": ""
+   },
+   "members": [
+    {
+     "phone": "01012345001",
+     "name": "Mariam Ahmed"
+    },
+    {
+     "phone": "01012345002",
+     "name": "Sara Mahmoud"
+    },
+    {
+     "phone": "01012345003",
+     "name": "Omar Khaled"
+    },
+    {
+     "phone": "01012345004",
+     "name": "Nour Hassan"
+    },
+    {
+     "phone": "01012345005",
+     "name": "Hana Sami"
+    }
+   ]
+  },
+  {
+   "group": "Tue 4pm",
+   "key": "tue 4pm",
+   "settings": {
+    "weekday": 2,
+    "time": "16:00",
+    "current_lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions",
+    "review_lessons": [
+     "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops"
+    ],
+    "note": "",
+    "parents_contacted": false,
+    "watch_deadline_override": "",
+    "hw_deadline_override": ""
+   },
+   "members": [
+    {
+     "phone": "01112345006",
+     "name": "Adham Reda"
+    },
+    {
+     "phone": "01112345007",
+     "name": "Yara Tarek"
+    },
+    {
+     "phone": "01112345008",
+     "name": "Karim Wael"
+    },
+    {
+     "phone": "01112345009",
+     "name": "Laila Fawzy"
+    }
+   ]
+  },
+  {
+   "group": "Sun 8pm",
+   "key": "sun 8pm",
+   "settings": {
+    "weekday": 0,
+    "time": "20:00",
+    "current_lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions",
+    "review_lessons": [
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables",
+     "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops"
+    ],
+    "note": "",
+    "parents_contacted": false,
+    "watch_deadline_override": "",
+    "hw_deadline_override": ""
+   },
+   "members": [
+    {
+     "phone": "01012345002",
+     "name": "Sara Mahmoud"
+    },
+    {
+     "phone": "01212345010",
+     "name": "Ziad Nabil"
+    },
+    {
+     "phone": "01212345011",
+     "name": "Dina Essam"
+    }
+   ]
+  }
+ ],
+ "unclassified": [
+  {
+   "phone": "01512345012",
+   "name": "Mostafa Adel"
+  }
+ ],
+ "students": {
+  "1012345001": {
+   "phone": "01012345001",
+   "name": "Mariam Ahmed",
+   "year": "Senior 1",
+   "parent_phone": "01234567890"
+  },
+  "1012345002": {
+   "phone": "01012345002",
+   "name": "Sara Mahmoud",
+   "year": "Senior 1",
+   "parent_phone": "01234567891"
+  },
+  "1012345003": {
+   "phone": "01012345003",
+   "name": "Omar Khaled",
+   "year": "Senior 1",
+   "parent_phone": "01234567892"
+  },
+  "1012345004": {
+   "phone": "01012345004",
+   "name": "Nour Hassan",
+   "year": "Senior 1",
+   "parent_phone": "01234567893"
+  },
+  "1012345005": {
+   "phone": "01012345005",
+   "name": "Hana Sami",
+   "year": "Senior 1",
+   "parent_phone": "01234567894"
+  },
+  "1112345006": {
+   "phone": "01112345006",
+   "name": "Adham Reda",
+   "year": "Senior 1",
+   "parent_phone": "01234567895"
+  },
+  "1112345007": {
+   "phone": "01112345007",
+   "name": "Yara Tarek",
+   "year": "Senior 1",
+   "parent_phone": ""
+  },
+  "1112345008": {
+   "phone": "01112345008",
+   "name": "Karim Wael",
+   "year": "Senior 1",
+   "parent_phone": "01112345008"
+  },
+  "1112345009": {
+   "phone": "01112345009",
+   "name": "Laila Fawzy",
+   "year": "Senior 1",
+   "parent_phone": "01234567896"
+  },
+  "1212345010": {
+   "phone": "01212345010",
+   "name": "Ziad Nabil",
+   "year": "Senior 1",
+   "parent_phone": "01234567897"
+  },
+  "1212345011": {
+   "phone": "01212345011",
+   "name": "Dina Essam",
+   "year": "Senior 1",
+   "parent_phone": "01234567898"
+  },
+  "1512345012": {
+   "phone": "01512345012",
+   "name": "Mostafa Adel",
+   "year": "Senior 1",
+   "parent_phone": "01234567899"
+  }
+ },
+ "lessons": {
+  "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+   "path": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions",
+   "subject": "programming",
+   "slug": "chapter-2-lesson-2-functions",
+   "has_video": true,
+   "has_quiz": true,
+   "has_assignment": true,
+   "lesson_locked": false,
+   "video_locked": true,
+   "quiz_locked": false
+  },
+  "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+   "path": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables",
+   "subject": "programming",
+   "slug": "chapter-2-lesson-1-variables",
+   "has_video": true,
+   "has_quiz": true,
+   "has_assignment": true,
+   "lesson_locked": false,
+   "video_locked": false,
+   "quiz_locked": false
+  },
+  "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops": {
+   "path": "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops",
+   "subject": "programming",
+   "slug": "chapter-1-lesson-4-loops",
+   "has_video": true,
+   "has_quiz": true,
+   "has_assignment": true,
+   "lesson_locked": false,
+   "video_locked": false,
+   "quiz_locked": false
+  }
+ },
+ "all_lessons": [
+  {
+   "path": "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops",
+   "lesson_locked": false,
+   "video_locked": false,
+   "quiz_locked": false
+  },
+  {
+   "path": "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-5-conditions",
+   "lesson_locked": false,
+   "video_locked": false,
+   "quiz_locked": false
+  },
+  {
+   "path": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables",
+   "lesson_locked": false,
+   "video_locked": false,
+   "quiz_locked": false
+  },
+  {
+   "path": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions",
+   "lesson_locked": false,
+   "video_locked": true,
+   "quiz_locked": false
+  },
+  {
+   "path": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-3-recursion",
+   "lesson_locked": false,
+   "video_locked": false,
+   "quiz_locked": false
+  },
+  {
+   "path": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-4-lists",
+   "lesson_locked": false,
+   "video_locked": false,
+   "quiz_locked": false
+  }
+ ],
+ "facts": {
+  "1012345001": {
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+    "can_watch": true,
+    "attendance": "online",
+    "watch_pct": 42,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": true,
+     "score": 7,
+     "total": 10,
+     "at": "2026-10-14",
+     "attempts": 1
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   }
+  },
+  "1012345002": {
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+    "can_watch": true,
+    "attendance": "online",
+    "watch_pct": 100,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": true,
+     "score": 9,
+     "total": 10,
+     "at": "2026-10-14",
+     "attempts": 1
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": true,
+     "at": "2026-10-15",
+     "score": null,
+     "total": null
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   }
+  },
+  "1012345003": {
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+    "can_watch": true,
+    "attendance": "center",
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": true,
+     "at": "2026-10-15",
+     "score": null,
+     "total": null
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   }
+  },
+  "1012345004": {
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+    "can_watch": false,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": true,
+     "score": 6,
+     "total": 10,
+     "at": "2026-10-14",
+     "attempts": 1
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": true,
+     "at": "2026-10-15",
+     "score": null,
+     "total": null
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   }
+  },
+  "1012345005": {
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+    "can_watch": false,
+    "attendance": "online",
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": false,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   }
+  },
+  "1112345006": {
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+    "can_watch": true,
+    "attendance": "online",
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   }
+  },
+  "1112345007": {
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+    "can_watch": true,
+    "attendance": "center",
+    "watch_pct": 85,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": true,
+     "score": 8,
+     "total": 10,
+     "at": "2026-10-14",
+     "attempts": 1
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": true,
+     "at": "2026-10-15",
+     "score": null,
+     "total": null
+    }
+   }
+  },
+  "1112345008": {
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+    "can_watch": true,
+    "attendance": "online",
+    "watch_pct": 90,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   }
+  },
+  "1112345009": {
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+    "can_watch": true,
+    "attendance": "online",
+    "watch_pct": 100,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": true,
+     "score": 10,
+     "total": 10,
+     "at": "2026-10-14",
+     "attempts": 1
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": true,
+     "at": "2026-10-15",
+     "score": null,
+     "total": null
+    }
+   }
+  },
+  "1212345010": {
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+    "can_watch": true,
+    "attendance": "online",
+    "watch_pct": 10,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": true,
+     "score": 5,
+     "total": 10,
+     "at": "2026-10-14",
+     "attempts": 1
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": true,
+     "at": "2026-10-15",
+     "score": null,
+     "total": null
+    }
+   }
+  },
+  "1212345011": {
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+    "can_watch": true,
+    "attendance": "online",
+    "watch_pct": 95,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": true,
+     "score": 10,
+     "total": 10,
+     "at": "2026-10-14",
+     "attempts": 1
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": true,
+     "at": "2026-10-15",
+     "score": null,
+     "total": null
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": true,
+     "score": 9,
+     "total": 10,
+     "at": "2026-10-14",
+     "attempts": 1
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": true,
+     "at": "2026-10-15",
+     "score": null,
+     "total": null
+    }
+   }
+  },
+  "1512345012": {
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+    "can_watch": true,
+    "attendance": "online",
+    "watch_pct": 60,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": true,
+     "score": 4,
+     "total": 10,
+     "at": "2026-10-14",
+     "attempts": 1
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   },
+   "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-4-loops": {
+    "can_watch": true,
+    "attendance": null,
+    "watch_pct": null,
+    "quiz": {
+     "taken": false
+    },
+    "quiz_open": true,
+    "homework": {
+     "submitted": false
+    }
+   }
+  }
+ },
+ "templates": {}
+}

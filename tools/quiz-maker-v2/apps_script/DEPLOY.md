@@ -109,3 +109,46 @@ page still pointing at the old one breaks.
   Files uploaded before that change must be shared manually once (Drive → Share →
   Anyone with the link → Viewer).
 - Google quotas are far above what a class needs. `assign.js` caps file uploads at 15 MB.
+
+## Follow-up dashboard backend (chunk 1)
+
+New actions in `Code.gs`, all admin-only except `record_watch`:
+`admin_followup_overview`, `admin_followup_set_attendance`, `admin_followup_save_group`,
+`admin_followup_save_templates`, and `record_watch` (a student's own session).
+
+**Redeploy as a New version of the existing deployment** (Deploy → Manage deployments → pencil →
+Version: "New version"). Never "New deployment": it changes the `/exec` URL and breaks every baked endpoint.
+
+**New tabs** — created automatically the first time an admin opens the overview (nothing to do by hand):
+
+| Tab | Columns |
+|---|---|
+| `Attendance` | `lesson, phone, mode, marked_at` |
+| `WatchProgress` | `phone, lesson, pct, duration_s, first_at, updated_at` |
+| `GroupSettings` | `group_key, group, weekday, time, current_lesson, review_lessons, note, parents_contacted, watch_deadline_override, hw_deadline_override, updated_at` |
+| `FollowupTemplates` | `key, body, updated_at` |
+
+Do not rename those headers. A hand edit is fine: `weekday` 0 = Sunday … 6 = Saturday, `time` is `HH:MM` (Cairo),
+`review_lessons` is a JSON list of lesson paths, `mode` is `center` or `online`.
+
+**Optional Script Properties** (defaults in brackets; anything unreadable falls back to the default):
+`FOLLOWUP_WATCH_DONE_PCT` [80], `FOLLOWUP_PRAISE_QUIZ_PCT` [90], `FOLLOWUP_WATCH_DAYS_BEFORE` [3], `FOLLOWUP_HW_DAYS_BEFORE` [1].
+
+**Needs the GitHub properties** (`GITHUB_REPO`, optional `GITHUB_BRANCH` / `GITHUB_TOKEN`, as for the access
+dashboard) to know which lessons have a quiz or an assignment. Without them the overview still works:
+`lessons_error` is filled in and every lesson is treated as having both.
+The lesson-list cache key is now `all_lessons_v2` (it also carries `has_quiz` / `has_assignment`); the old
+`all_lessons_v1` entry just expires.
+
+**What "center" does:** records attendance and gives that student free video access (an `Entitlements` row,
+scope = the lesson) and quiz access (a `QuizAccess` row) with `source = attendance`, never expiring. A student who
+already has live access that covers the lesson (paid, manual, group `folder/*`, or `*`) is left alone.
+Switching to "online" or clearing deletes **only** rows whose source is `attendance`.
+
+**Join rule for quizzes and homework:** `QuizResults` / `Submissions` store the bare lesson slug (last path
+segment), so rows are matched on student phone + slug, and on subject too when the row has one (compared with the
+lesson path's first segment). The overview returns `join_mismatches` (rows whose subject differed) and
+`slug_collisions` (two lessons sharing subject + slug) so a wrong join is visible rather than silent. After the
+first real run, look at `join_mismatches`: if it lists subjects, tell whoever owns the join rule.
+
+**Tests:** `node tests/test_followup.js apps_script/Code.gs` (133 checks).

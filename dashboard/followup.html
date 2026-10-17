@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>متابعة الطلاب — Teaching Portal</title>
+<link rel="icon" href="/icons/favicon.ico">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/theme.css">
+<link rel="stylesheet" href="/assets/followup.css">
+<link rel="stylesheet" href="/assets/followup-templates.css">
+<script src="/assets/theme.js" defer></script>
+</head>
+<body class="fu">
+
+<div id="fu-mock" class="fu-mockbadge" hidden>وضع التجربة — بيانات وهمية، ولا يتم حفظ أي شيء</div>
+
+<header class="fu-top">
+  <div class="fu-top-row">
+    <h1 class="fu-title">متابعة الطلاب</h1>
+    <button class="fu-ibtn" id="fu-templates" type="button" aria-label="قوالب الرسائل" title="قوالب الرسائل" hidden>✏️</button>
+    <button class="fu-ibtn" id="fu-help" type="button" aria-label="قواعد الرسائل" title="قواعد الرسائل">ℹ️</button>
+    <button class="fu-ibtn" id="theme-toggle" type="button" aria-label="الوضع الداكن" aria-pressed="false"><span class="theme-icon" aria-hidden="true"></span></button>
+    <button class="fu-ibtn" id="fu-refresh" type="button" aria-label="تحديث" title="تحديث" hidden>⟳</button>
+  </div>
+  <div class="fu-updated" id="fu-updated" aria-live="polite"></div>
+</header>
+<nav class="fu-tabs" id="fu-tabs" role="tablist" aria-label="الجروبات" hidden></nav>
+
+<main class="fu-wrap">
+  <div id="authgate"></div>
+  <div id="fu-root" aria-live="polite"></div>
+</main>
+
+<div id="fu-layer"></div>
+<div id="fu-toast-host"></div>
+
+<!-- Libraries are built against the contract in IMPROVEMENT_PLAN.md §4 (Chunks 3 and 4). -->
+<script src="/assets/followup-logic.js"></script>
+<script src="/assets/followup-templates.js"></script>
+<script src="/assets/followup-app.js"></script>
+</body>
+</html>

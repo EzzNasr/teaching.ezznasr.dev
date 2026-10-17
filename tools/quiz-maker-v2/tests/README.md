@@ -13,6 +13,10 @@ node tests/test_revoke.js              apps_script/Code.gs   # revoking access, 
 node tests/test_quiz_gate.js           apps_script/Code.gs   # locking/unlocking a quiz itself, separate from its video
 node tests/test_groups.js              apps_script/Code.gs   # student groups: membership, bulk grant/revoke access
 node tests/test_single_session.js      apps_script/Code.gs   # one active session per account: a new login signs out the old device
+node tests/test_followup.js            apps_script/Code.gs   # follow-up backend: overview facts, attendance grant/undo, group + template saves, record_watch
+node tests/test_followup_logic.js                            # follow-up status rules + Cairo deadlines (pure)
+node tests/test_followup_templates.js                        # message rendering: placeholders, bidi, WhatsApp formatting, 1200-char cap
+node tests/test_watch_tracker.js                             # video.js watch-coverage tracker
 ```
 
 Each prints PASS/FAIL per check and exits non-zero on any failure. Run them before
@@ -32,4 +36,10 @@ python tests/e2e_groups.py        # the roster picker on the Groups tab: create,
 python tests/e2e_dashboard.py     # the video-access admin dashboard (requests/access/history/videos/grant)
 python tests/e2e_step4b.py        # the quiz gate on the quiz page, and the new Quiz-gate/Groups dashboard tabs
 python tests/e2e_lesson_video_lock.py   # Lessons tab: open a video that is locked on its own, and 'also open its videos'
+python tests/e2e_followup.py          # the follow-up page: phone/desktop layout, every verdict, message sheet + wa.me link, dark mode, real-mode payloads
 ```
+
+`e2e_followup.py` needs no backend: it serves the repo statically and runs the page in `?mock=1`
+(plus a stub `AuthEngine` for the real-mode payload checks). If `assets/followup-logic.js` /
+`assets/followup-templates.js` do not exist it injects small stand-ins and says so; with the
+real files present it tests them as they are.

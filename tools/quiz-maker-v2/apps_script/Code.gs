@@ -277,6 +277,37 @@
  *   "grade  2" are the same group); the first spelling used is kept for
  *   display so every row of one group reads the same way.
  *
+ * ---- Follow-up dashboard (added; dashboard/followup.html) ---------------------
+ * Four tabs, all created lazily by _sheetByName the first time they're needed:
+ *   "Attendance"        lesson | phone | mode | marked_at
+ *                       One row per (lesson path, student). mode = center | online.
+ *                       No row = unmarked.
+ *   "WatchProgress"     phone | lesson | pct | duration_s | first_at | updated_at
+ *                       One row per (student, lesson path). pct = the most the
+ *                       player ever reported (0-100); it only goes up.
+ *   "GroupSettings"     group_key | group | weekday | time | current_lesson |
+ *                       review_lessons | note | parents_contacted |
+ *                       watch_deadline_override | hw_deadline_override | updated_at
+ *                       One row per WhatsApp group (= a Groups tab group). weekday
+ *                       0=Sun..6=Sat, time "HH:MM" Cairo, current_lesson = one full
+ *                       lesson path (attendance + watch + free center unlock),
+ *                       review_lessons = JSON array of lesson paths (homework + quiz).
+ *   "FollowupTemplates" key | body | updated_at   (saved overrides only; a missing
+ *                       row = the built-in default wording kept in the page)
+ * - admin_followup_overview {} -> raw facts for every group's lessons in ONE round
+ *   trip (no verdicts: the rules live in assets/followup-logic.js). Each sheet is
+ *   read once and access is worked out in memory — it never calls _accessState in a
+ *   loop. Quiz/homework rows join on student phone + the lesson's last path segment
+ *   (the "slug"), and on subject too when the row has one.
+ * - admin_followup_set_attendance {lesson, items:[{phone, mode}], grant?} saves the
+ *   attendance radio. "center" also gives that student free video + quiz access for
+ *   the lesson (rows with source "attendance", never expiring) UNLESS they already
+ *   hold live access that covers it; "online" or "" removes ONLY source "attendance"
+ *   rows, never a paid, manual or group grant.
+ * - admin_followup_save_group / admin_followup_save_templates edit the two settings
+ *   tabs. record_watch {lesson, pct, duration_s} is the STUDENT's player reporting
+ *   progress (max-merged, throttled, ignored while the video is locked for them).
+ *
  * ---- Redeploying after editing this file --------------------------------
  * Apps Script Web Apps don't auto-update on save. After changing this
  * file: Deploy → Manage deployments → pencil (edit) → Version: "New
@@ -482,6 +513,10 @@ var PLAIN_TEXT_HEADERS = {
   group: 1, added_at: 1,
   // GroupGrants
   group_key: 1, kind: 1, target: 1,
+  // Attendance + WatchProgress + GroupSettings + FollowupTemplates ("18:00" must not become a time cell)
+  mode: 1, marked_at: 1, first_at: 1, time: 1,
+  current_lesson: 1, review_lessons: 1, watch_deadline_override: 1, hw_deadline_override: 1,
+  key: 1, body: 1,
 };
 // Of those, the ones that hold phone numbers (a leading 0 is easily lost).
 var PHONE_HEADERS = { phone: 1, parent_phone: 1, student_id: 1 };
@@ -1284,6 +1319,21 @@ function doPost(e) {
 
       case "request_subscription":
         return _json(handleRequestSubscription(payload));
+
+      case "admin_followup_overview":
+        return _json(handleAdminFollowupOverview(payload));
+
+      case "admin_followup_set_attendance":
+        return _json(handleAdminFollowupSetAttendance(payload));
+
+      case "admin_followup_save_group":
+        return _json(handleAdminFollowupSaveGroup(payload));
+
+      case "admin_followup_save_templates":
+        return _json(handleAdminFollowupSaveTemplates(payload));
+
+      case "record_watch":
+        return _json(handleRecordWatch(payload));
 
       default:
         return _json({ ok: false, error: "Unknown action: " + payload.action });
@@ -2608,7 +2658,7 @@ var LESSON_EXCLUDE_PREFIXES = ["dashboard/", "tools/", "assets/", "_deleted-less
 
 function _allLessonsFromGithub() {
   var cache = CacheService.getScriptCache();
-  var hit = cache.get("all_lessons_v1");
+  var hit = cache.get("all_lessons_v2");
   if (hit !== null) return JSON.parse(hit);
 
   var props = _props();
@@ -2639,13 +2689,14 @@ function _allLessonsFromGithub() {
     if (LESSON_EXCLUDE_PREFIXES.some(function (pre) { return dir.indexOf(pre) === 0; })) return;
     // A real lesson folder has a quiz or an assignment page next to its index.
     if (!blobPaths[dir + "/quiz.html"] && !blobPaths[dir + "/assignment.html"]) return;
-    lessons.push({ lesson: dir.toLowerCase(), track: dir.split("/")[0].toLowerCase() });
+    lessons.push({ lesson: dir.toLowerCase(), track: dir.split("/")[0].toLowerCase(),
+                   has_quiz: !!blobPaths[dir + "/quiz.html"], has_assignment: !!blobPaths[dir + "/assignment.html"] });
   });
   lessons.sort(function (a, b) { return a.lesson < b.lesson ? -1 : 1; });
 
   var tracks = Object.keys(lessons.reduce(function (acc, l) { acc[l.track] = 1; return acc; }, {})).sort();
   var result = { lessons: lessons, tracks: tracks };
-  cache.put("all_lessons_v1", JSON.stringify(result), LESSON_LIST_CACHE_SECONDS);
+  cache.put("all_lessons_v2", JSON.stringify(result), LESSON_LIST_CACHE_SECONDS);
   return result;
 }
 
@@ -2793,6 +2844,756 @@ function handleAdminAccessOverview(payload) {
            payments: payments.reverse().slice(0, 500), access: access.reverse().slice(0, 1000),
            all_lessons: allLessons, tracks: tracks, lessons_error: lessonsError,
            quiz_access: quizAccess.reverse().slice(0, 1000), lesson_locks: lessonLocks, year_ends: yearEnds };
+}
+
+// -- Follow-up dashboard -----------------------------------------------------------
+// See the "Follow-up dashboard" note at the top of this file. The overview returns RAW
+// FACTS; every verdict ("hasn't watched", "homework missing"...) is decided in the page's
+// followup-logic.js so the rules can change without redeploying this file.
+var ATTENDANCE_HEADERS = ["lesson", "phone", "mode", "marked_at"];
+var WATCH_HEADERS = ["phone", "lesson", "pct", "duration_s", "first_at", "updated_at"];
+var GROUPSETTINGS_HEADERS = ["group_key", "group", "weekday", "time", "current_lesson", "review_lessons", "note",
+                             "parents_contacted", "watch_deadline_override", "hw_deadline_override", "updated_at"];
+var FOLLOWUP_TEMPLATE_HEADERS = ["key", "body", "updated_at"];
+var ATTENDANCE_MODES = { center: 1, online: 1 };
+var ATTENDANCE_SOURCE = "attendance";
+var MAX_ATTENDANCE_ITEMS = 500;
+var MAX_REVIEW_LESSONS = 5;
+var MAX_TEMPLATE_KEYS = 30;
+var MAX_TEMPLATE_BODY = 4000;
+var MAX_GROUP_NOTE = 2000;
+var WATCH_THROTTLE_SECONDS = 10;
+var FOLLOWUP_TEMPLATE_KEY_RE = /^[a-z][a-z0-9_]{0,39}$/;
+
+// Script Properties FOLLOWUP_WATCH_DONE_PCT / FOLLOWUP_PRAISE_QUIZ_PCT / FOLLOWUP_WATCH_DAYS_BEFORE /
+// FOLLOWUP_HW_DAYS_BEFORE override these defaults; anything unreadable falls back to the default.
+function _followupSettings() {
+  function num(prop, dflt, lo, hi) {
+    var n = parseFloat(_props().getProperty(prop));
+    return isFinite(n) && n >= lo && n <= hi ? n : dflt;
+  }
+  return {
+    watch_done_pct: num("FOLLOWUP_WATCH_DONE_PCT", 80, 1, 100),
+    praise_quiz_pct: num("FOLLOWUP_PRAISE_QUIZ_PCT", 90, 1, 100),
+    watch_days_before: num("FOLLOWUP_WATCH_DAYS_BEFORE", 3, 0, 30),
+    hw_days_before: num("FOLLOWUP_HW_DAYS_BEFORE", 1, 0, 30),
+  };
+}
+
+// The tab, created on first use. A second request creating it at the same moment is harmless.
+function _followupSheet(ss, name, headers) {
+  try { return _sheetByName(ss, name, headers); }
+  catch (e) {
+    var again = ss.getSheetByName(name);
+    if (again) return again;
+    throw e;
+  }
+}
+
+// Reads a few COLUMNS of a sheet (one range call each) instead of the whole grid —
+// QuizResults/Submissions rows carry big JSON blobs that the overview never needs.
+// Returns {n: rowCount, col: {name: [values]}}; an optional column that is missing reads as "".
+function _readColumns(sheet, required, optional, tabName) {
+  var out = { n: 0, col: {} };
+  if (!sheet || sheet.getLastRow() < 2) return out;
+  var idx = _needCols(sheet, tabName, required);
+  var n = sheet.getLastRow() - 1;
+  out.n = n;
+  required.concat(optional || []).forEach(function (name) {
+    if (!idx[name]) {
+      var blanks = [];
+      for (var i = 0; i < n; i++) blanks.push("");
+      out.col[name] = blanks;
+      return;
+    }
+    out.col[name] = sheet.getRange(2, idx[name], n, 1).getValues().map(function (r) { return r[0]; });
+  });
+  return out;
+}
+
+function _lastSegment(path) {
+  var parts = String(path).split("/");
+  return parts[parts.length - 1];
+}
+
+function _firstSegment(path) {
+  return String(path).split("/")[0];
+}
+
+// "yyyy-MM-ddTHH:mm:ss+03:00" for a moment, using Cairo's real offset (+02:00 / +03:00).
+function _cairoIso(d) {
+  var local = _fmt(d, TZ, true);                       // "yyyy-MM-dd HH:mm:ss" in Cairo
+  var p = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(local);
+  var asUtc = Date.UTC(+p[1], +p[2] - 1, +p[3], +p[4], +p[5], +p[6]);
+  var mins = Math.round((asUtc - d.getTime()) / 60000 / 15) * 15;
+  var sign = mins < 0 ? "-" : "+";
+  mins = Math.abs(mins);
+  return local.replace(" ", "T") + sign + ("0" + Math.floor(mins / 60)).slice(-2) + ":" + ("0" + (mins % 60)).slice(-2);
+}
+
+// "HH:MM" from a GroupSettings cell (Sheets may have turned it into a time cell), else "".
+function _hhmmOf(v) {
+  if (v instanceof Date) return _fmt(v, TZ, true).slice(11, 16);
+  var s = String(v == null ? "" : v).trim();
+  var m = /^(?:\d{4}-\d{2}-\d{2}[ T])?(\d{1,2}):(\d{2})/.exec(s);
+  if (!m || +m[1] > 23 || +m[2] > 59) return "";
+  return ("0" + m[1]).slice(-2) + ":" + m[2];
+}
+
+function _jsonArrayOfPaths(v) {
+  var arr;
+  try { arr = JSON.parse(String(v == null ? "" : v) || "[]"); } catch (e) { return []; }
+  if (!Array.isArray(arr)) return [];
+  var out = [];
+  arr.forEach(function (x) {
+    try { var p = _lessonPath(x); if (out.indexOf(p) === -1) out.push(p); } catch (e) { /* skip a damaged entry */ }
+  });
+  return out;
+}
+
+// {group_key: settings} from the GroupSettings tab. Missing = defaults (weekday null = not set yet).
+function _emptyGroupSettings() {
+  return { weekday: null, time: "", current_lesson: "", review_lessons: [], note: "", parents_contacted: false,
+           watch_deadline_override: "", hw_deadline_override: "" };
+}
+
+function _groupSettingsFromRow(r) {
+  var s = _emptyGroupSettings();
+  var wd = String(r.weekday == null ? "" : r.weekday).trim();
+  if (/^[0-6]$/.test(wd)) s.weekday = +wd;
+  s.time = _hhmmOf(r.time);
+  try { s.current_lesson = r.current_lesson ? _lessonPath(r.current_lesson) : ""; } catch (e) { s.current_lesson = ""; }
+  s.review_lessons = _jsonArrayOfPaths(r.review_lessons);
+  s.note = String(r.note == null ? "" : r.note);
+  s.parents_contacted = _isTruthyFlag(r.parents_contacted);
+  var wo = _ymdOf(r.watch_deadline_override), ho = _ymdOf(r.hw_deadline_override);
+  s.watch_deadline_override = wo || "";
+  s.hw_deadline_override = ho || "";
+  return s;
+}
+
+// ---- access, evaluated in memory (mirrors _accessState / _hasActiveQuizAccess) ------------------
+// {byPhone: {phoneKey: [{scope, ymd, pid, source}]}}. A damaged tab reads as "no access" (fails closed).
+function _entitlementIndex(ss) {
+  var idx = { byPhone: {} };
+  var sheet = ss.getSheetByName("Entitlements");
+  if (!sheet || sheet.getLastRow() < 2) return idx;
+  var c;
+  try { c = _needCols(sheet, "Entitlements", ["phone", "scope", "expires_at"]); } catch (e) { return idx; }
+  var srcCol = _headerIndex(sheet)["source"] || 0;
+  var tz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
+    var k = _phoneKey(r[c.phone - 1]);
+    if (!k) return;
+    var src = srcCol ? String(r[srcCol - 1] == null ? "" : r[srcCol - 1]).trim() : "";
+    (idx.byPhone[k] = idx.byPhone[k] || []).push({
+      scope: String(r[c.scope - 1]).trim().toLowerCase(), ymd: _ymdOf(r[c.expires_at - 1], tz),
+      pid: _sourcePayment(src), source: src });
+  });
+  return idx;
+}
+
+function _entitlementCovers(idx, statuses, key, lesson, ss, today) {
+  var rows = idx.byPhone[key] || [];
+  for (var i = 0; i < rows.length; i++) {
+    var e = rows[i];
+    if (e.ymd === null) continue;                                   // unreadable date: fail closed
+    if (!(e.ymd === "" || today <= e.ymd)) continue;
+    if (!_scopeCovers(e.scope, lesson, ss)) continue;
+    if (e.pid && statuses.hasOwnProperty(e.pid) && statuses[e.pid] !== "approved") continue;   // payment cancelled
+    return true;
+  }
+  return false;
+}
+
+// {phoneKey: {lesson: true}} of live QuizAccess rows (exact lesson, like _hasActiveQuizAccess).
+function _quizAccessIndex(ss) {
+  var map = {};
+  var sheet = ss.getSheetByName("QuizAccess");
+  if (!sheet || sheet.getLastRow() < 2) return map;
+  var c;
+  try { c = _needCols(sheet, "QuizAccess", ["phone", "lesson", "expires_at"]); } catch (e) { return map; }
+  var tz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
+  var today = _todayCairo();
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
+    var k = _phoneKey(r[c.phone - 1]);
+    if (!k) return;
+    var ymd = _ymdOf(r[c.expires_at - 1], tz);
+    if (ymd === null || !(ymd === "" || ymd >= today)) return;
+    (map[k] = map[k] || {})[String(r[c.lesson - 1]).trim().toLowerCase()] = true;
+  });
+  return map;
+}
+
+// Locks as the student sees them: {lessons: {path: bool}, videos: {path: {locked}}, quizzes: {path: bool}}
+// plus "damaged" flags (a broken tab locks everything, same as _lessonLockedNow / _quizLockedNow).
+function _lockIndex(ss) {
+  var out = { lessons: {}, lessonsDamaged: false, videos: {}, videosDamaged: false, quizzes: {}, quizzesDamaged: false };
+  function eachRow(tab, need, fn, flag) {
+    var sheet = ss.getSheetByName(tab);
+    if (!sheet || sheet.getLastRow() < 2) return;
+    var c;
+    try { c = _needCols(sheet, tab, need); } catch (e) { out[flag] = true; return; }
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) { fn(r, c); });
+  }
+  eachRow("Lessons", ["lesson", "locked"], function (r, c) {
+    var l = String(r[c.lesson - 1]).trim().toLowerCase();
+    if (l && !out.lessons.hasOwnProperty(l)) out.lessons[l] = _isLockedCell(r[c.locked - 1]);
+  }, "lessonsDamaged");
+  eachRow("Videos", ["lesson", "slot", "embed_url", "locked"], function (r, c) {
+    if (String(r[c.slot - 1]).trim().toLowerCase() !== "lesson") return;
+    var l = String(r[c.lesson - 1]).trim().toLowerCase();
+    if (l && !out.videos.hasOwnProperty(l)) out.videos[l] = { has: !!String(r[c.embed_url - 1]).trim(), locked: _isLockedCell(r[c.locked - 1]) };
+  }, "videosDamaged");
+  eachRow("Quizzes", ["lesson", "locked"], function (r, c) {
+    var l = String(r[c.lesson - 1]).trim().toLowerCase();
+    if (l && !out.quizzes.hasOwnProperty(l)) out.quizzes[l] = _isLockedCell(r[c.locked - 1]);
+  }, "quizzesDamaged");
+  return out;
+}
+
+function _lessonLockState(locks, path) {
+  var lessonLocked = locks.lessonsDamaged || (locks.lessons.hasOwnProperty(path) && locks.lessons[path]);
+  var v = locks.videos[path];
+  var videoRec = v && v.has ? v : null;                               // like _lookupVideo: no URL = no video
+  var videoLocked = locks.videosDamaged || !!(videoRec && videoRec.locked) || !!lessonLocked;
+  var quizLocked = locks.quizzesDamaged || (locks.quizzes.hasOwnProperty(path) && locks.quizzes[path]);
+  return { has_video: !!videoRec, lesson_locked: !!lessonLocked, video_locked: videoLocked, quiz_locked: !!quizLocked };
+}
+
+// ---- admin_followup_overview ----------------------------------------------------------------------
+function handleAdminFollowupOverview(payload) {
+  _requireAdminAny(payload);
+  var ss = _ss();
+  var dataSs = _dataSs();
+  var now = new Date();
+  var today = _fmt(now, TZ, false);
+  var settings = _followupSettings();
+
+  // The four tabs appear in the spreadsheet the first time the page is opened.
+  var gsSheet = _followupSheet(ss, "GroupSettings", GROUPSETTINGS_HEADERS);
+  var attSheet = _followupSheet(ss, "Attendance", ATTENDANCE_HEADERS);
+  var watchSheet = _followupSheet(ss, "WatchProgress", WATCH_HEADERS);
+  var tplSheet = _followupSheet(ss, "FollowupTemplates", FOLLOWUP_TEMPLATE_HEADERS);
+
+  // Students (registered), keyed by phone key. Admin accounts are not "students".
+  var students = {}, registeredOrder = [];
+  _sheetValuesAsObjects(_students()).forEach(function (r) {
+    var k = _phoneKey(r.phone);
+    if (!k || students.hasOwnProperty(k)) return;
+    students[k] = { phone: _restoreLeadingZero(String(r.phone == null ? "" : r.phone).trim()),
+                    name: String(r.display_name == null ? "" : r.display_name).trim(),
+                    year: String(r.year == null ? "" : r.year).trim(),
+                    parent_phone: _restoreLeadingZero(String(r.parent_phone == null ? "" : r.parent_phone).trim()),
+                    _admin: _isTruthyFlag(r.is_admin) };
+    registeredOrder.push(k);
+  });
+
+  // Groups + their settings.
+  var gSheet = ss.getSheetByName("Groups");
+  var spellings = _groupSpellings(gSheet);
+  var byKey = {}, inGroup = {};
+  (gSheet && gSheet.getLastRow() >= 2 ? _sheetValuesAsObjects(gSheet) : []).forEach(function (m) {
+    var gk = _groupKey(m.group), pk = _phoneKey(m.phone);
+    if (!gk || !pk) return;
+    var g = byKey[gk] = byKey[gk] || { group: spellings[gk] || String(m.group), key: gk, members: [], seen: {} };
+    if (g.seen[pk]) return;
+    g.seen[pk] = true;
+    inGroup[pk] = true;
+    var gName = String(m.name == null ? "" : m.name).trim();
+    if (!students.hasOwnProperty(pk)) {
+      students[pk] = { phone: _restoreLeadingZero(String(m.phone).trim()), name: gName, year: "", parent_phone: "", _admin: false };
+    }
+    g.members.push({ phone: students[pk].phone, name: students[pk].name || gName });
+  });
+  var settingsByKey = {};
+  _sheetValuesAsObjects(gsSheet).forEach(function (r) {
+    var k = _groupKey(r.group_key || r.group);
+    if (k && !settingsByKey.hasOwnProperty(k)) settingsByKey[k] = _groupSettingsFromRow(r);
+  });
+  var groups = Object.keys(byKey).sort(function (a, b) {
+    return byKey[a].group.toLowerCase() < byKey[b].group.toLowerCase() ? -1 : 1;
+  }).map(function (k) {
+    var g = byKey[k];
+    return { group: g.group, key: k, settings: settingsByKey[k] || _emptyGroupSettings(), members: g.members };
+  });
+
+  var unclassified = [];
+  registeredOrder.forEach(function (k) {
+    if (inGroup[k] || students[k]._admin) return;
+    unclassified.push({ phone: students[k].phone, name: students[k].name });
+  });
+  unclassified.sort(function (a, b) { return (a.name || a.phone).toLowerCase() < (b.name || b.phone).toLowerCase() ? -1 : 1; });
+
+  // Which students get facts: every group member and every unclassified student.
+  var factKeys = [];
+  groups.forEach(function (g) { g.members.forEach(function (m) { var k = _phoneKey(m.phone); if (factKeys.indexOf(k) === -1) factKeys.push(k); }); });
+  unclassified.forEach(function (u) { var k = _phoneKey(u.phone); if (factKeys.indexOf(k) === -1) factKeys.push(k); });
+  var studentsOut = {};
+  factKeys.forEach(function (k) {
+    var s = students[k];
+    studentsOut[k] = { phone: s.phone, name: s.name, year: s.year, parent_phone: s.parent_phone };
+  });
+
+  // Lessons in use, and the whole lesson list (soft-fails when GitHub is down).
+  var used = [];
+  groups.forEach(function (g) {
+    var s = g.settings;
+    [s.current_lesson].concat(s.review_lessons).forEach(function (l) { if (l && used.indexOf(l) === -1) used.push(l); });
+  });
+  var allLessons = [], lessonsError = "", ghFlags = {};
+  try {
+    allLessons = _allLessonsFromGithub().lessons;
+    allLessons.forEach(function (l) { ghFlags[l.lesson] = l; });
+  } catch (e) {
+    lessonsError = String(e.message || e);
+  }
+
+  var locks = _lockIndex(ss);
+  var lessonsOut = {};
+  var subjectSlugPaths = {};
+  function noteSlug(path) {
+    var k = _firstSegment(path) + "|" + _lastSegment(path);
+    var arr = subjectSlugPaths[k] = subjectSlugPaths[k] || [];
+    if (arr.indexOf(path) === -1) arr.push(path);
+  }
+  allLessons.forEach(function (l) { noteSlug(l.lesson); });
+  used.forEach(function (path) {
+    noteSlug(path);
+    var st = _lessonLockState(locks, path);
+    var gh = ghFlags[path];
+    lessonsOut[path] = { path: path, subject: _firstSegment(path), slug: _lastSegment(path),
+                         has_video: st.has_video,
+                         has_quiz: gh ? gh.has_quiz : true,           // unknown (GitHub down / brand-new lesson): assume yes
+                         has_assignment: gh ? gh.has_assignment : true,
+                         lesson_locked: st.lesson_locked, video_locked: st.video_locked, quiz_locked: st.quiz_locked };
+  });
+  var slugCollisions = [];
+  used.forEach(function (path) {
+    var arr = subjectSlugPaths[_firstSegment(path) + "|" + _lastSegment(path)];
+    if (arr.length > 1) {
+      lessonsOut[path].slug_collision = true;
+      if (!slugCollisions.some(function (c) { return c.slug === _lastSegment(path) && c.subject === _firstSegment(path); })) {
+        slugCollisions.push({ subject: _firstSegment(path), slug: _lastSegment(path), paths: arr.slice() });
+      }
+    }
+  });
+  var allLessonsOut = allLessons.map(function (l) {
+    var st = _lessonLockState(locks, l.lesson);
+    return { path: l.lesson, lesson_locked: st.lesson_locked, video_locked: st.video_locked, quiz_locked: st.quiz_locked };
+  });
+
+  // Per-student facts. Everything below is loaded once and looked up in memory.
+  var facts = {};
+  if (used.length && factKeys.length) {
+    var ent = _entitlementIndex(ss);
+    var statuses = _paymentStatuses(ss);
+    var qaccess = _quizAccessIndex(ss);
+
+    var att = {};     // phoneKey|lesson -> mode
+    var aCols = _readColumns(attSheet, ["lesson", "phone", "mode"], [], "Attendance");
+    for (var i = 0; i < aCols.n; i++) {
+      var am = String(aCols.col.mode[i]).trim().toLowerCase();
+      if (ATTENDANCE_MODES.hasOwnProperty(am)) att[_phoneKey(aCols.col.phone[i]) + "|" + String(aCols.col.lesson[i]).trim().toLowerCase()] = am;
+    }
+    var wp = {};      // phoneKey|lesson -> pct
+    var wCols = _readColumns(watchSheet, ["phone", "lesson", "pct"], [], "WatchProgress");
+    for (i = 0; i < wCols.n; i++) {
+      var pct = parseFloat(wCols.col.pct[i]);
+      if (!isFinite(pct)) continue;
+      var wk = _phoneKey(wCols.col.phone[i]) + "|" + String(wCols.col.lesson[i]).trim().toLowerCase();
+      if (!wp.hasOwnProperty(wk) || pct > wp[wk]) wp[wk] = pct;
+    }
+
+    var usedSlugs = {};
+    used.forEach(function (p) { usedSlugs[_lastSegment(p)] = true; });
+    var mismatch = {};
+    var quizBy = {}, hwBy = {};      // phoneKey|slug -> [{subject, ...}]
+    function slugOfCell(v) { return _lastSegment(String(v == null ? "" : v).trim().toLowerCase().replace(/\/+$/, "")); }
+
+    var qrSheet = dataSs.getSheetByName("QuizResults");
+    var qCols = _readColumns(qrSheet, ["student_id", "lesson"], ["subject", "date", "start_time", "score", "total"], "QuizResults");
+    for (i = 0; i < qCols.n; i++) {
+      var qs = slugOfCell(qCols.col.lesson[i]);
+      if (!usedSlugs[qs]) continue;
+      var qk = _phoneKey(qCols.col.student_id[i]) + "|" + qs;
+      (quizBy[qk] = quizBy[qk] || []).push({ idx: i, subject: String(qCols.col.subject[i] || "").trim().toLowerCase(),
+        at: _cairoDate(qCols.col.date[i]), time: _cairoTime(qCols.col.start_time[i]),
+        score: qCols.col.score[i], total: qCols.col.total[i] });
+    }
+    var sbSheet = dataSs.getSheetByName("Submissions");
+    var sCols = _readColumns(sbSheet, ["student_id", "lesson"], ["subject", "date", "score", "total"], "Submissions");
+    for (i = 0; i < sCols.n; i++) {
+      var hSlug = slugOfCell(sCols.col.lesson[i]);
+      if (!usedSlugs[hSlug]) continue;
+      var sk = _phoneKey(sCols.col.student_id[i]) + "|" + hSlug;
+      (hwBy[sk] = hwBy[sk] || []).push({ idx: i, subject: String(sCols.col.subject[i] || "").trim().toLowerCase(),
+        at: _cairoDate(sCols.col.date[i]), score: sCols.col.score[i], total: sCols.col.total[i] });
+    }
+    function matching(rows, lessonPath, source) {
+      var subj = _firstSegment(lessonPath), out = [];
+      (rows || []).forEach(function (r) {
+        if (r.subject === "" || r.subject === subj) { out.push(r); return; }
+        var mk = source + "|" + lessonPath + "|" + r.subject;
+        mismatch[mk] = (mismatch[mk] || 0) + 1;
+      });
+      return out;
+    }
+    function num(v) { var n = parseFloat(v); return isFinite(n) ? n : null; }
+
+    factKeys.forEach(function (k) {
+      var perLesson = facts[k] = {};
+      used.forEach(function (path) {
+        var st = _lessonLockState(locks, path), slug = _lastSegment(path);
+        var canWatch = !st.video_locked || _entitlementCovers(ent, statuses, k, path, ss, today);
+        var quizOpen = !st.quiz_locked || !!(qaccess[k] && qaccess[k][path]);
+        var mode = att.hasOwnProperty(k + "|" + path) ? att[k + "|" + path] : null;
+        var watch = wp.hasOwnProperty(k + "|" + path) ? wp[k + "|" + path] : null;
+
+        var qrows = matching(quizBy[k + "|" + slug], path, "quiz");
+        var quiz = { taken: false };
+        if (qrows.length) {
+          var best = qrows[0];
+          qrows.forEach(function (r) {
+            var a = (r.at + " " + r.time), b = (best.at + " " + best.time);
+            if (a > b || (a === b && r.idx > best.idx)) best = r;
+          });
+          quiz = { taken: true, score: num(best.score), total: num(best.total), at: best.at, attempts: qrows.length };
+        }
+        var hrows = matching(hwBy[k + "|" + slug], path, "homework");
+        var hw = { submitted: false };
+        if (hrows.length) {
+          var hb = hrows[0];
+          hrows.forEach(function (r) {
+            if (r.at > hb.at || (r.at === hb.at && r.idx > hb.idx)) hb = r;
+          });
+          hw = { submitted: true, at: hb.at, score: num(hb.score), total: num(hb.total) };
+        }
+        perLesson[path] = { can_watch: canWatch, attendance: mode, watch_pct: watch, quiz: quiz, quiz_open: quizOpen, homework: hw };
+      });
+    });
+
+    var joinMismatches = Object.keys(mismatch).map(function (mk) {
+      var p = mk.split("|");
+      return { source: p[0], lesson: p[1], subject_expected: _firstSegment(p[1]), subject_seen: p[2], rows: mismatch[mk] };
+    }).slice(0, 30);
+  }
+
+  var templates = {};
+  _sheetValuesAsObjects(tplSheet).forEach(function (r) {
+    var key = String(r.key || "").trim();
+    var body = String(r.body == null ? "" : r.body);
+    if (key && body.trim() !== "" && !templates.hasOwnProperty(key)) templates[key] = body;
+  });
+
+  return { ok: true, today: today, now: _cairoIso(now), settings: settings, groups: groups, unclassified: unclassified,
+           students: studentsOut, lessons: lessonsOut, all_lessons: allLessonsOut, lessons_error: lessonsError,
+           slug_collisions: slugCollisions, join_mismatches: joinMismatches || [], facts: facts, templates: templates };
+}
+
+// ---- admin_followup_set_attendance --------------------------------------------------------------
+// One upsert into Attendance per student, plus (center) the free video + quiz rows, or (online / clear)
+// the removal of ONLY the rows this feature made. Rows from payments, manual grants, group grants
+// ("a/b/*") and "*" are never touched: _grantRaw (overwrites a row's source) and
+// handleAdminRevokeAccess (deletes every row for phone+scope) are deliberately not used here.
+function handleAdminFollowupSetAttendance(payload) {
+  _requireAdminAny(payload);
+  var lesson = _lessonPath(payload.lesson);
+  if (!Array.isArray(payload.items) || !payload.items.length) throw new Error("items must be a non-empty list.");
+  if (payload.items.length > MAX_ATTENDANCE_ITEMS) throw new Error("Too many students in one request (max " + MAX_ATTENDANCE_ITEMS + ").");
+  var grant = payload.grant !== false;
+  var wanted = {}, order = [];
+  payload.items.forEach(function (it) {
+    var mode = String(it && it.mode != null ? it.mode : "").trim().toLowerCase();
+    if (mode !== "" && !ATTENDANCE_MODES.hasOwnProperty(mode)) throw new Error('mode must be "center", "online" or "".');
+    var digits = _normalizePhone(it && it.phone);
+    if (digits.length < 10) throw new Error("Every item needs a full phone number.");
+    var k = _phoneKey(digits);
+    if (!wanted.hasOwnProperty(k)) order.push(k);
+    wanted[k] = { phone: _canonicalPhone(digits) || digits, mode: mode };
+  });
+
+  return _withLock(function () {
+    var ss = _ss();
+    var now = _fmt(new Date(), TZ, true);
+
+    // 1. Attendance rows.
+    var aSheet = _followupSheet(ss, "Attendance", ATTENDANCE_HEADERS);
+    _ensureColumns(aSheet, ATTENDANCE_HEADERS);
+    var ac = _needCols(aSheet, "Attendance", ATTENDANCE_HEADERS);
+    var rowOf = {}, deleteAtt = [];
+    if (aSheet.getLastRow() >= 2) {
+      aSheet.getRange(2, 1, aSheet.getLastRow() - 1, aSheet.getLastColumn()).getValues().forEach(function (r, i) {
+        if (String(r[ac.lesson - 1]).trim().toLowerCase() !== lesson) return;
+        var k = _phoneKey(r[ac.phone - 1]);
+        if (!wanted.hasOwnProperty(k)) return;
+        if (rowOf.hasOwnProperty(k)) deleteAtt.push(i + 2);        // a duplicate row from a hand edit
+        else rowOf[k] = i + 2;
+      });
+    }
+    var clearRows = [];
+    order.forEach(function (k) {
+      var w = wanted[k];
+      if (w.mode === "") { if (rowOf.hasOwnProperty(k)) clearRows.push(rowOf[k]); return; }
+      if (rowOf.hasOwnProperty(k)) {
+        aSheet.getRange(rowOf[k], ac.mode).setNumberFormat("@").setValue(w.mode);
+        aSheet.getRange(rowOf[k], ac.marked_at).setNumberFormat("@").setValue(now);
+      } else {
+        _appendByHeader(aSheet, { lesson: lesson, phone: w.phone, mode: w.mode, marked_at: now });
+      }
+    });
+    deleteAtt.concat(clearRows).sort(function (a, b) { return b - a; }).forEach(function (r) { aSheet.deleteRows(r, 1); });
+
+    // 2. Free access for center students; take it back for online / cleared ones.
+    var today = _todayCairo();
+    var eSheet = _sheetByName(ss, "Entitlements", ENT_HEADERS);
+    _ensureColumns(eSheet, ENT_HEADERS);
+    var qSheet = _sheetByName(ss, "QuizAccess", QUIZ_ACCESS_HEADERS);
+    _ensureColumns(qSheet, QUIZ_ACCESS_HEADERS);
+    var ec = _needCols(eSheet, "Entitlements", ENT_HEADERS), qc = _needCols(qSheet, "QuizAccess", QUIZ_ACCESS_HEADERS);
+
+    var undo = {};     // phoneKeys whose attendance rows go
+    var give = {};     // phoneKeys that should get the free access
+    order.forEach(function (k) {
+      if (wanted[k].mode === "center") { if (grant) give[k] = true; }
+      else undo[k] = true;
+    });
+
+    var delEnt = [], delQuiz = [];
+    if (Object.keys(undo).length) {
+      if (eSheet.getLastRow() >= 2) {
+        eSheet.getRange(2, 1, eSheet.getLastRow() - 1, eSheet.getLastColumn()).getValues().forEach(function (r, i) {
+          if (String(r[ec.source - 1]).trim() !== ATTENDANCE_SOURCE) return;
+          if (String(r[ec.scope - 1]).trim().toLowerCase() !== lesson) return;
+          if (undo[_phoneKey(r[ec.phone - 1])]) delEnt.push(i + 2);
+        });
+      }
+      if (qSheet.getLastRow() >= 2) {
+        qSheet.getRange(2, 1, qSheet.getLastRow() - 1, qSheet.getLastColumn()).getValues().forEach(function (r, i) {
+          if (String(r[qc.source - 1]).trim() !== ATTENDANCE_SOURCE) return;
+          if (String(r[qc.lesson - 1]).trim().toLowerCase() !== lesson) return;
+          if (undo[_phoneKey(r[qc.phone - 1])]) delQuiz.push(i + 2);
+        });
+      }
+      delEnt.sort(function (a, b) { return b - a; }).forEach(function (r) { eSheet.deleteRows(r, 1); });
+      delQuiz.sort(function (a, b) { return b - a; }).forEach(function (r) { qSheet.deleteRows(r, 1); });
+    }
+
+    if (Object.keys(give).length) {
+      var ent = _entitlementIndex(ss), statuses = _paymentStatuses(ss), qidx = _quizAccessIndex(ss);
+      order.forEach(function (k) {
+        if (!give[k]) return;
+        if (!_entitlementCovers(ent, statuses, k, lesson, ss, today)) {
+          _appendByHeader(eSheet, { phone: wanted[k].phone, scope: lesson, expires_at: "", granted_at: now, source: ATTENDANCE_SOURCE });
+        }
+        if (!(qidx[k] && qidx[k][lesson])) {
+          _appendByHeader(qSheet, { phone: wanted[k].phone, lesson: lesson, expires_at: "", granted_at: now, source: ATTENDANCE_SOURCE });
+        }
+      });
+    }
+
+    // 3. Fresh values for the students just touched.
+    var ent2 = _entitlementIndex(ss), statuses2 = _paymentStatuses(ss), qidx2 = _quizAccessIndex(ss);
+    var locks = _lockIndex(ss), st = _lessonLockState(locks, lesson);
+    var results = order.map(function (k) {
+      return { phone: wanted[k].phone, mode: wanted[k].mode,
+               can_watch: !st.video_locked || _entitlementCovers(ent2, statuses2, k, lesson, ss, today),
+               quiz_open: !st.quiz_locked || !!(qidx2[k] && qidx2[k][lesson]) };
+    });
+    return { ok: true, results: results };
+  });
+}
+
+// ---- admin_followup_save_group -----------------------------------------------------------------
+function _checkOverrideYmd(v, label) {
+  var s = String(v == null ? "" : v).trim();
+  if (s === "") return "";
+  try { return _cleanYmd(s); } catch (e) { throw new Error(label + " must be empty or look like 2026-12-31."); }
+}
+
+function handleAdminFollowupSaveGroup(payload) {
+  _requireAdminAny(payload);
+  var gkey = _groupKey(payload.group);
+  if (!gkey) throw new Error("Missing group.");
+
+  var weekday = null;
+  var wd = payload.weekday;
+  if (wd !== undefined && wd !== null && String(wd).trim() !== "") {
+    if (!/^[0-6]$/.test(String(wd).trim())) throw new Error("weekday must be a whole number from 0 (Sunday) to 6 (Saturday).");
+    weekday = +String(wd).trim();
+  }
+  var time = String(payload.time == null ? "" : payload.time).trim();
+  if (time !== "") {
+    if (!/^\d{2}:\d{2}$/.test(time) || +time.slice(0, 2) > 23 || +time.slice(3) > 59) throw new Error('time must look like "18:00".');
+  }
+  var current = String(payload.current_lesson == null ? "" : payload.current_lesson).trim() === "" ? "" : _lessonPath(payload.current_lesson);
+  var review = [];
+  if (payload.review_lessons !== undefined && payload.review_lessons !== null && payload.review_lessons !== "") {
+    if (!Array.isArray(payload.review_lessons)) throw new Error("review_lessons must be a list of lesson paths.");
+    if (payload.review_lessons.length > MAX_REVIEW_LESSONS) throw new Error("At most " + MAX_REVIEW_LESSONS + " homework & quiz lessons per group.");
+    payload.review_lessons.forEach(function (l) { var p = _lessonPath(l); if (review.indexOf(p) === -1) review.push(p); });
+  }
+  var note = String(payload.note == null ? "" : payload.note);
+  if (note.length > MAX_GROUP_NOTE) throw new Error("The group note is too long (max " + MAX_GROUP_NOTE + " characters).");
+  var contacted = payload.parents_contacted === true || String(payload.parents_contacted).toUpperCase() === "TRUE";
+  var watchOverride = _checkOverrideYmd(payload.watch_deadline_override, "The watch deadline override");
+  var hwOverride = _checkOverrideYmd(payload.hw_deadline_override, "The homework deadline override");
+
+  // Soft check against the real lesson list: a typo should be noticed, but GitHub being down must not block saving.
+  var warnings = [];
+  var wanted = (current ? [current] : []).concat(review);
+  if (wanted.length) {
+    try {
+      var known = {};
+      _allLessonsFromGithub().lessons.forEach(function (l) { known[l.lesson] = true; });
+      wanted.forEach(function (l) { if (!known[l]) warnings.push("Lesson not found on the site: " + l); });
+    } catch (e) {
+      warnings.push("Couldn't check the lessons against GitHub: " + String(e.message || e));
+    }
+  }
+
+  return _withLock(function () {
+    var ss = _ss();
+    var spellings = _groupSpellings(ss.getSheetByName("Groups"));
+    if (!spellings.hasOwnProperty(gkey)) throw new Error("No such group.");
+    var sheet = _followupSheet(ss, "GroupSettings", GROUPSETTINGS_HEADERS);
+    _ensureColumns(sheet, GROUPSETTINGS_HEADERS);
+    var c = _needCols(sheet, "GroupSettings", GROUPSETTINGS_HEADERS);
+    var rec = { group_key: gkey, group: spellings[gkey], weekday: weekday === null ? "" : weekday, time: time,
+                current_lesson: current, review_lessons: JSON.stringify(review), note: note, parents_contacted: contacted,
+                watch_deadline_override: watchOverride, hw_deadline_override: hwOverride, updated_at: _fmt(new Date(), TZ, true) };
+    var row = 0;
+    if (sheet.getLastRow() >= 2) {
+      var keys = sheet.getRange(2, c.group_key, sheet.getLastRow() - 1, 1).getValues();
+      for (var i = 0; i < keys.length; i++) if (_groupKey(keys[i][0]) === gkey) { row = i + 2; break; }
+    }
+    if (row) {
+      GROUPSETTINGS_HEADERS.forEach(function (h) {
+        sheet.getRange(row, c[h]).setNumberFormat(PLAIN_TEXT_HEADERS[h] ? "@" : "General").setValue(rec[h]);
+      });
+    } else {
+      _appendByHeader(sheet, rec);
+    }
+    var out = { ok: true, settings: { weekday: weekday, time: time, current_lesson: current, review_lessons: review, note: note,
+                parents_contacted: contacted, watch_deadline_override: watchOverride, hw_deadline_override: hwOverride } };
+    if (warnings.length) out.warnings = warnings;
+    return out;
+  });
+}
+
+// ---- admin_followup_save_templates -------------------------------------------------------------
+function handleAdminFollowupSaveTemplates(payload) {
+  _requireAdminAny(payload);
+  var t = payload.templates;
+  if (!t || typeof t !== "object" || Array.isArray(t)) throw new Error("templates must be an object of {key: body}.");
+  var keys = Object.keys(t);
+  if (keys.length > MAX_TEMPLATE_KEYS) throw new Error("Too many templates in one save (max " + MAX_TEMPLATE_KEYS + ").");
+  keys.forEach(function (k) {
+    if (!FOLLOWUP_TEMPLATE_KEY_RE.test(k)) throw new Error('Template key "' + k + '" is not valid (lower-case letters, digits and _).');
+    var b = t[k];
+    if (b !== null && typeof b !== "string") throw new Error('Template "' + k + '" must be text (or null to reset it).');
+    if (b && b.length > MAX_TEMPLATE_BODY) throw new Error('Template "' + k + '" is too long (max ' + MAX_TEMPLATE_BODY + " characters).");
+  });
+
+  return _withLock(function () {
+    var ss = _ss();
+    var sheet = _followupSheet(ss, "FollowupTemplates", FOLLOWUP_TEMPLATE_HEADERS);
+    _ensureColumns(sheet, FOLLOWUP_TEMPLATE_HEADERS);
+    var c = _needCols(sheet, "FollowupTemplates", FOLLOWUP_TEMPLATE_HEADERS);
+    var now = _fmt(new Date(), TZ, true);
+    var rowOf = {};
+    if (sheet.getLastRow() >= 2) {
+      sheet.getRange(2, c.key, sheet.getLastRow() - 1, 1).getValues().forEach(function (r, i) {
+        var k = String(r[0]).trim();
+        if (k && !rowOf.hasOwnProperty(k)) rowOf[k] = i + 2;
+      });
+    }
+    var toDelete = [];
+    keys.forEach(function (k) {
+      var body = t[k];
+      if (body === null || String(body).trim() === "") { if (rowOf.hasOwnProperty(k)) toDelete.push(rowOf[k]); return; }
+      if (rowOf.hasOwnProperty(k)) {
+        sheet.getRange(rowOf[k], c.body).setNumberFormat("@").setValue(body);
+        sheet.getRange(rowOf[k], c.updated_at).setNumberFormat("@").setValue(now);
+      } else {
+        _appendByHeader(sheet, { key: k, body: body, updated_at: now });
+      }
+    });
+    toDelete.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
+
+    var saved = {};
+    _sheetValuesAsObjects(sheet).forEach(function (r) {
+      var k = String(r.key || "").trim(), b = String(r.body == null ? "" : r.body);
+      if (k && b.trim() !== "" && !saved.hasOwnProperty(k)) saved[k] = b;
+    });
+    return { ok: true, templates: saved };
+  });
+}
+
+// ---- record_watch (a STUDENT's session, not an admin's) ---------------------------------------
+// The player reports how much of the lesson video has really been watched. Keeps the highest
+// value ever reported; ignores admins, locked videos, nonsense, and anything more often than
+// every WATCH_THROTTLE_SECONDS per (student, lesson).
+function handleRecordWatch(payload) {
+  _requireStudentSession(payload);
+  var lesson = _lessonPath(payload.lesson);
+  var pct = typeof payload.pct === "number" ? payload.pct : parseFloat(payload.pct);
+  if (!isFinite(pct)) return { ok: true, ignored: true };
+  pct = Math.round(Math.max(0, Math.min(100, pct)) * 10) / 10;
+  var dur = parseFloat(payload.duration_s);
+  dur = isFinite(dur) && dur > 0 ? Math.round(dur) : 0;
+
+  if (_sessionState(payload) !== "student") return { ok: true, ignored: true };   // an admin previewing the page
+
+  var key = _phoneKey(payload.student_id);
+  var cache = CacheService.getScriptCache();
+  var tk = "wpt:" + _md5(key + "|" + lesson);
+  if (cache.get(tk) !== null) return { ok: true, ignored: true };
+
+  var ss = _ss();
+  var rec = _lookupVideo(lesson, "lesson");
+  if (!rec) return { ok: true, ignored: true };                                   // no video here to watch
+  if ((rec.locked || _isLessonLocked(lesson)) && !_accessState(ss, payload.student_id, lesson).active) {
+    return { ok: true, ignored: true };
+  }
+  cache.put(tk, "1", WATCH_THROTTLE_SECONDS);
+
+  return _withLock(function () {
+    var sheet = _followupSheet(ss, "WatchProgress", WATCH_HEADERS);
+    _ensureColumns(sheet, WATCH_HEADERS);
+    var c = _needCols(sheet, "WatchProgress", WATCH_HEADERS);
+    var now = _fmt(new Date(), TZ, true);
+    var rk = "wpr:" + _md5(key + "|" + lesson);
+    var row = 0;
+
+    var hinted = parseInt(cache.get(rk) || "", 10);                               // remembered row: one cheap check, no scan
+    if (hinted >= 2 && hinted <= sheet.getLastRow()) {
+      var chk = sheet.getRange(hinted, 1, 1, sheet.getLastColumn()).getValues()[0];
+      if (_phoneKey(chk[c.phone - 1]) === key && String(chk[c.lesson - 1]).trim().toLowerCase() === lesson) row = hinted;
+    }
+    if (!row && sheet.getLastRow() >= 2) {
+      var n = sheet.getLastRow() - 1;
+      var phones = sheet.getRange(2, c.phone, n, 1).getValues(), lessons = sheet.getRange(2, c.lesson, n, 1).getValues();
+      for (var i = 0; i < n; i++) {
+        if (_phoneKey(phones[i][0]) === key && String(lessons[i][0]).trim().toLowerCase() === lesson) { row = i + 2; break; }
+      }
+    }
+    if (!row) {
+      row = _appendByHeader(sheet, { phone: _canonicalPhone(payload.student_id) || _normalizePhone(payload.student_id), lesson: lesson,
+                                     pct: pct, duration_s: dur || "", first_at: now, updated_at: now });
+      cache.put(rk, String(row), 21600);
+      return { ok: true, pct: pct };
+    }
+    cache.put(rk, String(row), 21600);
+    var old = parseFloat(sheet.getRange(row, c.pct).getValues()[0][0]);
+    var best = isFinite(old) && old > pct ? old : pct;
+    if (!isFinite(old) || pct > old) {
+      sheet.getRange(row, c.pct).setValue(pct);
+      if (dur) sheet.getRange(row, c.duration_s).setValue(dur);
+      sheet.getRange(row, c.updated_at).setNumberFormat("@").setValue(now);
+    }
+    return { ok: true, pct: best };
+  });
 }
 
 // -- Quiz gate: lock/unlock a lesson's quiz, separate from its video ---------------

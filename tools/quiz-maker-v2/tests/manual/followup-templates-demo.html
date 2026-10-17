@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Follow-up templates — demo (fake data only)</title>
+<link rel="stylesheet" href="../../../../assets/theme.css">
+<link rel="stylesheet" href="../../../../assets/followup-templates.css">
+<style>
+  body { margin: 0; padding: 16px; background: var(--bg, #f4f7fb); color: var(--ink, #10233f); font-family: var(--arabic, Cairo, sans-serif); }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
+  .row button { min-height: 48px; padding: 0 16px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--panel); color: inherit; font: inherit; }
+  #sheet { margin: 18px 0; }
+  #sheet a { display: block; margin-top: 10px; min-height: 52px; line-height: 52px; text-align: center; border-radius: 14px; background: var(--whatsapp, #25d366); color: #fff; font-weight: 800; text-decoration: none; }
+  #log { font: 13px/1.5 monospace; direction: ltr; white-space: pre-wrap; color: var(--ink-dim); }
+</style>
+</head>
+<body>
+<h1>قوالب الرسائل — صفحة تجربة (بيانات وهمية)</h1>
+<div class="row">
+  <button id="dark" type="button">🌙 داكن / فاتح</button>
+  <select id="msg" aria-label="رسالة"></select>
+</div>
+<div id="editor"></div>
+<h1>رسالة جاهزة للإرسال</h1>
+<div id="sheet"></div>
+<div id="log"></div>
+<script src="../../../../assets/followup-templates.js"></script>
+<script>
+  var FT = window.FollowupTemplates, sample = FT.makeSample(new Date()), saved = {}, log = document.getElementById("log");
+  function say(t) { log.textContent += t + "\n"; }
+  var ed = FT.mountEditor(document.getElementById("editor"), {
+    templates: saved, sample: sample,
+    onSave: function (changes) { say("onSave " + JSON.stringify(changes).slice(0, 300)); Object.keys(changes).forEach(function (k) { if (changes[k] == null) delete saved[k]; else saved[k] = changes[k]; }); renderSheet(); }
+  });
+  var sel = document.getElementById("msg");
+  Object.keys(FT.DEFAULTS).filter(function (k) { return k !== "header" && k.indexOf("line_") !== 0; }).forEach(function (k) {
+    var o = document.createElement("option"); o.value = k; o.textContent = FT.LABELS[k] || k; sel.appendChild(o);
+  });
+  function renderSheet() {
+    var r = FT.composeFull(sample, sel.value, Object.assign({}, sample, { templates: saved }));
+    var box = document.getElementById("sheet"); box.innerHTML = "";
+    var b = document.createElement("div"); b.className = "ft-bubble"; b.dir = "auto"; b.innerHTML = FT.formatPreview(r.text); box.appendChild(b);
+    var a = document.createElement("a"); a.target = "_blank"; a.rel = "noopener"; a.textContent = "فتح واتساب ↗";
+    a.href = FT.waLink("201234567890", r.text); a.id = "wa"; box.appendChild(a);
+  }
+  sel.addEventListener("change", renderSheet); renderSheet();
+  document.getElementById("dark").addEventListener("click", function () {
+    var h = document.documentElement; h.setAttribute("data-theme", h.getAttribute("data-theme") === "dark" ? "light" : "dark");
+  });
+</script>
+</body>
+</html>

@@ -42,7 +42,7 @@
   "use strict";
 
   if (window.VideoSlot) return; // loaded twice — the first copy already did the work
-  window.__videoJsVersion = "v7-polish";
+  window.__videoJsVersion = "v8-watch";
 
   var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
   var SESSION_KEY = "teaching_session";
@@ -362,7 +362,118 @@
     return m ? m[1] : null;
   }
 
-  function attachControls(slot, frame) {
+  // -- watch tracking (reports real viewing progress to record_watch) -------------
+  // Distinct coverage, not elapsed time: the video is cut into 5 s buckets and a
+  // bucket counts only when playback moved through it continuously (a jump of more
+  // than 6 s between updates is a seek and covers nothing). pct = covered / total.
+  // Reporting is best-effort and silent: it never blocks or breaks the player.
+  // WATCH-TRACKER-BEGIN
+  var WT_BUCKET_S = 5, WT_MAX_STEP_S = 6, WT_SEND_EVERY_MS = 20000, WT_SAVE_EVERY_MS = 5000;
+
+  // cfg: { key, now(), storage, send(pct, durationS, urgent) }
+  function makeWatchTracker(cfg) {
+    var bits = [], dur = 0, last = null, sent = 0, playing = false;
+    var lastSendAt = 0, lastSaveAt = 0, dirty = false;
+
+    try {
+      var raw = cfg.storage && cfg.storage.getItem(cfg.key);
+      var saved = raw ? JSON.parse(raw) : null;
+      if (saved && typeof saved.b === "string" && /^[01]*$/.test(saved.b) && saved.d > 0) {
+        for (var i = 0; i < saved.b.length; i++) bits[i] = saved.b.charAt(i) === "1";
+        dur = saved.d;
+        sent = saved.s > 0 ? saved.s : 0;
+      }
+    } catch (e) {}
+
+    function total() { return dur > 0 ? Math.ceil(dur / WT_BUCKET_S) : 0; }
+    function pct() {
+      var n = total(), c = 0;
+      if (!n) return 0;
+      for (var i = 0; i < n; i++) if (bits[i]) c++;
+      return Math.min(100, Math.floor((c / n) * 100));
+    }
+    function save() {
+      lastSaveAt = cfg.now();
+      dirty = false;
+      try {
+        var s = "";
+        for (var i = 0, n = total(); i < n; i++) s += bits[i] ? "1" : "0";
+        cfg.storage.setItem(cfg.key, JSON.stringify({ d: dur, b: s, s: sent }));
+      } catch (e) {}
+    }
+    function mark(from, to) {
+      var n = total(), a = Math.floor(from / WT_BUCKET_S), b = Math.floor(to / WT_BUCKET_S);
+      for (var i = Math.max(a, 0); i <= b && i < n; i++) if (!bits[i]) { bits[i] = true; dirty = true; }
+    }
+    // Send only when pct grew by >= 1 since the last report. `urgent` = page is going away.
+    function flush(urgent) {
+      var p = pct();
+      if (dirty && (urgent || cfg.now() - lastSaveAt >= WT_SAVE_EVERY_MS)) save();
+      if (p < 1 || p < sent + 1) return false;
+      if (!urgent && cfg.now() - lastSendAt < WT_SEND_EVERY_MS) return false;
+      lastSendAt = cfg.now();
+      sent = p;
+      save();
+      try { cfg.send(p, Math.round(dur), !!urgent); } catch (e) {}
+      return true;
+    }
+    // info = the YouTube infoDelivery payload ({playerState, currentTime, duration}).
+    function onInfo(info) {
+      if (!info) return;
+      if (info.duration > 0) {
+        if (dur && Math.abs(info.duration - dur) > 1) { bits = []; sent = 0; last = null; } // different video
+        dur = info.duration;
+      }
+      if (typeof info.playerState === "number") {
+        var was = playing;
+        playing = info.playerState === 1;
+        if (!playing) last = null;
+        if (was && !playing) flush(true); // paused or ended: report now
+      }
+      if (playing && dur > 0 && typeof info.currentTime === "number") {
+        var t = info.currentTime;
+        if (last !== null && t >= last && t - last <= WT_MAX_STEP_S) mark(last, t);
+        else mark(t, t); // first tick, or a seek: only the spot we landed on
+        last = t;
+        flush(false);
+      }
+    }
+    return { onInfo: onInfo, flush: flush, pct: pct, isPlaying: function () { return playing; } };
+  }
+  // WATCH-TRACKER-END
+
+  // Wires a tracker to one lesson-slot player; null for admins, signed-out viewers and other slots.
+  function startWatchTracking(info, session) {
+    if (!info || info.kind !== "lesson" || !session || !session.student_id || !session.session_token || session.is_admin) return null;
+    if (!DRIVE_ENDPOINT || DRIVE_ENDPOINT.indexOf("{{") === 0) return null;
+    var store = null;
+    try { store = window.localStorage; } catch (e) {}
+    var tracker = makeWatchTracker({
+      key: "vp-cov:" + session.student_id + ":" + info.lesson,
+      now: function () { return Date.now(); },
+      storage: store,
+      send: function (p, d, urgent) {
+        var payload = { action: "record_watch", lesson: info.lesson, pct: p, duration_s: d,
+                        student_id: session.student_id, session_token: session.session_token };
+        if (urgent) {
+          try {
+            fetch(DRIVE_ENDPOINT, { method: "POST", keepalive: true, headers: { "Content-Type": "text/plain;charset=utf-8" },
+                                    body: JSON.stringify(payload) }).catch(function () {});
+          } catch (e) {}
+        } else {
+          call(payload).catch(function () {});
+        }
+      },
+    });
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "hidden") tracker.flush(true);
+    });
+    window.addEventListener("pagehide", function () { tracker.flush(true); });
+    return tracker;
+  }
+
+  function attachControls(slot, frame, info, session) {
+    var tracker = startWatchTracking(info, session);
     var playing = false, dur = 0, seeking = false, rateApplied = false;
     function cmd(func, args) {
       try { frame.contentWindow.postMessage(JSON.stringify({ event: "command", func: func, args: args || [] }), "*"); } catch (e) {}
@@ -448,6 +559,7 @@
       var d; try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch (x) { return; }
       if (!d || d.event !== "infoDelivery" || !d.info) return;
       var i = d.info;
+      if (tracker) tracker.onInfo(i);
       if (typeof i.playerState === "number") {
         playing = i.playerState === 1;
         btn.textContent = playing ? "\u275A\u275A" : "\u25B6";
@@ -559,7 +671,7 @@
           referrerpolicy: "strict-origin-when-cross-origin",
         });
         slot.appendChild(frame);
-        if (isYT) attachControls(slot, frame);
+        if (isYT) attachControls(slot, frame, info, session);
       }
       if (isYT && vid) {
         // Our own thumbnail + play button \u2014 nothing YouTube-branded shows
