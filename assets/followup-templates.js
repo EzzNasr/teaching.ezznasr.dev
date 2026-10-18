@@ -248,7 +248,15 @@
     var i = p.lastIndexOf("/");
     return i >= 0 ? p.slice(i + 1) : p;
   }
-  function prettyLesson(path) { return lessonSlug(path).replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim(); }
+  // Real lesson names (path -> title) are optional: the page passes them in via setLessonTitles().
+  // Without them (or for an unknown lesson) the old slug-based name is used, so behaviour is unchanged.
+  var _lessonTitles = {};
+  function setLessonTitles(map) { _lessonTitles = map && typeof map === "object" ? map : {}; }
+  function prettyLesson(path) {
+    var t = _lessonTitles[path];
+    if (t && typeof t === "string") return t.replace(/\s+/g, " ").trim();
+    return lessonSlug(path).replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  }
 
   function firstName(name) { return clean(name).split(" ")[0] || ""; }
 
@@ -909,7 +917,7 @@
     buildContext: buildContext, render: render, compose: compose, composeFull: composeFull,
     deriveIssues: deriveIssues, templateForState: templateForState,
     formatPreview: formatPreview, waLink: waLink, waDigits: waDigits, copyText: copyText, lintMessage: lintMessage,
-    deadlineWhen: deadlineWhen, sessionWhen: sessionWhen, prettyLesson: prettyLesson, lessonSlug: lessonSlug,
+    deadlineWhen: deadlineWhen, sessionWhen: sessionWhen, prettyLesson: prettyLesson, setLessonTitles: setLessonTitles, lessonSlug: lessonSlug,
     insertAt: insertAt, wrapSelection: wrapSelection, placeholdersFor: placeholdersFor,
     makeSample: makeSample, mountEditor: mountEditor
   };

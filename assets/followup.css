@@ -197,3 +197,17 @@ html[data-theme="dark"] .fu-filters .fu-chip[aria-pressed="true"]{color:#06201f}
 @media (min-width:900px){.fu-wrap,.fu-top{max-width:760px}}
 .fu :focus-visible{outline:3px solid var(--fu-teal);outline-offset:2px}
 .fu-btns.two>:only-child{grid-column:1/-1}
+
+/* ---- global year filter + readable lesson names ---- */
+.fu-year{margin:10px 0 2px}
+.fu-yseg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--fu-soft);border-radius:14px;padding:4px;gap:4px}
+.fu-yseg button{min-height:var(--fu-tap);border:0;border-radius:11px;background:transparent;font:inherit;font-weight:700;color:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.fu-yseg button small{opacity:.7;font-weight:600}
+.fu-yseg button[aria-checked="true"]{background:var(--fu-teal);color:#fff}
+html[data-theme="dark"] .fu-yseg button[aria-checked="true"]{color:#06201f}
+.fu-yhint{margin-top:8px;font-size:13px;color:var(--fu-dim,inherit);opacity:.85}
+.fu-lname{display:inline-block;direction:ltr;unicode-bidi:isolate;font-weight:700;font-size:14px;line-height:1.5;background:var(--fu-soft);padding:4px 12px;border-radius:10px;max-width:100%;overflow-wrap:anywhere}
+.fu-lesson-select{direction:ltr}
+.fu-year-chip{font-weight:700}
+.fu-guide li{margin-bottom:8px;line-height:1.7}
+.fu-guidebanner{border-style:dashed}

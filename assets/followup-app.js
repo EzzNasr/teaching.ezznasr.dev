@@ -31,7 +31,11 @@
     editTime: {},            // group key -> true while the weekday/time editor is shown
     lessonQ: {},             // lesson-picker search text, by picker id
     sheetClose: null, view: null,
+    year: "all",             // global Senior filter: "all" | "1" | "2"  (persisted in localStorage)
   };
+  var TITLES = {};           // lesson path -> real lesson name (assets/lesson-titles.json, built by tools/seo/seo_build.py)
+  var YEARS = [{ k: "1", label: "سينيور 1" }, { k: "2", label: "سينيور 2" }];
+  try { var y0 = localStorage.getItem("fu-year"); if (y0 === "1" || y0 === "2") STATE.year = y0; } catch (e) {}
 
   // ---- tiny DOM helpers ------------------------------------------------------------------------
   function el(tag, attrs, kids) {
@@ -60,10 +64,55 @@
   }
   function lessonSlug(p) { return String(p || "").split("/").pop(); }
   function lessonNo(p) {
-    var m = /lesson-(\d+)/i.exec(lessonSlug(p));
-    return m ? "الدرس " + m[1] : "";
+    var slug = lessonSlug(p), c = /chapter-(\d+)/i.exec(slug), m = /lesson-(\d+)/i.exec(slug);
+    if (!m) return "";
+    return (c ? "الفصل " + c[1] + " · " : "") + "الدرس " + m[1];
   }
-  function pretty(p) { return lessonSlug(p).replace(/-/g, " "); }
+  function pretty(p) { return lessonTitle(p); }
+
+  // ---- lesson names (never show the folder slug when a real name is known) -----------------------
+  function titleCase(t) { return t.replace(/\b([a-z])([a-z]*)/g, function (_, a, b) { return a.toUpperCase() + b; }); }
+  // "Chapter 2 Lesson 1 – Personal information" -> "Personal information"
+  function stripNumbering(t) { return String(t || "").replace(/^\s*(chapter\s*\d+\s*)?lesson\s*\d+\s*[\u2013\u2014:\-]*\s*/i, "").trim(); }
+  function lessonTitle(p) {
+    if (!p) return "";
+    var t = TITLES[p];
+    if (t) return stripNumbering(t) || t;
+    var slug = lessonSlug(p).replace(/^chapter-\d+-/i, "").replace(/^lesson-\d+-?/i, "");   // unknown lesson: tidy the slug
+    return titleCase(slug.replace(/-/g, " ").trim());
+  }
+  // "Ch 2 · L1 — Personal information"
+  function lessonLabel(p) {
+    if (!p) return "";
+    var slug = lessonSlug(p), c = /chapter-(\d+)/i.exec(slug), m = /lesson-(\d+)/i.exec(slug);
+    var num = (c ? "Ch " + c[1] + (m ? " · " : "") : "") + (m ? "L" + m[1] : "");
+    var t = lessonTitle(p);
+    return num && t ? num + " \u2014 " + t : (t || num);
+  }
+  function lessonChip(p) { return el("span", { class: "fu-lname", dir: "ltr", title: lessonSlug(p) }, [lessonLabel(p)]); }
+  function loadTitles() {
+    return fetch("/assets/lesson-titles.json", { cache: "no-cache" }).then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (j) { TITLES = j || {}; }, function () { TITLES = {}; });
+  }
+
+  // ---- year (Senior 1 / Senior 2) ----------------------------------------------------------------
+  function yearOfStudent(st) {
+    var t = String((st && st.year) || "").replace(/[\u0661\u0662]/g, function (c) { return c === "\u0661" ? "1" : "2"; });
+    var m = /(^|\D)([12])(\D|$)/.exec(t);
+    return m ? m[2] : "";
+  }
+  function yearOfLesson(p) { var m = /grade-([12])-secondary/i.exec(p || ""); return m ? m[1] : ""; }   // Programming only; others have no year
+  function yearLabel(k) { return k === "all" ? "الكل" : "سينيور " + k; }
+  function setYear(k) {
+    STATE.year = k; STATE.open = null; STATE.filter = "all"; STATE.q = "";
+    try { localStorage.setItem("fu-year", k); } catch (e) {}
+    if (STATE.data) {
+      var tabs = visibleTabKeys();
+      if (tabs.length && tabs.indexOf(STATE.tab) < 0) STATE.tab = tabs[0];   // nothing visible: keep the tab so switching back restores it
+      if (STATE.borrow && visibleGroups().every(function (g) { return g.key !== STATE.borrow; })) STATE.borrow = (visibleGroups()[0] || {}).key || null;
+      writeHash(); renderYearBar(); renderTabs(); renderPage(); window.scrollTo(0, 0);
+    }
+  }
 
   // ---- Cairo time -----------------------------------------------------------------------------
   function cairo(date) {
@@ -135,6 +184,7 @@
     var t = T();
     var ov = STATE.data && STATE.data.templates || {};
     if (t.setTemplates) t.setTemplates(ov); else if (t.setOverrides) t.setOverrides(ov);
+    if (t.setLessonTitles) t.setLessonTitles(TITLES);
     var c = Object.assign({ templates: ov }, ctx);
     var r = t.compose(summary, kind, c);
     var text = typeof r === "string" ? r : (r && r.text) || "";
@@ -310,13 +360,46 @@
     if (STATE.tab === NONE_TAB) {
       var b = groupByKey(STATE.borrow) || allGroups()[0] || null;
       var s = b ? clone(b.settings) : { weekday: null, time: "", current_lesson: "", review_lessons: [], note: "", parents_contacted: false, watch_deadline_override: "", hw_deadline_override: "" };
-      return { group: "طلاب غير مصنفين", key: NONE_TAB, unclassified: true, borrowed: b, settings: s, members: d.unclassified || [] };
+      return { group: "طلاب غير مصنفين", key: NONE_TAB, unclassified: true, borrowed: b, settings: s, members: (d.unclassified || []) };
     }
     return groupByKey(STATE.tab) || allGroups()[0] || null;
   }
   function studentOf(m) {
     var k = pkOf(m.phone), s = STATE.data.students[k] || {};
     return Object.assign({ phone: m.phone, name: m.name }, s, { key: k, name: m.name || s.name });
+  }
+  // ---- global year filter: who / which groups are visible ---------------------------------------
+  function yearPass(m) { return STATE.year === "all" || yearOfStudent(studentOf(m)) === STATE.year; }
+  function visibleMembers(g) { return (g.members || []).filter(yearPass); }
+  function visibleGroups() { return allGroups().filter(function (g) { return STATE.year === "all" || visibleMembers(g).length > 0; }); }
+  function visibleTabKeys() {
+    var keys = visibleGroups().map(function (g) { return g.key; }), d = STATE.data;
+    if (STATE.year === "all" || ((d && d.unclassified) || []).some(yearPass)) keys.push(NONE_TAB);
+    return keys;
+  }
+  function everyone() {   // unique students across all groups + unclassified
+    var seen = {}, out = [];
+    allGroups().forEach(function (g) { g.members.forEach(add); });
+    ((STATE.data && STATE.data.unclassified) || []).forEach(add);
+    function add(m) { var k = pkOf(m.phone); if (!seen[k]) { seen[k] = 1; out.push(m); } }
+    return out;
+  }
+  function lessonsForYear(all) {
+    var list = (all || []).slice();
+    if (STATE.year !== "all") list = list.filter(function (l) { var y = yearOfLesson(l.path); return !y || y === STATE.year; });
+    function num(p, re) { var m = re.exec(lessonSlug(p)); return m ? +m[1] : 999; }
+    list.sort(function (a, b) {
+      return (yearOfLesson(a.path) || "9").localeCompare(yearOfLesson(b.path) || "9") ||
+        num(a.path, /chapter-(\d+)/i) - num(b.path, /chapter-(\d+)/i) ||
+        num(a.path, /lesson-(\d+)/i) - num(b.path, /lesson-(\d+)/i) ||
+        a.path.localeCompare(b.path);
+    });
+    return list;
+  }
+  function lessonGroupLabel(p) {
+    var y = yearOfLesson(p), c = /chapter-(\d+)/i.exec(lessonSlug(p));
+    if (!y) return "دروس عامة";
+    return (STATE.year === "all" ? "سينيور " + y : "") + (c ? (STATE.year === "all" ? " · " : "") + "الفصل " + c[1] : (STATE.year === "all" ? "" : "دروس السنة"));
   }
 
   // ---- per-student actions (what the buttons are) ----------------------------------------------
@@ -373,7 +456,7 @@
   // ---- group view (computed once per render) ---------------------------------------------------
   function computeView(g) {
     var dl = deadlinesFor(g);
-    var rows = g.members.map(function (m) {
+    var rows = visibleMembers(g).map(function (m) {
       var st = studentOf(m), sm = summaryFor(st, g), ck = parentCheck(st);
       var ac = buildActions(st, g, sm, dl, ck);
       var v = sm.verdicts || {};
@@ -439,6 +522,40 @@
     }, function (err) { real.settings = before; refreshPage(); toast(errText(err), { err: true }); });
   }
 
+  // ---- rendering: global year bar ---------------------------------------------------------------
+  function renderYearBar() {
+    var bar = $("fu-year"); if (!bar) return;
+    clear(bar);
+    var d = STATE.data;
+    if (!d) { bar.hidden = true; return; }
+    bar.hidden = false;
+    var all = everyone(), counts = { all: all.length, "1": 0, "2": 0 }, unknown = 0;
+    all.forEach(function (m) { var y = yearOfStudent(studentOf(m)); if (y) counts[y]++; else unknown++; });
+    var seg = el("div", { class: "fu-yseg", role: "radiogroup", "aria-label": "السنة الدراسية" });
+    [{ k: "all", label: "الكل" }].concat(YEARS).forEach(function (y) {
+      seg.appendChild(el("button", { type: "button", role: "radio", "aria-checked": String(STATE.year === y.k), "data-year": y.k, onclick: function () { if (STATE.year !== y.k) setYear(y.k); } },
+        [y.label, el("small", {}, [String(counts[y.k])])]));
+    });
+    bar.appendChild(seg);
+    if (STATE.year !== "all") bar.appendChild(el("div", { class: "fu-yhint", id: "fu-yhint" }, [
+      "المعروض دلوقتي لطلاب " + yearLabel(STATE.year) + " بس: الجروبات، الطلاب، والدروس." + (unknown ? " (" + unknown + " طالب بدون سنة مش ظاهرين — اختار «الكل».)" : "")]));
+  }
+
+  // ---- first-visit banner ----------------------------------------------------------------------
+  function guideBanner() {
+    var seen = false; try { seen = localStorage.getItem("fu-guide-seen") === "1"; } catch (e) {}
+    if (seen || MOCK) return null;
+    function dismiss() { try { localStorage.setItem("fu-guide-seen", "1"); } catch (e) {} refreshPage(); }
+    return el("section", { class: "fu-card fu-guidebanner", id: "fu-guidebanner" }, [
+      el("div", { class: "fu-big" }, ["👋 أول مرة تستخدم الصفحة؟"]),
+      el("div", { class: "fu-dim", style: "margin:4px 0 12px" }, ["اختار السنة من فوق وبعدين الجروب. الدليل القصير بيشرح الخطوات في دقيقة."]),
+      el("div", { class: "fu-btns two" }, [
+        el("button", { class: "fu-btn primary", type: "button", id: "fu-guide-open", onclick: function () { dismiss(); openHelp(); } }, ["📖 افتح الدليل"]),
+        el("button", { class: "fu-btn", type: "button", id: "fu-guide-hide", onclick: dismiss }, ["إخفاء"]),
+      ]),
+    ]);
+  }
+
   // ---- rendering: shell ------------------------------------------------------------------------
   function renderTabs() {
     var nav = clear($("fu-tabs")), d = STATE.data;
@@ -448,8 +565,8 @@
       var b = el("button", { class: "fu-tab", type: "button", role: "tab", "aria-selected": String(STATE.tab === key), "data-tab": key, onclick: function () { selectTab(key); } }, [label, el("small", {}, ["· " + n])]);
       nav.appendChild(b);
     }
-    allGroups().forEach(function (g) { tab(g.key, g.group, g.members.length); });
-    tab(NONE_TAB, "طلاب غير مصنفين", (d.unclassified || []).length);
+    visibleGroups().forEach(function (g) { tab(g.key, g.group, visibleMembers(g).length); });
+    if (visibleTabKeys().indexOf(NONE_TAB) >= 0) tab(NONE_TAB, "طلاب غير مصنفين", (d.unclassified || []).filter(yearPass).length);
   }
   function selectTab(key) {
     STATE.tab = key; STATE.open = null; STATE.filter = "all"; STATE.q = ""; STATE.lessonQ = {};
@@ -469,21 +586,32 @@
   function lockChip(label, locked) { return el("span", { class: "fu-chip " + (locked ? "red" : "green") }, [(locked ? "🔒 " : "🔓 ") + label]); }
 
   function lessonPicker(id, value, onPick, lessons) {
-    var q = STATE.lessonQ[id] || "";
-    var opts = (lessons || []).filter(function (l) { return !q || l.path.toLowerCase().indexOf(q.toLowerCase()) >= 0 || l.path === value; });
-    var sel = el("select", { class: "fu-field", id: id, "aria-label": "اختيار الدرس" });
-    sel.appendChild(el("option", { value: "" }, ["— اختار الدرس —"]));
-    var seen = {};
-    opts.forEach(function (l) { seen[l.path] = 1; sel.appendChild(el("option", { value: l.path }, [lessonSlug(l.path)])); });
-    if (value && !seen[value]) sel.appendChild(el("option", { value: value }, [lessonSlug(value)]));
-    sel.value = value || "";
+    var pool = lessonsForYear(lessons);
+    var sel = el("select", { class: "fu-field fu-lesson-select", id: id, "aria-label": "اختيار الدرس", dir: "ltr" });
+    function fill(q) {
+      q = (q || "").trim().toLowerCase();
+      clear(sel);
+      sel.appendChild(el("option", { value: "" }, ["— اختار الدرس —"]));
+      var seen = {}, groups = {}, order = [];
+      pool.forEach(function (l) {
+        var hay = (lessonLabel(l.path) + " " + l.path).toLowerCase();
+        if (q && hay.indexOf(q) < 0 && l.path !== value) return;
+        var gl = lessonGroupLabel(l.path);
+        if (!groups[gl]) { groups[gl] = el("optgroup", { label: gl }); order.push(gl); }
+        groups[gl].appendChild(el("option", { value: l.path }, [lessonLabel(l.path)]));
+        seen[l.path] = 1;
+      });
+      order.forEach(function (gl) { sel.appendChild(groups[gl]); });
+      if (value && !seen[value]) {   // current value is outside the filter / search: keep it visible, flagged
+        var y = yearOfLesson(value), off = STATE.year !== "all" && y && y !== STATE.year;
+        sel.insertBefore(el("option", { value: value }, [lessonLabel(value) + (off ? "  (سينيور " + y + ")" : "")]), sel.childNodes[1] || null);
+      }
+      sel.value = value || "";
+    }
+    fill(STATE.lessonQ[id] || "");
     sel.addEventListener("change", function () { onPick(sel.value); });
-    var search = el("input", { class: "fu-field fu-search-lessons", type: "search", placeholder: "🔍 ابحث عن درس…", value: q, "aria-label": "بحث في الدروس", dir: "ltr" });
-    search.addEventListener("input", function () {
-      STATE.lessonQ[id] = search.value; var cur = sel.value;
-      var qq = search.value.toLowerCase();
-      Array.prototype.forEach.call(sel.options, function (o) { o.hidden = !!(qq && o.value && o.value !== cur && o.value.toLowerCase().indexOf(qq) < 0); });
-    });
+    var search = el("input", { class: "fu-field fu-search-lessons", type: "search", placeholder: "🔍 ابحث عن درس…", value: STATE.lessonQ[id] || "", "aria-label": "بحث في الدروس", dir: "auto" });
+    search.addEventListener("input", function () { STATE.lessonQ[id] = search.value; fill(search.value); });
     return el("div", { class: "fu-pick" }, [search, sel]);
   }
 
@@ -522,7 +650,7 @@
     // role A
     var a = el("div", { class: "fu-role", id: "fu-role-a" });
     a.appendChild(el("div", { class: "fu-row fu-between" }, [el("h3", {}, ["🎬 الحصة الحالية"]), el("span", { class: "fu-dim" }, ["حضور + مشاهدة"])]));
-    if (ro) a.appendChild(s.current_lesson ? el("div", { style: "margin-top:8px" }, [el("span", { class: "fu-slug" }, [lessonSlug(s.current_lesson)])]) : el("div", { class: "fu-dim" }, ["اختار جروب من «اعرض بحصص جروب»"]));
+    if (ro) a.appendChild(s.current_lesson ? el("div", { style: "margin-top:8px" }, [lessonChip(s.current_lesson)]) : el("div", { class: "fu-dim" }, ["اختار جروب من «اعرض بحصص جروب»"]));
     else a.appendChild(lessonPicker("pick-current", s.current_lesson, function (v) { saveGroup(g, { current_lesson: v }, { reload: true }); }, all));
     var ci = lessonInfo(s.current_lesson);
     if (ci) a.appendChild(el("div", { class: "fu-chips", style: "margin-top:10px" }, [lockChip("الحصة", ci.lesson_locked), lockChip("الفيديو", ci.video_locked), lockChip("الكويز", ci.quiz_locked)]));
@@ -535,7 +663,7 @@
     rv.forEach(function (path, i) {
       var inf = lessonInfo(path);
       var row = el("div", { style: "margin-top:8px" });
-      if (ro) row.appendChild(el("span", { class: "fu-slug" }, [lessonSlug(path)]));
+      if (ro) row.appendChild(lessonChip(path));
       else {
         row.appendChild(el("div", { class: "fu-row" }, [
           el("div", { class: "grow", style: "flex:1;min-width:0" }, [lessonPicker("pick-review-" + i, path, function (v) {
@@ -556,6 +684,10 @@
     }
     card.appendChild(b);
     card.appendChild(el("div", { class: "fu-hint" }, ["⚠️ حرّك الاختيارين لقدّام بعد كل حصة، وإلا مواعيد الحصة الجديدة ممكن تظهر متأخرة."]));
+    if (STATE.year !== "all") {
+      var off = [s.current_lesson].concat(s.review_lessons || []).filter(function (p) { var y = yearOfLesson(p); return p && y && y !== STATE.year; });
+      if (off.length) card.appendChild(el("div", { class: "fu-warnbox", id: "fu-year-mismatch", role: "alert" }, ["⚠️ في درس مختار من سينيور " + yearOfLesson(off[0]) + " والعرض الحالي " + yearLabel(STATE.year) + " — راجع اختيار الدروس."]));
+    }
     return card;
   }
 
@@ -585,8 +717,8 @@
 
   function borrowCard() {
     var sel = el("select", { class: "fu-field", id: "fu-borrow", "aria-label": "اعرض بحصص جروب", style: "direction:rtl;font:inherit" },
-      allGroups().map(function (g) { return el("option", { value: g.key }, [g.group]); }));
-    sel.value = (groupByKey(STATE.borrow) || allGroups()[0] || {}).key || "";
+      visibleGroups().map(function (g) { return el("option", { value: g.key }, [g.group]); }));
+    sel.value = (visibleGroups().filter(function (g) { return g.key === STATE.borrow; })[0] || visibleGroups()[0] || {}).key || "";
     sel.addEventListener("change", function () { STATE.borrow = sel.value; STATE.open = null; refreshPage(); });
     return el("section", { class: "fu-card" }, [el("label", {}, [el("span", { class: "fu-label" }, ["اعرض بحصص جروب ▾"]), sel]),
       el("div", { class: "fu-hint" }, ["الاختيار ده محلي ومش بيتحفظ — بيحدد بس الحصة الحالية وحصة الواجب والكويز المستخدمة في الحالات تحت."])]);
@@ -605,9 +737,10 @@
     return wrap;
   }
   function bulk(g, mode) {
-    var n = g.members.length;
-    confirmDialog("تسجيل " + n + " طالب كـ «" + (mode === "center" ? "سنتر" : "أونلاين") + "»؟" + (mode === "center" ? " هيتفتح الفيديو والكويز مجانًا للكل." : ""), "تأكيد").then(function (ok) {
-      if (ok) setAttendance(g, g.members.map(function (m) { return { phone: m.phone, mode: mode }; }));
+    var vis = visibleMembers(g), n = vis.length;
+    if (!n) { toast("مفيش طلاب ظاهرين في الجروب ده", { err: true }); return; }
+    confirmDialog("تسجيل " + n + " طالب" + (STATE.year !== "all" ? " (" + yearLabel(STATE.year) + " بس)" : "") + " كـ «" + (mode === "center" ? "سنتر" : "أونلاين") + "»؟" + (mode === "center" ? " هيتفتح الفيديو والكويز مجانًا للكل." : ""), "تأكيد").then(function (ok) {
+      if (ok) setAttendance(g, vis.map(function (m) { return { phone: m.phone, mode: mode }; }));
     });
   }
   function missingNames(V) {
@@ -657,6 +790,7 @@
   function microChips(r) {
     var chips = el("div", { class: "fu-chips chips" });
     (r.sm.microChips || []).forEach(function (c) { chips.appendChild(el("span", { class: "fu-chip t-" + (c.tone || "grey"), "data-chip": c.key }, [c.label])); });
+    if (STATE.year === "all") { var yk = yearOfStudent(r.st); if (yk) chips.insertBefore(el("span", { class: "fu-chip fu-year-chip", "data-chip": "year" }, ["S" + yk]), chips.firstChild); }
     var hasParentChip = (r.sm.microChips || []).some(function (c) { return /parent|phone/i.test(c.key || ""); });
     if (!hasParentChip && r.ck.level === "missing") chips.appendChild(el("span", { class: "fu-chip red", "data-chip": "parent" }, ["⚠️ لا رقم ولي أمر"]));
     else if (!hasParentChip && r.ck.level === "warn") chips.appendChild(el("span", { class: "fu-chip amber", "data-chip": "parent" }, ["⚠️ راجع رقم ولي الأمر"]));
@@ -677,7 +811,7 @@
       var f = facts[cur] || {}, info = lessonInfo(cur) || {};
       var A = el("div", { class: "fu-sec", "data-sec": "current" });
       A.appendChild(el("h4", {}, [el("span", {}, ["🎬 الحصة الحالية"]), lessonNo(cur) ? el("span", { class: "fu-dim" }, [lessonNo(cur)]) : null]));
-      A.appendChild(el("div", { style: "margin-bottom:10px" }, [el("span", { class: "fu-slug" }, [lessonSlug(cur)])]));
+      A.appendChild(el("div", { style: "margin-bottom:10px" }, [lessonChip(cur)]));
       var seg = el("div", { class: "fu-seg", role: "radiogroup", "aria-label": "الحضور" });
       [["online", "أونلاين"], ["center", "سنتر"]].forEach(function (x) {
         seg.appendChild(el("button", { type: "button", role: "radio", "aria-checked": String(f.attendance === x[0]), "data-att": x[0], onclick: function () {
@@ -704,7 +838,7 @@
     (s.review_lessons || []).forEach(function (path) {
       var f = facts[path] || {}, info = lessonInfo(path) || {}, B = el("div", { class: "fu-sec", "data-sec": "review" });
       B.appendChild(el("h4", {}, [el("span", {}, ["📝 واجب وكويز"]), lessonNo(path) ? el("span", { class: "fu-dim" }, [lessonNo(path)]) : null]));
-      B.appendChild(el("div", { style: "margin-bottom:8px" }, [el("span", { class: "fu-slug" }, [lessonSlug(path)])]));
+      B.appendChild(el("div", { style: "margin-bottom:8px" }, [lessonChip(path)]));
       if (info.has_assignment !== false) {
         var ok = f.homework && f.homework.submitted;
         B.appendChild(el("div", { class: "fu-kv" }, [el("span", {}, ["الواجب"]), el("span", { class: "fu-chip " + (ok ? "green" : "red"), "data-hw": ok ? "done" : "missing" }, [ok ? "✓ تم" : "✕ لم يُسلَّم"])]));
@@ -735,7 +869,7 @@
   function renderRows(V) {
     var host = clear($("fu-rows")), shown = V.rows.filter(passFilter);
     if ($("fu-count")) $("fu-count").textContent = "الطلاب · " + shown.length + (shown.length !== V.rows.length ? " / " + V.rows.length : "");
-    if (!shown.length) { host.appendChild(el("div", { class: "fu-empty" }, [V.rows.length ? "مفيش طلاب بالفلتر ده" : "مفيش طلاب في الجروب ده"])); return; }
+    if (!shown.length) { host.appendChild(el("div", { class: "fu-empty" }, [V.rows.length ? "مفيش طلاب بالفلتر ده" : (STATE.year !== "all" ? "مفيش طلاب " + yearLabel(STATE.year) + " في الجروب ده" : "مفيش طلاب في الجروب ده")])); return; }
     shown.forEach(function (r) {
       var st = r.st, open = STATE.open === st.key;
       var head = el("button", { class: "fu-stu-head", type: "button", "aria-expanded": String(open), "aria-controls": "fu-body-" + st.key, onclick: function () { toggleStudent(st.key); } }, [
@@ -832,8 +966,20 @@
     }, { full: true, label: "قوالب الرسائل" });
   }
   function openHelp() {
+    var steps = [
+      ["اختار السنة", "من الشريط اللي فوق: الكل / سينيور 1 / سينيور 2. الاختيار بيفلتر الجروبات والطلاب وقوائم الدروس في الصفحة كلها، وبيتفكر لحد ما تغيّره."],
+      ["اختار الجروب", "من التبويبات تحت العنوان. الرقم جنب الاسم = عدد الطلاب الظاهرين في السنة المختارة."],
+      ["حدد الدروس", "«الحصة الحالية» = حضور ومشاهدة. «واجب وكويز» = الحصة السابقة. أسماء الدروس بتظهر بالفصل والدرس (مثلًا Ch 2 · L1). حرّكهم لقدّام بعد كل حصة."],
+      ["سجّل الحضور", "افتح الطالب واختار أونلاين أو سنتر، أو استخدم «الكل سنتر / الكل أونلاين» (بيطبّق على الطلاب الظاهرين بس)."],
+      ["ابعت لولي الأمر", "الأزرار تحت كل طالب بتجهّز رسالة جاهزة. راجعها وعدّل لو عايز، وبعدين «فتح واتساب» — الإرسال دايمًا بإيدك."],
+      ["عدّل القوالب", "زرار ✏️ فوق بيفتح محرر قوالب الرسائل."],
+    ];
     openSheet(function (sheet) {
-      sheet.appendChild(el("h2", {}, ["قواعد الرسائل"]));
+      sheet.appendChild(el("h2", {}, ["دليل الاستخدام"]));
+      sheet.appendChild(el("ol", { class: "fu-help fu-guide" }, steps.map(function (x) {
+        return el("li", {}, [el("b", {}, [x[0]]), el("span", {}, [" — " + x[1]])]);
+      })));
+      sheet.appendChild(el("h3", { style: "margin:16px 0 8px" }, ["قواعد الرسائل"]));
       sheet.appendChild(el("ol", { class: "fu-help" }, [
         "الإرسال يدوي بس — مفيش بوتات ولا أتمتة غير رسمية لواتساب (خطر حظر الحساب).",
         "ما تبعتش عشرات الرسائل في دقايق — وزّعها.",
@@ -842,7 +988,7 @@
         "بيانات الطلاب وأولياء الأمور تفضل ورا تسجيل دخول الأدمن، ومتتحطش في الريبو.",
       ].map(function (t) { return el("li", {}, [t]); })));
       sheet.appendChild(el("button", { class: "fu-btn", id: "fu-close", type: "button", onclick: closeSheet }, ["تمام"]));
-    }, { label: "قواعد الرسائل" });
+    }, { label: "دليل الاستخدام", full: true });
   }
 
   // ---- render orchestration --------------------------------------------------------------------
@@ -862,8 +1008,10 @@
     updatedLine();
     var g = currentGroup();
     if (!g) { root.appendChild(el("div", { class: "fu-empty" }, ["مفيش جروبات لسه. أضف جروبات من لوحة Groups الأول."])); return; }
+    if (STATE.year !== "all" && !visibleTabKeys().length) { root.appendChild(el("div", { class: "fu-empty", id: "fu-year-empty" }, ["مفيش طلاب " + yearLabel(STATE.year) + " لسه."])); return; }
     var V = STATE.view = computeView(g);
     if (d.lessons_error) root.appendChild(el("div", { class: "fu-warnbox", id: "fu-lessons-error", role: "alert" }, ["⚠️ تعذّر تحميل قائمة الدروس من GitHub — قد تكون القائمة ناقصة. (" + (typeof d.lessons_error === "string" ? d.lessons_error : "") + ")"]));
+    var gb = guideBanner(); if (gb) root.appendChild(gb);
     if (g.unclassified) root.appendChild(borrowCard());
     if (!g.unclassified || (g.settings && g.settings.weekday !== null && g.settings.weekday !== undefined)) root.appendChild(nextSessionCard(g, V));
     root.appendChild(rolesCard(g, V));
@@ -886,18 +1034,21 @@
     return api({ action: "admin_followup_overview" }).then(function (data) {
       STATE.loading = false; $("fu-refresh").style.opacity = "";
       STATE.data = data; STATE.fetchedAt = Date.now();
-      if (!STATE.tab || (STATE.tab !== NONE_TAB && !groupByKey(STATE.tab))) {
-        var t0 = null; try { t0 = sessionStorage.getItem("fu-tab"); } catch (e) {}
-        STATE.tab = (t0 && (t0 === NONE_TAB || groupByKey(t0))) ? t0 : (allGroups()[0] ? allGroups()[0].key : NONE_TAB);
-      }
-      if (!STATE.borrow) STATE.borrow = allGroups()[0] ? allGroups()[0].key : null;
       var m = /student=(\d+)/.exec(location.hash);
+      // a deep link to a student the year filter hides switches the filter back to "all"
+      if (m && STATE.year !== "all" && data.students[m[1]] && yearOfStudent(data.students[m[1]]) !== STATE.year) { STATE.year = "all"; try { localStorage.setItem("fu-year", "all"); } catch (e) {} }
+      var keys = visibleTabKeys();
+      if (!STATE.tab || keys.indexOf(STATE.tab) < 0) {
+        var t0 = null; try { t0 = sessionStorage.getItem("fu-tab"); } catch (e) {}
+        STATE.tab = (t0 && keys.indexOf(t0) >= 0) ? t0 : (keys[0] || NONE_TAB);
+      }
+      if (!STATE.borrow || visibleGroups().every(function (g) { return g.key !== STATE.borrow; })) STATE.borrow = (visibleGroups()[0] || {}).key || null;
       if (m && !STATE.open && !quiet) {
         STATE.open = m[1];
         var hg = allGroups().filter(function (g) { return g.members.some(function (x) { return pkOf(x.phone) === m[1]; }); })[0];
         if (hg) STATE.tab = hg.key; else if ((data.unclassified || []).some(function (x) { return pkOf(x.phone) === m[1]; })) STATE.tab = NONE_TAB;
       }
-      renderTabs(); refreshPage();
+      renderYearBar(); renderTabs(); refreshPage();
       if (m && STATE.open && !quiet) { var n = $("stu-" + STATE.open); if (n) n.scrollIntoView({ block: "start" }); }
     }, function (err) {
       STATE.loading = false; $("fu-refresh").style.opacity = "";
@@ -920,7 +1071,7 @@
     STATE.session = session;
     $("fu-refresh").hidden = false; $("fu-templates").hidden = false;
     if (MOCK) $("fu-mock").hidden = false;
-    load(false);
+    loadTitles().then(function () { load(false); });
   }
   function loadScript(src) {
     return new Promise(function (res, rej) { var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = function () { rej(new Error("لم يتم تحميل " + src)); }; document.head.appendChild(s); });
