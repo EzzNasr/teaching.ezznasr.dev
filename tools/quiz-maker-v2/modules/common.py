@@ -1300,7 +1300,7 @@ def _site_asset_contents(drive_web_app_url):
     preview_site_assets_changes so the "what would change" check can never
     disagree with what the sync really does."""
     out = []
-    for name in ("auth.js", "quiz.js", "assign.js", "attachments.js", "video.js", "subscribe.js", "capture.js"):
+    for name in ("auth.js", "quiz.js", "assign.js", "attachments.js", "video.js", "subscribe.js"):
         content = load_asset_template(name)
         content = content.replace("{{DRIVE_ENDPOINT}}", drive_web_app_url.strip())
         out.append((name, content))
@@ -1794,121 +1794,6 @@ class MatchItemDialog(tk.Toplevel):
         options = sorted(set(r["correct"] for r in rows))
         explain = self.explain_text.get("1.0", "end").strip()
         self.result = {"type": "match", "prompt": prompt, "rows": rows, "options": options, "explain": explain}
-        if self.chapter_var is not None:
-            self.result["chapter"] = int(self.chapter_var.get())
-        self.destroy()
-
-
-# ---- Written (photo) questions -------------------------------------------------------
-# A written question is graded by hand from a photo of the student's answer. Its model
-# answer must never reach the public quiz JSON (get_quiz serves that to every student), so
-# it is split out here and stored in the backend's WrittenModels tab instead.
-def new_written_qid():
-    import uuid
-    return "w" + uuid.uuid4().hex[:8]
-
-
-def split_written_models(questions):
-    """-> (public_questions, models). public_questions has model_answer removed from
-    every written question; models is the list admin_set_written_models takes."""
-    public, models = [], []
-    for q in questions:
-        if isinstance(q, dict) and q.get("type") == "written":
-            pub = {k: v for k, v in q.items() if k != "model_answer"}
-            public.append(pub)
-            models.append({"question_id": q["qid"], "max_marks": q.get("max_marks", 1),
-                           "model_answer": q.get("model_answer", ""), "prompt": q.get("prompt", "")})
-        else:
-            public.append(q)
-    return public, models
-
-
-def merge_written_models(questions, models):
-    """Put model answers (and max marks) back onto written questions after loading a lesson."""
-    by_id = {m.get("question_id"): m for m in models or []}
-    for q in questions:
-        if isinstance(q, dict) and q.get("type") == "written":
-            m = by_id.get(q.get("qid"))
-            if m:
-                q["model_answer"] = m.get("model_answer", "")
-                if m.get("max_marks"):
-                    q["max_marks"] = m["max_marks"]
-    return questions
-
-
-class WrittenItemDialog(tk.Toplevel):
-    """Add/edit one written (photo) question: prompt, max marks, and the model answer you
-    grade against. The model answer stays server-side; students never receive it."""
-
-    def __init__(self, parent, existing=None, chapter_choices=None, default_chapter=None):
-        super().__init__(parent)
-        self.title("Written question (photo answer)")
-        self.result = None
-        self._qid = (existing or {}).get("qid") or new_written_qid()
-        fit_geometry(self, 560, 560, min_w=380, min_h=420)
-        self.resizable(True, True)
-        pad = {"padx": 10, "pady": 6}
-
-        self.chapter_var = None
-        if chapter_choices:
-            self.chapter_var = _add_chapter_row(self, chapter_choices, default_chapter,
-                                                 existing.get("chapter") if existing else None)
-
-        tk.Label(self, text="Question text (HTML ok)").pack(anchor="w", **pad)
-        self.q_text = tk.Text(self, height=3, wrap="word", undo=True, autoseparators=True, maxundo=-1)
-        self.q_text.pack(fill="x", **pad)
-
-        marks_row = tk.Frame(self)
-        marks_row.pack(fill="x", **pad)
-        tk.Label(marks_row, text="Max marks").pack(side="left")
-        self.max_var = tk.StringVar(value=str((existing or {}).get("max_marks", 1)))
-        tk.Spinbox(marks_row, from_=0.5, to=100, increment=0.5, width=6, textvariable=self.max_var).pack(side="left", padx=8)
-
-        tk.Label(self, text="Model answer \u2014 shown only to you while grading, never to students").pack(anchor="w", **pad)
-        self.model_text = tk.Text(self, height=6, wrap="word", undo=True, autoseparators=True, maxundo=-1)
-        self.model_text.pack(fill="both", expand=True, **pad)
-
-        tk.Label(self, text="Explanation shown to the student after grading (optional)").pack(anchor="w", **pad)
-        self.explain_text = tk.Text(self, height=2, wrap="word", undo=True, autoseparators=True, maxundo=-1)
-        self.explain_text.pack(fill="x", **pad)
-
-        tk.Label(self, fg="gray30", font=("TkDefaultFont", 8), justify="left",
-                 text="Students answer by photo, so the site needs the camera-capture update before a quiz with\n"
-                      "written questions goes live.").pack(anchor="w", padx=10)
-
-        btn_row = tk.Frame(self)
-        btn_row.pack(fill="x", pady=12)
-        tk.Button(btn_row, text="Save question", command=self._on_save).pack(side="right", padx=10)
-        tk.Button(btn_row, text="Cancel", command=self.destroy).pack(side="right")
-
-        if existing:
-            self.q_text.insert("1.0", existing.get("prompt", ""))
-            self.model_text.insert("1.0", existing.get("model_answer", ""))
-            self.explain_text.insert("1.0", existing.get("explain", ""))
-
-        lock_min_width_to_content(self)
-        self.transient(parent)
-        self.grab_set()
-
-    def _on_save(self):
-        q = self.q_text.get("1.0", "end").strip()
-        if not q:
-            messagebox.showerror("Missing question", "Enter the question text.", parent=self)
-            return
-        try:
-            mx = float(self.max_var.get())
-        except ValueError:
-            mx = 0
-        if mx <= 0 or mx > 100:
-            messagebox.showerror("Max marks", "Max marks must be a number between 0 and 100.", parent=self)
-            return
-        model = self.model_text.get("1.0", "end").strip()
-        if not model:
-            messagebox.showerror("Missing model answer", "Write the model answer you will grade against.", parent=self)
-            return
-        self.result = {"type": "written", "qid": self._qid, "prompt": q,
-                       "max_marks": int(mx) if mx == int(mx) else mx,
-                       "model_answer": model, "explain": self.explain_text.get("1.0", "end").strip()}
         if self.chapter_var is not None:
             self.result["chapter"] = int(self.chapter_var.get())
         self.destroy()

@@ -784,19 +784,5 @@
    }
   }
  },
- "templates": {},
- "flags": {
-  "FF_PARENT_LOG": true,
-  "FF_MONTHLY": true
- },
- "parent_log": {
-  "1012345005": [
-   {
-    "kind": "quiz",
-    "ref": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables",
-    "sent_at": "2026-10-14 18:30:00",
-    "note": "ردّت وقالت هتتعوّض"
-   }
-  ]
- }
+ "templates": {}
 }

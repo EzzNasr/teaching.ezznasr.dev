@@ -233,7 +233,6 @@
     r.forEach(function (x) { x = String(x || '').trim(); if (x && !seen[x]) { seen[x] = 1; out.push(x); } });
     return out;
   }
-  function mergeOverride(gs, ymd) { var o = {}; for (var k in gs) o[k] = gs[k]; o.hw_deadline_override = ymd; return o; }
   function hasFlag(meta, key) { return !meta || meta[key] !== false; }   // unknown meta → assume present
 
   /* --------------------------------------------------------------- §4.2 verdicts */
@@ -244,9 +243,8 @@
    *     needsAttendance, deadlines }
    * session.state ∈ no_lesson | no_video | needs_attendance | optional | session_locked |
    *                 session_unwatched | session_unfinished | session_done
-   * homework.state ∈ homework_done | homework_missing | homework_optional   (only lessons that have an assignment)
-   * quiz.state ∈ quiz_taken | quiz_absent | quiz_optional               (only lessons that have a quiz; absent is due unless the lesson has a later due date)
-   *   optional = the lesson's quiz_required / homework_required is false (Phase 2, LessonRequirements); never counted as missed
+   * homework.state ∈ homework_done | homework_missing   (only lessons that have an assignment)
+   * quiz.state ∈ quiz_taken | quiz_absent               (only lessons that have a quiz; absent is always due)
    */
   function studentVerdicts(student, groupSettings, overview, now) {
     now = toDate(now, overview);
@@ -278,26 +276,21 @@
     var homework = [], quiz = [];
     reviewList(gs).forEach(function (R) {
       var f = factsFor(overview, student, R), meta = lessonMeta(overview, R);
-      // Phase 2: a lesson can carry its own due date (meta.due_override) and can make the quiz and/or the
-      // homework optional (meta.quiz_required / meta.homework_required === false). Optional items are never
-      // "missing"/"absent"; a missing flag means required (the old behaviour).
-      var dlR = (meta && meta.due_override) ? groupDeadlines(mergeOverride(gs, meta.due_override), now, overview && overview.settings) : dl;
-      var hwOver = !!(dlR.hw && dlR.hw.state === 'overdue');
       if (hasFlag(meta, 'has_assignment')) {
-        var hw = f.homework || {}, done = !!hw.submitted, hwReq = !(meta && meta.homework_required === false);
+        var hw = f.homework || {}, done = !!hw.submitted;
         homework.push({
-          lesson: R, state: done ? 'homework_done' : (hwReq ? 'homework_missing' : 'homework_optional'), submitted: done, at: hw.at || null,
-          required: hwReq, due: !done && hwReq && hwOver, deadline_state: dlR.hw ? dlR.hw.state : null
+          lesson: R, state: done ? 'homework_done' : 'homework_missing', submitted: done, at: hw.at || null,
+          due: !done && !!(dl.hw && dl.hw.state === 'overdue'), deadline_state: dl.hw ? dl.hw.state : null
         });
       }
       if (hasFlag(meta, 'has_quiz')) {
-        var q = f.quiz || {}, taken = !!q.taken, qReq = !(meta && meta.quiz_required === false);
+        var q = f.quiz || {}, taken = !!q.taken;
         var score = taken ? num(q.score) : null, total = taken ? num(q.total) : null;
         var p = (taken && total) ? (score / total) * 100 : null;
         quiz.push({
-          lesson: R, state: taken ? 'quiz_taken' : (qReq ? 'quiz_absent' : 'quiz_optional'), taken: taken, score: score, total: total, pct: p,
-          at: q.at || null, attempts: q.attempts || 0, quiz_open: f.quiz_open !== false, required: qReq,
-          praise: p !== null && p >= cfg.praise_quiz_pct, due: !taken && qReq && (!(meta && meta.due_override) || hwOver)
+          lesson: R, state: taken ? 'quiz_taken' : 'quiz_absent', taken: taken, score: score, total: total, pct: p,
+          at: q.at || null, attempts: q.attempts || 0, quiz_open: f.quiz_open !== false,
+          praise: p !== null && p >= cfg.praise_quiz_pct, due: !taken
         });
       }
     });
@@ -335,16 +328,14 @@
     // 3. homework
     if (!v.homework.length) chips.push(chip('homework', '📝 —', 'grey'));
     else {
-      var done = v.homework.filter(function (h) { return h.submitted; }).length, miss = v.homework.filter(function (h) { return h.state === 'homework_missing'; }).length;
+      var done = v.homework.filter(function (h) { return h.submitted; }).length, miss = v.homework.length - done;
       var sfx = v.homework.length > 1 ? ' ' + done + '/' + v.homework.length : '';
-      if (!miss && !done) chips.push(chip('homework', '📝 اختياري', 'grey'));
-      else if (!miss) chips.push(chip('homework', '📝 ✓' + sfx, 'green'));
-      else chips.push(chip('homework', '📝 ✕' + sfx, v.homework.some(function (h) { return h.state === 'homework_missing' && h.due; }) ? 'red' : 'amber'));
+      if (!miss) chips.push(chip('homework', '📝 ✓' + sfx, 'green'));
+      else chips.push(chip('homework', '📝 ✕' + sfx, v.homework.some(function (h) { return !h.submitted && h.due; }) ? 'red' : 'amber'));
     }
     // 4. quiz
     if (!v.quiz.length) chips.push(chip('quiz', '❓ —', 'grey'));
-    else if (v.quiz.some(function (q) { return q.state === 'quiz_absent'; })) chips.push(chip('quiz', '❓ غائب', 'red'));
-    else if (v.quiz.every(function (q) { return !q.taken; })) chips.push(chip('quiz', '❓ اختياري', 'grey'));
+    else if (v.quiz.some(function (q) { return !q.taken; })) chips.push(chip('quiz', '❓ غائب', 'red'));
     else {
       var sc = 0, tt = 0;
       v.quiz.forEach(function (q) { sc += q.score || 0; tt += q.total || 0; });
@@ -440,8 +431,8 @@
       if (s.state === 'session_unwatched' || s.state === 'session_locked') { out.unwatched++; out.unwatchedStudents.push(who); }
       if (s.state === 'session_locked') out.locked++;
       if (s.state === 'session_unfinished') out.unfinished++;
-      if (sum.verdicts.homework.some(function (h) { return h.state === 'homework_missing'; })) { out.hwMissing++; out.hwMissingStudents.push(who); }
-      if (sum.verdicts.quiz.some(function (q) { return q.state === 'quiz_absent'; })) { out.quizAbsent++; out.quizAbsentStudents.push(who); }
+      if (sum.verdicts.homework.some(function (h) { return !h.submitted; })) { out.hwMissing++; out.hwMissingStudents.push(who); }
+      if (sum.verdicts.quiz.some(function (q) { return !q.taken; })) { out.quizAbsent++; out.quizAbsentStudents.push(who); }
       if (sum.flags.noParent) out.noParent++;
       if (sum.flags.late) out.late++;
       if (s.watch_pct !== null) anyTracking = true;

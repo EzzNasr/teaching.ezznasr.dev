@@ -211,32 +211,3 @@ html[data-theme="dark"] .fu-yseg button[aria-checked="true"]{color:#06201f}
 .fu-year-chip{font-weight:700}
 .fu-guide li{margin-bottom:8px;line-height:1.7}
 .fu-guidebanner{border-style:dashed}
-
-/* ---- Phase 2 (Session 2) ---------------------------------------------------------------------- */
-.fu-check{display:flex;align-items:center;gap:12px;min-height:var(--fu-tap);padding:4px 2px;cursor:pointer;font-weight:600}
-.fu-check input{width:26px;height:26px;flex:0 0 auto;accent-color:var(--fu-teal)}
-.fu-req{display:grid;gap:4px;margin-top:8px;padding:8px 10px;border-radius:12px;background:var(--fu-bg);border:1px dashed var(--fu-line)}
-.fu-logbox{display:grid;gap:8px;margin:12px 0;padding:12px;border-radius:14px;background:var(--fu-bg);border:1px solid var(--fu-line)}
-.fu-mrow{margin-top:10px}
-.fu-kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 14px}
-.fu-kpi{background:var(--fu-card);border:1px solid var(--fu-line);border-radius:16px;padding:12px;min-height:92px;box-shadow:var(--fu-shadow)}
-.fu-kpi b{display:block;font-size:26px;line-height:1.25}
-.fu-kpi span{color:var(--fu-dim);font-size:14px;display:block;line-height:1.35}
-.fu-kpi.bad b{color:var(--fu-bad)} .fu-kpi.good b{color:var(--fu-ok)}
-.fu-sumhead{display:flex;align-items:center;gap:8px;margin:0 0 12px}
-.fu-lrow{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:44px;padding:6px 0;border-top:1px solid var(--fu-line)}
-.fu-lrow:first-of-type{border-top:0}
-.fu-lrow .nm{min-width:0;overflow-wrap:anywhere;font-weight:600}
-.fu-pickrow{display:flex;align-items:center;gap:10px;width:100%;min-height:56px;padding:8px 14px;border:1px solid var(--fu-line);border-radius:14px;background:var(--fu-card);text-align:start;cursor:pointer;margin:0 0 8px;text-decoration:none;color:inherit}
-.fu-pickrow:hover{border-color:var(--fu-teal)}
-
-/* printable monthly review: only #fu-print is drawn, one student per page */
-#fu-print{display:none}
-@media print{
-  body.fu-printing > *:not(#fu-print){display:none!important}
-  body.fu-printing #fu-print{display:block!important;color:#000;background:#fff;font:16px/1.8 'Cairo',system-ui,sans-serif;direction:rtl}
-  .fu-print-page{page-break-after:always;padding:24px}
-  .fu-print-page:last-child{page-break-after:auto}
-  .fu-print-page h1{font-size:22px;margin:0 0 4px} .fu-print-page h2{font-size:18px;margin:0 0 16px}
-  .fu-print-body{white-space:normal;unicode-bidi:plaintext}
-}

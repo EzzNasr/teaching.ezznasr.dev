@@ -111,7 +111,6 @@
       if (tabs.length && tabs.indexOf(STATE.tab) < 0) STATE.tab = tabs[0];   // nothing visible: keep the tab so switching back restores it
       if (STATE.borrow && visibleGroups().every(function (g) { return g.key !== STATE.borrow; })) STATE.borrow = (visibleGroups()[0] || {}).key || null;
       writeHash(); renderYearBar(); renderTabs(); renderPage(); window.scrollTo(0, 0);
-      checkYearLessons();
     }
   }
 
@@ -127,12 +126,6 @@
     var m = /^(\d{2}):(\d{2})$/.exec(t || ""); if (!m) return "";
     var h = +m[1], ap = h >= 12 ? "م" : "ص";
     return ((h % 12) || 12) + ":" + m[2] + " " + ap;
-  }
-  function dmOf(v) { var m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(v || "")); return m ? (+m[3]) + "/" + (+m[2]) : ""; }
-  function weekOfYmd(ymd) {
-    var p = ymd.split("-").map(Number), dow = new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay(), back = (dow + 1) % 7;
-    function add(n) { var t = new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)); return t.getUTCFullYear() + "-" + String(t.getUTCMonth() + 1).padStart(2, "0") + "-" + String(t.getUTCDate()).padStart(2, "0"); }
-    return { start: add(-back), end: add(-back + 6) };
   }
   function nowD() {
     var d = STATE.data;
@@ -218,12 +211,11 @@
   }
 
   // ---- api -------------------------------------------------------------------------------------
-  var MK = { base: null, data: null, baseCan: {}, req: {}, log: {}, month: {}, sum: null };
+  var MK = { base: null, data: null, baseCan: {} };
   function mockLoad() {
     var p = MK.data ? Promise.resolve() : fetch("_fixtures/followup-overview.json", { cache: "no-store" }).then(function (r) {
       if (!r.ok) throw new Error("fixture " + r.status); return r.json();
-    }).then(function (j) { MK.data = j; MK.log = clone(j.parent_log || {}); })
-      .then(function () { return fetch("_fixtures/student-summary.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { MK.sum = j; }, function () {}); });
+    }).then(function (j) { MK.data = j; });
     return p;
   }
   function mockOverview() {
@@ -243,32 +235,14 @@
         if (!d.facts[k][p]) d.facts[k][p] = { can_watch: true, attendance: null, watch_pct: null, quiz: { taken: false }, quiz_open: true, homework: { submitted: false } };
       });
     });
-    d.flags = d.flags || { FF_PARENT_LOG: true, FF_MONTHLY: true };
-    d.week = weekOfYmd(d.today);
-    Object.keys(d.lessons).forEach(function (pth) {
-      var r = MK.req[pth] || {};
-      d.lessons[pth].quiz_required = r.quiz_required !== false; d.lessons[pth].homework_required = r.homework_required !== false; d.lessons[pth].due_override = r.due_override || "";
-    });
-    d.parent_log = clone(MK.log);
     return d;
-  }
-  function mockSummary(st, i, from, to) {
-    var o = clone(MK.sum || { totals: {}, quizzes: [], homework: [], expected: [], attendance: [], watch: [], video_access: [], written: { pending: 0, graded: 0, awarded: 0, max: 0, items: [] }, notifications: [] });
-    o.ok = true; o.student = { phone: st.phone, name: st.name, year: st.year || "", parent_phone: st.parent_phone || "" };
-    o.groups = MK.data.groups.filter(function (g) { return g.members.some(function (m) { return pkOf(m.phone) === pkOf(st.phone); }); }).map(function (g) { return { group: g.group, key: g.key }; });
-    o.range = { from: from, to: to };
-    if (o.totals.quiz_avg_pct != null) o.totals.quiz_avg_pct = Math.max(30, o.totals.quiz_avg_pct - i * 7);
-    o.totals.homework_missed = (o.totals.homework_missed || 0) + (i % 3 === 0 ? 1 : 0);
-    o.notifications = (MK.log[pkOf(st.phone)] || []).map(function (n) { return { student: st.phone, kind: n.kind, ref: n.ref, sent_at: n.sent_at, by: "mock", note: n.note || "" }; });
-    return o;
   }
   function mockApi(payload) {
     return mockLoad().then(function () {
       var a = payload.action, d = MK.data;
       if (a === "admin_followup_overview") return mockOverview();
       if (a === "admin_followup_set_attendance") {
-        var out = [], nCenter = payload.items.filter(function (it) { return it.mode === "center"; }).length;
-        if (payload.grant !== false && nCenter > 1 && payload.week_confirm !== weekOfYmd(d.today).start) return { ok: false, error: "Bulk center needs this week's confirmation (week_confirm = " + weekOfYmd(d.today).start + ")." };
+        var out = [];
         payload.items.forEach(function (it) {
           var k = pkOf(it.phone); d.facts[k] = d.facts[k] || {};
           var f = d.facts[k][payload.lesson] = d.facts[k][payload.lesson] || { can_watch: true, attendance: null, watch_pct: null, quiz: { taken: false }, quiz_open: true, homework: { submitted: false } };
@@ -286,50 +260,6 @@
         if (!g) return { ok: false, error: "Group not found." };
         ["weekday", "time", "current_lesson", "review_lessons", "note", "parents_contacted", "watch_deadline_override", "hw_deadline_override"].forEach(function (k) { if (k in payload) g.settings[k] = payload[k]; });
         return { ok: true, settings: clone(g.settings) };
-      }
-      if (a === "admin_set_requirement") {
-        var lk = String(payload.lesson || "").toLowerCase(), cur = MK.req[lk] || { quiz_required: true, homework_required: true, due_override: "" };
-        ["quiz_required", "homework_required", "due_override"].forEach(function (k) { if (k in payload) cur[k] = payload[k]; });
-        MK.req[lk] = cur; return { ok: true, requirement: Object.assign({ lesson: lk }, cur) };
-      }
-      if (a === "admin_log_parent_notification") {
-        var kinds = { quiz: 1, homework: 1, monthly: 1, custom: 1 };
-        if (!kinds[payload.kind]) return { ok: false, error: 'kind must be "quiz", "homework", "monthly" or "custom".' };
-        var pk = pkOf(payload.student), ref = String(payload.ref || "").toLowerCase(), arr = MK.log[pk] = MK.log[pk] || [];
-        var hit = arr.filter(function (n) { return n.kind === payload.kind && n.ref === ref; })[0];
-        var stamp = d.today + " 12:00:00";
-        if (hit) { if ("note" in payload) hit.note = payload.note; return { ok: true, created: false, notification: clone(hit) }; }   // like the backend: an edit keeps the original sent_at
-        var nn = { kind: payload.kind, ref: ref || (payload.kind === "custom" ? "custom-" + Date.now() : ""), sent_at: stamp, note: payload.note || "" };
-        arr.unshift(nn); return { ok: true, created: true, notification: clone(nn) };
-      }
-      if (a === "admin_group_add") {
-        var gname = String(payload.group || "").trim(); if (!gname) return { ok: false, error: "Missing group." };
-        var gk = gname.toLowerCase(), grp = d.groups.filter(function (x) { return x.key === gk; })[0];
-        if (!grp) { grp = { group: gname, key: gk, settings: { weekday: null, time: "", current_lesson: "", review_lessons: [], note: "", parents_contacted: false, watch_deadline_override: "", hw_deadline_override: "" }, members: [] }; d.groups.push(grp); }
-        var u = d.unclassified.filter(function (x) { return pkOf(x.phone) === pkOf(payload.phone); })[0];
-        var nm = u ? u.name : ((d.students[pkOf(payload.phone)] || {}).name || payload.phone);
-        d.unclassified = d.unclassified.filter(function (x) { return pkOf(x.phone) !== pkOf(payload.phone); });
-        if (!grp.members.some(function (x) { return pkOf(x.phone) === pkOf(payload.phone); })) grp.members.push({ phone: payload.phone, name: nm });
-        return { ok: true };
-      }
-      if (a === "admin_monthly_review") {
-        if (payload.op === "mark") {
-          var mk = pkOf(payload.student) + "|" + payload.month; MK.month[mk] = { status: payload.status, sent_at: payload.status === "sent" ? d.today + " 12:00:00" : "", note: payload.note || "" };
-          if (payload.status === "sent") { var pk2 = pkOf(payload.student); (MK.log[pk2] = MK.log[pk2] || []).unshift({ kind: "monthly", ref: payload.month, sent_at: d.today + " 12:00:00", note: payload.note || "" }); }
-          return { ok: true, review: Object.assign({ student: payload.student, month: payload.month }, MK.month[mk]) };
-        }
-        var grp2 = d.groups.filter(function (x) { return x.group === payload.group; })[0];
-        var members = payload.student ? [{ phone: payload.student }] : (grp2 ? grp2.members : []);
-        var rng = { from: payload.month + "-01", to: payload.month + "-" + (payload.month === d.today.slice(0, 7) ? d.today.slice(8) : "28") };
-        return { ok: true, month: payload.month, range: rng, closed: payload.month !== d.today.slice(0, 7), reviews: members.map(function (m, i) {
-          var st = Object.assign({ phone: m.phone, name: m.name }, d.students[pkOf(m.phone)] || {}), sum = mockSummary(st, i, rng.from, rng.to);
-          var row = MK.month[pkOf(m.phone) + "|" + payload.month] || { status: "pending", sent_at: "", note: "" };
-          return { student: sum.student, summary: sum, review: row };
-        }) };
-      }
-      if (a === "admin_student_summary") {
-        var sk = pkOf(payload.student), st2 = d.students[sk]; if (!st2) return { ok: false, error: "Student not found." };
-        return mockSummary(st2, 0, payload.from || d.today.slice(0, 8) + "01", payload.to || d.today);
       }
       if (a === "admin_followup_save_templates") {
         d.templates = d.templates || {};
@@ -366,23 +296,15 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { clear(host); }, opt.undo ? 8000 : (opt.err ? 7000 : 3500));
   }
-  function confirmDialog(text, okLabel, opts) {
-    opts = opts || {};
+  function confirmDialog(text, okLabel) {
     return new Promise(function (resolve) {
       var back = el("div", { class: "fu-back center", role: "presentation" });
       function done(v) { back.remove(); document.removeEventListener("keydown", onKey); resolve(v); }
       function onKey(e) { if (e.key === "Escape") done(false); }
       var ok = el("button", { class: "fu-btn primary", type: "button", onclick: function () { done(true); } }, [okLabel || "تأكيد"]);
-      var chk = null;
-      if (opts.check) {   // an explicit tick is required before the OK button works (bulk center = per-week decision)
-        chk = el("input", { type: "checkbox", id: "fu-dialog-check" });
-        ok.disabled = true;
-        chk.addEventListener("change", function () { ok.disabled = !chk.checked; });
-      }
       back.appendChild(el("div", { class: "fu-dialog", role: "alertdialog", "aria-modal": "true" }, [
         el("p", { style: "margin:0 0 16px;font-weight:700" }, [text]),
-        chk ? el("label", { class: "fu-check" }, [chk, el("span", {}, [opts.check])]) : null,
-        el("div", { class: "fu-btns two" }, [ok, el("button", { class: "fu-btn", type: "button", onclick: function () { done(false); } }, [opts.cancelLabel || "إلغاء"])]),
+        el("div", { class: "fu-btns two" }, [ok, el("button", { class: "fu-btn", type: "button", onclick: function () { done(false); } }, ["إلغاء"])]),
       ]));
       document.addEventListener("keydown", onKey);
       $("fu-layer").appendChild(back); ok.focus();
@@ -446,33 +368,6 @@
     var k = pkOf(m.phone), s = STATE.data.students[k] || {};
     return Object.assign({ phone: m.phone, name: m.name }, s, { key: k, name: m.name || s.name });
   }
-  function flag(n) { return !!(STATE.data && STATE.data.flags && STATE.data.flags[n]); }
-  var KIND_LABEL = { homework: "واجب", quiz: "كويز", monthly: "شهري", custom: "رسالة" };
-  // what a parent message is logged as (contract kinds: quiz, homework, monthly, custom)
-  function logKind(a) {
-    var k = String(a.kind || ""), l = String(a.lesson || "");
-    if (/^homework_/.test(k)) return { kind: "homework", ref: l };
-    if (/^quiz_/.test(k)) return { kind: "quiz", ref: l };
-    return { kind: "custom", ref: "watch:" + l };
-  }
-  function logItems(a) { return a.kind === "combined" ? (a.issues || []).map(logKind) : [logKind(a)]; }
-  function logOf(pk) { return ((STATE.data && STATE.data.parent_log) || {})[pk] || []; }
-  function loggedFor(pk, it) { var ref = String(it.ref).toLowerCase(); return logOf(pk).some(function (n) { return n.kind === it.kind && String(n.ref).toLowerCase() === ref; }); }
-  // a group's year = the year of its members (mixed / unknown shown as their own groups in the menus)
-  var YG_LABEL = { "1": "سينيور 1", "2": "سينيور 2", mixed: "مختلط", unknown: "بدون سنة" }, YG_ORDER = ["1", "2", "mixed", "unknown"];
-  function groupYearKey(g) {
-    var c = { "1": 0, "2": 0 };
-    (g.members || []).forEach(function (m) { var y = yearOfStudent(studentOf(m)); if (y) c[y]++; });
-    return c["1"] && c["2"] ? "mixed" : (c["1"] ? "1" : (c["2"] ? "2" : "unknown"));
-  }
-  function groupOptGroups(groups) {
-    var by = {};
-    groups.forEach(function (g) { (by[groupYearKey(g)] = by[groupYearKey(g)] || []).push(g); });
-    return YG_ORDER.filter(function (k) { return by[k]; }).map(function (k) {
-      return el("optgroup", { label: YG_LABEL[k], "data-year-group": k }, by[k].map(function (g) { return el("option", { value: g.key }, [g.group]); }));
-    });
-  }
-
   // ---- global year filter: who / which groups are visible ---------------------------------------
   function yearPass(m) { return STATE.year === "all" || yearOfStudent(studentOf(m)) === STATE.year; }
   function visibleMembers(g) { return (g.members || []).filter(yearPass); }
@@ -533,12 +428,12 @@
     }
     (v.homework || []).forEach(function (h) {
       var tag = multi ? " · " + (lessonNo(h.lesson) || pretty(h.lesson)) : "";
-      if (h.state === "homework_missing") neg.push({ kind: "homework_missing", lesson: h.lesson, verdict: h, label: "📝 الواجب" + tag, due: h.due !== undefined ? !!h.due : hwOver });
+      if (h.state === "homework_missing") neg.push({ kind: "homework_missing", lesson: h.lesson, verdict: h, label: "📝 الواجب" + tag, due: hwOver });
       else if (h.state === "homework_done") pos.push({ kind: "homework_done", lesson: h.lesson, verdict: h, label: "🌟 شكر على الواجب" + tag, due: true });
     });
     (v.quiz || []).forEach(function (q) {
       var tag = multi ? " · " + (lessonNo(q.lesson) || pretty(q.lesson)) : "";
-      if (q.state === "quiz_absent") neg.push({ kind: "quiz_absent", lesson: q.lesson, verdict: q, label: "❓ الكويز (غائب)" + tag, due: q.due !== undefined ? !!q.due : true, warn: true });
+      if (q.state === "quiz_absent") neg.push({ kind: "quiz_absent", lesson: q.lesson, verdict: q, label: "❓ الكويز (غائب)" + tag, due: true, warn: true });
       else if (q.state === "quiz_taken") {
         var qf = (facts[q.lesson] || {}).quiz;
         if (ratio(qf) >= d.settings.praise_quiz_pct) pos.push({ kind: "quiz_praise", lesson: q.lesson, verdict: q, label: "👏 كويز ممتاز" + tag, due: true });
@@ -572,7 +467,6 @@
         unwatched: !!(v.session && NEG_SESSION[v.session.state]),
         hwmissing: (v.homework || []).some(function (h) { return h.state === "homework_missing"; }),
         quizabsent: (v.quiz || []).some(function (q) { return q.state === "quiz_absent"; }),
-        notnotified: flag("FF_PARENT_LOG") && ac.dueNeg.some(function (a) { return logItems(a).some(function (it) { return !loggedFor(st.key, it); }); }),
       };
       return { st: st, sm: sm, ck: ck, ac: ac, tags: tags };
     });
@@ -596,9 +490,7 @@
       if (it.mode === "center") { f.can_watch = true; f.quiz_open = true; }
     });
     refreshPage();
-    var payload = { action: "admin_followup_set_attendance", lesson: lesson, items: items, grant: true };
-    if (opts.week_confirm) { payload.week_confirm = opts.week_confirm; payload.bulk = true; }
-    return api(payload).then(function (res) {
+    return api({ action: "admin_followup_set_attendance", lesson: lesson, items: items, grant: true }).then(function (res) {
       (res.results || []).forEach(function (r) {
         var f = (facts[pkOf(r.phone)] || {})[lesson]; if (f) { f.can_watch = r.can_watch; f.quiz_open = r.quiz_open; }
       });
@@ -607,9 +499,8 @@
         var one = items.length === 1;
         var name = one ? (STATE.data.students[pkOf(items[0].phone)] || {}).name || "" : items.length + " طالب";
         var modeTxt = items[0].mode === "center" ? "سنتر" : (items[0].mode === "online" ? "أونلاين" : "غير محدد");
-        var wk = STATE.data.week, exp = (items.some(function (it) { return it.mode === "center"; }) && (res.expires_at || (wk && wk.end))) ? " — ينتهي يوم الجمعة " + dmOf(res.expires_at || wk.end) : "";
-        toast("تم تسجيل " + name + ": " + modeTxt + exp, { undo: function () {
-          setAttendance(g, items.map(function (it) { var k = pkOf(it.phone); return { phone: it.phone, mode: prev[k].att || "" }; }), { silent: true, week_confirm: wk && wk.start });
+        toast("تم تسجيل " + name + ": " + modeTxt, { undo: function () {
+          setAttendance(g, items.map(function (it) { var k = pkOf(it.phone); return { phone: it.phone, mode: prev[k].att || "" }; }), { silent: true });
         } });
       }
     }, function (err) {
@@ -753,31 +644,6 @@
     return card;
   }
 
-  function setRequirement(path, patch) {
-    var d = STATE.data; d.lessons[path] = d.lessons[path] || lessonInfo(path) || { path: path };
-    var meta = d.lessons[path], before = {};
-    Object.keys(patch).forEach(function (k) { before[k] = meta[k]; meta[k] = patch[k]; });
-    refreshPage();
-    return api(Object.assign({ action: "admin_set_requirement", lesson: path }, patch)).then(function () {
-      return load(true).then(function () { toast("تم الحفظ ✓"); });
-    }, function (err) { Object.keys(before).forEach(function (k) { meta[k] = before[k]; }); refreshPage(); toast(errText(err), { err: true }); });
-  }
-  function reqSwitch(id, label, on, onchange) {
-    var chk = el("input", { type: "checkbox", id: id, role: "switch" }); chk.checked = on;
-    chk.addEventListener("change", function () { onchange(chk.checked); });
-    return el("label", { class: "fu-switch" }, [el("span", {}, [label]), chk, el("span", { class: "trk", "aria-hidden": "true" })]);
-  }
-  function reqControls(path, i, ro) {
-    var meta = lessonInfo(path) || {}, q = meta.quiz_required !== false, h = meta.homework_required !== false;
-    if (ro) return el("div", { class: "fu-chips", style: "margin-top:6px" }, [!q ? el("span", { class: "fu-chip grey" }, ["الكويز اختياري"]) : null, !h ? el("span", { class: "fu-chip grey" }, ["الواجب اختياري"]) : null]);
-    var due = el("input", { class: "fu-field", type: "date", id: "req-due-" + i, value: meta.due_override || "", "aria-label": "ميعاد تسليم مخصص للدرس", style: "direction:ltr" });
-    due.addEventListener("change", function () { setRequirement(path, { due_override: due.value }); });
-    return el("div", { class: "fu-req", "data-req": i }, [
-      reqSwitch("req-quiz-" + i, "الكويز مطلوب", q, function (v) { setRequirement(path, { quiz_required: v }); }),
-      reqSwitch("req-hw-" + i, "الواجب مطلوب", h, function (v) { setRequirement(path, { homework_required: v }); }),
-      el("label", {}, [el("span", { class: "fu-dim" }, ["ميعاد تسليم مخصص للدرس ده (اختياري)"]), due]),
-    ]);
-  }
   function rolesCard(g, V) {
     var d = STATE.data, s = g.settings, all = d.all_lessons || [], card = el("section", { class: "fu-card", "aria-label": "الحصص" });
     var ro = !!g.unclassified;
@@ -808,7 +674,6 @@
         ]));
       }
       if (inf) row.appendChild(el("div", { class: "fu-chips", style: "margin-top:6px" }, [lockChip("الكويز" + (rv.length > 1 ? " · " + (lessonNo(path) || "") : ""), inf.quiz_locked)]));
-      row.appendChild(reqControls(path, i, ro));
       b.appendChild(row);
     });
     if (!ro) {
@@ -851,77 +716,12 @@
   }
 
   function borrowCard() {
-    var sel = el("select", { class: "fu-field", id: "fu-borrow", "aria-label": "اعرض بحصص جروب", style: "direction:rtl;font:inherit" }, groupOptGroups(visibleGroups()));
+    var sel = el("select", { class: "fu-field", id: "fu-borrow", "aria-label": "اعرض بحصص جروب", style: "direction:rtl;font:inherit" },
+      visibleGroups().map(function (g) { return el("option", { value: g.key }, [g.group]); }));
     sel.value = (visibleGroups().filter(function (g) { return g.key === STATE.borrow; })[0] || visibleGroups()[0] || {}).key || "";
     sel.addEventListener("change", function () { STATE.borrow = sel.value; STATE.open = null; refreshPage(); });
     return el("section", { class: "fu-card" }, [el("label", {}, [el("span", { class: "fu-label" }, ["اعرض بحصص جروب ▾"]), sel]),
       el("div", { class: "fu-hint" }, ["الاختيار ده محلي ومش بيتحفظ — بيحدد بس الحصة الحالية وحصة الواجب والكويز المستخدمة في الحالات تحت."])]);
-  }
-
-  function noGroupsCard() {
-    return el("section", { class: "fu-card", id: "fu-nogroups" }, [
-      el("h3", {}, ["مفيش جروبات" + (STATE.year !== "all" ? " لـ " + yearLabel(STATE.year) : "") + " لسه"]),
-      el("p", { class: "fu-dim", style: "margin:8px 0 12px" }, ["الطلاب اللي تحت لسه من غير جروب. اعمل جروب جديد أو ضمّهم لجروب موجود، وبعدها تظهر حصصهم ومتابعتهم."]),
-      el("button", { class: "fu-btn primary", id: "fu-assign", type: "button", onclick: openAssign }, ["➕ اعمل جروب وضيف الطلاب"]),
-    ]);
-  }
-  function openAssign() {
-    var d = STATE.data, pool = (d.unclassified || []).filter(yearPass), groups = allGroups();
-    openSheet(function (sheet) {
-      sheet.appendChild(el("div", { class: "fu-row fu-between" }, [el("h2", {}, ["تعيين طلاب لجروب"]), el("button", { class: "fu-ibtn", id: "fu-close", type: "button", "aria-label": "إغلاق", onclick: closeSheet }, ["✕"])]));
-      var sel = el("select", { class: "fu-field", id: "fu-assign-group", "aria-label": "الجروب", style: "direction:rtl;font:inherit" }, groupOptGroups(groups));
-      sel.appendChild(el("option", { value: "__new" }, ["＋ جروب جديد…"]));
-      var nm = el("input", { class: "fu-field", id: "fu-assign-name", placeholder: "اسم الجروب الجديد (مثال: Sun 4pm)", dir: "auto", "aria-label": "اسم الجروب الجديد" });
-      function sync() { nm.hidden = sel.value !== "__new"; }
-      sel.value = groups.length ? groups[0].key : "__new"; sync(); sel.addEventListener("change", sync);
-      sheet.appendChild(el("label", {}, [el("span", { class: "fu-label" }, ["الجروب"]), sel]));
-      sheet.appendChild(nm);
-      sheet.appendChild(el("div", { class: "fu-label", style: "margin-top:14px" }, ["الطلاب (" + pool.length + ")"]));
-      var list = el("div", { id: "fu-assign-list" });
-      pool.forEach(function (m) {
-        var c = el("input", { type: "checkbox", value: m.phone, checked: true });
-        list.appendChild(el("label", { class: "fu-check" }, [c, el("span", {}, [m.name || m.phone])]));
-      });
-      if (!pool.length) list.appendChild(el("div", { class: "fu-empty" }, ["مفيش طلاب من غير جروب" + (STATE.year !== "all" ? " في " + yearLabel(STATE.year) : "")]));
-      sheet.appendChild(list);
-      var go = el("button", { class: "fu-btn primary", id: "fu-assign-go", type: "button", style: "margin-top:14px", onclick: function () {
-        var phones = Array.prototype.filter.call(list.querySelectorAll("input:checked"), function () { return true; }).map(function (i) { return i.value; });
-        var gname = sel.value === "__new" ? nm.value.trim() : (groupByKey(sel.value) || {}).group;
-        if (!gname) { toast("اكتب اسم الجروب", { err: true }); return; }
-        if (!phones.length) { toast("اختار طالب واحد على الأقل", { err: true }); return; }
-        go.disabled = true;
-        var ok = 0, bad = [];
-        phones.reduce(function (p, ph) { return p.then(function () { return api({ action: "admin_group_add", group: gname, phone: ph }).then(function () { ok++; }, function (e) { bad.push(errText(e)); }); }); }, Promise.resolve())
-          .then(function () { closeSheet(); return load(true); })
-          .then(function () {
-            var g2 = allGroups().filter(function (x) { return x.group.toLowerCase() === gname.toLowerCase(); })[0];
-            if (g2) selectTab(g2.key);
-            toast(bad.length ? "اتعيّن " + ok + " وفشل " + bad.length + ": " + bad[0] : "اتعيّن " + ok + " طالب لجروب " + gname + " ✓", { err: !!bad.length });
-          });
-      } }, ["تعيين"]);
-      sheet.appendChild(go);
-    }, { label: "تعيين طلاب لجروب" });
-  }
-
-  // switching the year with lessons of the OTHER year selected: ask once, then clear them (or keep them, the warning stays)
-  function checkYearLessons() {
-    if (!STATE.data || STATE.year === "all") return;
-    var bad = [];
-    visibleGroups().forEach(function (g) {
-      var s = g.settings, off = function (p) { var y = yearOfLesson(p); return !!(p && y && y !== STATE.year); };
-      var cur = off(s.current_lesson), rv = (s.review_lessons || []).filter(off);
-      if (cur || rv.length) bad.push({ g: g, cur: cur, rv: rv });
-    });
-    if (!bad.length) return;
-    confirmDialog("الجروبات دي فيها دروس من سنة تانية غير " + yearLabel(STATE.year) + ": " + bad.map(function (b) { return b.g.group; }).join("، ") + ". تمسح الدروس دي؟", "امسحها", { cancelLabel: "سيبها" }).then(function (ok) {
-      if (!ok) return;
-      bad.reduce(function (p, b) {
-        return p.then(function () {
-          var s = b.g.settings;
-          return saveGroup(b.g, { current_lesson: b.cur ? "" : s.current_lesson, review_lessons: (s.review_lessons || []).filter(function (x) { return b.rv.indexOf(x) < 0; }) }, { quiet: true });
-        });
-      }, Promise.resolve()).then(function () { return load(true); }).then(function () { toast("تم مسح الدروس من السنة التانية ✓"); });
-    });
   }
 
   function groupActions(g, V) {
@@ -929,7 +729,6 @@
     wrap.appendChild(el("button", { class: "fu-btn primary", id: "fu-reminder", type: "button", onclick: function () { openReminder(g, V); } }, ["📣 رسالة تذكير للجروب"]));
     wrap.appendChild(el("button", { class: "fu-btn", id: "fu-copy-names", type: "button", onclick: function () { copyMissingNames(V); } }, ["📋 نسخ أسماء اللي لسه ما سلّموش"]));
     var cur = g.settings.current_lesson;
-    if (flag("FF_MONTHLY")) wrap.appendChild(el("button", { class: "fu-btn", id: "fu-monthly", type: "button", onclick: function () { openMonthly(g); } }, ["📅 المراجعة الشهرية"]));
     wrap.appendChild(el("div", { class: "fu-btns two" }, [
       el("button", { class: "fu-btn", id: "fu-all-center", type: "button", onclick: function () { bulk(g, "center"); } }, ["الكل سنتر"]),
       el("button", { class: "fu-btn", id: "fu-all-online", type: "button", onclick: function () { bulk(g, "online"); } }, ["الكل أونلاين"]),
@@ -940,10 +739,8 @@
   function bulk(g, mode) {
     var vis = visibleMembers(g), n = vis.length;
     if (!n) { toast("مفيش طلاب ظاهرين في الجروب ده", { err: true }); return; }
-    var wk = STATE.data.week, needWeek = mode === "center" && n > 1 && wk;
-    confirmDialog("تسجيل " + n + " طالب" + (STATE.year !== "all" ? " (" + yearLabel(STATE.year) + " بس)" : "") + " كـ «" + (mode === "center" ? "سنتر" : "أونلاين") + "»؟" + (mode === "center" ? " هيتفتح الفيديو والكويز مجانًا للكل، وبينتهي يوم الجمعة." : ""), "تأكيد",
-      needWeek ? { check: "أؤكد إن أسبوع " + dmOf(wk.start) + " ← " + dmOf(wk.end) + " (السبت–الجمعة) سنتر للـ " + n + " طالب" } : null).then(function (ok) {
-      if (ok) setAttendance(g, vis.map(function (m) { return { phone: m.phone, mode: mode }; }), needWeek ? { week_confirm: wk.start } : {});
+    confirmDialog("تسجيل " + n + " طالب" + (STATE.year !== "all" ? " (" + yearLabel(STATE.year) + " بس)" : "") + " كـ «" + (mode === "center" ? "سنتر" : "أونلاين") + "»؟" + (mode === "center" ? " هيتفتح الفيديو والكويز مجانًا للكل." : ""), "تأكيد").then(function (ok) {
+      if (ok) setAttendance(g, vis.map(function (m) { return { phone: m.phone, mode: mode }; }));
     });
   }
   function missingNames(V) {
@@ -977,7 +774,7 @@
     inp.addEventListener("input", function () { STATE.q = inp.value; renderRows(V); });
     f.appendChild(el("div", { class: "fu-search" }, [inp]));
     var chips = el("div", { class: "fu-filters", role: "group", "aria-label": "فلتر" });
-    FILTERS.concat(flag("FF_PARENT_LOG") ? [["notnotified", "لم يُبلَّغ بعد"]] : []).forEach(function (x) {
+    FILTERS.forEach(function (x) {
       chips.appendChild(el("button", { class: "fu-chip", type: "button", "data-filter": x[0], "aria-pressed": String(STATE.filter === x[0]), onclick: function () { STATE.filter = x[0]; STATE.open = null; refreshPage(); } }, [x[1]]));
     });
     f.appendChild(chips);
@@ -994,7 +791,6 @@
     var chips = el("div", { class: "fu-chips chips" });
     (r.sm.microChips || []).forEach(function (c) { chips.appendChild(el("span", { class: "fu-chip t-" + (c.tone || "grey"), "data-chip": c.key }, [c.label])); });
     if (STATE.year === "all") { var yk = yearOfStudent(r.st); if (yk) chips.insertBefore(el("span", { class: "fu-chip fu-year-chip", "data-chip": "year" }, ["S" + yk]), chips.firstChild); }
-    if (flag("FF_PARENT_LOG") && logOf(r.st.key)[0]) chips.appendChild(el("span", { class: "fu-chip green", "data-chip": "notified", title: "آخر تواصل مع ولي الأمر" }, ["📨 " + dmOf(logOf(r.st.key)[0].sent_at)]));
     var hasParentChip = (r.sm.microChips || []).some(function (c) { return /parent|phone/i.test(c.key || ""); });
     if (!hasParentChip && r.ck.level === "missing") chips.appendChild(el("span", { class: "fu-chip red", "data-chip": "parent" }, ["⚠️ لا رقم ولي أمر"]));
     else if (!hasParentChip && r.ck.level === "warn") chips.appendChild(el("span", { class: "fu-chip amber", "data-chip": "parent" }, ["⚠️ راجع رقم ولي الأمر"]));
@@ -1024,11 +820,6 @@
       });
       A.appendChild(seg);
       if (!f.attendance) A.appendChild(el("div", { class: "fu-hint", style: "background:var(--fu-warn-bg);color:var(--fu-warn)" }, ["⚠️ الحضور غير محدد"]));
-      else {
-        var wd = f.attendance === "center" ? null : ((f.watch_pct || 0) >= d.settings.watch_done_pct);
-        A.appendChild(el("div", { class: "fu-chips", style: "margin-top:10px", "data-att-state": f.attendance === "center" ? "center" : (wd ? "watched" : "must") }, [
-          f.attendance === "center" ? el("span", { class: "fu-chip green" }, ["🏫 حضر في السنتر"]) : (wd ? el("span", { class: "fu-chip green" }, ["✅ شاهد أونلاين"]) : el("span", { class: "fu-chip amber" }, ["💻 لازم يشاهد أونلاين"]))]));
-      }
       if (f.attendance === "center") A.appendChild(el("div", { class: "fu-chips", style: "margin-top:10px" }, [el("span", { class: "fu-chip green" }, ["🔓 الفيديو والكويز مفتوحين مجانًا"])]));
       var watch = el("div", { style: "margin-top:12px", "data-watch": "" });
       var pct = f.watch_pct;
@@ -1073,11 +864,6 @@
       var prow = el("div", { class: "fu-btns two" }); ac.pos.forEach(function (a) { prow.appendChild(msgButton(r, g, a, V, false)); }); btns.appendChild(prow);
     }
     if (btns.childNodes.length) body.appendChild(btns);
-    if (flag("FF_PARENT_LOG")) {
-      var lg = logOf(st.key).slice(0, 3);
-      if (lg.length) body.appendChild(el("div", { class: "fu-chips", "data-log": "" }, lg.map(function (n) { return el("span", { class: "fu-chip grey" }, ["📨 " + (KIND_LABEL[n.kind] || n.kind) + " · " + dmOf(n.sent_at) + (n.note ? " — " + n.note : "")]); })));
-    }
-    body.appendChild(el("a", { class: "fu-btn", id: "fu-summary-link-" + st.key, href: "student-summary.html?student=" + st.key + (MOCK ? "&mock=1" : "") }, ["📊 ملخص الطالب"]));
     return body;
   }
   function renderRows(V) {
@@ -1131,156 +917,12 @@
       sheet.appendChild(el("label", {}, [el("span", { class: "fu-dim" }, ["✏️ تقدر تعدّل النص قبل الإرسال — التعديل للرسالة دي بس."]), ta]));
       sheet.appendChild(el("div", { class: "fu-dim", style: "margin:6px 0 12px" }, ["النجمة * = خط عريض في واتساب"]));
       sync();
-      if (flag("FF_PARENT_LOG")) sheet.appendChild(logBox(st, a));
       sheet.appendChild(el("div", { class: "fu-stack" }, [link, el("div", { class: "fu-btns two" }, [
         el("button", { class: "fu-btn", id: "fu-copy", type: "button", onclick: function () { copy(ta.value); } }, ["📋 نسخ"]),
         el("button", { class: "fu-btn", id: "fu-close", type: "button", onclick: closeSheet }, ["إغلاق"]),
       ])]));
     }, { label: "الرسالة" });
   }
-  // "I sent it" -> one ParentNotifications entry per item (a combined message logs each of its issues)
-  function logBox(st, a) {
-    var items = logItems(a), done = items.every(function (it) { return loggedFor(st.key, it); });
-    var note = el("input", { class: "fu-field", id: "fu-log-note", placeholder: "ملاحظة (اختياري) — مثال: ردّت وقالت هتسلّم", dir: "auto", "aria-label": "ملاحظة التواصل" });
-    var btn = el("button", { class: "fu-btn", id: "fu-log-send", type: "button" }, [done ? "✓ اتسجّل — تحديث الملاحظة" : "📨 سجّل إني بعتّ الرسالة"]);
-    btn.addEventListener("click", function () {
-      btn.disabled = true;
-      var d = STATE.data; d.parent_log = d.parent_log || {};
-      items.reduce(function (p, it) {
-        return p.then(function () {
-          return api({ action: "admin_log_parent_notification", student: st.phone, kind: it.kind, ref: it.ref, note: note.value }).then(function (res) {
-            var arr = d.parent_log[st.key] = (d.parent_log[st.key] || []).filter(function (n) { return !(n.kind === it.kind && String(n.ref).toLowerCase() === String(it.ref).toLowerCase()); });
-            var n = res.notification || {};
-            arr.unshift({ kind: it.kind, ref: String(it.ref).toLowerCase(), sent_at: n.sent_at || (d.today + " 00:00:00"), note: note.value });
-          });
-        });
-      }, Promise.resolve()).then(function () {
-        btn.textContent = "✓ اتسجّل"; btn.disabled = false; toast("اتسجّل التواصل مع ولي الأمر ✓"); refreshPage();
-      }, function (err) { btn.disabled = false; toast(errText(err), { err: true }); });
-    });
-    return el("div", { class: "fu-logbox" }, [el("span", { class: "fu-dim" }, ["بعد ما تبعت الرسالة في واتساب، سجّلها هنا عشان تعرف مين اتبلّغ."]), note, btn]);
-  }
-
-  // ---- monthly review (FF_MONTHLY): one message per student, batch per group, printable ------------
-  function monthOptions() {
-    var t = STATE.data.today, y = +t.slice(0, 4), m = +t.slice(5, 7), out = [];
-    for (var i = 0; i < 6; i++) { out.push(y + "-" + String(m).padStart(2, "0")); m--; if (m < 1) { m = 12; y--; } }
-    return out;
-  }
-  function monthLabelOf(m) { return T().monthLabel ? T().monthLabel(m) : m; }
-  function monthlyText(rev, month) {
-    try {
-      var r = T().composeFull(rev.summary, "monthly_review", { month: month, templates: STATE.data.templates || {} });
-      return { text: r.text, missing: r.missing || [] };
-    } catch (e) { console.error(e); return { text: "", missing: [], error: e }; }
-  }
-  var MSTATUS = { pending: ["معلّق", "amber"], ready: ["جاهز", "green"], sent: ["اتبعت", "green"], closed: ["مقفول", "grey"] };
-  function markMonth(rev, month, status, note) {
-    return api({ action: "admin_monthly_review", op: "mark", month: month, student: rev.student.phone, status: status, note: note || "" }).then(function (res) {
-      rev.review = Object.assign(rev.review || {}, res.review);
-      if (status === "sent") {
-        var d = STATE.data; d.parent_log = d.parent_log || {};
-        var pk = pkOf(rev.student.phone);
-        d.parent_log[pk] = (d.parent_log[pk] || []).filter(function (n) { return !(n.kind === "monthly" && n.ref === month); });
-        d.parent_log[pk].unshift({ kind: "monthly", ref: month, sent_at: (res.review && res.review.sent_at) || (d.today + " 00:00:00"), note: note || "" });
-        refreshPage();
-      }
-      return res;
-    });
-  }
-  function printMonthly(reviews, month) {
-    var host = el("div", { id: "fu-print", dir: "rtl" });
-    reviews.forEach(function (r) {
-      var m = monthlyText(r, month);
-      host.appendChild(el("section", { class: "fu-print-page" }, [el("h1", {}, ["التقرير الشهري — " + monthLabelOf(month)]), el("h2", {}, [r.student.name]), el("div", { class: "fu-print-body", html: T().formatPreview(m.text) })]));
-    });
-    document.body.appendChild(host); document.body.classList.add("fu-printing");
-    function cleanup() { host.remove(); document.body.classList.remove("fu-printing"); window.removeEventListener("afterprint", cleanup); }
-    window.addEventListener("afterprint", cleanup);
-    window.print();
-  }
-  function openMonthly(g, month0) {
-    var month = month0 || STATE.data.today.slice(0, 7), data = null, loading = true, err = "";
-    openSheet(function (sheet) {
-      var body = el("div", { id: "fu-monthly-body" }); sheet.appendChild(body);
-      function fetchIt() {
-        loading = true; err = ""; paint();
-        api({ action: "admin_monthly_review", month: month, group: g.group }).then(function (r) { data = r; loading = false; paint(); }, function (e) { loading = false; err = errText(e); paint(); });
-      }
-      function paint() {
-        clear(body);
-        body.appendChild(el("div", { class: "fu-row fu-between" }, [el("h2", {}, ["المراجعة الشهرية · " + g.group]), el("button", { class: "fu-ibtn", id: "fu-close", type: "button", "aria-label": "إغلاق", onclick: closeSheet }, ["✕"])]));
-        var sel = el("select", { class: "fu-field", id: "fu-month", "aria-label": "الشهر", style: "direction:rtl;font:inherit" }, monthOptions().map(function (m) { return el("option", { value: m }, [monthLabelOf(m)]); }));
-        sel.value = month; sel.addEventListener("change", function () { month = sel.value; fetchIt(); });
-        body.appendChild(el("label", { style: "display:block;margin-top:10px" }, [el("span", { class: "fu-label" }, ["الشهر"]), sel]));
-        if (loading) { body.appendChild(el("div", { class: "fu-skel" })); return; }
-        if (err) { body.appendChild(el("div", { class: "fu-err", id: "fu-monthly-error", role: "alert" }, [err])); return; }
-        var revs = data.reviews || [];
-        body.appendChild(el("div", { class: "fu-hint" }, [data.closed ? "الشهر خلص — الأرقام نهائية." : "الشهر لسه شغال — الأرقام لحد النهارده (" + dmOf(data.range.to) + ")."]));
-        body.appendChild(el("div", { class: "fu-stack", style: "margin:12px 0" }, [
-          el("button", { class: "fu-btn", id: "fu-monthly-copy-all", type: "button", onclick: function () {
-            copy(revs.map(function (r) { return r.student.name + "\n" + monthlyText(r, month).text; }).join("\n\n———\n\n"));
-          } }, ["📋 نسخ كل الرسائل"]),
-          el("div", { class: "fu-btns two" }, [
-            el("button", { class: "fu-btn", id: "fu-monthly-print", type: "button", onclick: function () { printMonthly(revs, month); } }, ["🖨️ طباعة"]),
-            el("button", { class: "fu-btn", id: "fu-monthly-ready", type: "button", onclick: function () {
-              var todo = revs.filter(function (r) { return (r.review || {}).status === "pending"; });
-              todo.reduce(function (p, r) { return p.then(function () { return markMonth(r, month, "ready"); }); }, Promise.resolve()).then(function () { paint(); toast("اتعلّم " + todo.length + " كجاهز ✓"); }, function (e) { toast(errText(e), { err: true }); });
-            } }, ["✓ الكل جاهز"]),
-          ]),
-        ]));
-        revs.forEach(function (r) {
-          var t = r.summary.totals || {}, st = MSTATUS[(r.review || {}).status] || MSTATUS.pending, ck = parentCheck({ phone: r.student.phone, parent_phone: r.student.parent_phone });
-          body.appendChild(el("div", { class: "fu-sec fu-mrow", "data-review": pkOf(r.student.phone) }, [
-            el("h4", {}, [el("span", {}, [r.student.name]), el("span", { class: "fu-chip " + st[1], "data-status": (r.review || {}).status || "pending" }, [st[0]])]),
-            el("div", { class: "fu-chips" }, [
-              el("span", { class: "fu-chip grey" }, ["📝 " + (t.quiz_avg_pct != null ? Math.round(t.quiz_avg_pct) + "%" : "—")]),
-              (t.quiz_missed || t.homework_missed) ? el("span", { class: "fu-chip red" }, ["⚠️ ناقص " + ((t.quiz_missed || 0) + (t.homework_missed || 0))]) : el("span", { class: "fu-chip green" }, ["✓ مفيش ناقص"]),
-              ck.level === "missing" ? el("span", { class: "fu-chip red" }, ["لا رقم ولي أمر"]) : null,
-            ]),
-            el("div", { style: "margin-top:10px" }, [el("button", { class: "fu-btn wa", type: "button", "data-open-review": pkOf(r.student.phone), onclick: function () { openMonthlyMessage(g, r, month); } }, ["💬 معاينة وإرسال"])]),
-          ]));
-        });
-        if (!revs.length) body.appendChild(el("div", { class: "fu-empty" }, ["مفيش طلاب في الجروب ده"]));
-      }
-      fetchIt();
-    }, { full: true, label: "المراجعة الشهرية" });
-  }
-  function openMonthlyMessage(g, rev, month) {
-    var m = monthlyText(rev, month), ck = parentCheck({ phone: rev.student.phone, parent_phone: rev.student.parent_phone });
-    var digits = ck.wa || (L().waDigits ? L().waDigits(rev.student.parent_phone) : "");
-    openSheet(function (sheet) {
-      var link = el("a", { class: "fu-btn wa", id: "fu-wa-open", target: "_blank", rel: "noopener", href: "#" }, ["فتح واتساب ↗"]);
-      var bubble = el("div", { class: "fu-bubble", id: "fu-preview", dir: "auto" });
-      var ta = el("textarea", { class: "fu-field fu-msg-edit", id: "fu-msg-text", dir: "auto", "aria-label": "نص الرسالة" }); ta.value = m.text;
-      function sync() {
-        try { bubble.innerHTML = T().formatPreview(ta.value); } catch (e) { bubble.textContent = ta.value; }
-        if (digits && ck.level !== "missing" && T().waLink) link.href = T().waLink(digits, ta.value); else { link.removeAttribute("href"); link.setAttribute("aria-disabled", "true"); }
-      }
-      ta.addEventListener("input", sync);
-      var st = MSTATUS[(rev.review || {}).status] || MSTATUS.pending;
-      sheet.appendChild(el("div", { class: "fu-row fu-between" }, [el("h2", {}, ["تقرير " + monthLabelOf(month) + " · " + rev.student.name]), el("span", { class: "fu-chip " + st[1], id: "fu-month-status" }, [st[0]])]));
-      if (ck.level === "missing") sheet.appendChild(el("div", { class: "fu-warnbox", id: "fu-phonewarn", role: "alert" }, ["⚠️ لا يوجد رقم ولي أمر — زر واتساب متوقف، تقدر تنسخ الرسالة."]));
-      else if (ck.level === "warn") sheet.appendChild(el("div", { class: "fu-warnbox" }, ["⚠️ راجع رقم ولي الأمر قبل الإرسال. " + (ck.reason || "")]));
-      if (m.missing.length) sheet.appendChild(el("div", { class: "fu-warnbox", id: "fu-missing" }, ["متغيرات غير معروفة في القالب: " + m.missing.join(" ")]));
-      if (isLate()) sheet.appendChild(el("div", { class: "fu-hint", id: "fu-late" }, ["🌙 الوقت متأخر — يُفضّل الإرسال بكرة."]));
-      sheet.appendChild(bubble);
-      sheet.appendChild(el("label", {}, [el("span", { class: "fu-dim" }, ["✏️ تقدر تعدّل النص قبل الإرسال — التعديل للرسالة دي بس."]), ta]));
-      sync();
-      var chip = function () { var s2 = MSTATUS[(rev.review || {}).status] || MSTATUS.pending; var c = $("fu-month-status"); if (c) { c.textContent = s2[0]; c.className = "fu-chip " + s2[1]; } };
-      sheet.appendChild(el("div", { class: "fu-stack", style: "margin-top:12px" }, [link,
-        el("div", { class: "fu-btns two" }, [
-          el("button", { class: "fu-btn", id: "fu-month-sent", type: "button", onclick: function () { markMonth(rev, month, "sent", "").then(function () { chip(); toast("اتسجّل إنها اتبعتت ✓"); }, function (e) { toast(errText(e), { err: true }); }); } }, ["✓ تم الإرسال"]),
-          el("button", { class: "fu-btn", id: "fu-month-ready", type: "button", onclick: function () { markMonth(rev, month, "ready", "").then(function () { chip(); toast("اتعلّمت جاهزة ✓"); }, function (e) { toast(errText(e), { err: true }); }); } }, ["جاهزة"]),
-        ]),
-        el("div", { class: "fu-btns two" }, [
-          el("button", { class: "fu-btn", id: "fu-copy", type: "button", onclick: function () { copy(ta.value); } }, ["📋 نسخ"]),
-          el("button", { class: "fu-btn", id: "fu-month-back", type: "button", onclick: function () { openMonthly(g, month); } }, ["رجوع للقائمة"]),
-        ]),
-      ]));
-    }, { label: "التقرير الشهري" });
-  }
-
   function openReminder(g, V) {
     var res, err = null, rv = g.settings.review_lessons || [];
     try {
@@ -1370,13 +1012,11 @@
     var V = STATE.view = computeView(g);
     if (d.lessons_error) root.appendChild(el("div", { class: "fu-warnbox", id: "fu-lessons-error", role: "alert" }, ["⚠️ تعذّر تحميل قائمة الدروس من GitHub — قد تكون القائمة ناقصة. (" + (typeof d.lessons_error === "string" ? d.lessons_error : "") + ")"]));
     var gb = guideBanner(); if (gb) root.appendChild(gb);
-    var noGroups = g.unclassified && !visibleGroups().length;
-    if (noGroups) root.appendChild(noGroupsCard());
-    else if (g.unclassified) root.appendChild(borrowCard());
-    if (!noGroups && (!g.unclassified || (g.settings && g.settings.weekday !== null && g.settings.weekday !== undefined))) root.appendChild(nextSessionCard(g, V));
-    if (!noGroups) root.appendChild(rolesCard(g, V));
+    if (g.unclassified) root.appendChild(borrowCard());
+    if (!g.unclassified || (g.settings && g.settings.weekday !== null && g.settings.weekday !== undefined)) root.appendChild(nextSessionCard(g, V));
+    root.appendChild(rolesCard(g, V));
     if (!g.unclassified) root.appendChild(settingsCard(g));
-    if (!noGroups) root.appendChild(bannerAndTiles(V));
+    root.appendChild(bannerAndTiles(V));
     if (!g.unclassified) root.appendChild(groupActions(g, V));
     root.appendChild(listHead(V));
     root.appendChild(el("div", { id: "fu-rows" }));

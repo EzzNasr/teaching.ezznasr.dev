@@ -28,7 +28,6 @@ from modules.common import (
     MCQItemDialog,
     TrueFalseItemDialog,
     MatchItemDialog,
-    WrittenItemDialog,
     GradedBulkDialog,
 )
 
@@ -312,7 +311,6 @@ class QuizTab(ttk.Frame):
         tk.Button(btn_row, text="+ Multiple choice", command=self._add_mcq).pack(side="left")
         tk.Button(btn_row, text="+ True/False", command=self._add_truefalse).pack(side="left", padx=6)
         tk.Button(btn_row, text="+ Matching", command=self._add_match).pack(side="left")
-        tk.Button(btn_row, text="+ Written (photo)", command=self._add_written).pack(side="left", padx=6)
         tk.Button(btn_row, text="+ Bulk paste...", command=self._bulk_add).pack(side="left", padx=6)
         tk.Button(btn_row, text="Edit selected", command=self._edit_question).pack(side="left", padx=6)
         tk.Button(btn_row, text="Remove selected", command=self._remove_question).pack(side="left")
@@ -538,13 +536,6 @@ class QuizTab(ttk.Frame):
                 synced_quiz = None
             if synced_quiz and isinstance(synced_quiz.get("questions"), list):
                 questions = synced_quiz["questions"]
-                if any(isinstance(q, dict) and q.get("type") == "written" for q in questions):
-                    try:   # model answers live in WrittenModels, not in the quiz content
-                        common.merge_written_models(questions, drive_bridge.get_written_models(
-                            drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key))
-                    except drive_bridge.DriveBridgeError as e:
-                        messagebox.showwarning("Model answers not loaded",
-                                               "Couldn't read the written questions' model answers:\n{}".format(e))
 
         if self.questions or self.lesson_name_var.get().strip():
             if not messagebox.askyesno(
@@ -669,7 +660,7 @@ class QuizTab(ttk.Frame):
 
     # -- question list --------------------------------------------------
 
-    _TYPE_LABELS = {"mcq": "MCQ", "truefalse": "T/F", "match": "Match", "written": "Written"}
+    _TYPE_LABELS = {"mcq": "MCQ", "truefalse": "T/F", "match": "Match"}
 
     def _current_chapter(self):
         try:
@@ -734,14 +725,6 @@ class QuizTab(ttk.Frame):
             self.questions.append(dlg.result)
             self._refresh_listbox()
 
-    def _add_written(self):
-        dlg = WrittenItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
-        self.wait_window(dlg)
-        if dlg.result:
-            self._snapshot()
-            self.questions.append(dlg.result)
-            self._refresh_listbox()
-
     def _bulk_add(self):
         dlg = GradedBulkDialog(self, current_chapter=self._current_chapter())
         self.wait_window(dlg)
@@ -758,8 +741,7 @@ class QuizTab(ttk.Frame):
             return
         idx = sel[0]
         existing = self._normalize_legacy(self.questions[idx])
-        dialog_cls = {"mcq": MCQItemDialog, "truefalse": TrueFalseItemDialog, "match": MatchItemDialog,
-                      "written": WrittenItemDialog}[existing["type"]]
+        dialog_cls = {"mcq": MCQItemDialog, "truefalse": TrueFalseItemDialog, "match": MatchItemDialog}[existing["type"]]
         dlg = dialog_cls(self, existing=existing, chapter_choices=self._chapter_choices(),
                           default_chapter=self._current_chapter())
         self.wait_window(dlg)
@@ -942,14 +924,11 @@ class QuizTab(ttk.Frame):
                     existing_assign_questions_json = q_match.group(1)
 
         # ---- quiz.html ----
-        # Written questions: the model answer goes to the WrittenModels tab, never into the
-        # quiz JSON (get_quiz serves that to every student) or the page.
-        public_questions, written_models = common.split_written_models(self.questions)
         quiz_json = {
             "title": lesson_name,
             "subject": subject_slug,
             "lesson": lesson_slug,
-            "questions": public_questions,
+            "questions": self.questions,
         }
         track_class = common.track_class_for_group(subject_slug, group_relpath)
         drive_cfg = common.get_drive_config(common.load_config())
@@ -971,9 +950,6 @@ class QuizTab(ttk.Frame):
                 drive_bridge.set_quiz_content(
                     drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, quiz_json)
                 content_synced = True
-                if written_models:
-                    drive_bridge.set_written_models(
-                        drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, written_models)
             except drive_bridge.DriveBridgeError as e:
                 messagebox.showerror(
                     "Couldn't reach the Drive bridge",
@@ -982,7 +958,7 @@ class QuizTab(ttk.Frame):
 
         quiz_meta = {"title": lesson_name, "subject": subject_slug, "lesson": lesson_slug}
         if not content_synced:
-            quiz_meta["questions"] = public_questions
+            quiz_meta["questions"] = self.questions
 
         # Preserve a solution video already set on this quiz page (via the
         # standalone "Solution video" control below) across regeneration —

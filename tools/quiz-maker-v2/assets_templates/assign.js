@@ -181,19 +181,6 @@
     return sel;
   }
 
-  // Photo answers ("written" items). capture.js is loaded on demand so assignment
-  // pages generated before it existed keep working untouched.
-  function loadCapture() {
-    if (window.TeachingCapture) return Promise.resolve(window.TeachingCapture);
-    return new Promise(function (resolve, reject) {
-      var s = document.createElement("script");
-      s.src = "/assets/capture.js?v=1";
-      s.onload = function () { window.TeachingCapture ? resolve(window.TeachingCapture) : reject(new Error("camera tools missing")); };
-      s.onerror = function () { reject(new Error("Couldn't load the camera tools. Check your connection and refresh the page.")); };
-      document.head.appendChild(s);
-    });
-  }
-
   function mount(rootSelector) {
     var root = document.querySelector(rootSelector);
     if (!root) return;
@@ -222,7 +209,7 @@
         return;
       }
 
-      var state = { submitted: false, score: 0, total: 0, answers: [], record: null, syncStatus: null, widgets: {}, photoError: "" };
+      var state = { submitted: false, score: 0, total: 0, answers: [], record: null, syncStatus: null };
       render();
 
       function render() {
@@ -259,19 +246,6 @@
             var sel = buildSelect(["True", "False"]);
             block.appendChild(el("div", { class: "qz-graded-row" }, [sel]));
             entries.push({ item: item, select: sel });
-          } else if (item.type === "written") {
-            // Answered on paper: the student photographs it. Not auto-graded.
-            block.appendChild(el("p", { class: "qz-lede" }, ["Write your answer on paper, then take a clear photo of it" +
-              (item.max_marks ? " (" + item.max_marks + " mark" + (item.max_marks > 1 ? "s" : "") + ")" : "") + "."]));
-            var slot = el("div", {}, [el("p", { class: "qz-progress" }, ["Loading camera tools\u2026"])]);
-            block.appendChild(slot);
-            (function (itm, holder) {
-              loadCapture().then(function (cap) {
-                var w = cap.createWidget({ key: "teaching_hw_draft:" + session.student_id + ":" + (lesson || "") + ":" + itm.id, max: itm.max_images || 3 });
-                state.widgets[itm.id] = w; holder.innerHTML = ""; holder.appendChild(w.el);
-              }, function (e) { holder.innerHTML = ""; holder.appendChild(el("div", { class: "qz-error" }, [e.message])); });
-            })(item, slot);
-            entries.push({ item: item, written: true });
           } else if (item.type === "match") {
             var rowSelects = [];
             (item.rows || []).forEach(function (row) {
@@ -293,7 +267,6 @@
 
         function onSubmit() {
           var incomplete = entries.some(function (e) {
-            if (e.written) return false;                      // photos are optional to attach, never block
             if (e.checks) return !e.checks.some(function (c) { return c.cb.checked; });
             return e.select ? e.select.value === "" : e.rowSelects.some(function (rs) { return rs.value === ""; });
           });
@@ -323,16 +296,7 @@
 
         entries.forEach(function (e) {
           var item = e.item;
-          if (e.written) {
-            var w = state.widgets[item.id], n = w ? w.count() : 0, max = Math.max(1, Math.floor(Number(item.max_marks)) || 1);
-            total += max;
-            answers.push({
-              id: item.id, type: "written", prompt: item.prompt,
-              chosen: n ? "[" + n + " photo" + (n > 1 ? "s" : "") + "]" : "", correct_answer: "", is_correct: false,
-              pending: n > 0, max: max, image_count: n,
-              chapter: (typeof item.chapter !== "undefined") ? item.chapter : null,
-            });
-          } else if (item.type === "match") {
+          if (item.type === "match") {
             item.rows.forEach(function (row, i) {
               total++;
               var chosen = e.rowSelects[i].value;
@@ -398,22 +362,6 @@
         sendRecord();
       }
 
-      // Photo answers go up first, under this submission's client_id, so the
-      // teacher's grading queue can pair them with it. Already-sent photos are
-      // skipped, and the server ignores a re-sent one, so retrying is safe.
-      function uploadPhotos() {
-        var written = state.record.answers.filter(function (a) { return a.type === "written" && state.widgets[a.id]; });
-        return written.reduce(function (chain, a) {
-          return chain.then(function () {
-            return state.widgets[a.id].upload(function (item, b64) {
-              return postToDrive({ action: "upload_written_image", kind: "assignment", student_id: session.student_id, session_token: session.session_token,
-                lesson_path: location.pathname.split("/").filter(Boolean).filter(function (p) { return !/\.html?$/i.test(p); }).join("/"),
-                attempt_id: state.record.client_id, question_id: a.id, image_id: item.id, data_base64: b64, mime_type: "image/jpeg" });
-            }).then(function (r) { if (!r.ok) throw new Error(r.error || "A photo didn't upload."); });
-          });
-        }, Promise.resolve());
-      }
-
       // Posts state.record. Safe to call again (retry button): same
       // client_id, so the server ignores it if the first try landed.
       function sendRecord() {
@@ -423,15 +371,8 @@
         // "Busy" replies (a whole class saving at once) are repeated automatically
         // with the same client_id — never a duplicate — while the page says it is
         // still saving.
-        uploadPhotos()
-          .then(function () {
-            return postToDrive(Object.assign({ action: "upload_submission" }, state.record), function () { state.busy = true; render(); });
-          })
-          .then(function () {
-            state.busy = false; state.syncStatus = "ok";
-            Object.keys(state.widgets).forEach(function (k) { state.widgets[k].clear(); });   // delivered: drop the local photo draft
-            state.widgets = {}; render();
-          })
+        postToDrive(Object.assign({ action: "upload_submission" }, state.record), function () { state.busy = true; render(); })
+          .then(function () { state.busy = false; state.syncStatus = "ok"; render(); })
           .catch(function (err) {
             state.busy = false;
             state.syncStatus = (err && err.message === "not-configured") ? "not-configured" : "failed";
@@ -478,8 +419,6 @@
           state.answers = [];
           state.record = null;
           state.syncStatus = null;
-          Object.keys(state.widgets).forEach(function (k) { state.widgets[k].clear(); });
-          state.widgets = {};
           render();
         });
         root.appendChild(summary);

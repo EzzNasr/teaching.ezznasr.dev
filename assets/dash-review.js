@@ -188,7 +188,6 @@
         var ctx = { when: row.start_time || row.date || "", student: row.name || "" };
         var rowKey = "q" + idx;
         parseList(row.questions_json).forEach(function (q) {
-          if (q.pending) return;   // photo answer not graded yet: neither right nor wrong
           var L = lessonNode(groupOf(row), chapterOf(q.chapter, slug), slug, row.subject);
           touch(L, "quiz", rowKey);
           record(L, "quiz", {
@@ -204,7 +203,6 @@
         var ctx = { when: row.submitted_time || row.date || "", student: row.name || "" };
         var rowKey = "s" + idx;
         parseList(row.answers_json).forEach(function (a) {
-          if (a.pending) return;
           var L = lessonNode(groupOf(row), chapterOf(a.chapter, slug), slug, row.subject);
           touch(L, "assign", rowKey);
           record(L, "assign", {

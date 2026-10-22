@@ -17,7 +17,6 @@ node tests/test_followup.js            apps_script/Code.gs   # follow-up backend
 node tests/test_followup_logic.js                            # follow-up status rules + Cairo deadlines (pure)
 node tests/test_followup_templates.js                        # message rendering: placeholders, bidi, WhatsApp formatting, 1200-char cap
 node tests/test_watch_tracker.js                             # video.js watch-coverage tracker
-node tests/test_keys.js apps_script/Code.gs apps_script/Phase2_Keys.gs   # lesson-key aliases + admin_migrate_lesson_keys (25 checks)
 ```
 
 Each prints PASS/FAIL per check and exits non-zero on any failure. Run them before

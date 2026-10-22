@@ -1210,7 +1210,7 @@ function doPost(e) {
         return _json(handleUploadSubmission(payload));
 
       case "upload_quiz_result":
-        return _json(handleUploadQuizResult(_p2Pre("p2c_prepare_quiz_payload", payload)));   // S3: server-side grading when FF_DEFERRED_ANSWERS
+        return _json(handleUploadQuizResult(payload));
 
       case "check_student":
         return _json(handleCheckStudent(payload));
@@ -1237,7 +1237,7 @@ function doPost(e) {
         return _json(handleGetVideo(payload));
 
       case "admin_set_video":
-        return _json(_p2AuditWrap("admin_set_video", payload, handleAdminSetVideo(payload)));
+        return _json(handleAdminSetVideo(payload));
 
       case "admin_list_videos":
         return _json(handleAdminListVideos(payload));
@@ -1255,10 +1255,10 @@ function doPost(e) {
         return _json(handleAdminDecidePayment(payload));
 
       case "admin_grant_access":
-        return _json(_p2AuditWrap("admin_grant_access", payload, handleAdminGrantAccess(payload)));
+        return _json(handleAdminGrantAccess(payload));
 
       case "admin_revoke_access":
-        return _json(_p2AuditWrap("admin_revoke_access", payload, handleAdminRevokeAccess(payload)));
+        return _json(handleAdminRevokeAccess(payload));
 
       case "admin_access_overview":
         return _json(handleAdminAccessOverview(payload));
@@ -1267,10 +1267,10 @@ function doPost(e) {
         return _json(handleGetQuizState(payload));
 
       case "admin_set_quiz_lock":
-        return _json(_p2AuditWrap("admin_set_quiz_lock", payload, handleAdminSetQuizLock(payload)));
+        return _json(handleAdminSetQuizLock(payload));
 
       case "get_quiz":
-        return _json(_p2Post("p2c_decorate_quiz", handleGetQuiz(payload), payload));   // S3: strips answers when FF_DEFERRED_ANSWERS
+        return _json(handleGetQuiz(payload));
 
       case "admin_set_quiz_content":
         return _json(handleAdminSetQuizContent(payload));
@@ -1288,25 +1288,25 @@ function doPost(e) {
         return _json(handleAdminGroupRemove(payload));
 
       case "admin_group_grant_access":
-        return _json(_p2AuditWrap("admin_group_grant_access", payload, handleAdminGroupGrantAccess(payload)));
+        return _json(handleAdminGroupGrantAccess(payload));
 
       case "admin_group_revoke_access":
-        return _json(_p2AuditWrap("admin_group_revoke_access", payload, handleAdminGroupRevokeAccess(payload)));
+        return _json(handleAdminGroupRevokeAccess(payload));
 
       case "admin_list_lessons":
         return _json(handleAdminListLessons(payload));
 
       case "admin_grant_quiz_access":
-        return _json(_p2AuditWrap("admin_grant_quiz_access", payload, handleAdminGrantQuizAccess(payload)));
+        return _json(handleAdminGrantQuizAccess(payload));
 
       case "admin_revoke_quiz_access":
-        return _json(_p2AuditWrap("admin_revoke_quiz_access", payload, handleAdminRevokeQuizAccess(payload)));
+        return _json(handleAdminRevokeQuizAccess(payload));
 
       case "admin_group_grant_quiz_access":
-        return _json(_p2AuditWrap("admin_group_grant_quiz_access", payload, handleAdminGroupGrantQuizAccess(payload)));
+        return _json(handleAdminGroupGrantQuizAccess(payload));
 
       case "admin_group_revoke_quiz_access":
-        return _json(_p2AuditWrap("admin_group_revoke_quiz_access", payload, handleAdminGroupRevokeQuizAccess(payload)));
+        return _json(handleAdminGroupRevokeQuizAccess(payload));
 
       case "admin_set_lesson_tags":
         return _json(handleAdminSetLessonTags(payload));
@@ -1321,10 +1321,10 @@ function doPost(e) {
         return _json(handleRequestSubscription(payload));
 
       case "admin_followup_overview":
-        return _json(_p2CallOr("p2_admin_followup_overview", handleAdminFollowupOverview, payload));   // S2 wraps it (requirements, parent log, week)
+        return _json(handleAdminFollowupOverview(payload));
 
       case "admin_followup_set_attendance":
-        return _json(_p2CallOr("p2_admin_followup_set_attendance", handleAdminFollowupSetAttendance, payload));   // S2: weekly center rule
+        return _json(handleAdminFollowupSetAttendance(payload));
 
       case "admin_followup_save_group":
         return _json(handleAdminFollowupSaveGroup(payload));
@@ -1335,53 +1335,12 @@ function doPost(e) {
       case "record_watch":
         return _json(handleRecordWatch(payload));
 
-      // ---- Phase 2 (see docs/contract.md). Handlers live in Phase2_*.gs; Phase2_Core.gs owns _p2Call.
-      case "admin_student_summary":   // S2
-        return _json(_p2Call("p2_admin_student_summary", payload));
-
-      case "admin_monthly_review":   // S2
-        return _json(_p2Call("p2_admin_monthly_review", payload));
-
-      case "admin_set_requirement":   // S2
-        return _json(_p2Call("p2_admin_set_requirement", payload));
-
-      case "admin_log_parent_notification":   // S2
-        return _json(_p2Call("p2_admin_log_parent_notification", payload));
-
-      case "admin_list_parent_notifications":   // S2
-        return _json(_p2Call("p2_admin_list_parent_notifications", payload));
-
-      case "upload_written_image":   // S3
-        return _json(_p2Call("p2_upload_written_image", payload));
-
-      case "get_quiz_review":   // S3
-        return _json(_p2Call("p2_get_quiz_review", payload));
-
-      case "admin_grading_queue":   // S4
-        return _json(_p2Call("p2_admin_grading_queue", payload));
-
-      case "admin_grade_written":   // S4
-        return _json(_p2Call("p2_admin_grade_written", payload));
-
-      case "admin_set_written_models":   // S4 (added at integration; Quiz Maker authoring)
-        return _json(_p2Call("p2_admin_set_written_models", payload));
-
-      case "admin_get_written_models":   // S4 (added at integration)
-        return _json(_p2Call("p2_admin_get_written_models", payload));
-
-      case "get_written_image":   // S4 (added at integration; admin or the owning student)
-        return _json(_p2Call("p2_get_written_image", payload));
-
-      case "admin_migrate_lesson_keys":   // S1
-        return _json(_p2Call("p2_admin_migrate_lesson_keys", payload));
-
       default:
         return _json({ ok: false, error: "Unknown action: " + payload.action });
     }
   } catch (err) {
     var out = { ok: false, error: String(err.message || err) };
     if (err && err.retryable) out.retryable = true;   // lock was busy — the browser may resend the same record
-    if (err && err.disabled) out.disabled = true;     // Phase 2 feature flag is off (p2_requireFlag)
     return _json(out);
   }
 }
@@ -1675,28 +1634,7 @@ function _lessonPath(raw) {
   var l = String(raw == null ? "" : raw).trim().toLowerCase()
     .replace(/\\/g, "/").replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, "");
   if (!/^[a-z0-9][a-z0-9._\/-]{0,199}$/.test(l) || l.indexOf("..") !== -1) throw new Error("Missing or invalid lesson.");
-  return _canonKey(l);
-}
-
-// ---- lesson key aliases -----------------------------------------------------------------------
-// Commit f58d9b7 renamed three Senior 2 folders. Grants, locks and results written under the old
-// keys must keep working, so every key read from a sheet or a request goes through _canonKey.
-// Mirror of assets/lesson-aliases.json. Full-path keys and bare slugs.
-var _G2 = "programming/baccalaureate/grade-2-secondary/";
-var LESSON_ALIASES = (function () {
-  var pairs = [
-    ["lesson-1-development-of-information-technology-and-social-transformation", "chapter-1-lesson-1-development-of-information-technology-and-social-transformation"],
-    ["lesson-2-how-ai-works", "chapter-1-lesson-2-how-ai-works"],
-    ["chaper-1-lesson-3-ai-in-daily-life-and-industry", "chapter-1-lesson-3-ai-in-daily-life-and-industry"]
-  ];
-  var m = {};
-  pairs.forEach(function (p) { m[_G2 + p[0]] = _G2 + p[1]; m[p[0]] = _G2 + p[1]; });
-  return m;
-})();
-
-// Old/typo'd key -> current key. Anything else (wildcards, "#ch1" scopes, "*", unknown keys) is unchanged.
-function _canonKey(k) {
-  return Object.prototype.hasOwnProperty.call(LESSON_ALIASES, k) ? LESSON_ALIASES[k] : k;
+  return l;
 }
 
 function _videoKey(lesson, slot) {
@@ -1752,7 +1690,7 @@ function _findVideoRow(sheet, lesson, slot) {
   var c = _videoCols(sheet);
   var values = sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues();
   for (var i = 0; i < values.length; i++) {
-    if (_canonKey(String(values[i][c.lesson - 1]).trim().toLowerCase()) === lesson &&
+    if (String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson &&
         String(values[i][c.slot - 1]).trim().toLowerCase() === slot) {
       return { row: i + 2, cols: c, embed_url: String(values[i][c.embed_url - 1]).trim(),
                locked: _isLockedCell(values[i][c.locked - 1]) };
@@ -1818,7 +1756,7 @@ function _findLessonRow(sheet, lesson) {
   var c = _needCols(sheet, "Lessons", ["lesson", "locked"]);
   var values = sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues();
   for (var i = 0; i < values.length; i++) {
-    if (_canonKey(String(values[i][c.lesson - 1]).trim().toLowerCase()) === lesson) {
+    if (String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) {
       return { row: i + 2, cols: c, locked: _isLockedCell(values[i][c.locked - 1]) };
     }
   }
@@ -2065,7 +2003,7 @@ function _lessonTagsMap(ss) {
   if (sheet && sheet.getLastRow() >= 2) {
     var c = _needCols(sheet, "LessonTags", ["lesson", "chapter", "term"]);
     sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
-      var lesson = _canonKey(String(r[c.lesson - 1]).trim().toLowerCase());
+      var lesson = String(r[c.lesson - 1]).trim().toLowerCase();
       var chapter = parseInt(r[c.chapter - 1], 10);
       var term = parseInt(r[c.term - 1], 10);
       if (lesson && chapter > 0 && term > 0) map[lesson] = { chapter: chapter, term: term };
@@ -2103,13 +2041,13 @@ function handleAdminSetLessonTags(payload) {
     var values = last >= 2 ? sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues() : [];
     var at = -1;
     for (var i = 0; i < values.length; i++) {
-      if (_canonKey(String(values[i][c.lesson - 1]).trim().toLowerCase()) === lesson) { at = i; break; }
+      if (String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) { at = i; break; }
     }
 
     if (!clearing) {
       for (var j = 0; j < values.length; j++) {
         if (j === at) continue;
-        var otherLesson = _canonKey(String(values[j][c.lesson - 1]).trim().toLowerCase());
+        var otherLesson = String(values[j][c.lesson - 1]).trim().toLowerCase();
         if (_gradeSuffixForLesson(otherLesson) !== suffix) continue;
         if (parseInt(values[j][c.chapter - 1], 10) !== chapter) continue;
         var otherTerm = parseInt(values[j][c.term - 1], 10);
@@ -2169,7 +2107,6 @@ function _normalizeScope(raw) {
 // lesson's tags (from LessonTags, via `ss`) match — untagged lessons never match.
 function _scopeCovers(scope, lesson, ss) {
   if (!scope) return false;
-  scope = _canonKey(scope); lesson = _canonKey(lesson);
   if (scope === "*") return true;
   if (scope === lesson) return true;
   if (scope.slice(-2) === "/*") return lesson.indexOf(scope.slice(0, -1)) === 0;
@@ -2257,7 +2194,7 @@ function _accessState(ss, phone, lesson) {
   var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
   for (var i = 0; i < values.length; i++) {
     if (!_phonesMatch(values[i][c.phone - 1], phone)) continue;
-    if (!_scopeCovers(_canonKey(String(values[i][c.scope - 1]).trim().toLowerCase()), lesson, ss)) continue;
+    if (!_scopeCovers(String(values[i][c.scope - 1]).trim().toLowerCase(), lesson, ss)) continue;
     var ymd = _ymdOf(values[i][c.expires_at - 1], tz);
     if (ymd === null) continue;                       // unreadable date: fail closed
     if (ymd === "" || today <= ymd) {
@@ -2282,7 +2219,7 @@ function _latestRequest(ss, phone, lesson) {
   var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
   for (var i = values.length - 1; i >= 0; i--) {
     if (!_phonesMatch(values[i][c.phone - 1], phone)) continue;
-    if (_canonKey(String(values[i][c.scope - 1]).trim().toLowerCase()) !== lesson) continue;
+    if (String(values[i][c.scope - 1]).trim().toLowerCase() !== lesson) continue;
     var st = String(values[i][c.status - 1]).trim().toLowerCase();
     return st === "pending" || st === "rejected" || st === "revoked" ? st : null;
   }
@@ -2304,7 +2241,7 @@ function _grantRaw(ss, phone, scope, explicitYmd, days, source) {
   if (sheet.getLastRow() >= 2) {
     var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
     for (var i = 0; i < values.length; i++) {
-      if (_phonesMatch(values[i][c.phone - 1], phone) && _canonKey(String(values[i][c.scope - 1]).trim().toLowerCase()) === scope) {
+      if (_phonesMatch(values[i][c.phone - 1], phone) && String(values[i][c.scope - 1]).trim().toLowerCase() === scope) {
         found = { row: i + 2, ymd: _ymdOf(values[i][c.expires_at - 1], tz),      // null = unreadable
                   source: String(values[i][c.source - 1] == null ? "" : values[i][c.source - 1]).trim() };
         break;
@@ -2366,7 +2303,7 @@ function handleRequestAccess(payload) {
       sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
         if (String(r[c.status - 1]).trim().toLowerCase() !== "pending" || !_phonesMatch(r[c.phone - 1], phone)) return;
         pending++;
-        if (!dup && _canonKey(String(r[c.scope - 1]).trim().toLowerCase()) === lesson) dup = String(r[c.payment_id - 1]);
+        if (!dup && String(r[c.scope - 1]).trim().toLowerCase() === lesson) dup = String(r[c.payment_id - 1]);
       });
     }
     if (dup) return { ok: true, status: "pending", duplicate: true, payment_id: dup };   // double-tap / resend
@@ -2443,7 +2380,7 @@ function _heldSubscriptionScopes(ss, phone) {
   var tz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
   var today = _todayCairo(), statuses = null;
   sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
-    var scope = _canonKey(String(r[c.scope - 1]).trim().toLowerCase());
+    var scope = String(r[c.scope - 1]).trim().toLowerCase();
     if (scope.indexOf("#") === -1 || !_phonesMatch(r[c.phone - 1], phone)) return;
     var ymd = _ymdOf(r[c.expires_at - 1], tz);
     if (ymd === null || (ymd !== "" && today > ymd)) return;
@@ -2464,7 +2401,7 @@ function _pendingSubscriptionScopes(ss, phone) {
   if (!sheet || sheet.getLastRow() < 2) return out;
   var c = _needCols(sheet, "Payments", ["payment_id", "phone", "scope", "status"]);
   sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
-    var scope = _canonKey(String(r[c.scope - 1]).trim().toLowerCase());
+    var scope = String(r[c.scope - 1]).trim().toLowerCase();
     if (scope.indexOf("#") === -1 || String(r[c.status - 1]).trim().toLowerCase() !== "pending") return;
     if (_phonesMatch(r[c.phone - 1], phone)) out[scope] = String(r[c.payment_id - 1]);
   });
@@ -2541,7 +2478,7 @@ function handleRequestSubscription(payload) {
     if (sheet.getLastRow() >= 2) {
       var c = _needCols(sheet, "Payments", PAYMENT_HEADERS);
       sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
-        var rs = _canonKey(String(r[c.scope - 1]).trim().toLowerCase());
+        var rs = String(r[c.scope - 1]).trim().toLowerCase();
         if (rs.indexOf("#") === -1 || String(r[c.status - 1]).trim().toLowerCase() !== "pending" || !_phonesMatch(r[c.phone - 1], phone)) return;
         pendingSubs++;
         if (!dup && rs === scope) dup = String(r[c.payment_id - 1]);
@@ -2675,7 +2612,7 @@ function handleAdminRevokeAccess(payload) {
     var rows = [], pays = [], seenScope = "", seenPhone = "";
     for (var i = 0; i < values.length; i++) {
       var src = srcCol ? _sourcePayment(values[i][srcCol - 1]) : "";
-      var rowScope = _canonKey(String(values[i][c.scope - 1]).trim().toLowerCase());
+      var rowScope = String(values[i][c.scope - 1]).trim().toLowerCase();
       var hit = pid ? src === pid : (_phonesMatch(values[i][c.phone - 1], phone) && rowScope === scope);
       if (!hit) continue;
       rows.push(i + 2);
@@ -3050,7 +2987,7 @@ function _entitlementIndex(ss) {
     if (!k) return;
     var src = srcCol ? String(r[srcCol - 1] == null ? "" : r[srcCol - 1]).trim() : "";
     (idx.byPhone[k] = idx.byPhone[k] || []).push({
-      scope: _canonKey(String(r[c.scope - 1]).trim().toLowerCase()), ymd: _ymdOf(r[c.expires_at - 1], tz),
+      scope: String(r[c.scope - 1]).trim().toLowerCase(), ymd: _ymdOf(r[c.expires_at - 1], tz),
       pid: _sourcePayment(src), source: src });
   });
   return idx;
@@ -3083,7 +3020,7 @@ function _quizAccessIndex(ss) {
     if (!k) return;
     var ymd = _ymdOf(r[c.expires_at - 1], tz);
     if (ymd === null || !(ymd === "" || ymd >= today)) return;
-    (map[k] = map[k] || {})[_canonKey(String(r[c.lesson - 1]).trim().toLowerCase())] = true;
+    (map[k] = map[k] || {})[String(r[c.lesson - 1]).trim().toLowerCase()] = true;
   });
   return map;
 }
@@ -3100,16 +3037,16 @@ function _lockIndex(ss) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) { fn(r, c); });
   }
   eachRow("Lessons", ["lesson", "locked"], function (r, c) {
-    var l = _canonKey(String(r[c.lesson - 1]).trim().toLowerCase());
+    var l = String(r[c.lesson - 1]).trim().toLowerCase();
     if (l && !out.lessons.hasOwnProperty(l)) out.lessons[l] = _isLockedCell(r[c.locked - 1]);
   }, "lessonsDamaged");
   eachRow("Videos", ["lesson", "slot", "embed_url", "locked"], function (r, c) {
     if (String(r[c.slot - 1]).trim().toLowerCase() !== "lesson") return;
-    var l = _canonKey(String(r[c.lesson - 1]).trim().toLowerCase());
+    var l = String(r[c.lesson - 1]).trim().toLowerCase();
     if (l && !out.videos.hasOwnProperty(l)) out.videos[l] = { has: !!String(r[c.embed_url - 1]).trim(), locked: _isLockedCell(r[c.locked - 1]) };
   }, "videosDamaged");
   eachRow("Quizzes", ["lesson", "locked"], function (r, c) {
-    var l = _canonKey(String(r[c.lesson - 1]).trim().toLowerCase());
+    var l = String(r[c.lesson - 1]).trim().toLowerCase();
     if (l && !out.quizzes.hasOwnProperty(l)) out.quizzes[l] = _isLockedCell(r[c.locked - 1]);
   }, "quizzesDamaged");
   return out;
@@ -3257,14 +3194,14 @@ function handleAdminFollowupOverview(payload) {
     var aCols = _readColumns(attSheet, ["lesson", "phone", "mode"], [], "Attendance");
     for (var i = 0; i < aCols.n; i++) {
       var am = String(aCols.col.mode[i]).trim().toLowerCase();
-      if (ATTENDANCE_MODES.hasOwnProperty(am)) att[_phoneKey(aCols.col.phone[i]) + "|" + _canonKey(String(aCols.col.lesson[i]).trim().toLowerCase())] = am;
+      if (ATTENDANCE_MODES.hasOwnProperty(am)) att[_phoneKey(aCols.col.phone[i]) + "|" + String(aCols.col.lesson[i]).trim().toLowerCase()] = am;
     }
     var wp = {};      // phoneKey|lesson -> pct
     var wCols = _readColumns(watchSheet, ["phone", "lesson", "pct"], [], "WatchProgress");
     for (i = 0; i < wCols.n; i++) {
       var pct = parseFloat(wCols.col.pct[i]);
       if (!isFinite(pct)) continue;
-      var wk = _phoneKey(wCols.col.phone[i]) + "|" + _canonKey(String(wCols.col.lesson[i]).trim().toLowerCase());
+      var wk = _phoneKey(wCols.col.phone[i]) + "|" + String(wCols.col.lesson[i]).trim().toLowerCase();
       if (!wp.hasOwnProperty(wk) || pct > wp[wk]) wp[wk] = pct;
     }
 
@@ -3272,7 +3209,7 @@ function handleAdminFollowupOverview(payload) {
     used.forEach(function (p) { usedSlugs[_lastSegment(p)] = true; });
     var mismatch = {};
     var quizBy = {}, hwBy = {};      // phoneKey|slug -> [{subject, ...}]
-    function slugOfCell(v) { return _lastSegment(_canonKey(String(v == null ? "" : v).trim().toLowerCase().replace(/\/+$/, ""))); }
+    function slugOfCell(v) { return _lastSegment(String(v == null ? "" : v).trim().toLowerCase().replace(/\/+$/, "")); }
 
     var qrSheet = dataSs.getSheetByName("QuizResults");
     var qCols = _readColumns(qrSheet, ["student_id", "lesson"], ["subject", "date", "start_time", "score", "total"], "QuizResults");
@@ -3387,7 +3324,7 @@ function handleAdminFollowupSetAttendance(payload) {
     var rowOf = {}, deleteAtt = [];
     if (aSheet.getLastRow() >= 2) {
       aSheet.getRange(2, 1, aSheet.getLastRow() - 1, aSheet.getLastColumn()).getValues().forEach(function (r, i) {
-        if (_canonKey(String(r[ac.lesson - 1]).trim().toLowerCase()) !== lesson) return;
+        if (String(r[ac.lesson - 1]).trim().toLowerCase() !== lesson) return;
         var k = _phoneKey(r[ac.phone - 1]);
         if (!wanted.hasOwnProperty(k)) return;
         if (rowOf.hasOwnProperty(k)) deleteAtt.push(i + 2);        // a duplicate row from a hand edit
@@ -3427,14 +3364,14 @@ function handleAdminFollowupSetAttendance(payload) {
       if (eSheet.getLastRow() >= 2) {
         eSheet.getRange(2, 1, eSheet.getLastRow() - 1, eSheet.getLastColumn()).getValues().forEach(function (r, i) {
           if (String(r[ec.source - 1]).trim() !== ATTENDANCE_SOURCE) return;
-          if (_canonKey(String(r[ec.scope - 1]).trim().toLowerCase()) !== lesson) return;
+          if (String(r[ec.scope - 1]).trim().toLowerCase() !== lesson) return;
           if (undo[_phoneKey(r[ec.phone - 1])]) delEnt.push(i + 2);
         });
       }
       if (qSheet.getLastRow() >= 2) {
         qSheet.getRange(2, 1, qSheet.getLastRow() - 1, qSheet.getLastColumn()).getValues().forEach(function (r, i) {
           if (String(r[qc.source - 1]).trim() !== ATTENDANCE_SOURCE) return;
-          if (_canonKey(String(r[qc.lesson - 1]).trim().toLowerCase()) !== lesson) return;
+          if (String(r[qc.lesson - 1]).trim().toLowerCase() !== lesson) return;
           if (undo[_phoneKey(r[qc.phone - 1])]) delQuiz.push(i + 2);
         });
       }
@@ -3632,7 +3569,7 @@ function handleRecordWatch(payload) {
     var hinted = parseInt(cache.get(rk) || "", 10);                               // remembered row: one cheap check, no scan
     if (hinted >= 2 && hinted <= sheet.getLastRow()) {
       var chk = sheet.getRange(hinted, 1, 1, sheet.getLastColumn()).getValues()[0];
-      if (_phoneKey(chk[c.phone - 1]) === key && _canonKey(String(chk[c.lesson - 1]).trim().toLowerCase()) === lesson) row = hinted;
+      if (_phoneKey(chk[c.phone - 1]) === key && String(chk[c.lesson - 1]).trim().toLowerCase() === lesson) row = hinted;
     }
     if (!row && sheet.getLastRow() >= 2) {
       var n = sheet.getLastRow() - 1;
@@ -3673,7 +3610,7 @@ function _findQuizRow(sheet, lesson) {
   var c = _needCols(sheet, "Quizzes", ["lesson", "locked"]);
   var values = sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues();
   for (var i = 0; i < values.length; i++) {
-    if (_canonKey(String(values[i][c.lesson - 1]).trim().toLowerCase()) === lesson) {
+    if (String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) {
       return { row: i + 2, cols: c, locked: _isLockedCell(values[i][c.locked - 1]) };
     }
   }
@@ -3764,7 +3701,7 @@ function _findQuizContentRow(sheet, lesson) {
   var c = _needCols(sheet, "QuizContent", ["lesson", "content_json"]);
   var values = sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues();
   for (var i = 0; i < values.length; i++) {
-    if (_canonKey(String(values[i][c.lesson - 1]).trim().toLowerCase()) === lesson) {
+    if (String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) {
       return { row: i + 2, cols: c, content_json: String(values[i][c.content_json - 1] || "") };
     }
   }
@@ -3872,7 +3809,7 @@ function _grantQuizRaw(ss, phone, lesson, explicitYmd, days, source) {
   if (sheet.getLastRow() >= 2) {
     var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
     for (var i = 0; i < values.length; i++) {
-      if (_phonesMatch(values[i][c.phone - 1], phone) && _canonKey(String(values[i][c.lesson - 1]).trim().toLowerCase()) === lesson) {
+      if (_phonesMatch(values[i][c.phone - 1], phone) && String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) {
         found = { row: i + 2, ymd: _ymdOf(values[i][c.expires_at - 1], tz) };
         break;
       }
@@ -3906,7 +3843,7 @@ function _hasActiveQuizAccess(lesson, phone) {
   var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
   for (var i = 0; i < values.length; i++) {
     if (!_phonesMatch(values[i][c.phone - 1], phone)) continue;
-    if (_canonKey(String(values[i][c.lesson - 1]).trim().toLowerCase()) !== lesson) continue;
+    if (String(values[i][c.lesson - 1]).trim().toLowerCase() !== lesson) continue;
     var ymd = _ymdOf(values[i][c.expires_at - 1], tz);
     if (ymd === null) continue;               // unreadable date -> doesn't count as access
     if (ymd === "" || ymd >= today) return true;
@@ -3947,7 +3884,7 @@ function handleAdminRevokeQuizAccess(payload) {
     var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
     var rows = [];
     for (var i = 0; i < values.length; i++) {
-      if (_phonesMatch(values[i][c.phone - 1], phone) && _canonKey(String(values[i][c.lesson - 1]).trim().toLowerCase()) === lesson) rows.push(i + 2);
+      if (_phonesMatch(values[i][c.phone - 1], phone) && String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) rows.push(i + 2);
     }
     if (!rows.length) throw new Error("No matching quiz access to revoke.");
     rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
@@ -4003,7 +3940,7 @@ function handleAdminGroupRevokeQuizAccess(payload) {
       var values = qaSheet.getRange(2, 1, qaSheet.getLastRow() - 1, qaSheet.getLastColumn()).getValues();
       var rows = [];
       for (var i = 0; i < values.length; i++) {
-        if (_phonesMatch(values[i][c.phone - 1], m.phone) && _canonKey(String(values[i][c.lesson - 1]).trim().toLowerCase()) === lesson) rows.push(i + 2);
+        if (_phonesMatch(values[i][c.phone - 1], m.phone) && String(values[i][c.lesson - 1]).trim().toLowerCase() === lesson) rows.push(i + 2);
       }
       if (!rows.length) return;
       rows.sort(function (a, b) { return b - a; }).forEach(function (r) { qaSheet.deleteRows(r, 1); });
@@ -4316,7 +4253,7 @@ function handleAdminGroupRevokeAccess(payload) {
       var rows = [], pays = [];
       for (var i = 0; i < values.length; i++) {
         if (!_phonesMatch(values[i][c.phone - 1], m.phone)) continue;
-        if (_canonKey(String(values[i][c.scope - 1]).trim().toLowerCase()) !== scope) continue;
+        if (String(values[i][c.scope - 1]).trim().toLowerCase() !== scope) continue;
         rows.push(i + 2);
         var src = srcCol ? _sourcePayment(values[i][srcCol - 1]) : "";
         if (src) pays.push(src);
