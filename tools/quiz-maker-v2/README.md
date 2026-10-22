@@ -106,3 +106,14 @@ migrate_video_slots.py       one-off: migrates any lesson still using a raw bake
 quiz_maker_config.json       site_root + Drive bridge URL/token (local only, git-ignored;
                               copy quiz_maker_config.example.json to create it)
 ```
+
+
+## Written (photo) questions: bulk paste syntax (Quiz and Assignment tabs)
+```
+WRITTEN: Explain the difference between a list and a tuple.
+Marks: 8
+Model: A list is mutable, a tuple is not.
+(the model can continue on the next lines)
+E: optional note shown to the student after grading
+```
+`W:` and `Max:` are accepted as short forms. Marks default to 1. The model answer is sent to the server for the grading page and is never put in the quiz or homework page. Until you grade a written answer it is not counted in the student's total (12/12 stays 12/12; after grading 5/8 it reads 17/20). Needs FF_CAMERA (photo upload) and FF_GRADING (grading page).

@@ -631,14 +631,14 @@
     },
     {
       "id": "R-024",
-      "title": "Access dashboard merges old/typo'd lesson keys into one lesson",
+      "title": "Written (photo) questions in quizzes and homework use the CURRENT total: ungraded written marks are not counted, graded ones are; regrade is idempotent; follow-up facts match",
       "status": "active",
-      "owner": "cleanup",
+      "owner": "S3+S4",
       "cmd": [
         "node",
-        "tests/test_access_alias_client.js"
+        "tests/test_R024_written_totals.js"
       ],
-      "note": "client-side belt-and-braces for the server's _canonKey"
+      "note": "Authoring side (bulk paste WRITTEN:/Marks:/Model:, models split from the page) is in tests/test_written_authoring.py (R-S4a); the homework page side in e2e_capture.py."
     }
   ]
 }

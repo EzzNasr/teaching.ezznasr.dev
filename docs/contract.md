@@ -197,3 +197,11 @@ same file. S5 reads all handoffs before each integration build.
 - `review_lessons` is kept as the UNION of both lists on every split save, so older readers still see every lesson.
 - Readers: use `FollowupLogic.hwList/quizList/allReviewLessons` (JS) or `g.settings.hw_lessons || g.settings.review_lessons` (Apps Script). `admin_student_summary.expected[]` only marks a quiz/homework as required for lessons in that kind's list.
 - The page ids: `#fu-role-hw`, `#fu-role-quiz`, `#pick-hw-N`, `#pick-quiz-N`, `#fu-add-hw`, `#fu-add-quiz`.
+
+
+## v1.6 (Oct 23): current-total scoring for written questions
+- `QuizResults` / `Submissions` `score` and `total` are always the CURRENT figures: auto-graded questions + every written question the teacher has GRADED (its awarded marks in `score`, its max in `total`).
+- A written answer that is still waiting for grading (photo attached) is in neither. A written question with no photo counts 0 of its max (blank answer), same as an unanswered auto question.
+- So 12 auto questions all right + 8 written marks waiting = 12/12; after grading 5/8 = 17/20. Parent messages, the summary and the follow-up facts just read `score`/`total`; nothing else adjusts them.
+- Homework (assign.js) follows the same rule at submit time; `admin_grade_written` keeps `base_score/base_total` (the auto part) and always recomputes `score = base_score + sum(awarded)`, `total = base_total + sum(max)` over graded written answers only.
+- Authoring: Quiz Maker's Quiz AND Assignment tabs have "+ Written (photo)"; the shared bulk paste accepts `WRITTEN:` (alias `W:`), `Marks:` (alias `Max:`, default 1), `Model:` (multi-line), `E:`. A homework written item's page `id` is its stable `qid`; the model answer goes to WrittenModels, never into the page.

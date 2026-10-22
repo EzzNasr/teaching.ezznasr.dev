@@ -28,6 +28,7 @@ from modules.common import (
     TrueFalseItemDialog,
     MatchItemDialog,
     GradedBulkDialog,
+    WrittenItemDialog,
 )
 
 class AssignmentTab(ttk.Frame):
@@ -153,6 +154,7 @@ class AssignmentTab(ttk.Frame):
         tk.Button(graded_btn_row, text="+ Multiple choice", command=self._add_mcq).pack(side="left")
         tk.Button(graded_btn_row, text="+ True/False", command=self._add_truefalse).pack(side="left", padx=6)
         tk.Button(graded_btn_row, text="+ Matching", command=self._add_match).pack(side="left")
+        tk.Button(graded_btn_row, text="+ Written (photo)", command=self._add_written).pack(side="left", padx=6)
         tk.Button(graded_btn_row, text="+ Bulk paste...", command=self._bulk_add_graded).pack(side="left", padx=6)
         tk.Button(graded_btn_row, text="Edit selected", command=self._edit_graded).pack(side="left", padx=6)
         tk.Button(graded_btn_row, text="Remove selected", command=self._remove_graded).pack(side="left")
@@ -197,7 +199,7 @@ class AssignmentTab(ttk.Frame):
 
     def _refresh_graded_listbox(self):
         self.graded_listbox.delete(0, "end")
-        labels = {"mcq": "MCQ", "truefalse": "T/F", "match": "Match"}
+        labels = {"mcq": "MCQ", "truefalse": "T/F", "match": "Match", "written": "Written"}
         for i, item in enumerate(self.graded_items):
             preview = item["prompt"][:70].replace("\n", " ")
             chapter = item.get("chapter")
@@ -226,6 +228,13 @@ class AssignmentTab(ttk.Frame):
             self.graded_items.append(dlg.result)
             self._refresh_graded_listbox()
 
+    def _add_written(self):
+        dlg = WrittenItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
+        self.wait_window(dlg)
+        if dlg.result:
+            self.graded_items.append(dlg.result)
+            self._refresh_graded_listbox()
+
     def _bulk_add_graded(self):
         dlg = GradedBulkDialog(self, current_chapter=self._current_chapter())
         self.wait_window(dlg)
@@ -241,7 +250,8 @@ class AssignmentTab(ttk.Frame):
             return
         idx = sel[0]
         item = self.graded_items[idx]
-        dialog_cls = {"mcq": MCQItemDialog, "truefalse": TrueFalseItemDialog, "match": MatchItemDialog}[item["type"]]
+        dialog_cls = {"mcq": MCQItemDialog, "truefalse": TrueFalseItemDialog, "match": MatchItemDialog,
+                      "written": WrittenItemDialog}[item["type"]]
         dlg = dialog_cls(self, existing=item, chapter_choices=self._chapter_choices(),
                           default_chapter=self._current_chapter())
         self.wait_window(dlg)
@@ -352,8 +362,20 @@ class AssignmentTab(ttk.Frame):
                         # Strip the generation-time "id" field — it's reassigned
                         # fresh on every Update, so it's not part of the editable shape.
                         self.graded_items = [{k: v for k, v in item.items() if k != "id"} for item in loaded]
+                        # A written question's id IS its stable question id (the grading page pairs
+                        # photos, model answer and marks by it), so it must survive a reload.
+                        for src, item in zip(loaded, self.graded_items):
+                            if item.get("type") == "written":
+                                item["qid"] = src.get("id") or item.get("qid") or common.new_written_qid()
                     except Exception:
                         self.graded_items = []
+                if any(i.get("type") == "written" for i in self.graded_items) and drive_cfg["web_app_url"] and drive_cfg["admin_token"]:
+                    try:   # model answers live on the server (WrittenModels), never in the page
+                        common.merge_written_models(self.graded_items, drive_bridge.get_written_models(
+                            drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key))
+                    except drive_bridge.DriveBridgeError as e:
+                        messagebox.showwarning("Model answers not loaded",
+                                               "Couldn't read the written questions' model answers:\n{}".format(e))
             self._refresh_graded_listbox()
             self.status_var.set("Loaded current assignment settings for " + self.lesson_var.get())
         else:
@@ -509,15 +531,20 @@ class AssignmentTab(ttk.Frame):
             return
 
         graded_items_out = []
+        written_models = []
         if mode_slug == "graded":
             if not self.graded_items:
                 messagebox.showerror(
                     "No graded questions",
                     "Submission type is \u201cGraded questions\u201d, but no questions have been added yet. "
-                    "Use the + Multiple choice / + True/False / + Matching / + Bulk paste buttons below "
+                    "Use the + Multiple choice / + True/False / + Matching / + Written / + Bulk paste buttons below "
                     "to add some first.")
                 return
-            graded_items_out = [dict(item, id="g" + str(i + 1)) for i, item in enumerate(self.graded_items)]
+            # Written questions keep their own id (= qid): photos, the model answer and the marks are
+            # all matched by it. Model answers go to the server, never into the page.
+            graded_public, written_models = common.split_written_models(self.graded_items)
+            graded_items_out = [dict(item, id=(item.get("qid") if item.get("type") == "written" else "g" + str(i + 1)))
+                                for i, item in enumerate(graded_public)]
 
         subject_slug = self._subject_slug()
         group_relpath = self._group_relpath()
@@ -551,6 +578,21 @@ class AssignmentTab(ttk.Frame):
                             .replace("{{ASSIGN_QUESTIONS_JSON}}", json.dumps({"items": graded_items_out})))
         with open(assignment_path, "w", encoding="utf-8") as f:
             f.write(assignment_html)
+
+        if written_models:
+            if drive_cfg["web_app_url"] and drive_cfg["admin_token"]:
+                try:
+                    drive_bridge.set_written_models(drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, written_models)
+                except drive_bridge.DriveBridgeError as e:
+                    messagebox.showerror(
+                        "Model answers not saved",
+                        "assignment.html was written, but the written questions' model answers could not be "
+                        "sent to the server, so the grading page won't show them. Click Update again once the "
+                        "Drive bridge works:\n{}".format(e))
+            else:
+                messagebox.showwarning("Model answers not saved",
+                                       "The Drive bridge isn't configured, so the written questions' model answers "
+                                       "were not saved anywhere. Set it up and click Update again.")
 
         # Make sure the lesson's index.html actually links to the assignment
         # page (in case this lesson was generated with "include assignment"

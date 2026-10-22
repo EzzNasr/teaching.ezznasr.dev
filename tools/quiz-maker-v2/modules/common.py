@@ -1399,6 +1399,16 @@ MATCH: Match each term to its definition
 - Function -> Named block of code
 E: optional explanation
 
+Written (the student photographs a handwritten answer; you grade it later, by hand):
+WRITTEN: Explain the difference between a list and a tuple.
+Marks: 8
+Model: A list is mutable, a tuple is not. (can continue on the next lines)
+E: optional explanation shown to the student after grading.
+- "W:" works instead of "WRITTEN:", and "Max:" instead of "Marks:". Marks defaults to 1.
+- The model answer is kept on the server for the grading page; students never receive it.
+- Until you grade it, the written question is NOT counted: a quiz with 12 auto questions
+  and 8 written marks reads 12/12 now, then (say) 17/20 once you grade it.
+
 Separate questions with a blank line or a line of ---.
 Mark correct MCQ option(s) with a * right after them (up to 6 options,
 A-F) \u2014 star more than one for a "select all that apply" question.
@@ -1440,10 +1450,16 @@ def parse_bulk_graded_questions(text, current_chapter=None):
     q_text, options, correct, explain = None, [], [], ""
     tf_text, tf_correct, tf_explain = None, None, ""
     match_prompt, match_rows, match_explain = None, [], ""
+    w_prompt, w_marks, w_model, w_explain, w_field = None, 1, "", "", "prompt"
 
     def flush():
         item = None
-        if mode == "mcq" and q_text and len(options) >= 2:
+        if mode == "written" and w_prompt:
+            item = {
+                "type": "written", "qid": new_written_qid(), "prompt": w_prompt.strip(),
+                "max_marks": w_marks, "model_answer": w_model.strip(), "explain": w_explain.strip(),
+            }
+        elif mode == "mcq" and q_text and len(options) >= 2:
             item = {
                 "id": next_id(), "type": "mcq", "prompt": q_text,
                 "options": list(options), "correct": list(correct) if correct else [0],
@@ -1476,6 +1492,7 @@ def parse_bulk_graded_questions(text, current_chapter=None):
             q_text, options, correct, explain = None, [], [], ""
             tf_text, tf_correct, tf_explain = None, None, ""
             match_prompt, match_rows, match_explain = None, [], ""
+            w_prompt, w_marks, w_model, w_explain, w_field = None, 1, "", "", "prompt"
             continue
 
         ch_match = re.match(r"^Ch:\s*(\d+)", line, re.IGNORECASE)
@@ -1485,8 +1502,38 @@ def parse_bulk_graded_questions(text, current_chapter=None):
             q_text, options, correct, explain = None, [], [], ""
             tf_text, tf_correct, tf_explain = None, None, ""
             match_prompt, match_rows, match_explain = None, [], ""
+            w_prompt, w_marks, w_model, w_explain, w_field = None, 1, "", "", "prompt"
             chapter = int(ch_match.group(1))
             continue
+
+        wm = re.match(r"^(WRITTEN|W):\s*(.*)$", line, re.IGNORECASE)
+        if wm:
+            flush()
+            mode = "written"
+            w_prompt, w_marks, w_model, w_explain, w_field = wm.group(2).strip(), 1, "", "", "prompt"
+            continue
+
+        if mode == "written":
+            mk = re.match(r"^(MARKS|MAX):\s*([0-9]+(?:\.[0-9]+)?)", line, re.IGNORECASE)
+            if mk:
+                v = float(mk.group(2))
+                w_marks = (int(v) if v == int(v) else v) if 0 < v <= 100 else 1
+                continue
+            md = re.match(r"^MODEL:\s*(.*)$", line, re.IGNORECASE)
+            if md:
+                w_model, w_field = md.group(1), "model"
+                continue
+            if line.startswith("E:"):
+                w_explain, w_field = line[2:].strip(), "explain"
+                continue
+            if not re.match(r"^(Q:|TF:|MATCH:|Ch:)", line, re.IGNORECASE):   # a continuation line of the current field
+                if w_field == "model":
+                    w_model += "\n" + line
+                elif w_field == "explain":
+                    w_explain += "\n" + line
+                else:
+                    w_prompt += "\n" + line
+                continue
 
         if line.startswith("Q:"):
             flush()
@@ -1949,6 +1996,12 @@ class GradedBulkDialog(tk.Toplevel):
         if not items:
             messagebox.showerror("Nothing parsed", "No valid questions were found in that text.", parent=self)
             return
+        no_model = [it for it in items if it.get("type") == "written" and not it.get("model_answer")]
+        if no_model:
+            messagebox.showwarning(
+                "Written question without a model answer",
+                "{} written question(s) have no \"Model:\" line. They are added, but the grading page will "
+                "have nothing to compare against until you edit them and add one.".format(len(no_model)), parent=self)
         self.result = items
         self.destroy()
 

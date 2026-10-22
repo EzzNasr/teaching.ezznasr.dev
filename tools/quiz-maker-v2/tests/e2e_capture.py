@@ -256,7 +256,8 @@ def run(browser, tmp):
     check("homework: photo uploaded under the submission's client_id", ph["attempt_id"] == sub["client_id"] and ph["kind"] == "assignment", (ph.get("attempt_id"), sub.get("client_id")))
     w = [a for a in sub["answers"] if a["type"] == "written"][0]
     check("homework: written answer recorded as pending with its photo count and max marks", w["pending"] is True and w["image_count"] == 1 and w["max"] == 3, w)
-    check("homework: total counts the written marks (1 + 3), score only the auto-graded", sub["score"] == 1 and sub["total"] == 4, (sub["score"], sub["total"]))
+    check("R-024 homework: a pending written answer is NOT in the total yet (1 of 1, its 3 marks join when graded)", sub["score"] == 1 and sub["total"] == 1, (sub["score"], sub["total"]))
+    check("R-024 homework: the result page says a written answer is waiting for grading", "waiting for your teacher" in p.pg.inner_text("body"), p.pg.inner_text("body")[:300])
     check("homework: submission landed on the server", "Saved on this device" not in p.pg.inner_text("body"))
     p.s.close()
 

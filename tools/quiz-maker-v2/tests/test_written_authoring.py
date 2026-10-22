@@ -41,4 +41,44 @@ loaded = common.merge_written_models(json.loads(json.dumps(pub)), models)
 t("merge restores model answer after reload", loaded[1]["model_answer"] == "SECRET")
 t("merge ignores unknown ids and non-written", common.merge_written_models([{"type": "written", "qid": "zz"}, qs[0]], models)[0].get("model_answer") is None)
 t("qids are unique and well-formed", len({common.new_written_qid() for _ in range(200)}) == 200 and common.new_written_qid().startswith("w"))
+# ---- bulk paste: WRITTEN blocks (quiz tab and assignment tab share this parser) ----
+BULK = """Ch: 2
+Q: What is 1+1?
+A) 1
+B) 2 *
+C) 3
+E: because
+
+WRITTEN: Explain list vs tuple.
+second line of the question
+Marks: 8
+Model: A list is mutable.
+A tuple is not.
+E: see notes
+
+W: Short one
+Max: 2.5
+Model: x
+---
+TF: Python is compiled
+Correct: False
+
+WRITTEN: no model here
+"""
+items = common.parse_bulk_graded_questions(BULK, 1)
+wr = [i for i in items if i["type"] == "written"]
+t("bulk: 1 mcq + 1 tf + 3 written parsed", len(items) == 5 and len(wr) == 3)
+t("bulk: written prompt continues over lines", wr[0]["prompt"] == "Explain list vs tuple.\nsecond line of the question")
+t("bulk: Marks / Max parsed (8, 2.5; default 1)", [w["max_marks"] for w in wr] == [8, 2.5, 1])
+t("bulk: multi-line Model and E parsed", wr[0]["model_answer"] == "A list is mutable.\nA tuple is not." and wr[0]["explain"] == "see notes")
+t("bulk: W: alias works", wr[1]["prompt"] == "Short one" and wr[1]["model_answer"] == "x")
+t("bulk: a written question without Model is kept (empty model)", wr[2]["model_answer"] == "")
+t("bulk: every written item has a unique qid", len({w["qid"] for w in wr}) == 3 and all(w["qid"].startswith("w") for w in wr))
+t("bulk: chapter from Ch: line applies to written", all(w.get("chapter") == 2 for w in wr))
+t("bulk: the mcq before it is unharmed", items[0]["type"] == "mcq" and items[0]["correct"] == [1])
+pub, models = common.split_written_models(items)
+t("bulk: split sends 3 models to the server and no model in the page JSON", len(models) == 3 and "A list is mutable" not in json.dumps(pub))
+bad = common.parse_bulk_graded_questions("WRITTEN: x\nMarks: 0\nModel: m", None)
+t("bulk: Marks 0 falls back to 1", bad and bad[0]["max_marks"] == 1)
+
 sys.exit(0 if ok else 1)

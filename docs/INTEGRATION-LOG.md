@@ -72,3 +72,8 @@ Not done: R-019 (RTL) and R-022 (audit coverage) still TODO; S3 did not deliver 
 ## Integration 5 (Oct 22)
 - Follow-up page: homework and quiz lessons are now two separate lists per group (R-023). New GroupSettings columns hw_lessons, quiz_lessons (auto-added on first save; blank = follows the old shared list, so nothing changes until you edit a group).
 - Touched: Code.gs (GroupSettings read/save/overview), Phase2_Keys.gs (migration covers the new columns), Phase2_Followup.gs (summary), followup-logic.js, followup-templates.js, followup-app.js, tests.
+
+## Integration 6 (Oct 23)
+- Assignment tab: "+ Written (photo)" button, edit, model answers synced to WrittenModels on Update and merged back on load; written item id = qid.
+- Bulk paste (both tabs): WRITTEN:/W:, Marks:/Max:, Model:, E:.
+- Homework now excludes a pending written answer from `total` (assign.js); result page says it is waiting. R-024 added.

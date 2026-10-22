@@ -325,7 +325,9 @@
           var item = e.item;
           if (e.written) {
             var w = state.widgets[item.id], n = w ? w.count() : 0, max = Math.max(1, Math.floor(Number(item.max_marks)) || 1);
-            total += max;
+            // Counted in the total only once it has been graded: with a photo attached the answer waits for
+            // the teacher (pending) and the grader adds its max then. No photo = 0 of max, as a blank answer.
+            if (!(n > 0)) total += max;
             answers.push({
               id: item.id, type: "written", prompt: item.prompt,
               chosen: n ? "[" + n + " photo" + (n > 1 ? "s" : "") + "]" : "", correct_answer: "", is_correct: false,
@@ -447,6 +449,11 @@
           el("div", { class: "qz-summary__score" }, [state.score + " / " + state.total]),
           el("div", { class: "qz-summary__label" }, [pct + "% correct \u00b7 " + session.student_name]),
         ];
+        var waiting = (state.answers || []).filter(function (a) { return a.type === "written" && a.pending; }).length;
+        if (waiting) {
+          children.push(el("div", { class: "qz-progress" }, [waiting + (waiting > 1 ? " written answers are" : " written answer is") +
+            " waiting for your teacher to grade. This score covers the other questions and will be updated once they are graded."]));
+        }
         if (state.syncStatus === "not-configured") {
           children.push(el("div", { class: "qz-error" }, [
             "Saved on this device. Result delivery isn't fully set up yet \u2014 let your instructor know.",
