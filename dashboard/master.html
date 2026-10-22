@@ -358,17 +358,40 @@ html[data-theme] .d-tabs {
   display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
 }
 html[data-theme] .d-tabs::-webkit-scrollbar { display: none; }
-html[data-theme] .d-tabs a {
-  flex: none; padding: 7px 12px; border-radius: 999px;
+html[data-theme] .d-tabs a,
+html[data-theme] .d-tabs button {
+  flex: none; display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 12px; border-radius: 999px; cursor: pointer;
   color: var(--mx-muted); text-decoration: none; white-space: nowrap;
-  font-size: 13px; font-weight: 600;
+  font: 600 13px/1.2 var(--mx-font);
   border: 1px solid transparent; background: transparent;
   transition: color .15s, background-color .15s, border-color .15s;
 }
-html[data-theme] .d-tabs a:hover { color: var(--mx-ink); background: var(--mx-surface); border-color: var(--mx-line); }
-html[data-theme] .d-tabs a.is-on {
+html[data-theme] .d-tabs a:hover,
+html[data-theme] .d-tabs button:hover { color: var(--mx-ink); background: var(--mx-surface); border-color: var(--mx-line); }
+html[data-theme] .d-tabs a.is-on,
+html[data-theme] .d-tabs button.is-on {
   color: var(--mx-accent); background: var(--mx-accent-soft);
   border-color: color-mix(in srgb, var(--mx-accent) 25%, transparent);
+}
+html[data-theme] .d-tabs button:focus-visible { outline: 2px solid var(--mx-accent); outline-offset: 2px; }
+html[data-theme] .d-tab-count {
+  font-family: var(--mx-mono); font-size: 11px; font-weight: 500;
+  padding: 1px 7px; border-radius: 999px;
+  background: var(--mx-surface-2); color: var(--mx-muted);
+}
+html[data-theme] .d-tabs button.is-on .d-tab-count { background: var(--mx-surface); color: var(--mx-accent); }
+
+/* ---- Year blocks inside a section ----------------------------------------- */
+html[data-theme] .dash-year-group { margin-top: 18px; }
+html[data-theme] .dash-year-group + .dash-year-group { padding-top: 18px; border-top: 1px dashed var(--mx-line); }
+html[data-theme] .dash-year-head {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 10px;
+  font-family: var(--mx-mono); font-size: 11.5px; font-weight: 500;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--mx-muted);
+}
+html[data-theme] .dash-year-head::before {
+  content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--mx-accent);
 }
 
 /* ---- Lists & rows --------------------------------------------------------- */
@@ -989,6 +1012,57 @@ html[data-theme] .dash-loadbar-fill {
     showMore();
   }
 
+  // Splits rows into one block per year ("Senior 1", "Senior 2", then any
+  // other label, then the no-year bucket), keeping each block's row order.
+  var YEAR_ORDER = ["Senior 1", "Senior 2"];
+  function groupByYear(rows, yearOf, emptyLabel) {
+    var groups = {}, order = [];
+    rows.forEach(function (r) {
+      var y = yearOf(r) || "";
+      if (!groups[y]) { groups[y] = []; order.push(y); }
+      groups[y].push(r);
+    });
+    order.sort(function (a, b) {
+      var ia = YEAR_ORDER.indexOf(a), ib = YEAR_ORDER.indexOf(b);
+      if (!a) return 1; if (!b) return -1;
+      if (ia !== -1 || ib !== -1) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      return a.localeCompare(b);
+    });
+    return order.map(function (y) { return { label: y || emptyLabel || "No year on file", rows: groups[y] }; });
+  }
+
+  // When "All years" is selected, lists are split into a block per year.
+  // When a single year tab is active, the list is shown as one block.
+  function appendByYear(section, rows, yearOf, buildRow, opts) {
+    opts = opts || {};
+    var groups = STATE.filterYear ? [] : groupByYear(rows, yearOf, opts.emptyLabel);
+    if (groups.length < 2) {
+      if (opts.paged === false) {
+        var single = el("div", { class: "d-list" });
+        rows.forEach(function (r) { single.appendChild(buildRow(r)); });
+        section.appendChild(single);
+      } else {
+        appendPaged(section, rows, buildRow);
+      }
+      return;
+    }
+    groups.forEach(function (g) {
+      var block = el("div", { class: "dash-year-group" }, [
+        el("h3", { class: "dash-year-head" }, [g.label, el("span", { class: "d-count" }, [String(g.rows.length)])]),
+      ]);
+      if (opts.paged === false) {
+        var list = el("div", { class: "d-list" });
+        g.rows.forEach(function (r) { list.appendChild(buildRow(r)); });
+        block.appendChild(list);
+      } else {
+        appendPaged(block, g.rows, buildRow);
+      }
+      section.appendChild(block);
+    });
+  }
+
+  function rowYear(r) { return studentYearByDigits(normalizePhone(r.student_id)); }
+
   function newestFirst(rows) {
     return (rows || []).slice().reverse();
   }
@@ -1255,6 +1329,7 @@ html[data-theme] .dash-loadbar-fill {
     filterYear: "",      // "" = all years | "Senior 1" | "Senior 2" | NO_YEAR
     filterTrack: "",     // "" = all tracks/programmes (e.g. "baccalaureate")
     search: "",          // matched against lesson / quiz_title / question text
+    activeTab: "sec-chapters", // which section tab is open below the filters
   };
 
   var NO_YEAR = "__none__";
@@ -1532,11 +1607,10 @@ html[data-theme] .dash-loadbar-fill {
       section.appendChild(el("div", { class: "dash-empty" }, ["No applicable assignments found for this filter."]));
       return section;
     }
-    var agg = el("div", { class: "d-list" });
-    aggregate.forEach(function (a) {
+    appendByYear(section, aggregate, function (a) { return a.year || ""; }, function (a) {
       var pct = a.pool ? a.submitted / a.pool : 1;
       var barClass = pct >= 0.8 ? "is-good" : (pct < 0.5 ? "is-low" : "");
-      agg.appendChild(el("div", { class: "dash-chapter" }, [
+      return el("div", { class: "dash-chapter" }, [
         el("div", { class: "dash-chapter-top" }, [
           el("b", { dir: "auto" }, [R.lessonLabel(a.lesson)]),
           document.createTextNode((a.year ? (a.subject + " \u00b7 " + a.year) : catalogTag(a)) + " \u00b7 " + a.submitted + "/" + a.pool),
@@ -1544,9 +1618,8 @@ html[data-theme] .dash-loadbar-fill {
         el("div", { class: "dash-bar" }, [
           el("div", { class: "dash-bar-fill " + barClass, style: "width:" + Math.max(3, Math.round(pct * 100)) + "%" }),
         ]),
-      ]));
-    });
-    section.appendChild(agg);
+      ]);
+    }, { paged: false, emptyLabel: "Both years" });
     return section;
   }
 
@@ -1601,7 +1674,7 @@ html[data-theme] .dash-loadbar-fill {
       section.appendChild(el("div", { class: "dash-empty" }, ["No quiz attempts match the current filters."]));
       return section;
     }
-    appendPaged(section, newestFirst(quizRows), function (r) {
+    appendByYear(section, newestFirst(quizRows), rowYear, function (r) {
       var score = Number(r.score) || 0, total = Number(r.total) || 0;
       var qs = parseQuestions(r);
       var slug = r.lesson || "";
@@ -1626,7 +1699,7 @@ html[data-theme] .dash-loadbar-fill {
       section.appendChild(el("div", { class: "dash-empty" }, ["No submissions match the current filters."]));
       return section;
     }
-    appendPaged(section, newestFirst(subRows), function (r) {
+    appendByYear(section, newestFirst(subRows), rowYear, function (r) {
       var when = fmtWhen(r.submitted_time || r.date);
       var slug = r.lesson || "";
       var info = R.lessonInfo(slug);
@@ -1670,9 +1743,8 @@ html[data-theme] .dash-loadbar-fill {
       section.appendChild(el("div", { class: "dash-empty" }, ["No students match the current filters."]));
       return section;
     }
-    var list = el("div", { class: "d-list" });
-    roster.forEach(function (r) {
-      list.appendChild(el("div", { class: "dash-row" }, [
+    appendByYear(section, roster, function (r) { return r.year; }, function (r) {
+      return el("div", { class: "dash-row" }, [
         el("div", { class: "dash-row-main" }, [
           el("div", { class: "dash-row-title", dir: "auto" }, [r.display_name]),
           trail(["Phone " + (displayPhone(r.phone) || "\u2014"), "Parent " + (displayPhone(r.parent_phone) || "not on file"), r.created_at ? "Joined " + fmtWhen(r.created_at) : ""]),
@@ -1681,37 +1753,33 @@ html[data-theme] .dash-loadbar-fill {
         el("div", { class: "dash-badge" }, [r.quizzes + " quiz" + (r.quizzes === 1 ? "" : "zes")]),
         el("div", { class: "dash-score" }, [r.avgPct]),
         el("div", { class: "dash-badge" }, [r.submissions + " sub" + (r.submissions === 1 ? "" : "s")]),
-      ]));
-    });
-    section.appendChild(list);
+      ]);
+    }, { paged: false });
     return section;
   }
 
-  function jumpNav(items) {
-    var links = items.map(function (it, i) {
-      return el("a", { href: "#" + it[0], class: i === 0 ? "is-on" : "" }, [it[1]]);
+  // One section is shown at a time; the tab bar switches between them.
+  // Arrow keys move between tabs (WAI-ARIA tabs pattern).
+  function sectionTabs(items, onSelect) {
+    var buttons = items.map(function (it) {
+      var on = STATE.activeTab === it.id;
+      var btn = el("button", {
+        type: "button", role: "tab", id: "tab-" + it.id, "aria-controls": "panel-sections",
+        "aria-selected": String(on), tabindex: on ? "0" : "-1", class: on ? "is-on" : "",
+      }, [it.label, it.count === null || it.count === undefined ? null : el("span", { class: "d-tab-count" }, [String(it.count)])]);
+      btn.addEventListener("click", function () { onSelect(it.id, false); });
+      return btn;
     });
-    return el("div", { class: "d-tabs-wrap" }, [el("nav", { class: "d-tabs", "aria-label": "Sections" }, links)]);
-  }
-
-  // Highlights the jump link of the section currently under the sticky bars.
-  // Sections are rebuilt on every filter change, so this looks them up fresh.
-  function watchSections(ids) {
-    var queued = false;
-    function update() {
-      queued = false;
-      var current = ids[0];
-      ids.forEach(function (id) {
-        var n = document.getElementById(id);
-        if (n && n.getBoundingClientRect().top <= 150) current = id;
-      });
-      Array.prototype.forEach.call(document.querySelectorAll(".d-tabs a"), function (a) {
-        a.classList.toggle("is-on", a.getAttribute("href") === "#" + current);
-      });
-    }
-    window.addEventListener("scroll", function () {
-      if (!queued) { queued = true; requestAnimationFrame(update); }
-    }, { passive: true });
+    var bar = el("div", { class: "d-tabs", role: "tablist", "aria-label": "Sections" }, buttons);
+    bar.addEventListener("keydown", function (e) {
+      var i = items.map(function (it) { return it.id; }).indexOf(STATE.activeTab);
+      var next = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : null;
+      if (next === null) return;
+      e.preventDefault();
+      next = (next + items.length) % items.length;
+      onSelect(items[next].id, true);
+    });
+    return el("div", { class: "d-tabs-wrap" }, [bar]);
   }
 
   function renderDashboard(session) {
@@ -1732,23 +1800,29 @@ html[data-theme] .dash-loadbar-fill {
     var below = el("div", {}, []);
     [tabsSlot, statsSlot, filtersSlot, below].forEach(function (n) { root.appendChild(n); });
 
-    var SECTION_IDS = ["sec-chapters", "sec-missed", "sec-completion", "sec-quizzes", "sec-submissions", "sec-students"];
-    watchSections(SECTION_IDS);
-
-    function rerenderFiltered() {
+    function rerenderFiltered(focusTab) {
       var filteredQuiz = getFilteredQuiz();
       var filteredSubs = getFilteredSubs();
+      var sections = [
+        { id: "sec-chapters", label: "Chapters and lessons", render: function () { return renderChapterSection(filteredQuiz, filteredSubs); } },
+        { id: "sec-missed", label: "Most missed", render: function () { return renderMostMissed(filteredQuiz); } },
+        { id: "sec-completion", label: "Assignment completion", render: renderAssignmentCompletion },
+        { id: "sec-quizzes", label: "Quiz attempts", count: filteredQuiz.length, render: function () { return renderQuizSection(filteredQuiz); } },
+        { id: "sec-submissions", label: "Submissions", count: filteredSubs.length, render: function () { return renderSubmissionsSection(filteredSubs); } },
+        { id: "sec-students", label: "Students", render: renderStudentsSection },
+      ];
+      var active = sections.filter(function (s) { return s.id === STATE.activeTab; })[0] || sections[0];
+      STATE.activeTab = active.id;
       below.innerHTML = "";
-      below.appendChild(jumpNav([
-        ["sec-chapters", "Chapters and lessons"], ["sec-missed", "Most missed"], ["sec-completion", "Assignment completion"],
-        ["sec-quizzes", "Quiz attempts"], ["sec-submissions", "Submissions"], ["sec-students", "Students"],
-      ]));
-      below.appendChild(renderChapterSection(filteredQuiz, filteredSubs));
-      below.appendChild(renderMostMissed(filteredQuiz));
-      below.appendChild(renderAssignmentCompletion());
-      below.appendChild(renderQuizSection(filteredQuiz));
-      below.appendChild(renderSubmissionsSection(filteredSubs));
-      below.appendChild(renderStudentsSection());
+      below.appendChild(sectionTabs(sections, function (id, fromKeyboard) {
+        STATE.activeTab = id;
+        rerenderFiltered(fromKeyboard);
+      }));
+      below.appendChild(el("div", { role: "tabpanel", id: "panel-sections", "aria-labelledby": "tab-" + active.id, class: "dash-panel" }, [active.render()]));
+      if (focusTab) {
+        var t = document.getElementById("tab-" + active.id);
+        if (t) t.focus();
+      }
     }
 
     // Anything that changes the roster/stats/filter controls themselves

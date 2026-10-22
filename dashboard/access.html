@@ -1983,4 +1983,850 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
     var yes = [], no = [];
     allLessonsList(d).forEach(function (l) {
       var ok = mine.some(function (a) { return covers(a, l.lesson); }), y = yearOf(l.lesson);
-      if (ok) yes.push(l); else if (y && (!yr || y === yr)) no.push
+      if (ok) yes.push(l); else if (y && (!yr || y === yr)) no.push(l);
+    });
+    function block(title, list, granted) {
+      var kids = [];
+      byChapter(list, function (l) { return l.lesson; }).forEach(function (ch) {
+        kids.push(chapterHead(ch.title, countLabel(ch.items.length, "lesson", "lessons")));
+        ch.items.forEach(function (l) {
+          kids.push(el("div", { class: "ac-cl" + (granted ? "" : " is-no") }, [lessonShort(l.lesson), el("small", {}, [yearOf(l.lesson)])]));
+          if (granted) { var q = quizBy[l.lesson]; kids.push(el("div", { class: "ac-cq" }, ["Quiz \u00b7 " + (q ? (q.locked ? "locked" : "open") : "no gate")])); }
+        });
+      });
+      var det = el("details", {}, [el("summary", {}, [title + "  \u00b7  " + list.length])].concat(kids.length ? kids : [el("p", { class: "ac-hint" }, ["None."])]));
+      if (granted) det.setAttribute("open", "");
+      return det;
+    }
+    var terms = mine.filter(function (a) { var s = subScope(a.scope); return s && s.kind === "t"; });
+    return el("div", { class: "ac-cov" }, [block("Granted", yes, true), block("Not granted", no, false)]
+      .concat(terms.length ? [el("p", { class: "ac-hint" }, ["Also has " + terms.map(function (a) { return scopeInfo(a.scope).title; }).join(", ") + " \u2014 which lessons that covers is decided by the server, so it isn't counted above."])] : []));
+  }
+
+  function accessPanel(d) {
+    var f = STATE.filters.access;
+    var mode = STATE.view.access;
+    var base = d.access.filter(function (a) {
+      var ok = f.status === "all" ||
+        (f.status === "active" && a.state === "active") ||
+        (f.status === "ending" && a.state === "active" && a.days_left !== null && a.days_left <= 7) ||
+        (f.status === "expired" && a.state === "expired") ||
+        (f.status === "problem" && (a.state === "cancelled" || a.state === "invalid"));
+      return ok && matches(f.q, [a.name, a.phone, a.scope, a.payment_id, a.source]);
+    });
+    var counts = yearCounts(base, function (flt, a) { return sectionPass(d, flt, a.scope); });
+    var list = base.filter(function (a) { return sectionPass(d, STATE.year, a.scope); });
+
+    var wrap = el("div", {});
+    wrap.appendChild(yearBar(counts));
+    var groupBy = el("div", { class: "ac-fgroup" }, ["Group by", segmented([["lesson", "Lesson"], ["person", "Person"]], mode, function (v) { STATE.view.access = v; STATE.open = null; render(); }, "data-view", "Group by")]);
+    wrap.appendChild(filtersNode("access", [["active", "Active now"], ["ending", "Ending within 7 days"], ["expired", "Expired"], ["problem", "Cancelled / needs fixing"], ["all", "Everything"]], "Name, phone or lesson", groupBy));
+
+    var section = el("div", { class: "dash-section" }, [
+      el("h2", {}, [mode === "person" ? "Each student and what they can watch" : "Each lesson and who can watch it", el("span", { class: "ac-count" }, [String(list.length) + " of " + d.access.length])]),
+      el("p", { class: "dash-section-note" }, ["Split by year, then grouped by " + (mode === "person" ? "student" : "lesson") + ". Click a group to fold it."]),
+    ]);
+    if (!list.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, [d.access.length ? "Nothing matches this filter." : "Nobody has been given access yet."]));
+      wrap.appendChild(section);
+      return wrap;
+    }
+    var keys = [], body = [], seenP = {};
+    bySection(list, function (a) { return sectionOf(a.scope); }).forEach(function (sec) {
+      var groups = groupAccessRows(sec.items, mode);
+      body.push(sectionHead(sec.name, (mode === "person" ? countLabel(groups.length, "student", "students") + "  \u00b7  " : "") + countLabel(sec.items.length, "grant", "grants")));
+      body.push(el("div", { class: "ac-lines is-access ac-lines-headonly" }, [linesHead([mode === "person" ? "Lesson" : "Student", "Status", "Until", "How", ""])]));
+      groups.forEach(function (g) {
+        var hasOpen = !!STATE.open && g.rows.some(function (a) { return STATE.open.indexOf("acc:" + a.phone + "|" + a.scope + ":") === 0; });
+        var lines = el("div", { class: "ac-lines is-access" }, g.rows.map(function (a) { return accessRow(d, a, mode); }));
+        var kids = [lines];
+        if (mode === "person" && !seenP[keyOf(g.sample.phone)]) { seenP[keyOf(g.sample.phone)] = 1; kids.push(coverageBlock(d, g.sample)); }
+        body.push(collapsible("acc:" + mode + ":" + sec.name + ":" + g.gk, accessGroupHead(d, g, mode), kids, hasOpen, keys));
+      });
+    });
+    if (keys.length > 1) section.appendChild(expandTools(keys));
+    body.forEach(function (n) { section.appendChild(n); });
+    wrap.appendChild(section);
+    return wrap;
+  }
+
+  // ---- HISTORY ----------------------------------------------------------------------------------------
+
+  function historyRow(d, p) {
+    var si = scopeInfo(p.scope), key = "pay:" + p.payment_id;
+    var accessText = null, accessSub = "";
+    if (p.status === "approved" || p.status === "revoked" || p.access_state) {
+      if (p.access_until) { accessText = p.access_until === "never" ? "Never expires" : "until " + p.access_until; accessSub = p.access_state === "active" ? "currently active" : p.access_state === "expired" ? "expired" : p.access_state; }
+      else accessText = p.status === "revoked" ? "Access removed" : "No access row found";
+    }
+    var asked = el("div", { class: "ac-who" }, [
+      el("b", {}, [si.title]),
+      el("span", {}, ["ref " + dash(p.reference) + (p.note ? "  \u00b7  " + (subScope(p.scope) ? "amount " : "") + p.note : "") + "  \u00b7  #" + p.payment_id]),
+    ]);
+    var item = el("div", { class: "ac-item", "data-history": p.payment_id });
+    var actions = el("div", { class: "ac-line-actions" }, []);
+    var canRevoke = p.status === "approved" && p.access_state === "active";
+    if (canRevoke) {
+      var rv = el("button", { class: "ac-btn danger", type: "button", "data-open": "revoke-pay" }, ["Revoke\u2026"]);
+      rv.addEventListener("click", function () { openPanel(key + ":revoke"); });
+      actions.appendChild(rv);
+    }
+    item.appendChild(el("div", { class: "ac-line" }, [
+      el("div", { class: "ac-cell ac-cell-main" }, [whoBlock(p.name, p.phone, p.known_student)]),
+      el("div", { class: "ac-cell" }, [asked]),
+      el("div", { class: "ac-cell ac-cell-badge" }, [badge(payBadge(p.status))]),
+      lineCell("Timeline", "Asked " + dash(p.created_at), p.status === "pending" ? "not decided yet" : "decided " + dash(p.decided_at)),
+      accessText ? lineCell("Access it gave", accessText, accessSub) : lineCell("Access it gave", "\u2014", ""),
+      actions,
+    ]));
+    if (canRevoke && STATE.open === key + ":revoke") {
+      var yes = el("button", { class: "ac-btn danger solid", type: "button", "data-do": "revoke" }, ["Yes, revoke access"]);
+      yes.addEventListener("click", function () {
+        yes.disabled = true;
+        run({ action: "admin_revoke_access", payment_id: p.payment_id }, "Revoked the access from payment " + p.payment_id + " (" + (p.name || p.phone) + ").", yes);
+      });
+      item.appendChild(el("div", { class: "ac-panel", "data-panel": "revoke" }, [
+        el("p", {}, [el("b", {}, ["Revoke the access this payment gave?"]), " " + (p.name || p.phone) + " loses it on their next page load. The request stays here, marked revoked."]),
+        el("div", { class: "ac-actions" }, [yes, cancelBtn()]),
+      ]));
+    } else if (p.status === "pending") {
+      item.appendChild(el("div", { class: "ac-note" }, ["Waiting for you \u2014 decide it under Requests."]));
+    }
+    return item;
+  }
+
+  function historyPanel(d) {
+    var f = STATE.filters.history;
+    var base = d.payments.filter(function (p) {
+      return (f.status === "all" || p.status === f.status) && matches(f.q, [p.name, p.phone, p.reference, p.scope, p.payment_id, p.note]);
+    });
+    var counts = yearCounts(base, function (flt, p) { return sectionPass(d, flt, p.scope); });
+    var list = base.filter(function (p) { return sectionPass(d, STATE.year, p.scope); });
+    var wrap = el("div", {});
+    wrap.appendChild(yearBar(counts));
+    wrap.appendChild(filtersNode("history", [["all", "All requests"], ["pending", "Waiting"], ["approved", "Approved"], ["rejected", "Rejected"], ["revoked", "Revoked"]], "Name, phone, reference or lesson"));
+    var section = el("div", { class: "dash-section" }, [
+      el("h2", {}, ["Every payment request", el("span", { class: "ac-count" }, [String(list.length) + " of " + d.payments.length])]),
+      el("p", { class: "dash-section-note" }, ["The full record, split by year: who asked, what they wrote, what you decided and when. Newest first."]),
+    ]);
+    if (!list.length) section.appendChild(el("div", { class: "dash-empty" }, [d.payments.length ? "Nothing matches this filter." : "No payment requests yet."]));
+    bySection(list, function (p) { return sectionOf(p.scope); }).forEach(function (sec) {
+      section.appendChild(sectionHead(sec.name, countLabel(sec.items.length, "request", "requests")));
+      section.appendChild(el("div", { class: "ac-lines is-history" }, [linesHead(["Student", "Asked for", "Status", "Timeline", "Access it gave", ""])]
+        .concat(sec.items.map(function (p) { return historyRow(d, p); }))));
+    });
+    wrap.appendChild(section);
+    return wrap;
+  }
+
+  // ---- QUIZ GATE --------------------------------------------------------------------------------------
+
+  function quizLockPanel(lesson, isNew) {
+    var box = el("div", { class: "ac-panel", "data-panel": "quiz-lock" });
+    var note = isNew
+      ? "This lesson has no quiz gate yet. Adding one starts it LOCKED \u2014 open it yourself right before the test."
+      : "Locking stops new submissions at once (a page already open can't sneak one through). Unlocking lets students in immediately.";
+    var goLock = el("button", { class: "ac-btn danger solid", type: "button" }, [isNew ? "Add gate, start locked" : "Lock it"]);
+    var goOpen = el("button", { class: "ac-btn primary", type: "button" }, [isNew ? "Add gate, start open" : "Open it"]);
+    function fire(locked, btn) {
+      btn.disabled = true;
+      run({ action: "admin_set_quiz_lock", lesson: lesson, locked: locked },
+        pretty(lesson) + "'s quiz is now " + (locked ? "locked." : "open."), btn);
+    }
+    goLock.addEventListener("click", function () { fire(true, goLock); });
+    goOpen.addEventListener("click", function () { fire(false, goOpen); });
+    box.appendChild(el("p", {}, [note]));
+    box.appendChild(el("div", { class: "ac-actions" }, isNew ? [goOpen, goLock, cancelBtn()] : [goLock, goOpen, cancelBtn()]));
+    return box;
+  }
+
+  function quizAddForm(d) {
+    var already = {};
+    d.quizzes.forEach(function (q) { already[q.lesson] = 1; });
+    var all = allLessonsList(d).filter(function (l) { return !already[l.lesson]; });
+    var tracks = allTracksList(d);
+    var f = STATE.filters.quizAdd;
+
+    var trackSel = el("select", { class: "ac-input", "aria-label": "Filter by track" },
+      [el("option", { value: "" }, ["All tracks"])].concat(tracks.map(function (t) { return el("option", { value: t }, [pretty(t)]); })));
+    trackSel.value = f.track;
+    var search = el("input", { class: "ac-input", type: "text", placeholder: "Filter by name or path\u2026", "aria-label": "Filter lessons", "data-search": "quizAdd" });
+    search.value = f.q;
+
+    var yearSel = lessonYearSelect(f.year);
+    var visible = all.filter(function (l) {
+      if (f.track && l.track !== f.track) return false;
+      if (!yearPass(f.year, l.lesson)) return false;
+      if (f.q && l.lesson.indexOf(f.q.toLowerCase()) === -1) return false;
+      return true;
+    });
+    var sel = el("select", { class: "ac-input", id: "qz-lesson-sel" }, [el("option", { value: "" }, [visible.length ? "Choose a lesson\u2026" : "No lessons match this filter"])]
+      .concat(lessonOptionGroups(visible))
+      .concat([el("option", { value: "__custom" }, ["Type a path\u2026"])]));
+    var custom = el("input", { class: "ac-input", type: "text", placeholder: "programming/other/some-lesson", hidden: "" });
+    var go = el("button", { class: "ac-btn primary", type: "button" }, ["Gate this quiz\u2026"]);
+    function value() { return sel.value === "__custom" ? custom.value.trim() : sel.value; }
+    trackSel.addEventListener("change", function () { f.track = trackSel.value; render(); });
+    yearSel.addEventListener("change", function () { f.year = yearSel.value; render(); });
+    search.addEventListener("input", function () {
+      f.q = search.value;
+      var pos = search.selectionStart;
+      render();
+      var again = document.querySelector('[data-search="quizAdd"]');
+      if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
+    });
+    sel.addEventListener("change", function () { custom.hidden = sel.value !== "__custom"; go.disabled = !value(); });
+    custom.addEventListener("input", function () { go.disabled = !value(); });
+    go.disabled = true;
+    go.addEventListener("click", function () { openPanel("qz:" + value() + ":new"); });
+
+    var note = d.lessons_error
+      ? "Couldn't read the full lesson list from GitHub (" + d.lessons_error + ") \u2014 showing only lessons already known here. You can still type a path."
+      : "A lesson with no gate behaves as it always has \u2014 open. Add one to control it.";
+    return el("div", { class: "dash-section" }, [
+      el("h2", {}, ["Gate another quiz"]),
+      el("p", { class: "dash-section-note" }, [note]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Track", trackSel]), el("label", {}, ["Year", yearSel]), el("label", {}, ["Search", search])]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Lesson", sel, custom]), go]),
+      STATE.open && STATE.open.slice(0, 3) === "qz:" && STATE.open.slice(-4) === ":new" ? quizLockPanel(STATE.open.slice(3, -4), true) : null,
+    ]);
+  }
+
+  function quizRow(q) {
+    var key = "qz:" + q.lesson;
+    var item = el("div", { class: "ac-item", "data-quiz": q.lesson });
+    var toggle = el("button", { class: "ac-btn " + (q.locked ? "primary" : "danger"), type: "button" }, [q.locked ? "Open it\u2026" : "Lock it\u2026"]);
+    toggle.addEventListener("click", function () { openPanel(key); });
+    item.appendChild(el("div", { class: "ac-line" }, [
+      el("div", { class: "ac-cell ac-cell-main" }, [el("div", { class: "ac-who" }, [el("b", {}, [pretty(q.lesson)]), el("span", {}, [q.lesson])])]),
+      el("div", { class: "ac-cell ac-cell-badge" }, [badge(q.locked ? { text: "Locked", cls: "is-good" } : { text: "Open", cls: "is-warn" })]),
+      lineCell("Last changed", dash(q.updated_at), ""),
+      el("div", { class: "ac-line-actions" }, [toggle]),
+    ]));
+    if (STATE.open === key) item.appendChild(quizLockPanel(q.lesson, false));
+    return item;
+  }
+
+  function quizzesPanel(d) {
+    var counts = yearCounts(d.quizzes, function (flt, q) { return yearPass(flt, q.lesson); });
+    var shown = d.quizzes.filter(function (q) { return yearPass(STATE.year, q.lesson); })
+      .sort(function (a, b) { return cmpLessons(a.lesson, b.lesson); });
+    var section = el("div", { class: "dash-section" }, [
+      el("h2", {}, ["Quiz gate", el("span", { class: "ac-count" }, [String(d.counts.quizzes_locked) + " locked of " + d.quizzes.length])]),
+      el("p", { class: "dash-section-note" }, ["Separate from the video lock \u2014 this controls whether the QUIZ ITSELF can be opened and submitted. Most useful right at test time."]),
+    ]);
+    if (!d.quizzes.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, ["No quiz has been gated yet. Every quiz is open by default \u2014 add a gate below only for the ones you want to control."]));
+    } else if (!shown.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, ["No gated quizzes for this year."]));
+    }
+    bySection(shown, function (q) { return sectionOf(q.lesson); }).forEach(function (sec) {
+      var locked = sec.items.filter(function (q) { return q.locked; }).length;
+      section.appendChild(sectionHead(sec.name, locked + " locked of " + sec.items.length));
+      section.appendChild(el("div", { class: "ac-lines is-quiz" }, [linesHead(["Quiz", "Gate", "Last changed", ""])].concat(sec.items.map(quizRow))));
+    });
+    return el("div", {}, [yearBar(counts), section, quizAddForm(d)]);
+  }
+
+  // ---- GROUPS -------------------------------------------------------------------------------------------
+
+  function groupApplyPanel(d, g, mode) {
+    var isQuiz = mode === "quiz-grant" || mode === "quiz-revoke";
+    var isGrant = mode === "grant" || mode === "quiz-grant";
+
+    // Year filter narrows the dropdown in place, so the duration etc. the teacher already set survives.
+    var gy = STATE.filters.groupScope;
+    // Quiz gate is per-lesson only (no folder/site-wide wildcard) \u2014 mirrors the Quizzes sheet.
+    var scopeOpts = { lessonsOnly: isQuiz, placeholder: isQuiz ? "Choose a lesson\u2026" : "Choose\u2026" };
+    var scopeSel = el("select", { class: "ac-input" }, scopeOptionNodes(d, gy.year, scopeOpts));
+    var yearSel = lessonYearSelect(gy.year);
+    yearSel.addEventListener("change", function () {
+      gy.year = yearSel.value;
+      refillSelect(scopeSel, scopeOptionNodes(d, gy.year, scopeOpts));
+      update();
+    });
+    var preview = el("div", { class: "ac-preview" });
+    var go, term;
+    function describeWhat(scope) { return isQuiz ? "the \u201c" + pretty(scope) + "\u201d quiz" : scopeInfo(scope).title; }
+    function update() {
+      if (isGrant) {
+        var t = term.term();
+        preview.textContent = scopeSel.value ? "Every member of \u201c" + g.group + "\u201d (" + g.members.length + ") will be able to " + (isQuiz ? "open and submit " + describeWhat(scopeSel.value) + " even while it's locked for everyone else, " : "watch " + describeWhat(scopeSel.value) + " ") + term.describe(d.today, "") + "." : "Choose what this unlocks.";
+        go.disabled = !(scopeSel.value && t);
+      } else {
+        preview.textContent = scopeSel.value ? "Removes " + (isQuiz ? "the early-access override for " : "access to ") + describeWhat(scopeSel.value) + " from every member of \u201c" + g.group + "\u201d (only members who currently have it)." : "Choose what to take away.";
+        go.disabled = !scopeSel.value;
+      }
+    }
+    scopeSel.addEventListener("change", update);
+    if (isGrant) {
+      term = termControls("gap-" + g.group, update, "30");
+      go = el("button", { class: "ac-btn primary", type: "button" }, [isQuiz ? "Give the group quiz access" : "Give the group access"]);
+      go.addEventListener("click", function () {
+        var t = term.term();
+        go.disabled = true;
+        var action = isQuiz ? "admin_group_grant_quiz_access" : "admin_group_grant_access";
+        var payload = isQuiz ? { action: action, group: g.group, lesson: scopeSel.value } : { action: action, group: g.group, scope: scopeSel.value };
+        run(Object.assign(payload, t),
+          function (r) { return "Gave " + r.count + " " + (r.count === 1 ? "member" : "members") + " of \u201c" + g.group + "\u201d " + (isQuiz ? "quiz access to " + describeWhat(r.lesson) : "access to " + scopeInfo(r.scope).title) + (r.expires_at ? " until " + r.expires_at : ", no end date") + "."; }, go);
+      });
+    } else {
+      go = el("button", { class: "ac-btn danger solid", type: "button" }, ["Revoke from the whole group"]);
+      go.addEventListener("click", function () {
+        go.disabled = true;
+        var action = isQuiz ? "admin_group_revoke_quiz_access" : "admin_group_revoke_access";
+        var payload = isQuiz ? { action: action, group: g.group, lesson: scopeSel.value } : { action: action, group: g.group, scope: scopeSel.value };
+        run(payload,
+          function (r) { return "Removed " + (isQuiz ? "quiz access to " + describeWhat(r.lesson) : "access to " + scopeInfo(r.scope).title) + " from " + r.removed_students + " " + (r.removed_students === 1 ? "member" : "members") + " of \u201c" + g.group + "\u201d."; }, go);
+      });
+    }
+    update();
+    return el("div", { class: "ac-panel" }, [
+      el("p", {}, [el("b", {}, [isGrant ? "Give the whole group " + (isQuiz ? "quiz access." : "access.") : "Revoke the whole group's " + (isQuiz ? "quiz access." : "access.")]), isGrant ? " Applies to every current member, and to anyone you add to the group later (ending on the same date)." : " A member who doesn't have this is simply skipped. Students added later won\u2019t get it either."]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Year", yearSel]), el("label", {}, [isQuiz ? "Which quiz" : "What", scopeSel])]),
+      isGrant ? term.node : null, preview,
+      el("div", { class: "ac-actions" }, [go, cancelBtn()]),
+    ]);
+  }
+
+  // A dropdown checklist of students: search, tick any number, "select all shown".
+  // options: [{ phone, name, sub }]. Selection lives in the closure, so typing in the
+  // search box never loses ticks. onChange(count) fires on every change.
+  function studentPicker(options, opts) {
+    opts = opts || {};
+    var chosen = {};
+    var count = 0;
+    var summaryLabel = el("span", {}, [opts.placeholder || "Choose students\u2026"]);
+    var summary = el("summary", { class: "ac-input" }, [summaryLabel]);
+    var search = el("input", { class: "ac-input", type: "search", placeholder: "Search name, phone or year\u2026", "aria-label": "Search students" });
+    var counter = el("span", {}, ["0 selected"]);
+    var rows = options.map(function (o) {
+      var box = el("input", { type: "checkbox", value: o.phone });
+      var row = el("label", { class: "ac-pickitem", "data-q": ((o.name || "") + " " + o.phone + " " + (o.sub || "")).toLowerCase() },
+        [box, el("span", {}, [o.name || "No name", el("small", {}, [o.phone + (o.sub ? "  \u00b7  " + o.sub : "")])])]);
+      box.addEventListener("change", function () { if (box.checked) chosen[o.phone] = 1; else delete chosen[o.phone]; refresh(); });
+      return { row: row, box: box, phone: o.phone, year: o.year || "" };
+    });
+    function refresh() {
+      count = Object.keys(chosen).length;
+      counter.textContent = count + " selected";
+      summaryLabel.textContent = count ? plural(count, "student") + " selected" : (opts.placeholder || "Choose students\u2026");
+      if (opts.onChange) opts.onChange(count);
+    }
+    function shown() { return rows.filter(function (r) { return !r.row.hidden; }); }
+    // Year filter (Senior 1 / Senior 2 / ...), built from the years that actually occur in this list.
+    var yc = {}, noneCount = 0;
+    options.forEach(function (o) { if (o.year) yc[o.year] = (yc[o.year] || 0) + 1; else noneCount++; });
+    var yearKeys = Object.keys(yc).sort();
+    var yearSel = options.length && (yearKeys.length || noneCount)
+      ? el("select", { class: "ac-input", "aria-label": "Filter students by year", "data-roster-year": "" },
+          [el("option", { value: "" }, ["All years (" + options.length + ")"])]
+            .concat(yearKeys.map(function (y) { return el("option", { value: y }, [y + " (" + yc[y] + ")"]); }))
+            .concat(noneCount ? [el("option", { value: "__none__" }, ["No year set (" + noneCount + ")"])] : []))
+      : null;
+    function applyFilter() {
+      var q = search.value.trim().toLowerCase(), yf = yearSel ? yearSel.value : "";
+      rows.forEach(function (r) {
+        var hide = (q && r.row.getAttribute("data-q").indexOf(q) === -1) || (yf && (yf === "__none__" ? r.year : r.year !== yf));
+        r.row.hidden = !!hide;
+      });
+    }
+    search.addEventListener("input", applyFilter);
+    if (yearSel) yearSel.addEventListener("change", applyFilter);
+    var all = el("button", { class: "ac-btn", type: "button" }, ["Select all shown"]);
+    var none = el("button", { class: "ac-btn", type: "button" }, ["Clear"]);
+    all.addEventListener("click", function () { shown().forEach(function (r) { r.box.checked = true; chosen[r.phone] = 1; }); refresh(); });
+    none.addEventListener("click", function () { rows.forEach(function (r) { r.box.checked = false; }); chosen = {}; refresh(); });
+    var list = el("div", { class: "ac-picklist" }, rows.length ? rows.map(function (r) { return r.row; })
+      : [el("p", { class: "ac-hint" }, [opts.empty || "No students to show."])]);
+    var panel = el("div", { class: "ac-pickpanel" }, [search, yearSel, el("div", { class: "ac-picktools" }, [all, none, counter]), list]);
+    var box = el("details", { class: "ac-pick" }, [summary, panel]);
+    box.addEventListener("toggle", function () {
+      var sec = box.closest ? box.closest(".dash-section") : null;
+      if (sec) sec.classList.toggle("has-open-pick", box.open);
+    });
+    return {
+      node: box,
+      selected: function () { return Object.keys(chosen); },
+      reset: function () { rows.forEach(function (r) { r.box.checked = false; }); chosen = {}; refresh(); },
+    };
+  }
+
+  function rosterEmptyText(d, fallback) {
+    return d.roster === undefined
+      ? "The student list didn\u2019t come from the server. Paste the new Code.gs into Apps Script, deploy a New version, then reload this page."
+      : fallback;
+  }
+  function rosterOptions(d, exceptPhones) {
+    var skip = {};
+    (exceptPhones || []).forEach(function (p) { skip[keyOf(p)] = 1; });
+    return (d.roster || []).filter(function (r) { return !skip[keyOf(r.phone)]; })
+      .map(function (r) { return { phone: r.phone, name: r.name, sub: r.year, year: r.year || "" }; });
+  }
+  function keyOf(phone) { return String(phone || "").replace(/\D/g, "").slice(-10); }
+  // One remembered group grant -> words. g: { kind: "access"|"quiz", target, expires_at ("" = never) }
+  function grantText(g) {
+    var what = g.kind === "quiz" ? "Quiz: " + pretty(g.target) : scopeInfo(g.target).title;
+    return what + (g.expires_at ? " until " + g.expires_at : ", no end date");
+  }
+  function inheritedText(list) {
+    return list && list.length ? " They also got what the group already has: " + list.map(grantText).join("; ") + "." : "";
+  }
+  function yearForPhone(d, phone) {
+    var k = keyOf(phone);
+    var r = (d.roster || []).filter(function (x) { return keyOf(x.phone) === k; })[0];
+    return r ? (r.year || "") : "";
+  }
+
+  // Wide scopes first, then lessons in chapter/lesson order, each lesson's quiz right under its video access.
+  function sortGrants(list) {
+    var wide = function (x) { return isWide(x.target) || subScope(x.target) ? 0 : 1; };
+    return list.slice().sort(function (a, b) {
+      return wide(a) - wide(b) || (wide(a) ? cmpLessons(a.target, b.target) : (a.target < b.target ? -1 : a.target > b.target ? 1 : 0)) || (a.kind === b.kind ? 0 : a.kind === "quiz" ? 1 : -1);
+    });
+  }
+
+  function groupCard(d, g) {
+    var key = "grp:" + g.group;
+    var card = el("div", { class: "ac-card", "data-group": g.group }, [
+      el("div", { class: "ac-top" }, [el("div", { class: "ac-who" }, [el("b", {}, [g.group]), el("span", {}, [memberSummary(d, g)])])]),
+    ]);
+    card.appendChild(memberBlock(d, g));
+
+    // What this group gives. Anyone added to the group from now on gets all of it automatically.
+    var gives;
+    if (g.grants === undefined) {
+      gives = el("div", { class: "ac-note" }, ["This page can\u2019t see what the group gives yet. Paste the newest Code.gs into Apps Script and deploy a New version, then reload."]);
+    } else if (!g.grants.length) {
+      gives = el("div", { class: "ac-note" }, ["This group doesn\u2019t give anything to new members yet. Use \u201cGive this group access\u201d below; anyone you add afterwards gets it too."]);
+    } else {
+      gives = el("div", { class: "ac-panel", "data-group-gives": g.group }, [
+        el("p", {}, [el("b", {}, ["Anyone added to this group gets:"])]),
+        el("ul", { class: "ac-gives" }, sortGrants(g.grants).map(function (x) { return el("li", x.kind === "quiz" ? { style: "margin-left:18px;list-style:circle;font-weight:500" } : {}, [grantText(x)]); })),
+        el("p", {}, ["Each ends on the same date as the group\u2019s own. Removing a student from the group does not take away access they already have \u2014 revoke it under \u201cWho has access\u201d."]),
+      ]);
+    }
+    card.appendChild(gives);
+
+    // Add: pick from the roster (students not already in this group), or type a phone for someone without an account yet.
+    var addPick = studentPicker(rosterOptions(d, g.members.map(function (m) { return m.phone; })), {
+      placeholder: "Choose students to add\u2026", empty: rosterEmptyText(d, "Everyone in the roster is already in this group."),
+      onChange: function (n) { addBtn.disabled = !n && !phoneIn.value.trim(); addBtn.textContent = n ? "Add " + n : "Add"; },
+    });
+    var phoneIn = el("input", { class: "ac-input", type: "tel", placeholder: "or type a phone number", "aria-label": "Phone to add" });
+    var addBtn = el("button", { class: "ac-btn primary", type: "button" }, ["Add"]);
+    addBtn.disabled = true;
+    phoneIn.addEventListener("input", function () { addBtn.disabled = !addPick.selected().length && !phoneIn.value.trim(); });
+    addBtn.addEventListener("click", function () {
+      var phones = addPick.selected();
+      if (phoneIn.value.trim()) phones.push(phoneIn.value.trim());
+      if (!phones.length) return;
+      addBtn.disabled = true;
+      run({ action: "admin_group_add", group: g.group, phones: phones },
+        function (r) { return "Added " + plural(r.count, "student") + " to \u201c" + g.group + "\u201d" + (r.already.length ? " (" + r.already.length + " already in it)" : "") + "." + inheritedText(r.count ? r.inherited : null); }, addBtn);
+    });
+
+    // Remove: tick any number of current members.
+    var rmPick = studentPicker(g.members.map(function (m) {
+      var yr = yearForPhone(d, m.phone);
+      return { phone: m.phone, name: m.name || "Unknown", year: yr, sub: [yr, m.known_student === false ? "no account yet" : ""].filter(Boolean).join("  \u00b7  ") };
+    }), {
+      placeholder: "Choose members to remove\u2026", empty: "No members yet.",
+      onChange: function (n) { rmBtn.disabled = !n; rmBtn.textContent = n ? "Remove " + n : "Remove"; },
+    });
+    var rmBtn = el("button", { class: "ac-btn danger", type: "button" }, ["Remove"]);
+    rmBtn.disabled = true;
+    rmBtn.addEventListener("click", function () {
+      var phones = rmPick.selected();
+      if (!phones.length) return;
+      rmBtn.disabled = true;
+      run({ action: "admin_group_remove", group: g.group, phones: phones },
+        function (r) { return "Removed " + plural(r.removed, "student") + " from \u201c" + g.group + "\u201d."; }, rmBtn);
+    });
+
+    var grantBtn = el("button", { class: "ac-btn primary", type: "button" }, ["Give this group access\u2026"]);
+    var revokeBtn = el("button", { class: "ac-btn danger", type: "button" }, ["Revoke from this group\u2026"]);
+    var quizGrantBtn = el("button", { class: "ac-btn primary", type: "button" }, ["Give this group quiz access\u2026"]);
+    var quizRevokeBtn = el("button", { class: "ac-btn danger", type: "button" }, ["Revoke quiz access from this group\u2026"]);
+    grantBtn.addEventListener("click", function () { openPanel(key + ":grant"); });
+    revokeBtn.addEventListener("click", function () { openPanel(key + ":revoke"); });
+    quizGrantBtn.addEventListener("click", function () { openPanel(key + ":quiz-grant"); });
+    quizRevokeBtn.addEventListener("click", function () { openPanel(key + ":quiz-revoke"); });
+
+    card.appendChild(el("div", { class: "ac-row" }, [el("div", { class: "ac-pickwrap" }, ["Add students", addPick.node]), el("label", {}, ["\u00a0", phoneIn]), addBtn]));
+    if (g.members.length) card.appendChild(el("div", { class: "ac-row" }, [el("div", { class: "ac-pickwrap" }, ["Remove students", rmPick.node]), rmBtn]));
+    var openMode = STATE.open === key + ":grant" ? "grant" : STATE.open === key + ":revoke" ? "revoke"
+      : STATE.open === key + ":quiz-grant" ? "quiz-grant" : STATE.open === key + ":quiz-revoke" ? "quiz-revoke" : null;
+    if (openMode) card.appendChild(groupApplyPanel(d, g, openMode));
+    else card.appendChild(el("div", { class: "ac-actions" }, [grantBtn, revokeBtn, quizGrantBtn, quizRevokeBtn]));
+    return card;
+  }
+
+  function groupCreateForm(d) {
+    var name = el("input", { class: "ac-input", type: "text", placeholder: "e.g. Grade 2 \u2014 Section A", "aria-label": "New group name" });
+    var go = el("button", { class: "ac-btn primary", type: "button" }, ["Create group"]);
+    var phone = el("input", { class: "ac-input", type: "tel", placeholder: "or type a phone number", "aria-label": "Phone to add" });
+    function count() { return pick.selected().length + (phone.value.trim() ? 1 : 0); }
+    function sync() { var n = count(); go.disabled = !name.value.trim() || !n; go.textContent = n ? "Create group with " + n : "Create group"; }
+    var pick = studentPicker(rosterOptions(d), { placeholder: "Choose students\u2026", empty: rosterEmptyText(d, "No registered students yet."), onChange: sync });
+    name.addEventListener("input", sync);
+    phone.addEventListener("input", sync);
+    go.disabled = true;
+    go.addEventListener("click", function () {
+      var phones = pick.selected();
+      if (phone.value.trim()) phones.push(phone.value.trim());
+      if (!name.value.trim() || !phones.length) return;
+      go.disabled = true;
+      run({ action: "admin_group_add", group: name.value.trim(), phones: phones },
+        function (r) { return "Created \u201c" + r.group + "\u201d with " + plural(r.count, "student") + "." + inheritedText(r.count ? r.inherited : null); }, go);
+    });
+    return el("div", { class: "dash-section" }, [
+      el("h2", {}, ["New group"]),
+      el("p", { class: "dash-section-note" }, ["Name it, tick the students from your roster, and create. You can add or remove students later from the group's own card."]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Group name", name]), el("div", { class: "ac-pickwrap" }, ["Students", pick.node]), el("label", {}, ["\u00a0", phone]), go]),
+    ]);
+  }
+
+  function memberYearPass(d, flt, m) {
+    if (!flt) return true;
+    var y = yearForPhone(d, m.phone);
+    return flt === "__none__" ? !y : y === flt;
+  }
+  function memberSummary(d, g) {
+    var by = {};
+    g.members.forEach(function (m) { var y = yearForPhone(d, m.phone) || "No year set"; by[y] = (by[y] || 0) + 1; });
+    var ys = orderedYears(Object.keys(by).filter(function (k) { return k !== "No year set"; })).concat(by["No year set"] ? ["No year set"] : []);
+    return countLabel(g.members.length, "student", "students") + (ys.length ? "  \u00b7  " + ys.map(function (y) { return y + ": " + by[y]; }).join("  \u00b7  ") : "");
+  }
+  function memberBlock(d, g) {
+    if (!g.members.length) return el("p", { class: "ac-hint" }, ["No members yet."]);
+    var by = {};
+    g.members.forEach(function (m) {
+      if (!memberYearPass(d, STATE.year, m)) return;
+      var y = yearForPhone(d, m.phone) || "No year set";
+      (by[y] = by[y] || []).push(m);
+    });
+    var order = orderedYears(Object.keys(by).filter(function (k) { return k !== "No year set"; })).concat(by["No year set"] ? ["No year set"] : []);
+    if (!order.length) return el("p", { class: "ac-hint" }, ["No members from this year in this group."]);
+    var kids = [];
+    order.forEach(function (y) {
+      if (order.length > 1 || STATE.year) kids.push(el("div", { class: "ac-mh" }, [y + "  \u00b7  " + by[y].length]));
+      kids.push(el("div", { class: "ac-members" }, by[y].map(function (m) {
+        return el("span", { class: "ac-member" }, [m.name || "Unknown", el("small", {}, [m.phone + (m.known_student === false ? "  \u00b7  no account yet" : "")])]);
+      })));
+    });
+    return el("div", {}, kids);
+  }
+
+  function groupsPanel(d) {
+    var pass = function (flt, g) { return !flt || g.members.some(function (m) { return memberYearPass(d, flt, m); }); };
+    var counts = yearCounts(d.groups, pass);
+    var shown = d.groups.filter(function (g) { return pass(STATE.year, g); });
+    var section = el("div", { class: "dash-section" }, [
+      el("h2", {}, ["Groups", el("span", { class: "ac-count" }, [STATE.year ? shown.length + " of " + d.groups.length : String(d.groups.length)])]),
+      el("p", { class: "dash-section-note" }, ["Classify students, then grant or revoke access for the whole group in one action. Members are split by the year on their account."]),
+    ]);
+    if (!d.groups.length) section.appendChild(el("div", { class: "dash-empty" }, ["No groups yet \u2014 create one below."]));
+    else if (!shown.length) section.appendChild(el("div", { class: "dash-empty" }, ["No group has members from this year."]));
+    shown.forEach(function (g) { section.appendChild(groupCard(d, g)); });
+    return el("div", {}, [yearBar(counts), section, groupCreateForm(d)]);
+  }
+
+  // ---- LESSONS ------------------------------------------------------------------------------------------
+
+  function lessonLockPanel(lesson, isNew, ownLocked) {
+    ownLocked = ownLocked || [];
+    var box = el("div", { class: "ac-panel", "data-panel": "lesson-lock" });
+    var note = isNew
+      ? "This lesson has no lock yet. Locking it closes every video in it \u2014 existing, or added later from the Quiz Maker \u2014 until you open it. The quiz gate is separate and untouched either way."
+      : "Locking closes every video in this lesson at once, including ones you never toggled on their own (those stay closed regardless). Opening lets everyone in, unless a video was locked on its own \u2014 that one stays locked. The quiz gate below is separate and untouched either way.";
+    var goLock = el("button", { class: "ac-btn danger solid", type: "button" }, [isNew ? "Add lock, start closed" : "Lock it"]);
+    var goOpen = el("button", { class: "ac-btn primary", type: "button" }, [isNew ? "Add row, start open" : "Open it"]);
+    // A video can be locked on its own, and opening the lesson does NOT open it. Say so here and
+    // let the teacher open those videos in the same click (ticked by default: that is what
+    // "open this lesson" almost always means).
+    var alsoBox = null, alsoRow = null;
+    if (ownLocked.length) {
+      alsoBox = el("input", { type: "checkbox", id: "lsn-also-open" });
+      alsoBox.checked = true;   // el() drops empty attributes, so set the property
+      alsoRow = el("label", { class: "ac-check", for: "lsn-also-open" }, [alsoBox, el("span", {}, ["Also open the " + (ownLocked.length === 1 ? "video" : ownLocked.length + " videos") + " locked on their own: " + ownLocked.map(function (v) { return (SLOT_LABEL[v.slot] || v.slot).toLowerCase(); }).join(", ")])]);
+    }
+    function fire(locked, btn) {
+      btn.disabled = true;
+      var calls = [{ action: "admin_set_lesson_lock", lesson: lesson, locked: locked }];
+      var alsoVideos = !locked && alsoBox && alsoBox.checked;
+      if (alsoVideos) ownLocked.forEach(function (v) { calls.push({ action: "admin_set_video", lesson: lesson, slot: v.slot, locked: false }); });
+      runMany(calls, pretty(lesson) + " is now " + (locked ? "locked." : "open.") + (alsoVideos ? " Its videos are open too." : ""), btn);
+    }
+    goLock.addEventListener("click", function () { fire(true, goLock); });
+    goOpen.addEventListener("click", function () { fire(false, goOpen); });
+    box.appendChild(el("p", {}, [note]));
+    if (alsoRow) box.appendChild(el("p", {}, [alsoRow]));
+    box.appendChild(el("div", { class: "ac-actions" }, isNew ? [goOpen, goLock, cancelBtn()] : [goLock, goOpen, cancelBtn()]));
+    return box;
+  }
+
+  // One video's own lock (the Videos row's "locked" cell). This is the switch that was missing:
+  // videos are born locked, and the lesson-level switch above can never open one of them.
+  function videoLockPanel(lesson, v, lessonLocked) {
+    var label = SLOT_LABEL[v.slot] || v.slot;
+    var box = el("div", { class: "ac-panel", "data-panel": "video-lock" });
+    var note = v.locked
+      ? "Opening the " + label.toLowerCase() + " lets everyone watch it." + (lessonLocked ? " The lesson itself is still locked, so it stays closed until you open the lesson too." : "")
+      : "Locking the " + label.toLowerCase() + " closes just this video. Students need approved access to watch it.";
+    var go = el("button", { class: "ac-btn " + (v.locked ? "primary" : "danger solid"), type: "button" }, [v.locked ? "Open it" : "Lock it"]);
+    go.addEventListener("click", function () {
+      go.disabled = true;
+      run({ action: "admin_set_video", lesson: lesson, slot: v.slot, locked: !v.locked },
+        "The " + label.toLowerCase() + " for " + pretty(lesson) + " is now " + (v.locked ? "open." : "locked."), go);
+    });
+    box.appendChild(el("p", {}, [note]));
+    box.appendChild(el("div", { class: "ac-actions" }, [go, cancelBtn()]));
+    return box;
+  }
+
+  function lessonsPanel(d) {
+    var lockByLesson = {};
+    (d.lesson_locks || []).forEach(function (l) { lockByLesson[l.lesson] = l; });
+    var quizByLesson = {};
+    d.quizzes.forEach(function (q) { quizByLesson[q.lesson] = q; });
+    var videosByLesson = {};
+    d.videos.forEach(function (v) { (videosByLesson[v.lesson] = videosByLesson[v.lesson] || []).push(v); });
+
+    var f = STATE.filters.lessons;
+    var all0 = allLessonsList(d);
+    var tracks = allTracksList(d);
+    var trackSel = el("select", { class: "ac-input", "aria-label": "Filter by track" },
+      [el("option", { value: "" }, ["All tracks"])].concat(tracks.map(function (t) { return el("option", { value: t }, [pretty(t)]); })));
+    trackSel.value = f.track;
+    var search = el("input", { class: "ac-input", type: "text", placeholder: "Filter by name or path\u2026", "aria-label": "Filter lessons", "data-search": "lessons", value: f.q });
+    trackSel.addEventListener("change", function () { f.track = trackSel.value; render(); });
+    search.addEventListener("input", function () {
+      f.q = search.value;
+      var pos = search.selectionStart;
+      render();
+      var again = document.querySelector('[data-search="lessons"]');
+      if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
+    });
+
+    var pre = all0.filter(function (l) {
+      if (f.track && l.track !== f.track) return false;
+      var q = f.q.trim().toLowerCase();
+      if (q && l.lesson.indexOf(q) === -1 && pretty(l.lesson).toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+    var counts = yearCounts(pre, function (flt, l) { return yearPass(flt, l.lesson); });
+    var all = sortLessonsByYear(pre.filter(function (l) { return yearPass(STATE.year, l.lesson); }));
+
+    var section = el("div", { class: "dash-section" }, [
+      el("h2", {}, ["Lessons", el("span", { class: "ac-count" }, [String(d.counts.lessons_locked) + " locked of " + all0.length])]),
+      el("p", { class: "dash-section-note" }, [d.lessons_error
+        ? "Couldn't read the full lesson list from GitHub (" + d.lessons_error + ") \u2014 showing only lessons already known here."
+        : "Locking a lesson closes every video in it, whether or not a video exists yet. The quiz gate on each card is separate and overrides this \u2014 a quiz can stay locked while its lesson is open, or open while its lesson is locked."]),
+      el("div", { class: "ac-row" }, [el("label", {}, ["Track", trackSel]), el("label", {}, ["Search", search])]),
+    ]);
+
+    if (!all.length) {
+      section.appendChild(el("div", { class: "dash-empty" }, [all0.length ? "Nothing matches this filter." : "No lessons found."]));
+      return el("div", {}, [yearBar(counts), section]);
+    }
+
+    bySection(all, function (l) { return sectionOf(l.lesson); }).forEach(function (sec) {
+      var lockedN = sec.items.filter(function (l) { var k = lockByLesson[l.lesson]; return k && k.locked; }).length;
+      section.appendChild(sectionHead(sec.name, lockedN + " locked of " + sec.items.length));
+      byChapter(sec.items, function (l) { return l.lesson; }).forEach(function (ch) {
+      section.appendChild(chapterHead(ch.title, countLabel(ch.items.length, "lesson", "lessons") + "  ·  " + ch.items.filter(function (l) { return lockByLesson[l.lesson] && lockByLesson[l.lesson].locked; }).length + " locked"));
+      ch.items.forEach(function (l) {
+        var lock = lockByLesson[l.lesson];
+        var locked = !!(lock && lock.locked);
+        var quiz = quizByLesson[l.lesson];
+        var quizLocked = !!(quiz && quiz.locked);
+        var vids = (videosByLesson[l.lesson] || []).slice().sort(function (a, b) { return a.slot < b.slot ? -1 : 1; });
+        var key = "lsn:" + l.lesson;
+        var qkey = "qz:" + l.lesson;
+
+        var card = el("div", { class: "ac-card", "data-lesson": l.lesson }, [
+          el("div", { class: "ac-top" }, [
+            el("div", { class: "ac-who" }, [el("b", {}, [lessonShort(l.lesson)]), el("span", {}, [l.lesson])]),
+            badge(locked ? { text: "Lesson locked", cls: "is-good" } : { text: "Lesson open", cls: "is-warn" }),
+          ]),
+        ]);
+
+        var chips = vids.length
+          ? vids.map(function (v) {
+              var effLocked = v.locked || locked;
+              var extra = v.locked ? (locked ? "" : "locked on its own \u2014 the lesson being open doesn't open it") : (locked ? "via lesson lock" : "");
+              return chip(SLOT_LABEL[v.slot] || v.slot, effLocked ? "Locked" : "Open to everyone", effLocked ? "is-good" : "is-warn", extra);
+            })
+          : [chip("Videos", "None yet", "", "added from the Quiz Maker \u2014 locking the lesson now means one added later starts locked too")];
+        card.appendChild(el("div", { class: "ac-chips" }, chips));
+
+        var lockToggle = el("button", { class: "ac-btn " + (locked ? "" : "primary"), type: "button" }, [lock ? (locked ? "Open it\u2026" : "Lock it\u2026") : "Lock this lesson\u2026"]);
+        lockToggle.addEventListener("click", function () { openPanel(key); });
+        var quizToggle = el("button", { class: "ac-btn " + (quizLocked ? "" : "danger"), type: "button" }, [quiz ? (quizLocked ? "Open the quiz\u2026" : "Lock the quiz\u2026") : "Gate this quiz\u2026"]);
+        quizToggle.addEventListener("click", function () { openPanel(qkey); });
+        card.appendChild(el("div", { class: "ac-subrow" }, [el("span", { class: "ac-subtag" }, ["Quiz"]),
+          el("span", { class: "ac-subtxt" }, [quiz ? (quizLocked ? "Locked — students need quiz access" : "Open to everyone") : "No gate — open to everyone"]),
+          badge(quiz ? (quizLocked ? { text: "Locked", cls: "is-good" } : { text: "Open", cls: "is-warn" }) : { text: "No gate", cls: "" }), quizToggle]));
+
+        var ownLocked = vids.filter(function (v) { return v.locked; });
+        var videoToggles = vids.map(function (v) {
+          var b = el("button", { class: "ac-btn " + (v.locked ? "primary" : ""), type: "button", "data-video-toggle": v.slot }, [(v.locked ? "Open " : "Lock ") + (SLOT_LABEL[v.slot] || v.slot).toLowerCase() + "\u2026"]);
+          b.addEventListener("click", function () { openPanel("vid:" + l.lesson + ":" + v.slot); });
+          return b;
+        });
+        var openVideo = vids.filter(function (v) { return STATE.open === "vid:" + l.lesson + ":" + v.slot; })[0];
+
+        if (STATE.open === key) card.appendChild(lessonLockPanel(l.lesson, !lock, ownLocked));
+        else if (STATE.open === qkey) card.appendChild(quizLockPanel(l.lesson, !quiz));
+        else if (openVideo) card.appendChild(videoLockPanel(l.lesson, openVideo, locked));
+        else card.appendChild(el("div", { class: "ac-actions" }, [lockToggle].concat(videoToggles)));
+
+        section.appendChild(card);
+      });
+      });
+    });
+    return el("div", {}, [yearBar(counts), section]);
+  }
+
+  // ---- GIVE ACCESS ------------------------------------------------------------------------------------
+
+  function grantPanel(d) {
+    var gy = STATE.filters.grant;
+    var grantOpts = { custom: true };
+    var phone = el("input", { class: "ac-input", type: "tel", id: "gr-phone", placeholder: "01xxxxxxxxx", "aria-label": "Student phone", autocomplete: "off" });
+    var scopeSel = el("select", { class: "ac-input", id: "gr-scope", "aria-label": "What it covers" }, scopeOptionNodes(d, gy.year, grantOpts));
+    var yearSel = lessonYearSelect(gy.year);
+    yearSel.id = "gr-year";
+    yearSel.addEventListener("change", function () {
+      gy.year = yearSel.value;
+      refillSelect(scopeSel, scopeOptionNodes(d, gy.year, grantOpts));
+      update();
+    });
+    var custom = el("input", { class: "ac-input", type: "text", id: "gr-custom", placeholder: "programming/other/some-lesson", "aria-label": "Lesson path", hidden: "" });
+    var preview = el("div", { class: "ac-preview", "aria-live": "polite" });
+    var term;
+    function scopeValue() { return scopeSel.value === "__custom" ? custom.value.trim() : scopeSel.value; }
+    function update() {
+      custom.hidden = scopeSel.value !== "__custom";
+      var t = term.term(), s = scopeValue();
+      preview.textContent = phone.value.trim() && s ? phone.value.trim() + " will be able to watch " + scopeInfo(s).title + " " + term.describe(d.today, "") + "." : "Fill in the phone number and what it covers.";
+      go.disabled = !(phone.value.trim() && s && t);
+    }
+    term = termControls("gr", update, "30");
+    var go = el("button", { class: "ac-btn primary", type: "button", "data-do": "grant" }, ["Give access"]);
+    go.addEventListener("click", function () {
+      var t = term.term();
+      if (!t) return;
+      go.disabled = true;
+      STATE.toast = null;
+      refreshToast();
+      api(Object.assign({ action: "admin_grant_access", phone: phone.value.trim(), scope: scopeValue() }, t)).then(
+        function (r) {
+          setToast(true, (r.known_student ? r.name + " (" + r.phone + ")" : r.phone + " \u2014 no account with this number yet; it will apply when they register") +
+            " now has " + scopeInfo(r.scope).title + (r.expires_at ? " until " + r.expires_at : " with no end date") + ".");
+          return load(true);
+        },
+        function (err) { setToast(false, (err && err.message) || "That didn't work."); refreshToast(); go.disabled = false; }
+      );
+    });
+    [phone, scopeSel, custom].forEach(function (n) { n.addEventListener("input", update); n.addEventListener("change", update); });
+    update();
+    return el("div", { class: "dash-section" }, [
+      el("h2", {}, ["Give access by hand"]),
+      el("p", { class: "dash-section-note" }, ["For a cash payment, a scholarship, or fixing a mistake \u2014 no request needed. Works for a number that hasn't registered yet."]),
+      el("div", { class: "ac-form-row" }, [el("label", {}, ["Student's phone", phone]), el("label", {}, ["Year", yearSel]), el("label", {}, ["What it covers", scopeSel, custom])]),
+      term.node, preview, el("div", { class: "ac-actions" }, [go]),
+    ]);
+  }
+
+  // ---- page ------------------------------------------------------------------------------------------
+
+  function render() {
+    var root = document.getElementById("dashboard");
+    var y = window.scrollY;
+    var d = STATE.data;
+    root.innerHTML = "";
+    root.hidden = false;
+    var c = d.counts;
+    var people = {};
+    d.access.forEach(function (a) { if (a.state === "active") people[a.phone.replace(/\D/g, "").slice(-10)] = 1; });
+    root.appendChild(el("div", { class: "dash-head" }, [el("div", {}, [
+      el("h1", {}, ["Lesson access"]),
+      el("p", {}, ["Who can get into which lessons, the payments behind it, and how to take access away. Today is " + d.today + " (Cairo)."]),
+    ])]));
+    var t = toastNode();
+    if (t) root.appendChild(t);
+    if (d.lessons_error) root.appendChild(el("div", { class: "ac-note", style: "margin:0 0 16px" }, [el("b", {}, ["The full lesson list didn\u2019t load, so dropdowns only show lessons already known here. "]), d.lessons_error]));
+    root.appendChild(helpBlock());
+    var perYear = function (fn) { return "S1: " + fn("Senior 1") + "  \u00b7  S2: " + fn("Senior 2"); };
+    var pendingBy = function (y) { return d.payments.filter(function (p) { return p.status === "pending" && sectionPass(d, y, p.scope); }).length; };
+    var peopleBy = function (y) { var s = {}; d.access.forEach(function (a) { if (a.state === "active" && sectionPass(d, y, a.scope)) s[keyOf(a.phone)] = 1; }); return Object.keys(s).length; };
+    var soonBy = function (y) { return d.access.filter(function (a) { return a.state === "active" && a.days_left !== null && a.days_left <= 7 && sectionPass(d, y, a.scope); }).length; };
+    var lessonsLockedBy = function (y) { return (d.lesson_locks || []).filter(function (l) { return l.locked && yearPass(y, l.lesson); }).length; };
+    var quizzesLockedBy = function (y) { return d.quizzes.filter(function (q) { return q.locked && yearPass(q.lesson ? y : "", q.lesson); }).length; };
+    root.appendChild(el("div", { class: "dash-stats" }, [
+      statCard(c.pending, "requests waiting for you", perYear(pendingBy)),
+      statCard(Object.keys(people).length, "students with active access", perYear(peopleBy)),
+      statCard(c.ending_soon, "ending within 7 days", perYear(soonBy)),
+      statCard(c.lessons_locked, "lessons locked", perYear(lessonsLockedBy)),
+      statCard(c.videos_locked + " / " + c.videos_open, "videos locked / open"),
+      statCard(c.quizzes_locked, "quizzes currently locked", perYear(quizzesLockedBy)),
+    ]));
+    root.appendChild(tabsNode(d));
+    var panel = STATE.tab === "requests" ? requestsPanel(d)
+      : STATE.tab === "access" ? accessPanel(d)
+      : STATE.tab === "history" ? historyPanel(d)
+      : STATE.tab === "lessons" ? lessonsPanel(d)
+      : STATE.tab === "quizzes" ? quizzesPanel(d)
+      : STATE.tab === "groups" ? groupsPanel(d)
+      : grantPanel(d);
+    root.appendChild(panel);
+    window.scrollTo(0, y);
+  }
+
+  function renderError(message) {
+    var root = document.getElementById("dashboard");
+    root.innerHTML = "";
+    root.hidden = false;
+    root.appendChild(el("div", { class: "dash-err" }, [message]));
+  }
+
+  function renderNeedsRelogin() {
+    var root = document.getElementById("dashboard");
+    root.innerHTML = "";
+    root.hidden = false;
+    var btn = el("button", { class: "qz-next", type: "button" }, ["Log out & sign in again \u2192"]);
+    btn.addEventListener("click", function () { window.AuthEngine.clearSession(); location.reload(); });
+    root.appendChild(el("div", { class: "dash-err" }, ["Your saved sign-in is missing a session token. Log in again to refresh it (phone and password stay the same)."]));
+    root.appendChild(btn);
+  }
+
+  function renderLoading() {
+    var root = document.getElementById("dashboard");
+    root.innerHTML = "";
+    root.hidden = false;
+    root.appendChild(el("div", { class: "dash-loading-state", role: "status", "aria-live": "polite" }, [
+      el("div", { class: "dash-loading-card" }, [
+        el("div", { class: "dash-loading-art", "aria-hidden": "true" }, [el("span", { class: "dash-loading-ring" }), el("span", { class: "dash-loading-core" })]),
+        el("div", { class: "dash-loading-copy" }, [
+          el("h1", { class: "dash-loading-title" }, ["Loading lesson access"]),
+          el("p", { class: "dash-loading-note" }, ["Reading payments, access and lessons", el("span", { class: "dash-loading-dots", "aria-hidden": "true" }, [el("i"), el("i"), el("i")])]),
+        ]),
+      ]),
+    ]));
+  }
+
+  window.AuthEngine.mount("#authgate", function (session) {
+    document.getElementById("authgate").remove();
+    if (!session.session_token) { renderNeedsRelogin(); return; }
+    // Convenience only: the server re-checks is_admin on every call.
+    if (session.is_admin === false) { location.href = "student.html"; return; }
+    STATE.session = session;
+    load(false);
+  });
+})();
+</script>
+
+</body>
+</html>
