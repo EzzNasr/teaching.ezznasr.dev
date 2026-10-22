@@ -68,3 +68,7 @@ Not done: R-019 (RTL) and R-022 (audit coverage) still TODO; S3 did not deliver 
 - grading.html: multi-photo display (get_written_image index/count).
 - R-I01: dry-run assertion narrowed to "no migrate_lesson_keys audit row".
 - Gate: run_registry --strict 44 PASS; --e2e 52 PASS + 3 sandbox-only FAIL (R-E17/19/20).
+
+## Integration 5 (Oct 22)
+- Follow-up page: homework and quiz lessons are now two separate lists per group (R-023). New GroupSettings columns hw_lessons, quiz_lessons (auto-added on first save; blank = follows the old shared list, so nothing changes until you edit a group).
+- Touched: Code.gs (GroupSettings read/save/overview), Phase2_Keys.gs (migration covers the new columns), Phase2_Followup.gs (summary), followup-logic.js, followup-templates.js, followup-app.js, tests.

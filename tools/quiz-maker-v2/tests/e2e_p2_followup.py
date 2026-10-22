@@ -168,6 +168,23 @@ def main():
         check("no JS errors (requirements)", not errors, errors)
         ctx.close()
 
+        # ================= homework and quiz lessons chosen separately (R-023, page side) =================
+        ctx, page, errors = open_page(browser, base, None)
+        page.wait_for_selector(".fu-stu")
+        check("R-023 two separate blocks: homework and quiz, each with its own lesson list", page.locator("#fu-role-hw").count() == 1 and page.locator("#fu-role-quiz").count() == 1)
+        check("R-023 homework block has the homework switch + due date, quiz block only the quiz switch", page.locator("#fu-role-hw #req-hw-0").count() == 1 and page.locator("#fu-role-hw #req-due-0").count() == 1 and page.locator("#fu-role-hw #req-quiz-0").count() == 0 and page.locator("#fu-role-quiz #req-quiz-0").count() == 1 and page.locator("#fu-role-quiz #req-hw-0").count() == 0)
+        page.click("#fu-add-quiz")
+        page.select_option("#pick-quiz-new", index=1)
+        page.wait_for_function("document.querySelectorAll('#fu-role-quiz [data-remove]').length===2")
+        check("R-023 adding a lesson to the QUIZ list leaves the homework list alone", page.locator("#fu-role-quiz [data-remove]").count() == 2 and page.locator("#fu-role-hw [data-remove]").count() == 1)
+        page.click("#fu-role-quiz [data-remove='1']")
+        page.wait_for_function("document.querySelectorAll('#fu-role-quiz [data-remove]').length===1")
+        page.click("#fu-role-hw [data-remove='0']")
+        page.wait_for_function("document.querySelectorAll('#fu-role-hw [data-remove]').length===0")
+        check("R-023 emptying the homework list keeps the quiz list (and the page shows no homework-missing)", page.locator("#fu-role-quiz [data-remove]").count() == 1 and tiles(page)["hwmissing"] == "0" and tiles(page)["quizabsent"] == "2", tiles(page))
+        check("no JS errors (R-023)", not errors, errors)
+        ctx.close()
+
         # ================= attendance state chips + bulk center week confirm (R-010, page side) =================
         ctx, page, errors = open_page(browser, base, None)
         page.wait_for_selector(".fu-stu")

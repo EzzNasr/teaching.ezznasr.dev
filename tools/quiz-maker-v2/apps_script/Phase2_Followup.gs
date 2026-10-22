@@ -361,14 +361,18 @@ function _p2fuSummaryFor(X, key, from, to) {
   X.groups.forEach(function (g) {
     if (g.members.indexOf(key) < 0) return;
     var due = _p2fuHwDue(g.settings, X.today, X.hm, X.cfg);
-    (g.settings.review_lessons || []).forEach(function (l) {
+    // Oct 22: homework and quiz lessons are chosen separately (null = follows review_lessons).
+    var rv = g.settings.review_lessons || [], hwL = g.settings.hw_lessons || rv, qzL = g.settings.quiz_lessons || rv;
+    hwL.concat(qzL).forEach(function (l) {
       var c = _p2fuCanon(l); if (!c) return;
-      var e = expected[c] = expected[c] || { lesson: c, group_due: "" };
+      var e = expected[c] = expected[c] || { lesson: c, group_due: "", hw: false, quiz: false };
       if (due && (!e.group_due || due < e.group_due)) e.group_due = due;
     });
+    hwL.forEach(function (l) { var c = _p2fuCanon(l); if (c && expected[c]) expected[c].hw = true; });
+    qzL.forEach(function (l) { var c = _p2fuCanon(l); if (c && expected[c]) expected[c].quiz = true; });
   });
   Object.keys(X.req).forEach(function (l) {
-    var r = X.req[l]; if (r.due_override && r.due_override <= to && !expected[l]) expected[l] = { lesson: l, group_due: "" };
+    var r = X.req[l]; if (r.due_override && r.due_override <= to && !expected[l]) expected[l] = { lesson: l, group_due: "", hw: true, quiz: true };
   });
   function everDone(rowsByKey, subject, slug) { return !!(rowsByKey || []).some(function (r) { return r.slug === slug && (r.subject === "" || r.subject === subject) && (!r.date || r.date <= to); }); }
   var exp = Object.keys(expected).sort().map(function (l) {
@@ -376,8 +380,9 @@ function _p2fuSummaryFor(X, key, from, to) {
     var due = rq.due_override || expected[l].group_due || "";
     var quizDone = everDone(X.quiz[key], subject, slug), hwDone = everDone(X.hw[key], subject, slug);
     var duePassed = !due || X.today > due;
-    return { lesson: l, quiz: { required: rq.quiz_required, done: quizDone, missed: rq.quiz_required && !quizDone && duePassed },
-             homework: { required: rq.homework_required, done: hwDone, due: due, missed: rq.homework_required && !hwDone && duePassed } };
+    var needQ = rq.quiz_required && expected[l].quiz !== false, needH = rq.homework_required && expected[l].hw !== false;   // not in that group's list = not expected
+    return { lesson: l, quiz: { required: needQ, done: quizDone, missed: needQ && !quizDone && duePassed },
+             homework: { required: needH, done: hwDone, due: due, missed: needH && !hwDone && duePassed } };
   });
 
   // attendance, watch, video access

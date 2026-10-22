@@ -25,7 +25,9 @@ var MIGRATE_TARGETS = [
   { tab: "Videos", column: "lesson", unique: true, alsoKey: "slot" },
   { tab: "Quizzes", column: "lesson", unique: true },
   { tab: "GroupSettings", column: "current_lesson" },
-  { tab: "GroupSettings", column: "review_lessons", json: true }
+  { tab: "GroupSettings", column: "review_lessons", json: true },
+  { tab: "GroupSettings", column: "hw_lessons", json: true },
+  { tab: "GroupSettings", column: "quiz_lessons", json: true }
 ];
 
 function handleAdminMigrateLessonKeys(payload) {

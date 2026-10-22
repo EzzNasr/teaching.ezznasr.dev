@@ -1,5 +1,8 @@
-tools/quiz-maker-v2/quiz_maker_config.json
 *.pyc
 __pycache__/
 *.bak
 *.lnk
+*.zip
+*.log
+*.patch
+tools/quiz-maker-v2/quiz_maker_config.json
