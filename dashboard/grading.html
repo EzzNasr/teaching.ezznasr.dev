@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Grading — Ezz Nasr : Teaching</title>
+<link rel="icon" href="/icons/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/base.css">
+<link rel="stylesheet" href="/assets/forms.css">
+<style>
+  :root{ --maxw:1180px; }
+  main{ padding:20px 0 64px; }
+  .titlebar{ flex-wrap:wrap; row-gap:6px; } .titlebar nav{ flex-wrap:wrap; }   /* phone width: four admin links + the mark overflowed by 12px (R-019) */
+  .g-bar{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:0 0 14px; }
+  .g-bar label{ display:flex; flex-direction:column; gap:3px; font:600 11px var(--mono); color:var(--ink-dim); letter-spacing:.04em; text-transform:uppercase; }
+  .g-bar select,.g-bar input{ font:14px var(--sans); padding:7px 9px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); min-width:130px; }
+  .g-tabs{ display:flex; gap:6px; margin-left:auto; }
+  .g-tab{ font:600 12.5px var(--mono); padding:7px 12px; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; }
+  .g-tab[aria-pressed="true"]{ background:var(--ink); color:var(--bg, #fff); }
+  .g-state{ font:13.5px var(--mono); color:var(--ink-dim); padding:22px 0; }
+  .g-err{ color:var(--status-fail); }
+  .g-layout{ display:grid; grid-template-columns:260px 1fr; gap:16px; align-items:start; }
+  .g-list{ border:1px solid var(--line); border-radius:12px; background:var(--panel); max-height:74vh; overflow:auto; }
+  .g-row{ display:block; width:100%; text-align:start; padding:9px 12px; border:0; border-bottom:1px dashed var(--line); background:none; color:var(--ink); cursor:pointer; font:13px var(--sans); }
+  .g-row small{ display:block; font:11px var(--mono); color:var(--ink-dim); }
+  .g-row[aria-current="true"]{ background:color-mix(in srgb, var(--ink) 9%, transparent); }
+  .g-row.is-done::after{ content:" ✓"; color:var(--status-shipped); }
+  .g-card{ border:1px solid var(--line); border-radius:14px; background:var(--panel); box-shadow:var(--shadow); padding:16px 18px; }
+  .g-meta{ font:12px var(--mono); color:var(--ink-dim); margin-bottom:8px; }
+  .g-q{ font-size:16px; margin:0 0 14px; }
+  .g-pair{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .g-box{ border:1px solid var(--line); border-radius:11px; background:var(--panel-soft); padding:12px; min-height:200px; }
+  .g-box h3{ margin:0 0 8px; font:600 11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink-dim); }
+  .g-model{ white-space:pre-wrap; font-size:15px; }
+  .g-photo{ width:100%; max-height:62vh; object-fit:contain; border-radius:8px; cursor:zoom-in; transition:transform .15s; }
+  .g-photo.is-zoom{ max-height:none; cursor:zoom-out; }
+  .g-photo-tools{ margin-top:8px; display:flex; gap:6px; }
+  .g-mark{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:14px; }
+  .g-mark input[type=number]{ width:90px; font:600 18px var(--mono); padding:7px 9px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); }
+  .g-mark input[type=text]{ flex:1 1 220px; font:14px var(--sans); padding:9px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); }
+  .g-btn{ font:600 13px var(--mono); padding:8px 13px; border-radius:9px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; }
+  .g-btn.primary{ background:var(--ink); color:var(--bg, #fff); border-color:var(--ink); }
+  .g-btn:disabled{ opacity:.5; cursor:default; }
+  .g-keys{ font:11.5px var(--mono); color:var(--ink-dim); margin-top:10px; }
+  .g-saved{ font:12px var(--mono); color:var(--status-shipped); }
+  kbd{ font:11px var(--mono); border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+  @media (max-width:820px){ .g-layout,.g-pair{ grid-template-columns:1fr; } .g-list{ max-height:200px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="titlebar">
+    <a href="/" class="mark"><span class="dot"></span> EZZ NASR <span aria-hidden="true">&middot;</span> TEACHING</a>
+    <nav>
+      <a href="master.html">Results</a>
+      <a href="access.html">Video access</a>
+      <a href="followup.html" lang="ar">متابعة</a>
+      <a href="grading.html" aria-current="page">Grading</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap page-head">
+    <h1>Grading</h1>
+    <p class="lede">Written answers waiting for marks. Photo on the right, your model answer on the left.</p>
+  </div>
+  <div class="wrap">
+    <div id="authgate"></div>
+    <div id="g-root" aria-live="polite"></div>
+  </div>
+</main>
+
+<footer><div class="wrap"><p class="footer-note">teaching.ezznasr.dev/dashboard/grading</p></div></footer>
+
+<script>
+(function () {
+  "use strict";
+  var MOCK = /[?&]mock=1\b/.test(location.search);
+  var root = document.getElementById("g-root");
+  var S = { session: null, items: [], i: 0, status: "pending", f: { year: "", group: "", lesson: "", student_id: "" },
+            counts: { pending: 0, graded: 0 }, opts: { lessons: {}, students: {} }, imgCache: {}, rot: 0, busy: false };
+
+  function el(tag, attrs, kids) {
+    var n = document.createElement(tag); attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === "text") n.textContent = attrs[k];
+      else if (k === "on") Object.keys(attrs.on).forEach(function (e) { n.addEventListener(e, attrs.on[e]); });
+      else if (k in n && k !== "list") n[k] = attrs[k]; else n.setAttribute(k, attrs[k]);
+    });
+    (kids || []).forEach(function (c) { if (c != null && c !== false) n.appendChild(typeof c === "object" ? c : document.createTextNode(String(c))); });
+    return n;
+  }
+  function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); return n; }
+  function key(it) { return it.submission_id + "|" + it.question_id; }
+  function lessonLabel(l) { var s = String(l).split("/").pop(); return s.replace(/-/g, " "); }
+
+  // ---------- API (real: AuthEngine.adminCall; mock: in-memory) ----------
+  var MOCK_ITEMS = [
+    { submission_id: "a1", kind: "quiz", student_id: "0100", name: "Sara", year: "Senior 2", lesson: "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-2-how-ai-works", question_id: "w1", prompt: "Explain overfitting.", model_answer: "A model memorises training data and fails on new data.", max: 3, awarded: null, note: "", graded_at: "", has_image: true },
+    { submission_id: "a2", kind: "quiz", student_id: "0101", name: "Omar", year: "Senior 2", lesson: "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-2-how-ai-works", question_id: "w1", prompt: "Explain overfitting.", model_answer: "A model memorises training data and fails on new data.", max: 3, awarded: null, note: "", graded_at: "", has_image: true },
+    { submission_id: "a3", kind: "quiz", student_id: "0102", name: "Mona", year: "Senior 1", lesson: "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-1-information-and-media", question_id: "w2", prompt: "ما هي المعلومات؟", model_answer: "بيانات لها معنى.", max: 2, awarded: null, note: "", graded_at: "", has_image: false }
+  ];
+  function api(payload) {
+    if (MOCK) return mockApi(payload);
+    if (!window.AuthEngine) return Promise.reject(new Error("auth.js didn't load."));
+    return window.AuthEngine.adminCall(S.session, payload).then(function (r) {
+      if (!r || r.ok === false) throw new Error((r && r.error) || "Request failed.");
+      return r;
+    });
+  }
+  function mockApi(p) {
+    return new Promise(function (res, rej) {
+      setTimeout(function () {
+        if (p.action === "admin_grading_queue") {
+          var all = MOCK_ITEMS.filter(function (x) { return (!p.year || x.year === p.year) && (!p.lesson || x.lesson === p.lesson) && (!p.student || x.student_id === p.student); });
+          var items = all.filter(function (x) { var g = x.awarded !== null; return p.status === "all" || (p.status === "graded" ? g : !g); });
+          res({ ok: true, items: JSON.parse(JSON.stringify(items)), counts: { pending: all.filter(function (x) { return x.awarded === null; }).length, graded: all.filter(function (x) { return x.awarded !== null; }).length } });
+        } else if (p.action === "admin_grade_written") {
+          var it = MOCK_ITEMS.filter(function (x) { return x.submission_id === p.submission_id && x.question_id === p.question_id; })[0];
+          if (!it) return rej(new Error("Written answer not found."));
+          if (p.awarded > it.max) return rej(new Error("Marks can't be more than " + it.max + "."));
+          it.awarded = p.awarded; it.note = p.note; res({ ok: true, awarded: p.awarded, max: it.max });
+        } else if (p.action === "get_written_image") {
+          res({ ok: true, content_type: "image/svg+xml", data_base64: btoa('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="260"><rect width="400" height="260" fill="#fff8e1"/><text x="20" y="60" font-size="22">student answer ' + p.submission_id + '</text></svg>') });
+        } else rej(new Error("mock: unknown action"));
+      }, 30);
+    });
+  }
+
+  // ---------- loading ----------
+  function filters(withStatus) {
+    var p = { action: "admin_grading_queue", status: withStatus || S.status };
+    ["year", "group", "lesson"].forEach(function (k) { if (S.f[k]) p[k] = S.f[k]; });
+    if (S.f.student_id) p.student = S.f.student_id;   // "student", not "student_id": adminCall overwrites student_id with the signed-in admin
+    return p;
+  }
+  function loadOptions() {          // lesson/student dropdowns come from everything, not the filtered view
+    return api({ action: "admin_grading_queue", status: "all" }).then(function (r) {
+      S.opts = { lessons: {}, students: {} };
+      r.items.forEach(function (x) { S.opts.lessons[x.lesson] = 1; S.opts.students[x.student_id] = x.name || x.student_id; });
+    });
+  }
+  function load(keepKey) {
+    return api(filters()).then(function (r) {
+      S.items = r.items; S.counts = r.counts; S.truncated = !!r.truncated;
+      var idx = keepKey ? S.items.map(key).indexOf(keepKey) : -1;
+      S.i = idx >= 0 ? idx : 0; S.rot = 0;
+      render();
+    }).catch(function (e) { clear(root).appendChild(el("div", { class: "g-state g-err", text: e.message })); });
+  }
+
+  // ---------- rendering ----------
+  function select(label, value, options, onchange) {
+    var s = el("select", { on: { change: function () { onchange(s.value); } } }, options.map(function (o) { return el("option", { value: o[0], text: o[1] }); }));
+    s.value = value; return el("label", {}, [label, s]);
+  }
+  function render() {
+    clear(root);
+    var lessons = Object.keys(S.opts.lessons).sort(), students = Object.keys(S.opts.students).sort(function (a, b) { return S.opts.students[a] < S.opts.students[b] ? -1 : 1; });
+    var set = function (k) { return function (v) { S.f[k] = v; load(); }; };
+    var groupIn = el("input", { type: "text", value: S.f.group, placeholder: "e.g. Sat 5pm", on: { change: function () { S.f.group = groupIn.value.trim(); load(); } } });
+    root.appendChild(el("div", { class: "g-bar" }, [
+      select("Year", S.f.year, [["", "All"], ["Senior 1", "Senior 1"], ["Senior 2", "Senior 2"]], set("year")),
+      el("label", {}, ["Group", groupIn]),
+      select("Lesson", S.f.lesson, [["", "All lessons"]].concat(lessons.map(function (l) { return [l, lessonLabel(l)]; })), set("lesson")),
+      select("Student", S.f.student_id, [["", "All students"]].concat(students.map(function (s) { return [s, S.opts.students[s]]; })), set("student_id")),
+      el("div", { class: "g-tabs" }, ["pending", "graded", "all"].map(function (s) {
+        var n = s === "pending" ? S.counts.pending : s === "graded" ? S.counts.graded : S.counts.pending + S.counts.graded;
+        return el("button", { class: "g-tab", type: "button", text: s + " " + n, "aria-pressed": String(S.status === s), on: { click: function () { S.status = s; load(); } } });
+      }))
+    ]));
+    if (!S.items.length) {
+      root.appendChild(el("div", { class: "g-state", text: S.status === "pending" ? "Nothing waiting for grading. 🎉" : "Nothing here with these filters." }));
+      return;
+    }
+    if (S.truncated) root.appendChild(el("div", { class: "g-state", text: "Showing the first 500. Narrow the filters to see the rest." }));
+    var list = el("div", { class: "g-list", role: "listbox" }, S.items.map(function (it, i) {
+      return el("button", { class: "g-row" + (it.awarded !== null ? " is-done" : ""), type: "button", "aria-current": String(i === S.i),
+        on: { click: function () { go(i); } } }, [it.name || it.student_id, el("small", { text: lessonLabel(it.lesson) + " · " + it.question_id })]);
+    }));
+    root.appendChild(el("div", { class: "g-layout" }, [list, card(S.items[S.i])]));
+    var cur = list.querySelector('[aria-current="true"]'); if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest" });
+    var m = document.getElementById("g-marks"); if (m) { m.focus(); m.select(); }
+    loadImage(S.items[S.i]);
+  }
+  function card(it) {
+    var max = it.max, marks = el("input", { id: "g-marks", type: "number", min: 0, max: max == null ? "" : max, step: 0.5, value: it.awarded === null ? "" : it.awarded, "aria-label": "Marks" });
+    var note = el("input", { id: "g-note", type: "text", value: it.note || "", placeholder: "Note for the student (optional)", dir: "auto" });
+    var msg = el("span", { id: "g-msg", class: "g-saved" });
+    var save = el("button", { class: "g-btn primary", type: "button", id: "g-save", text: "Save & next", on: { click: function () { saveCur(); } } });
+    var imgBox = el("div", { id: "g-img" }, [el("div", { class: "g-state", text: it.has_image ? "Loading photo…" : "No photo uploaded for this answer." })]);
+    return el("div", { class: "g-card" }, [
+      el("div", { class: "g-meta", text: (it.name || it.student_id) + " · " + it.year + " · " + lessonLabel(it.lesson) + " · " + (S.i + 1) + "/" + S.items.length }),
+      el("p", { class: "g-q", dir: "auto", text: it.prompt || "(question text not synced)" }),
+      el("div", { class: "g-pair" }, [
+        el("div", { class: "g-box" }, [el("h3", { text: "Model answer" }), el("div", { class: "g-model", dir: "auto", text: it.model_answer || "(no model answer synced — open the quiz in Quiz Maker and sync)" })]),
+        el("div", { class: "g-box" }, [el("h3", { text: "Student's answer" }), imgBox,
+          el("div", { class: "g-photo-tools" }, [el("button", { class: "g-btn", type: "button", text: "Rotate", on: { click: function () { S.rot = (S.rot + 90) % 360; var p = document.querySelector(".g-photo"); if (p) p.style.transform = "rotate(" + S.rot + "deg)"; } } })])])
+      ]),
+      el("div", { class: "g-mark" }, [
+        marks, el("span", { text: "/ " + (max == null ? "?" : max) }),
+        el("button", { class: "g-btn", type: "button", text: "0", on: { click: function () { marks.value = 0; } } }),
+        el("button", { class: "g-btn", type: "button", text: "Full", on: { click: function () { if (max != null) marks.value = max; } } }),
+        note, save, msg
+      ]),
+      el("div", { class: "g-keys" }, [el("kbd", { text: "Enter" }), " save & next · ", el("kbd", { text: "Alt+←/→" }), " previous / next · ", el("kbd", { text: "Alt+F" }), " full marks · ", el("kbd", { text: "Alt+Z" }), " zero"])
+    ]);
+  }
+  function loadImage(it) {
+    if (!it.has_image) return;
+    var k = key(it), box = document.getElementById("g-img");
+    function show(url) {
+      if (key(S.items[S.i] || {}) !== k || !box) return;
+      clear(box).appendChild(el("img", { class: "g-photo", src: url, alt: "Student's written answer", on: { click: function (e) { e.target.classList.toggle("is-zoom"); } } }));
+    }
+    if (S.imgCache[k]) return show(S.imgCache[k]);
+    api({ action: "get_written_image", submission_id: it.submission_id, question_id: it.question_id }).then(function (r) {
+      S.imgCache[k] = "data:" + r.content_type + ";base64," + r.data_base64; show(S.imgCache[k]);
+    }).catch(function (e) { if (box && key(S.items[S.i]) === k) clear(box).appendChild(el("div", { class: "g-state g-err", text: "Couldn't load the photo: " + e.message })); });
+  }
+
+  // ---------- actions ----------
+  function go(i) { if (i < 0 || i >= S.items.length) return; S.i = i; S.rot = 0; render(); }
+  function saveCur() {
+    if (S.busy) return; var it = S.items[S.i]; if (!it) return;
+    var marks = document.getElementById("g-marks"), msg = document.getElementById("g-msg"), btn = document.getElementById("g-save");
+    var v = marks.value.trim();
+    if (v === "" || isNaN(+v) || +v < 0) { msg.className = "g-saved g-err"; msg.textContent = "Enter marks (0 or more)."; return; }
+    if (it.max != null && +v > it.max) { msg.className = "g-saved g-err"; msg.textContent = "Max is " + it.max + "."; return; }
+    S.busy = true; btn.disabled = true; msg.className = "g-saved"; msg.textContent = "Saving…";
+    api({ action: "admin_grade_written", submission_id: it.submission_id, question_id: it.question_id, student: it.student_id, awarded: +v, note: document.getElementById("g-note").value })
+      .then(function () {
+        var wasPending = it.awarded === null;
+        it.awarded = +v; it.note = document.getElementById("g-note").value;
+        if (wasPending) { S.counts.pending--; S.counts.graded++; }
+        S.busy = false;
+        var next = -1;                                   // next ungraded after this one, else wrap, else stay
+        for (var d = 1; d <= S.items.length; d++) { var j = (S.i + d) % S.items.length; if (S.items[j].awarded === null) { next = j; break; } }
+        if (S.status === "pending") { S.items.splice(S.i, 1); if (!S.items.length) { render(); return; } S.i = next < 0 ? 0 : (next > S.i ? next - 1 : next); }
+        else S.i = next < 0 ? S.i : next;
+        render();
+      })
+      .catch(function (e) { S.busy = false; btn.disabled = false; msg.className = "g-saved g-err"; msg.textContent = e.message; });
+  }
+  document.addEventListener("keydown", function (e) {
+    var t = e.target, typing = t && (t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && t.type === "text") || t.tagName === "SELECT");
+    if (e.key === "Enter" && t && t.id === "g-marks") { e.preventDefault(); saveCur(); }
+    else if (e.key === "Enter" && e.ctrlKey) { e.preventDefault(); saveCur(); }
+    else if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); go(S.i + 1); }
+    else if (e.altKey && e.key === "ArrowLeft") { e.preventDefault(); go(S.i - 1); }
+    else if (e.altKey && (e.key === "f" || e.key === "F")) { var it = S.items[S.i], m = document.getElementById("g-marks"); if (it && it.max != null && m) { e.preventDefault(); m.value = it.max; } }
+    else if (e.altKey && (e.key === "z" || e.key === "Z")) { var m2 = document.getElementById("g-marks"); if (m2) { e.preventDefault(); m2.value = 0; } }
+  });
+
+  // ---------- boot ----------
+  function start(session) {
+    S.session = session;
+    clear(root).appendChild(el("div", { class: "g-state", text: "Loading…" }));
+    loadOptions().then(function () { return load(); }).catch(function (e) { clear(root).appendChild(el("div", { class: "g-state g-err", text: e.message })); });
+  }
+  function loadScript(src) { return new Promise(function (ok, bad) { var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = function () { bad(new Error("Couldn't load " + src)); }; document.head.appendChild(s); }); }
+  function boot() {
+    if (MOCK) { var g = document.getElementById("authgate"); if (g) g.remove(); start(null); return; }
+    loadScript("/assets/auth.js").then(function () {
+      window.AuthEngine.mount("#authgate", function (session) {
+        var gate = document.getElementById("authgate"); if (gate) gate.remove();
+        if (!session.session_token) { clear(root).appendChild(el("div", { class: "g-state g-err", text: "Your saved sign-in has no session. Sign out and sign in again." })); return; }
+        if (session.is_admin === false) { location.href = "student.html"; return; }   // convenience only; the server re-checks
+        start(session);
+      });
+    }, function (e) { clear(root).appendChild(el("div", { class: "g-state g-err", text: e.message })); });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
+})();
+</script>
+</body>
+</html>

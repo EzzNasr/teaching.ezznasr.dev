@@ -11,6 +11,9 @@ const J = o => JSON.stringify(o);
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const addDays = (ymd, n) => { const [y, m, d] = ymd.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
 
+// Phase 2 weekly center rule (plan 5.4, R-010): center access lapses on that week's Friday (Cairo, week = Sat-Fri),
+// and a bulk center request (2+ students) must carry this week's Saturday as week_confirm.
+const WEEK_START = addDays(today, -((new Date(today + 'T00:00:00Z').getUTCDay() + 1) % 7)), WEEK_END = addDays(WEEK_START, 6);
 const G1 = 'programming/baccalaureate/grade-1-secondary/';
 const CUR = G1 + 'chapter-2-lesson-2-functions';       // current lesson: attendance + watch
 const REV = G1 + 'chapter-2-lesson-1-variables';       // homework + quiz lesson
@@ -182,8 +185,8 @@ let o = ov();
   let r = setAtt(CUR, [{ phone: P('sara'), mode: 'center' }]);
   t('center: ok, fresh values come back (video + quiz now open)', r.ok && r.results.length === 1 && r.results[0].can_watch === true && r.results[0].quiz_open === true && r.results[0].mode === 'center', J(r));
   const sEnt = dataRows('Entitlements').filter(x => x.source === 'attendance'), sQa = dataRows('QuizAccess').filter(x => x.source === 'attendance');
-  t('center: one video row (scope = the lesson, never expires, source "attendance")', sEnt.length === 1 && sEnt[0].scope === CUR && sEnt[0].expires_at === '' && String(sEnt[0].phone) === P('sara'), J(sEnt));
-  t('center: one quiz row (lesson, never expires, source "attendance")', sQa.length === 1 && sQa[0].lesson === CUR && sQa[0].expires_at === '', J(sQa));
+  t('center: one video row (scope = the lesson, lapses on this week\'s Friday, source "attendance")', sEnt.length === 1 && sEnt[0].scope === CUR && String(sEnt[0].expires_at).slice(0, 10) === WEEK_END && String(sEnt[0].phone) === P('sara'), J(sEnt));
+  t('center: one quiz row (lesson, lapses on this week\'s Friday, source "attendance")', sQa.length === 1 && sQa[0].lesson === CUR && String(sQa[0].expires_at).slice(0, 10) === WEEK_END, J(sQa));
   o = ov();
   t('overview shows attendance "center" and the open video + quiz', fact(o, 'sara', CUR).attendance === 'center' && fact(o, 'sara', CUR).can_watch === true && fact(o, 'sara', CUR).quiz_open === true);
   setAtt(CUR, [{ phone: P('sara'), mode: 'center' }]);
@@ -192,13 +195,13 @@ let o = ov();
   // students who already hold live access keep it exactly as it was
   const before = J(dataRows('Entitlements').filter(x => String(x.phone) !== P('sara') && String(x.phone) !== P('nour') && String(x.phone) !== P('hana')));
   const eBefore = entCount();
-  r = setAtt(CUR, [{ phone: P('omar'), mode: 'center' }, { phone: P('adham'), mode: 'center' }, { phone: P('farida'), mode: 'center' }]);
+  r = setAtt(CUR, [{ phone: P('omar'), mode: 'center' }, { phone: P('adham'), mode: 'center' }, { phone: P('farida'), mode: 'center' }], { week_confirm: WEEK_START });
   t('center leaves paid / "folder/*" / "*" access alone (no new video rows)', r.ok && entCount() === eBefore && J(dataRows('Entitlements').filter(x => String(x.phone) !== P('sara') && String(x.phone) !== P('nour') && String(x.phone) !== P('hana'))) === before, J(r));
   t('...omar already had a live quiz row, so none was added for him; adham + farida got one', dataRows('QuizAccess').filter(x => String(x.phone) === P('omar')).length === 1 && dataRows('QuizAccess').filter(x => x.source === 'attendance' && [P('adham'), P('farida')].includes(String(x.phone))).length === 2);
   t('...the paid row still names its payment as the source', dataRows('Entitlements').some(x => String(x.phone) === P('omar') && /^payment:/.test(x.source)));
 
   // expired / cancelled rows do not count as access: the student gets the free rows, and the old rows stay
-  r = setAtt(CUR, [{ phone: P('nour'), mode: 'center' }, { phone: P('hana'), mode: 'center' }]);
+  r = setAtt(CUR, [{ phone: P('nour'), mode: 'center' }, { phone: P('hana'), mode: 'center' }], { week_confirm: WEEK_START });
   const nourRows = dataRows('Entitlements').filter(x => String(x.phone) === P('nour')), hanaRows = dataRows('Entitlements').filter(x => String(x.phone) === P('hana'));
   t('center gives free access to a student whose old access expired / was cancelled', r.results.every(x => x.can_watch) && nourRows.length === 2 && hanaRows.length === 2, J([nourRows, hanaRows]));
 

@@ -1,0 +1,9 @@
+{
+  "_comment": "Old/typo'd lesson key -> current FULL key (bare slugs too, per docs/contract.md 2). Mirrored in Phase2_Keys.gs (P2_LESSON_ALIASES) and Code.gs (LESSON_ALIASES); tests R-001b and test_keys fail if they drift. Add a pair whenever a lesson folder is renamed.",
+  "programming/baccalaureate/grade-2-secondary/lesson-1-development-of-information-technology-and-social-transformation": "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-1-development-of-information-technology-and-social-transformation",
+  "programming/baccalaureate/grade-2-secondary/lesson-2-how-ai-works": "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-2-how-ai-works",
+  "programming/baccalaureate/grade-2-secondary/chaper-1-lesson-3-ai-in-daily-life-and-industry": "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-3-ai-in-daily-life-and-industry",
+  "lesson-1-development-of-information-technology-and-social-transformation": "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-1-development-of-information-technology-and-social-transformation",
+  "lesson-2-how-ai-works": "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-2-how-ai-works",
+  "chaper-1-lesson-3-ai-in-daily-life-and-industry": "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-3-ai-in-daily-life-and-industry"
+}

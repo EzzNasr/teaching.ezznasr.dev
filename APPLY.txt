@@ -1,10 +1,20 @@
-Dashboard polish: student.html + master.html
+Phase 2 delivery
 
-Unzip over the ROOT of the repo (teaching.ezznasr.dev), accepting "replace":
-  dashboard/student.html   REPLACES
-  dashboard/master.html    REPLACES
-  assets/dashboard.css     NEW  (shared design system for both dashboards)
-  assets/dash-review.js    NEW  (chapter > lesson > question grouping + rendering)
+Unzip in the folder that CONTAINS teaching.ezznasr.dev (the zip paths start with
+teaching.ezznasr.dev/), accepting "replace". Then, in this order:
 
-No Apps Script redeploy needed. Commit + push, then hard-refresh.
-access.html and wrong-questions.html are untouched.
+1. node scripts/run_registry.js    (from the repo root; expect: nothing FAIL (XFAIL/TODO are normal in an interim build))
+2. Apps Script: paste EACH of these into the project (one file each; Code.gs replaces the old one):
+     - Phase2_Capture.gs
+     - Phase2_Keys.gs
+     - Phase2_Grading.gs
+     - Phase2_Core.gs
+     - Phase2_Followup.gs
+     - Code.gs
+   Then Deploy -> Manage deployments -> pencil -> New version.
+   Script Properties: add FF_CAMERA, FF_DEFERRED_ANSWERS, FF_GRADING, FF_PARENT_LOG, FF_MONTHLY = 1 only when you want that feature on (missing = off).
+3. Quiz Maker -> "Sync site assets" (changed templates: assign.js, capture.js, quiz.js). Answer Yes.
+4. python tools/quiz-maker-v2/check_asset_drift.py   -> must print "In sync."
+5. Commit + push, hard-refresh the browser. Then follow docs/rollout-checklist.md section "After deploy".
+
+NOTE: Integration 4 (release candidate): S1-S5 integrated. R-019 and R-022 now active; strict gate green. Grants, revokes, quiz locks and group grants are now written to AuditLog (needs Phase2_Core.gs pasted). Grading page shows every photo of an answer and wraps its nav on phones. FF_CAMERA/FF_DEFERRED_ANSWERS stay off until legacy quiz.html answers are stripped (strip_embedded_answers.py). Browser tests R-E17/E19/E20 fail only in the offline sandbox (same on the untouched repo).
