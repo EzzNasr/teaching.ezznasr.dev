@@ -390,6 +390,9 @@ def main():
         page.click(".fu-dialog .fu-btn:not(.primary)")
         check("cancelling the confirm changes nothing", page.locator(".fu-banner").count() == 1)
         page.click("#fu-all-center")
+        # Phase 2: bulk center now needs an explicit per-week tick before the confirm button works
+        check("bulk center: the confirm stays disabled until the week is ticked", page.is_disabled(".fu-dialog .fu-btn.primary"))
+        page.check("#fu-dialog-check")
         page.click(".fu-dialog .fu-btn.primary")
         page.wait_for_function("!document.querySelector('#fu-unmarked')")
         check("bulk 'all center' marks everyone (banner disappears)", True)

@@ -149,3 +149,18 @@ def get_quiz_content(web_app_url, admin_token, lesson):
     payload = {"action": "admin_get_quiz_content", "token": admin_token, "lesson": lesson}
     result = _post_json(web_app_url, payload)
     return result.get("quiz")
+
+
+def set_written_models(web_app_url, admin_token, lesson, models):
+    """Admin-only: store each written question's model answer + max marks in the backend's
+    WrittenModels tab (upsert). Kept apart from the quiz content because get_quiz hands that
+    to every student."""
+    return _post_json(web_app_url, {"action": "admin_set_written_models", "token": admin_token,
+                                    "lesson": lesson, "models": models})
+
+
+def get_written_models(web_app_url, admin_token, lesson):
+    """Admin-only: the stored model answers for a lesson (list), so reopening a lesson for
+    editing doesn't lose them."""
+    return _post_json(web_app_url, {"action": "admin_get_written_models", "token": admin_token,
+                                    "lesson": lesson}).get("models", [])

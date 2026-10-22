@@ -39,6 +39,14 @@ class Spreadsheet {
 
 function load(codeGsPath, opts = {}) {
   const store = {}, spreadsheets = {};
+  // Test clock (Session 5). Default: real time, host Date, exactly as before. env.setNow(iso)
+  // freezes "now" for code under test; env.setNow(null) goes back to real time.
+  let nowMs = null;
+  class ClockDate extends Date {
+    constructor(...a) { if (a.length === 0 && nowMs !== null) super(nowMs); else super(...a); }
+    static now() { return nowMs !== null ? nowMs : Date.now(); }
+    static [Symbol.hasInstance](x) { return x instanceof Date; }   // host-made Dates still count
+  }
   const props = { STUDENTS_SHEET_ID: 'STU', DATA_SHEET_ID: 'DATA', ADMIN_TOKEN: 'tok', SUBMISSIONS_FOLDER_ID: 'f', QUIZ_RESULTS_FOLDER_ID: 'f', ...(opts.props || {}) };
   const cache = {};
   const drive = { files: [], n: 0, createdWhileLocked: 0, onCreate: null };
@@ -51,7 +59,7 @@ function load(codeGsPath, opts = {}) {
     return `${p.year}${p.month}${p.day}T${p.hour}${p.minute}${p.second}Z`;
   };
   const ctx = {
-    console, Date, JSON, Math, parseInt, isNaN, String, Array, Object, Error, RegExp,
+    console, Date: opts.clock ? ClockDate : Date, JSON, Math, parseInt, isNaN, String, Array, Object, Error, RegExp,
     Logger: { log: (...a) => (opts.log || (() => {}))(...a) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: k => (k in props ? props[k] : null), setProperty: (k, v) => { props[k] = v; } }) },
     CacheService: { getScriptCache: () => ({ get: k => (k in cache ? cache[k] : null), put: (k, v) => { cache[k] = v; }, remove: k => { delete cache[k]; } }) },
@@ -62,9 +70,13 @@ function load(codeGsPath, opts = {}) {
       createFile: b => {
         if (lockState.held) drive.createdWhileLocked++;
         if (drive.onCreate) { const h = drive.onCreate; drive.onCreate = null; h(); }
-        const f = { id: 'file' + (++drive.n), name: b && b.n, trashed: false, getId() { return this.id; }, setTrashed(v) { this.trashed = v; } };
+        const f = { id: 'file' + (++drive.n), name: b && b.n, blob: b, sharing: null, trashed: false, getId() { return this.id; }, getName() { return this.name; }, getBlob() { return this.blob; }, setTrashed(v) { this.trashed = v; }, setSharing(a, p) { this.sharing = [a, p]; return this; } };
         drive.files.push(f); return f;
-      }, getFiles: () => ({ hasNext: () => false }) }), getFileById: () => ({ makeCopy() {} }) },
+      },
+      // Session 5 additions (new APIs only; existing behaviour unchanged)
+      createFolder: n => ({ id: 'folder' + n, getId() { return 'folder' + n; }, getName() { return n; }, createFile(b) { return ctx.DriveApp.getFolderById('f').createFile(b); } }),
+      getFoldersByName: () => ({ hasNext: () => false }),
+      getFiles: () => ({ hasNext: () => false }) }), getFileById: id => { const f = drive.files.find(x => x.id === id); return f ? f : { makeCopy() {} }; } },
     Utilities: {
       formatDate: fmtDate,
       getUuid: () => crypto.randomUUID(),
@@ -72,11 +84,21 @@ function load(codeGsPath, opts = {}) {
       computeDigest: (alg, s) => [...crypto.createHash('md5').update(String(s)).digest()].map(b => (b > 127 ? b - 256 : b)),
       newBlob: (b, m, n) => ({ b, m, n, setName() {} }),
       base64Decode: s => Buffer.from(s, 'base64'),
+      base64Encode: b => Buffer.from(b).toString('base64'),
     },
   };
   vm.createContext(ctx);
-  vm.runInContext(fs.readFileSync(codeGsPath, 'utf8'), ctx);
+  // Apps Script shares one global scope across all .gs files, so load them all into one context.
+  // Code.gs first, then (unless opts.phase2 === false) every Phase2_*.gs next to it, sorted by name.
+  // Pass an array to choose the files yourself. Order must not matter (contract.md section 1).
+  const files = Array.isArray(codeGsPath) ? codeGsPath.slice() : [codeGsPath];
+  if (!Array.isArray(codeGsPath) && opts.phase2 !== false) {
+    const dir = require('path').dirname(codeGsPath);
+    fs.readdirSync(dir).filter(f => /^Phase2_.*\.gs$/.test(f)).sort().forEach(f => files.push(require('path').join(dir, f)));
+  }
+  files.forEach(f => vm.runInContext(fs.readFileSync(f, 'utf8'), ctx, { filename: require('path').basename(f) }));
   const post = payload => JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify(payload) } }).text);
-  return { ctx, post, getSS, props, cache, drive, lockState };
+  const setNow = iso => { if (!opts.clock) throw new Error("load(..., { clock: true }) is needed before setNow"); nowMs = iso === null ? null : new Date(iso).getTime(); };
+  return { ctx, post, getSS, props, cache, drive, lockState, setNow, files };
 }
 module.exports = { load };

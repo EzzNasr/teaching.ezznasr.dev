@@ -427,7 +427,7 @@
     var seen = {};
     list.forEach(function (l) { seen[yearOf(l.lesson)] = 1; });
     return orderedYears(Object.keys(seen)).reduce(function (acc, y) {
-      return acc.concat(list.filter(function (l) { return yearOf(l.lesson) === y; }));
+      return acc.concat(list.filter(function (l) { return yearOf(l.lesson) === y; }).sort(function (x, z) { return cmpLessons(x.lesson, z.lesson); }));
     }, []);
   }
   // <optgroup>s of lesson <option>s, one group per year.
@@ -435,6 +435,7 @@
     var by = {};
     list.forEach(function (l) { var y = yearOf(l.lesson); (by[y] = by[y] || []).push(l); });
     return orderedYears(Object.keys(by)).map(function (y) {
+      by[y].sort(function (x, z) { return cmpLessons(x.lesson, z.lesson); });
       return el("optgroup", { label: (y || "Other lessons") + " (" + by[y].length + ")" }, by[y].map(function (l) {
         return el("option", { value: l.lesson }, [pretty(l.lesson) + "  (" + l.lesson + ")"]);
       }));
@@ -476,7 +477,7 @@
     var seen = {}, out = [];
     (d.videos || []).forEach(function (v) { if (!seen[v.lesson]) { seen[v.lesson] = 1; out.push({ lesson: v.lesson, track: v.lesson.split("/")[0] }); } });
     (d.quizzes || []).forEach(function (q) { if (!seen[q.lesson]) { seen[q.lesson] = 1; out.push({ lesson: q.lesson, track: q.lesson.split("/")[0] }); } });
-    return out.sort(function (a, b) { return a.lesson < b.lesson ? -1 : 1; });
+    return out.sort(function (a, b) { return cmpLessons(a.lesson, b.lesson); });
   }
   function allTracksList(d) {
     if (d.tracks && d.tracks.length) return d.tracks;
@@ -1003,9 +1004,11 @@
     var groups = order.map(function (k) { return m[k]; });
     if (mode === "person") {
       groups.sort(function (x, y) { return lowName(x.sample) < lowName(y.sample) ? -1 : lowName(x.sample) > lowName(y.sample) ? 1 : (x.gk < y.gk ? -1 : 1); });
-      groups.forEach(function (g) { g.rows.sort(function (x, y) { return scopeRank(x.scope) - scopeRank(y.scope) || (x.scope < y.scope ? -1 : 1); }); });
+      groups.forEach(function (g) { g.rows.sort(function (x, y) { return scopeRank(x.scope) - scopeRank(y.scope) || (scopeRank(x.scope) === 3 ? cmpLessons(x.scope, y.scope) : 0) || (x.scope < y.scope ? -1 : 1); }); });
     } else {
-      groups.sort(function (x, y) { return scopeRank(x.gk) - scopeRank(y.gk) || (x.gk < y.gk ? -1 : 1); });
+      // plain lesson scopes (rank 3) go by year > chapter > lesson NUMBER, not by key text: three spellings of a key used to
+      // put Ch1 L3 before Ch1 L1 (R-004). Wide scopes and sub-scopes keep their text order.
+      groups.sort(function (x, y) { return scopeRank(x.gk) - scopeRank(y.gk) || (scopeRank(x.gk) === 3 ? cmpLessons(x.gk, y.gk) : 0) || (x.gk < y.gk ? -1 : 1); });
       groups.forEach(function (g) { g.rows.sort(function (x, y) { return lowName(x) < lowName(y) ? -1 : lowName(x) > lowName(y) ? 1 : (x.phone < y.phone ? -1 : 1); }); });
     }
     return groups;

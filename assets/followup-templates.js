@@ -142,6 +142,22 @@
       "💬 ولو عندهم أي سؤال في المنصة أو المادة العلمية، إحنا موجودين دايمًا علشان نساعدهم 🌷"
     ),
 
+    // Phase 2 (Session 2): the monthly review sent to a parent. Every {*_line} is built from the student summary
+    // and is dropped when empty; {review_lines} lists what still has to be made up.
+    monthly_review: J(
+      "{H}📅 *التقرير الشهري — {month_label}* بخصوص *{student_name}* 📌",
+      "",
+      "{quiz_line}",
+      "{homework_line}",
+      "{attendance_line}",
+      "{watch_line}",
+      "",
+      "{missed_line}",
+      "{review_lines}",
+      "",
+      "💬 ولو عندهم أي سؤال في المنصة أو المادة العلمية، إحنا موجودين دايمًا علشان نساعدهم 🌷"
+    ),
+
     group_reminder: J(
       "السلام عليكم 👋",
       "",
@@ -168,7 +184,7 @@
   // Editor tab order + Arabic labels.
   var ORDER = [
     "session_unwatched", "session_unfinished", "homework_missing", "quiz_absent",
-    "quiz_mark", "combined", "group_reminder",
+    "quiz_mark", "combined", "group_reminder", "monthly_review",
     "session_done", "homework_done", "quiz_praise",
     "line_session_unwatched", "line_session_unfinished", "line_homework_missing", "line_quiz_absent",
     "header"
@@ -188,7 +204,8 @@
     line_homework_missing: "سطر: واجب ناقص",
     line_quiz_absent: "سطر: غياب كويز",
     combined: "رسالة مجمّعة",
-    group_reminder: "تذكير للجروب"
+    group_reminder: "تذكير للجروب",
+    monthly_review: "تقرير شهري"
   };
 
   var PLACEHOLDERS = {
@@ -211,11 +228,19 @@
     hw_list: { ar: "قائمة الواجبات (مرقّمة)", en: "Numbered homework list" },
     watch_list: { ar: "قائمة المشاهدة (مرقّمة)", en: "Numbered watch list" },
     parents_contacted_line: { ar: "سطر «تم التواصل مع أولياء الأمور» (لو مفعّل)", en: "Parents-contacted line (only when the group flag is on)" },
-    issues: { ar: "قائمة المشاكل (للرسالة المجمّعة)", en: "Joined issue lines (combined message)" }
+    issues: { ar: "قائمة المشاكل (للرسالة المجمّعة)", en: "Joined issue lines (combined message)" },
+    month_label: { ar: "الشهر (أكتوبر 2026)", en: "Month and year in Arabic" },
+    quiz_line: { ar: "سطر الكويزات (العدد والمتوسط)", en: "Quiz count and average line" },
+    homework_line: { ar: "سطر الواجبات (المسلَّم من المطلوب)", en: "Homework submitted vs required line" },
+    attendance_line: { ar: "سطر الحضور (سنتر / أونلاين)", en: "Attendance line" },
+    watch_line: { ar: "سطر متوسط المشاهدة", en: "Average watch line" },
+    missed_line: { ar: "سطر المطلوب تعويضه", en: "What has to be made up (count line)" },
+    review_lines: { ar: "تفاصيل ما فات (سطر لكل درس)", en: "One line per missed item" }
   };
 
   // Values that carry their own markup (or are already isolated): inserted as-is.
-  var RAW_KEYS = { hw_list: 1, watch_list: 1, issues: 1, parents_contacted_line: 1, deadline_when: 1, session_when: 1 };
+  var RAW_KEYS = { hw_list: 1, watch_list: 1, issues: 1, parents_contacted_line: 1, deadline_when: 1, session_when: 1,
+                   month_label: 1, quiz_line: 1, homework_line: 1, attendance_line: 1, watch_line: 1, missed_line: 1, review_lines: 1 };
   // Values wrapped in bidi isolates (LTR runs inside Arabic text, names that may be Latin).
   var ISOLATE_KEYS = {
     student_name: 1, student_first_name: 1, group: 1, lesson: 1, lesson_slug: 1, lesson_current: 1,
@@ -536,6 +561,7 @@
    *             `issues` ([{template, lesson}]) overrides what the combined message lists.
    */
   function composeFull(summary, kind, ctx) {
+    if (kind === "monthly_review") return composeMonthly(summary, ctx);
     summary = summary || {}; ctx = ctx || {};
     var input = {
       student: ctx.student || summary.student || {},
@@ -576,6 +602,56 @@
     var r = render(bodyFor(kind, templates), c, { header: header, isolates: useIso });
     var f = fit(r.text, [c.issues, c.hw_list, c.watch_list], MAX_LEN);
     return { text: f.text, missing: r.missing, trimmed: f.trimmed, kind: kind };
+  }
+
+  // ------------------------------------------------------------------ monthly review (Phase 2)
+  var MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+  function monthLabel(month) {
+    var m = /^(\d{4})-(\d{2})$/.exec(str(month));
+    return m && +m[2] >= 1 && +m[2] <= 12 ? MONTHS_AR[+m[2] - 1] + " " + m[1] : str(month);
+  }
+  function rnd(n) { return Math.round(+n * 10) / 10; }
+  /**
+   * composeMonthly(summary, ctx) -> { text, missing, trimmed, kind }
+   *   summary : the `summary` object of one admin_monthly_review / admin_student_summary result
+   *             ({student, groups, totals, expected, ...})
+   *   ctx     : { month: "2026-10", templates, isolates }
+   * Same text for the WhatsApp message, the copy button and the printable page, so the three can never disagree.
+   */
+  function composeMonthly(summary, ctx) {
+    summary = summary || {}; ctx = ctx || {};
+    var tot = summary.totals || {}, exp = summary.expected || [], st = summary.student || {};
+    var useIso = ctx.isolates !== false;
+    var reqHw = exp.filter(function (e) { return e.homework && e.homework.required; });
+    var hwDone = reqHw.filter(function (e) { return e.homework.done; }).length;
+    var c = {
+      student_name: str(st.name || st.phone), student_first_name: str(st.name || "").split(/\s+/)[0],
+      group: str(summary.groups && summary.groups[0] ? summary.groups[0].group : ""),
+      month_label: monthLabel(ctx.month || (summary.range && String(summary.range.from).slice(0, 7)) || (ctx.now instanceof Date ? ctx.now : new Date()).toISOString().slice(0, 7)),
+      lesson: "", lesson_slug: "", lesson_current: "", lesson_review: "", watch_pct: "", score: "", total: "", quiz_pct: "",
+      hw_deadline: "", watch_deadline: "", deadline_when: "", session_when: "", group_note: "", hw_list: "", watch_list: "", parents_contacted_line: "", issues: "",
+      quiz_line: tot.quiz_count ? "📝 الكويزات: *" + tot.quiz_count + "* " + (tot.quiz_count === 1 ? "كويز" : "كويزات") + (tot.quiz_avg_pct != null ? " — المتوسط *" + rnd(tot.quiz_avg_pct) + "%*" : "") : "📝 الكويزات: لم يتم حل أي كويز هذا الشهر",
+      homework_line: reqHw.length ? "✍️ الواجبات: سُلّم *" + hwDone + "* من *" + reqHw.length + "* المطلوب" : (tot.homework_count ? "✍️ الواجبات: سُلّم *" + tot.homework_count + "*" : ""),
+      attendance_line: (tot.attendance_center || tot.attendance_online) ? "🏫 الحضور: *" + (tot.attendance_center || 0) + "* سنتر · *" + (tot.attendance_online || 0) + "* أونلاين" : "",
+      watch_line: tot.watch_avg_pct != null ? "▶️ متوسط المشاهدة: *" + rnd(tot.watch_avg_pct) + "%*" : "",
+      missed_line: "", review_lines: ""
+    };
+    var parts = [];
+    if (tot.quiz_missed) parts.push("*" + tot.quiz_missed + "* " + (tot.quiz_missed === 1 ? "كويز" : "كويزات"));
+    if (tot.homework_missed) parts.push("*" + tot.homework_missed + "* " + (tot.homework_missed === 1 ? "واجب" : "واجبات"));
+    if (parts.length) c.missed_line = "⚠️ المطلوب تعويضه: " + parts.join(" و ");
+    var lines = [];
+    exp.forEach(function (e) {
+      var nm = iso(clean(prettyLesson(e.lesson)), useIso);
+      if (e.quiz && e.quiz.missed) lines.push("• كويز *" + nm + "*: لم يتم حله");
+      if (e.homework && e.homework.missed) lines.push("• واجب *" + nm + "*: لم يتم تسليمه");
+    });
+    c.review_lines = lines.slice(0, 8).join("\n") + (lines.length > 8 ? "\n• …و " + (lines.length - 8) + " غير كده" : "");
+    c.__isolates = useIso;
+    var templates = ctx.templates || {};
+    var r = render(bodyFor("monthly_review", templates), c, { header: bodyFor("header", templates), isolates: useIso });
+    var f = fit(r.text, [c.review_lines], MAX_LEN);
+    return { text: f.text, missing: r.missing, trimmed: f.trimmed, kind: "monthly_review" };
   }
   function compose(summary, kind, ctx) { return composeFull(summary, kind, ctx).text; }
 
@@ -706,6 +782,7 @@
     else if (/^quiz_(mark|praise)/.test(k)) extra = ["score", "total", "quiz_pct"];
     else if (k === "combined") extra = ["issues", "watch_pct", "hw_deadline", "watch_deadline"];
     else if (k === "group_reminder") { base = ["group", "lesson_current", "lesson_review"]; extra = ["hw_list", "watch_list", "parents_contacted_line", "deadline_when", "hw_deadline", "watch_deadline", "session_when", "group_note"]; }
+    else if (k === "monthly_review") { base = ["student_name", "student_first_name", "group"]; extra = ["month_label", "quiz_line", "homework_line", "attendance_line", "watch_line", "missed_line", "review_lines"]; }
     else if (k === "header") { base = ["student_name", "group"]; extra = []; }
     return base.concat(extra);
   }
@@ -914,7 +991,7 @@
   return {
     VERSION: VERSION, MAX_LEN: MAX_LEN, FSI: FSI, PDI: PDI,
     DEFAULTS: DEFAULTS, PLACEHOLDERS: PLACEHOLDERS, LABELS: LABELS, ORDER: ORDER, LIST_ITEMS: LIST_ITEMS,
-    buildContext: buildContext, render: render, compose: compose, composeFull: composeFull,
+    buildContext: buildContext, render: render, compose: compose, composeFull: composeFull, composeMonthly: composeMonthly, monthLabel: monthLabel,
     deriveIssues: deriveIssues, templateForState: templateForState,
     formatPreview: formatPreview, waLink: waLink, waDigits: waDigits, copyText: copyText, lintMessage: lintMessage,
     deadlineWhen: deadlineWhen, sessionWhen: sessionWhen, prettyLesson: prettyLesson, setLessonTitles: setLessonTitles, lessonSlug: lessonSlug,
