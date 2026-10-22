@@ -24,7 +24,10 @@ const J = o => JSON.stringify(o).slice(0, 220);
   const o = env.post({ action: 'admin_followup_overview', token: 'tok' });
   t('fallback: without Phase2_Followup.gs the old overview still answers', o.ok === true && !o.not_implemented, J(o));
   const s = env.post({ action: 'admin_student_summary', token: 'tok', student: '01000000001' });
-  t('fallback: a Phase 2 only action says "not implemented" (and nothing else breaks)', s.ok === false && s.not_implemented === true, J(s));
+  // Merged layout (handlers live in Code.gs): a Phase 2 action must be served, not "not implemented". Split layout: the stub answers.
+  const merged = /^function p2_admin_student_summary\b/m.test(require('fs').readFileSync(path.join(dir, 'Code.gs'), 'utf8'));
+  if (merged) t('merged Code.gs: a Phase 2 action is served without Phase2_Followup.gs', s.ok === true && !s.not_implemented, J(s));
+  else t('fallback: a Phase 2 only action says "not implemented" (and nothing else breaks)', s.ok === false && s.not_implemented === true, J(s));
 }
 // 3. flags: off => {disabled:true}, on => works (TRUE, 1, true)
 {

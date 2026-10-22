@@ -34,7 +34,7 @@ function _p2cWrittenSheet() { return _gAnswersSheet(); }   // S4 owns the tab la
 // Stable id for a question: its own "id" if it has one, else its position.
 function _p2cQid(q, i) {
   if (q && q.id !== undefined && q.id !== null && q.id !== "") return String(q.id);
-  if (q && q.qid !== undefined && q.qid !== null && q.qid !== "") return String(q.qid);   // written questions carry qid, not id
+  if (q && q.qid !== undefined && q.qid !== null && q.qid !== "") return String(q.qid);
   return String(i);
 }
 

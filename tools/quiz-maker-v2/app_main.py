@@ -19,7 +19,7 @@ from tkinter import ttk, messagebox, filedialog
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from modules import common, drive_bridge
+from modules import common, drive_bridge, test_runner
 from modules.quiz_tab import QuizTab
 from modules.assignment_tab import AssignmentTab
 from modules.attachment_tab import AttachmentTab
@@ -127,6 +127,13 @@ class App(tk.Tk):
         row.pack(fill="x", padx=8, pady=6)
         tk.Entry(row, textvariable=self.site_root_var).pack(side="left", fill="x", expand=True)
         tk.Button(row, text="Browse...", command=self._pick_site_root).pack(side="left", padx=6)
+        # "Run tests": opens a terminal and streams scripts/test_all.sh live (see modules/test_runner.py)
+        tests_btn = tk.Menubutton(row, text="Run tests \u25be", relief="raised", padx=8)
+        tests_menu = tk.Menu(tests_btn, tearoff=0)
+        for _mode, (_flags, _label) in test_runner.MODES.items():
+            tests_menu.add_command(label=_label, command=lambda m=_mode: self._run_tests(m))
+        tests_btn.configure(menu=tests_menu)
+        tests_btn.pack(side="left")
         tk.Label(root_frame,
                  text="Path to your local teaching-site repo (the folder containing programming/, english/, "
                       "math/, assets/, CNAME). Shared by all three tabs below.",
@@ -166,6 +173,14 @@ class App(tk.Tk):
         else:
             self.status_var.set("Site folder not found automatically — click Browse to locate it "
                                  "(needs assets/ and CNAME inside).")
+
+    def _run_tests(self, mode):
+        """Open a terminal window running the master test gate; the app stays usable meanwhile."""
+        err = test_runner.launch(self.site_root_var.get().strip(), mode)
+        if err:
+            messagebox.showerror("Run tests", err)
+        else:
+            self.status_var.set("Tests running in a separate terminal window...")
 
     def _pick_site_root(self):
         path = filedialog.askdirectory(title="Select your teaching-site repo folder")

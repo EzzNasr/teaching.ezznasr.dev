@@ -7,13 +7,17 @@ let pass = 0, fail = 0;
 const t = (n, c, x) => { (c ? pass++ : fail++); console.log((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : '  -> ' + (x || ''))); };
 const ACTIONS = ['admin_student_summary', 'admin_monthly_review', 'admin_set_requirement', 'admin_log_parent_notification', 'admin_list_parent_notifications', 'upload_written_image', 'get_quiz_review', 'admin_grading_queue', 'admin_grade_written', 'admin_migrate_lesson_keys'];
 const CODE = path.join(dir, 'Code.gs'), CORE = path.join(dir, 'Phase2_Core.gs');
+// Layout: Code.gs may have the Phase2_*.gs files MERGED into it (deploy = Code.gs alone). Detected by the handlers living in Code.gs.
+const MERGED = /^function p2_admin_set_requirement\b/m.test(fs.readFileSync(CODE, 'utf8'));
+const norm = x => x.replace(/\r\n/g, '\n').split('\n').map(l => l.replace(/\s+$/, '')).filter(Boolean).join('\n');   // blank lines / trailing spaces don't count as drift
 
 // --- router hook: only Code.gs + Core loaded, so no handler exists yet
 {
   const env = load([CODE, CORE]);
   for (const a of ACTIONS) {
     const r = env.post({ action: a, token: 'tok' });
-    t('router: ' + a + ' answers "not implemented" when its handler is absent', r.ok === false && r.not_implemented === true && /Not implemented yet/.test(r.error), JSON.stringify(r));
+    if (MERGED) t('router: ' + a + ' is served by the merged Code.gs (never "not implemented")', !r.not_implemented, JSON.stringify(r));
+    else t('router: ' + a + ' answers "not implemented" when its handler is absent', r.ok === false && r.not_implemented === true && /Not implemented yet/.test(r.error), JSON.stringify(r));
   }
   t('router: unknown action still unknown', /Unknown action/.test(env.post({ action: 'nope' }).error));
   // handler present: payload reaches it and the answer comes back untouched
@@ -74,7 +78,15 @@ const CODE = path.join(dir, 'Code.gs'), CORE = path.join(dir, 'Phase2_Core.gs');
     if (owner[n] && owner[n] !== f) dups.push(n + ' (' + owner[n] + ' & ' + f + ')'); else owner[n] = f;
     if (f !== 'Code.gs' && !/^(_p2|p2|P2_)/.test(n) && !LEGACY_UNPREFIXED.has(n)) badPrefix.push(f + ': ' + n);
   }
-  t('no global name is defined in two .gs files', !dups.length, dups.join(', '));
+  if (MERGED) {
+    // Merged layout: a Phase2_*.gs file is a source copy of a section of Code.gs. Same names in both is fine ONLY while the
+    // copies are identical, so a fix made in one place and not the other fails here instead of silently winning in Apps Script.
+    const codeSrc = norm(fs.readFileSync(path.join(dir, 'Code.gs'), 'utf8'));
+    const drift = gs.filter(f => !codeSrc.includes(norm(fs.readFileSync(path.join(dir, f), 'utf8'))));
+    t('merged Code.gs contains every Phase2_*.gs verbatim (no drift between the copies)', !drift.length, 'differs from Code.gs: ' + drift.join(', '));
+    const realDups = dups.filter(d => { const m = /\(([^&]+) & ([^)]+)\)/.exec(d); return m && !m.slice(1).some(f => gs.includes(f.trim())); });
+    t('no global name is defined twice outside the merged copies', !realDups.length, realDups.join(', '));
+  } else t('no global name is defined in two .gs files', !dups.length, dups.join(', '));
   t('every global in Phase2_*.gs starts with p2 / _p2 / P2_', !badPrefix.length, badPrefix.join(', '));
   for (const f of gs) {   // load alone in an EMPTY context: only declarations may run at load time
     let err = '';
