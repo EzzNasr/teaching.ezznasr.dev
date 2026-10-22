@@ -4879,3 +4879,1526 @@ function installWeeklyBackupTrigger() {
   ScriptApp.newTrigger("weeklyBackup").timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(3).create();
   Logger.log("Weekly backup scheduled: Sundays around 03:00 (script time zone). Keeps the last " + BACKUP_KEEP + " copies.");
 }
+
+// ============================================================================
+// ===== MERGED FROM Phase2_Core.gs =====
+// ============================================================================
+
+// Phase 2 core helpers (owned by Session 5). Paste into Apps Script as its own file.
+// Contract: docs/contract.md. Only declarations here - nothing runs at load time.
+
+// Router hook: doPost's Phase 2 `case` lines call this with the handler's name.
+function _p2Call(handlerName, payload) {
+  var fn = (typeof globalThis !== "undefined" ? globalThis : this)[handlerName];
+  if (typeof fn !== "function") {
+    return { ok: false, error: "Not implemented yet: " + handlerName.replace(/^p2_/, ""), not_implemented: true };
+  }
+  return fn(payload);
+}
+
+// Like _p2Call, but when the Phase 2 handler is not pasted yet the OLD handler answers, so an
+// action that worked before Phase 2 (the two follow-up actions) never regresses to "not implemented".
+function _p2CallOr(handlerName, fallback, payload) {
+  var fn = (typeof globalThis !== "undefined" ? globalThis : this)[handlerName];
+  return typeof fn === "function" ? fn(payload) : fallback(payload);
+}
+
+// Feature flags are Script Properties (FF_CAMERA, FF_DEFERRED_ANSWERS, FF_GRADING,
+// FF_PARENT_LOG, FF_MONTHLY). "1" or "true" means on; anything else, or missing, is off.
+function p2_flag(name) {
+  var v = PropertiesService.getScriptProperties().getProperty(name);
+  return v === "1" || String(v).toLowerCase() === "true";
+}
+
+// Throws a marked error when the flag is off. The router turns it into
+// {ok:false, error:"Feature disabled: FF_X", disabled:true}.
+function p2_requireFlag(name) {
+  if (!p2_flag(name)) {
+    var e = new Error("Feature disabled: " + name);
+    e.disabled = true;
+    throw e;
+  }
+}
+
+var P2_AUDIT_HEADERS = ["at", "who", "action", "target", "before", "after"];
+
+// Appends one audit row. Never throws (a logging problem must not fail the real action).
+function p2_audit(who, action, target, before, after) {
+  try {
+    var ss = _dataSs();
+    var sh = ss.getSheetByName("AuditLog");
+    if (!sh) {
+      sh = ss.insertSheet("AuditLog");
+      sh.appendRow(P2_AUDIT_HEADERS);
+    }
+    var s = function (v) { return v === undefined || v === null ? "" : (typeof v === "string" ? v : JSON.stringify(v)); };
+    sh.appendRow([_cairoIso(new Date()), s(who), s(action), s(target), s(before), s(after)]);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+// Optional S3 hooks around two existing actions: when Phase2_Capture.gs is not pasted they are no-ops.
+function _p2Pre(name, payload) { var f = (typeof globalThis !== "undefined" ? globalThis : this)[name]; return typeof f === "function" ? f(payload) : payload; }
+function _p2Post(name, resp, payload) { var f = (typeof globalThis !== "undefined" ? globalThis : this)[name]; return typeof f === "function" ? f(resp, payload) : resp; }
+
+
+// Audit coverage (R-022): every access-changing admin action leaves one AuditLog row (contract section 8).
+// Wraps the response only: never changes it, never throws. Failed actions (ok:false) are not logged.
+function _p2AuditWrap(action, payload, resp) {
+  try {
+    if (resp && resp.ok !== false) {
+      var p = payload || {};
+      var target = p.phone || p.student || p.group || p.lesson || p.scope || "";
+      var detail = { scope: p.scope || p.lesson || p.slot || "", group: p.group || "", never: p.never === true, expires: p.expires_at || p.expires || "", locked: p.locked };
+      p2_audit(p.student_id && !p.token ? p.student_id : "token", action, target, "", detail);
+    }
+  } catch (e) { /* logging must never fail the action */ }
+  return resp;
+}
+
+
+// ============================================================================
+// ===== MERGED FROM Phase2_Keys.gs =====
+// ============================================================================
+
+/**
+ * Phase2_Keys.gs  (S1)  — paste into Apps Script as its own file, next to Code.gs.
+ *
+ * admin_migrate_lesson_keys
+ *   Rewrites old/typo'd lesson keys (see LESSON_ALIASES in Code.gs) to the current ones in the
+ *   access tabs. DRY RUN BY DEFAULT: nothing changes unless the request has  apply: true.
+ *   Safe to run twice (second run finds nothing). QuizResults / Submissions are never touched:
+ *   they keep their history under the old bare slug and are matched through the alias map.
+ *
+ *   Before changing a tab it copies it to "bak_<Tab>_<yyyymmdd>_<n>".
+ *   A Lessons / Videos / Quizzes row whose current key already has a row is NOT renamed (that
+ *   would create a duplicate); it is listed under "conflicts" for you to resolve by hand.
+ *
+ *   Request:  { action: "admin_migrate_lesson_keys", token | session, apply?: true }
+ *   Reply:    { ok, dry_run, changes: [{tab, column, row, from, to}], conflicts: [...],
+ *               tabs_changed: [...], backups: [...] }
+ */
+
+var MIGRATE_TARGETS = [
+  { tab: "Entitlements", column: "scope" },
+  { tab: "QuizAccess", column: "lesson" },
+  { tab: "Attendance", column: "lesson" },
+  { tab: "WatchProgress", column: "lesson" },
+  { tab: "Lessons", column: "lesson", unique: true },
+  { tab: "Videos", column: "lesson", unique: true, alsoKey: "slot" },
+  { tab: "Quizzes", column: "lesson", unique: true },
+  { tab: "GroupSettings", column: "current_lesson" },
+  { tab: "GroupSettings", column: "review_lessons", json: true },
+  { tab: "GroupSettings", column: "hw_lessons", json: true },
+  { tab: "GroupSettings", column: "quiz_lessons", json: true }
+];
+
+function handleAdminMigrateLessonKeys(payload) {
+  _requireAdminAny(payload);
+  var apply = payload.apply === true;
+  return _withLock(function () {
+    var ss = _ss();
+    var changes = [], conflicts = [], plans = {};   // plans[tab] = [{col, row, to}]
+
+    MIGRATE_TARGETS.forEach(function (t) {
+      var sheet = ss.getSheetByName(t.tab);
+      if (!sheet || sheet.getLastRow() < 2) return;
+      var idx = _headerIndex(sheet);
+      if (!idx[t.column]) return;
+      var n = sheet.getLastRow() - 1;
+      var col = sheet.getRange(2, idx[t.column], n, 1).getValues().map(function (r) { return r[0]; });
+      var keyCol = t.alsoKey && idx[t.alsoKey]
+        ? sheet.getRange(2, idx[t.alsoKey], n, 1).getValues().map(function (r) { return String(r[0]).trim().toLowerCase(); })
+        : null;
+
+      // rows already holding a current key (for the duplicate check)
+      var have = {};
+      if (t.unique) col.forEach(function (v, i) {
+        have[String(v).trim().toLowerCase() + "|" + (keyCol ? keyCol[i] : "")] = true;
+      });
+
+      col.forEach(function (raw, i) {
+        var from = String(raw == null ? "" : raw), to;
+        if (t.json) {
+          var arr; try { arr = JSON.parse(from || "[]"); } catch (e) { return; }
+          if (!Array.isArray(arr)) return;
+          var seen = {}, out = [], moved = false;
+          arr.forEach(function (x) {
+            var c = _canonKey(String(x).trim().toLowerCase());
+            if (c !== String(x).trim().toLowerCase()) moved = true;
+            if (!seen[c]) { seen[c] = 1; out.push(c); }
+          });
+          if (!moved) return;
+          to = JSON.stringify(out);
+        } else {
+          var low = from.trim().toLowerCase();
+          to = _canonKey(low);
+          if (to === low) return;
+          if (t.unique && have[to + "|" + (keyCol ? keyCol[i] : "")]) {
+            conflicts.push({ tab: t.tab, column: t.column, row: i + 2, from: from, to: to,
+                             why: "a row for the current key already exists" });
+            return;
+          }
+        }
+        changes.push({ tab: t.tab, column: t.column, row: i + 2, from: from, to: to });
+        (plans[t.tab] = plans[t.tab] || []).push({ col: idx[t.column], row: i + 2, to: to });
+      });
+    });
+
+    var backups = [], tabsChanged = Object.keys(plans);
+    if (apply && tabsChanged.length) {
+      var stamp = _todayCairo().replace(/-/g, "") + "_" + (Date.now() % 100000);
+      tabsChanged.forEach(function (tab) {
+        var src = ss.getSheetByName(tab);
+        var bak = ss.insertSheet("bak_" + tab + "_" + stamp);
+        var vals = src.getDataRange().getValues();
+        bak.getRange(1, 1, vals.length, vals[0].length).setValues(vals);
+        backups.push(bak.getName());
+      });
+      tabsChanged.forEach(function (tab) {
+        var sheet = ss.getSheetByName(tab);
+        plans[tab].forEach(function (p) { sheet.getRange(p.row, p.col).setValue(p.to); });
+      });
+    }
+    return { ok: true, dry_run: !apply, changes: changes, conflicts: conflicts,
+             tabs_changed: apply ? tabsChanged : [], backups: backups };
+  });
+}
+
+
+// =====================================================================================
+// Integration glue (S5, Oct 21): the contract surface from docs/contract.md section 2 and 4.
+// S1 built the resolver inside Code.gs (_canonKey / LESSON_ALIASES). The contract wants it here
+// too, with no load-order dependence, so this is a literal MIRROR of that map. tests R-001b and
+// test_keys.js fail if the three copies (this, Code.gs, assets/lesson-aliases.json) differ.
+// =====================================================================================
+var P2_LESSON_ALIASES = {
+  "programming/baccalaureate/grade-2-secondary/lesson-1-development-of-information-technology-and-social-transformation": "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-1-development-of-information-technology-and-social-transformation",
+  "programming/baccalaureate/grade-2-secondary/lesson-2-how-ai-works": "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-2-how-ai-works",
+  "programming/baccalaureate/grade-2-secondary/chaper-1-lesson-3-ai-in-daily-life-and-industry": "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-3-ai-in-daily-life-and-industry",
+  "lesson-1-development-of-information-technology-and-social-transformation": "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-1-development-of-information-technology-and-social-transformation",
+  "lesson-2-how-ai-works": "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-2-how-ai-works",
+  "chaper-1-lesson-3-ai-in-daily-life-and-industry": "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-3-ai-in-daily-life-and-industry"
+};
+
+// Canonical full key for a full key or bare slug in the alias map; anything else comes back unchanged.
+function p2k_canon(key) {
+  var s = key == null ? "" : String(key);
+  return Object.prototype.hasOwnProperty.call(P2_LESSON_ALIASES, s) ? P2_LESSON_ALIASES[s] : s;
+}
+// Every spelling that means this lesson, canonical first.
+function p2k_aliases(key) {
+  var c = p2k_canon(key), out = [c];
+  Object.keys(P2_LESSON_ALIASES).forEach(function (a) { if (P2_LESSON_ALIASES[a] === c && out.indexOf(a) === -1) out.push(a); });
+  return out;
+}
+function p2k_same(a, b) { return p2k_canon(a) === p2k_canon(b); }
+
+// Contract wrapper: {dry_run?:true} (default true; dry_run:false applies). S1's native {apply:true} still works.
+// Adds the contract field names next to S1's, and writes one AuditLog row per applied run.
+function p2_admin_migrate_lesson_keys(payload) {
+  payload = payload || {};
+  var apply = payload.dry_run === false || payload.apply === true;
+  var res = handleAdminMigrateLessonKeys(Object.assign({}, payload, { apply: apply }));
+  (res.changes || []).forEach(function (c) { c.field = c.column; c.before = c.from; c.after = c.to; });
+  res.backup_tab = (res.backups && res.backups[0]) || "";
+  if (apply && res.changes && res.changes.length) {
+    p2_audit(payload.student_id || "token", "migrate_lesson_keys", { tabs: res.tabs_changed },
+             { changes: res.changes.length }, { backups: res.backups });
+  }
+  return res;
+}
+
+
+// ============================================================================
+// ===== MERGED FROM Phase2_Capture.gs =====
+// ============================================================================
+
+// ============================================================================
+// Phase2_Capture.gs  (Session 3: student capture + deferred answers)
+//
+// Paste into the same Apps Script project as Code.gs (File > New > Script).
+// Does NOT edit Code.gs. Needs four lines in doPost's router (S5 owns that),
+// see handoff/S3-to-S5.md:
+//
+//   case "get_quiz":            return _json(p2c_decorate_quiz(handleGetQuiz(payload), payload));
+//   case "upload_quiz_result":  return _json(handleUploadQuizResult(p2c_prepare_quiz_payload(payload)));
+//   case "upload_written_image":return _json(p2_upload_written_image(payload));
+//   case "get_quiz_review":     return _json(p2_get_quiz_review(payload));
+//
+// Flags (Script Properties, default OFF; "1"/"true"/"on"):
+//   FF_DEFERRED_ANSWERS  quiz answers are NOT sent to the browser; the server grades.
+//   FF_CAMERA            "written" questions (photo of handwritten work). Quizzes
+//                        need FF_DEFERRED_ANSWERS too (the server binds photos to
+//                        the attempt); homework only needs FF_CAMERA.
+// Optional property WRITTEN_FOLDER_ID (Drive folder for photos); falls back to
+// SUBMISSIONS_FOLDER_ID.
+//
+// WrittenAnswers tab (in _dataSs(), created on first upload). One row per
+// (submission_id, question_id). submission_id = the attempt's client_id.
+//   submission_id, student_id, lesson, question_id, drive_file_id (comma list),
+//   awarded, max, note, graded_at, image_ids (comma list), uploaded_at
+// S4 owns awarded/max/note/graded_at; this file never writes them. Layout: _gAnswersSheet().
+// ============================================================================
+
+var P2_C_MAX_IMAGES = 3;
+var P2_C_MAX_IMAGE_BYTES = 2.5 * 1024 * 1024;   // client sends ~1600px JPEG, normally 200-600 KB
+var P2_C_UPLOADS_PER_HOUR = 60;                  // per student
+
+function _p2cWrittenSheet() { return _gAnswersSheet(); }   // S4 owns the tab layout (Phase2_Grading.gs)
+
+// Stable id for a question: its own "id" if it has one, else its position.
+function _p2cQid(q, i) {
+  if (q && q.id !== undefined && q.id !== null && q.id !== "") return String(q.id);
+  if (q && q.qid !== undefined && q.qid !== null && q.qid !== "") return String(q.qid);
+  return String(i);
+}
+function _p2cMaxMarks(q) {
+  var m = Number(q && q.max_marks);
+  return isFinite(m) && m >= 1 ? Math.min(100, Math.floor(m)) : 1;
+}
+
+// ---- get_quiz: tag / strip ------------------------------------------------
+
+// What a student's browser may see while FF_DEFERRED_ANSWERS is on: prompts and
+// choices only. Never correct answers, explanations, model answers.
+function _p2cStripQuestion(q, i) {
+  var out = { _i: i, qid: _p2cQid(q, i) };
+  var type = q.type || "";
+  if (q.chapter !== undefined) out.chapter = q.chapter;
+  if (!type) {                                   // legacy: {q, options, correct:int}
+    out.type = "mcq"; out.prompt = q.q; out.options = q.options || []; out.multi = false;
+  } else if (type === "truefalse") {
+    out.type = "truefalse"; out.prompt = q.prompt; out.options = ["True", "False"]; out.multi = false;
+  } else if (type === "match") {
+    out.type = "match"; out.prompt = q.prompt; out.options = q.options || [];
+    out.rows = (q.rows || []).map(function (r) { return { label: r.label }; });
+  } else if (type === "written") {
+    out.type = "written"; out.prompt = q.prompt; out.max_marks = _p2cMaxMarks(q);
+    out.max_images = P2_C_MAX_IMAGES;
+  } else {                                       // mcq
+    out.type = "mcq"; out.prompt = q.prompt; out.options = q.options || [];
+    out.multi = Array.isArray(q.correct) && q.correct.length > 1;
+  }
+  return out;
+}
+
+function p2c_decorate_quiz(resp, payload) {
+  var deferred = p2_flag("FF_DEFERRED_ANSWERS");
+  var camera = deferred && p2_flag("FF_CAMERA");
+  resp.features = { deferred: deferred, camera: camera };
+  if (!resp || resp.locked || !resp.quiz || !Array.isArray(resp.quiz.questions)) return resp;
+  var served = [];
+  resp.quiz.questions.forEach(function (q, i) {
+    if (q && q.type === "written" && !camera) return;      // can't be answered without the camera path
+    if (deferred) served.push(_p2cStripQuestion(q, i));
+    else { var c = Object.assign({}, q); c._i = i; c.qid = _p2cQid(q, i); served.push(c); }
+  });
+  resp.quiz.questions = served;
+  resp.quiz.deferred = deferred;
+  return resp;
+}
+
+// ---- upload_quiz_result: server-side grading -------------------------------
+
+function _p2cIntIn(v, n) { return typeof v === "number" && v === Math.floor(v) && v >= 0 && v < n; }
+
+// Grades ONE question from the student's raw answer. Returns the same entry
+// shape quiz.js always posted (question/type/your_answer/correct_answer/
+// is_correct/chapter) plus explain + qid so the review page can show them.
+function _p2cGradeOne(q, i, v, imageCount) {
+  var type = q.type || "";
+  var e = { i: i, qid: _p2cQid(q, i), question: type ? q.prompt : q.q, type: type || "mcq",
+            chapter: q.chapter !== undefined ? q.chapter : null, explain: q.explain || "" };
+  var opts = q.options || [];
+  if (type === "written") {
+    e.type = "written"; e.max = _p2cMaxMarks(q); e.correct_answer = "";
+    e.your_answer = imageCount ? "[" + imageCount + " photo" + (imageCount > 1 ? "s" : "") + "]" : "";
+    e.is_correct = false; e.pending = imageCount > 0; e.image_count = imageCount;
+    return e;
+  }
+  if (type === "match") {
+    var rows = q.rows || [], got = Array.isArray(v) ? v : [], ok = rows.length > 0, yours = [], right = [];
+    rows.forEach(function (row, k) {
+      var c = typeof got[k] === "string" ? got[k] : "";
+      if (opts.indexOf(c) === -1) c = "";
+      if (c !== row.correct) ok = false;
+      yours.push(row.label + ": " + c); right.push(row.label + ": " + row.correct);
+    });
+    e.your_answer = yours.join("; "); e.correct_answer = right.join("; "); e.is_correct = ok;
+    return e;
+  }
+  var correctIdx, optList;
+  if (!type) { correctIdx = [q.correct]; optList = opts; }
+  else if (type === "truefalse") { correctIdx = [q.correct ? 0 : 1]; optList = ["True", "False"]; }
+  else { correctIdx = Array.isArray(q.correct) ? q.correct : [q.correct]; optList = opts; }
+  var chosen = (Array.isArray(v) ? v : [v]).filter(function (x) { return _p2cIntIn(x, optList.length); });
+  chosen = chosen.filter(function (x, k) { return chosen.indexOf(x) === k; }).sort();
+  var want = correctIdx.slice().sort();
+  e.is_correct = chosen.length > 0 && chosen.length === want.length && chosen.every(function (x, k) { return x === want[k]; });
+  e.your_answer = chosen.map(function (x) { return optList[x]; }).join(", ");
+  e.correct_answer = want.map(function (x) { return optList[x]; }).join(", ");
+  return e;
+}
+
+// Pure: quiz content + the student's raw answers -> record fields.
+function _p2cGradeQuiz(quiz, answers, imageCounts) {
+  var byI = {};
+  (answers || []).forEach(function (a) { if (a && typeof a.i === "number") byI[a.i] = a.v; });
+  var entries = [], score = 0, total = 0;
+  quiz.questions.forEach(function (q, i) {
+    var e = _p2cGradeOne(q, i, byI[i], (imageCounts && imageCounts[_p2cQid(q, i)]) || 0);
+    if (e.type === "written") { if (!e.pending) total += e.max; }
+    else { total += 1; if (e.is_correct) score += 1; }
+    entries.push(e);
+  });
+  return { score: score, total: total, questions: entries };
+}
+
+function _p2cImageCounts(studentId, attemptId) {
+  var counts = {};
+  var sheet = _peekSheet("WrittenAnswers");
+  if (!sheet || sheet.getLastRow() < 2) return counts;
+  var c = _headerIndex(sheet);
+  if (!c.submission_id || !c.student_id || !c.question_id || !c.image_ids) return counts;
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  values.forEach(function (row) {
+    if (String(row[c.submission_id - 1]) !== "c:" + attemptId) return;
+    if (!_phonesMatch(row[c.student_id - 1], studentId)) return;
+    var n = String(row[c.image_ids - 1]).split(",").filter(function (s) { return s; }).length;
+    counts[String(row[c.question_id - 1])] = n;
+  });
+  return counts;
+}
+
+function p2c_prepare_quiz_payload(payload) {
+  if (!p2_flag("FF_DEFERRED_ANSWERS")) return payload;
+  if (!payload || !payload.student_id) return payload;          // handler gives its usual error
+  var lesson = _lessonPath(payload.lesson_path || payload.lesson);
+  var json = _lookupQuizContent(lesson);
+  if (!json) return payload;                                    // never synced: the client-graded legacy path
+  var quiz;
+  try { quiz = JSON.parse(json); } catch (e) { return payload; }
+  if (!quiz || !Array.isArray(quiz.questions)) return payload;
+  // A synced quiz is ALWAYS graded here while the flag is on. A client that
+  // posts its own score (stale cached page, or someone calling the API directly)
+  // is refused instead of being trusted.
+  if (!Array.isArray(payload.answers) || !payload.client_id) {
+    throw new Error("This page is out of date \u2014 please refresh it and submit again.");
+  }
+  var graded = _p2cGradeQuiz(quiz, payload.answers, _p2cImageCounts(payload.student_id, String(payload.client_id)));
+  var out = Object.assign({}, payload);
+  out.score = graded.score;
+  out.total = graded.total;
+  out.questions = graded.questions;
+  out.wrong_questions = graded.questions.filter(function (q) { return !q.is_correct && !q.pending; })
+    .map(function (q) { return { question: q.question, your_answer: q.your_answer, correct_answer: q.correct_answer }; });
+  delete out.answers;
+  return out;
+}
+
+// ---- upload_written_image ---------------------------------------------------
+
+function _p2cImageKind(bytes) {
+  function b(i) { return bytes[i] & 0xFF; }
+  if (bytes.length > 3 && b(0) === 0xFF && b(1) === 0xD8 && b(2) === 0xFF) return "jpg";
+  if (bytes.length > 8 && b(0) === 0x89 && b(1) === 0x50 && b(2) === 0x4E && b(3) === 0x47) return "png";
+  if (bytes.length > 12 && b(0) === 0x52 && b(1) === 0x49 && b(2) === 0x46 && b(3) === 0x46 &&
+      b(8) === 0x57 && b(9) === 0x45 && b(10) === 0x42 && b(11) === 0x50) return "webp";
+  return null;
+}
+
+function _p2cFindWrittenRow(sheet, attemptId, studentId, qid) {
+  if (sheet.getLastRow() < 2) return null;
+  var c = _headerIndex(sheet);
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][c.submission_id - 1]) === "c:" + attemptId && String(values[i][c.question_id - 1]) === qid &&
+        _phonesMatch(values[i][c.student_id - 1], studentId)) {
+      return { row: i + 2, cols: c,
+               files: String(values[i][c.drive_file_id - 1]).split(",").filter(String),
+               ids: String(values[i][c.image_ids - 1]).split(",").filter(String) };
+    }
+  }
+  return null;
+}
+
+function p2_upload_written_image(payload) {
+  p2_requireFlag("FF_CAMERA");
+  _requireStudentSession(payload);
+  var student = _normalizePhone(payload.student_id);
+  var attempt = String(payload.attempt_id || ""), imageId = String(payload.image_id || "");
+  var qid = String(payload.question_id == null ? "" : payload.question_id);
+  var kind = payload.kind === "assignment" ? "assignment" : "quiz";
+  if (!/^[A-Za-z0-9_-]{8,100}$/.test(attempt)) throw new Error("Missing or invalid attempt_id.");
+  if (!/^[A-Za-z0-9_-]{8,100}$/.test(imageId)) throw new Error("Missing or invalid image_id.");
+  if (!/^[A-Za-z0-9_.-]{1,40}$/.test(qid)) throw new Error("Missing or invalid question_id.");
+  var lesson = _lessonPath(payload.lesson_path || payload.lesson);
+
+  if (kind === "quiz") {
+    p2_requireFlag("FF_DEFERRED_ANSWERS");
+    if (_quizLockedForStudent(lesson, student)) throw new Error("This quiz is locked.");
+    var json = _lookupQuizContent(lesson), quiz = null;
+    try { quiz = json ? JSON.parse(json) : null; } catch (e) { quiz = null; }
+    var ok = false;
+    if (quiz && Array.isArray(quiz.questions)) {
+      quiz.questions.forEach(function (q, i) { if (q && q.type === "written" && _p2cQid(q, i) === qid) ok = true; });
+    }
+    if (!ok) throw new Error("That question doesn't take a photo answer.");
+  }
+
+  // Rate limit (per student, per hour) - stops a loop or a shared phone from filling Drive.
+  var cache = CacheService.getScriptCache(), rk = "p2up:" + _md5(student);
+  var used = parseInt(cache.get(rk) || "0", 10) || 0;
+  if (used >= P2_C_UPLOADS_PER_HOUR) throw new Error("Too many photos in a short time. Please wait a while and try again.");
+
+  var bytes;
+  try { bytes = Utilities.base64Decode(String(payload.data_base64 || "")); } catch (e) { throw new Error("The photo could not be read."); }
+  if (!bytes || !bytes.length) throw new Error("The photo is empty.");
+  if (bytes.length > P2_C_MAX_IMAGE_BYTES) throw new Error("The photo is too large. Retake it a little further away.");
+  var ext = _p2cImageKind(bytes);
+  if (!ext) throw new Error("Only JPEG, PNG or WebP photos are accepted.");
+
+  // Resend of an upload that already landed: no new file.
+  var peeked = _peekSheet("WrittenAnswers");
+  if (peeked) {
+    var hit = _p2cFindWrittenRow(peeked, attempt, student, qid);
+    if (hit && hit.ids.indexOf(imageId) !== -1) return { ok: true, duplicate: true, image_id: imageId, count: hit.ids.length };
+  }
+
+  var folder = _folder(_props().getProperty("WRITTEN_FOLDER_ID") ? "WRITTEN_FOLDER_ID" : "SUBMISSIONS_FOLDER_ID");
+  var name = "written--" + _safeName(lesson.split("/").pop()) + "--" + _safeName(student) + "--" +
+             attempt.slice(0, 8) + "--q" + _safeName(qid) + "--" + imageId.slice(0, 8) + "." + ext;
+  var mime = ext === "jpg" ? "image/jpeg" : ext === "png" ? "image/png" : "image/webp";
+  var made = [];
+  try {
+    made.push(folder.createFile(Utilities.newBlob(bytes, mime, name)));
+    var result = _withLock(function () {
+      var sheet = _p2cWrittenSheet();
+      var found = _p2cFindWrittenRow(sheet, attempt, student, qid);
+      var now = _fmt(new Date(), TZ, true);
+      if (found) {
+        if (found.ids.indexOf(imageId) !== -1) return { ok: true, duplicate: true, image_id: imageId, count: found.ids.length };
+        if (found.ids.length >= P2_C_MAX_IMAGES) throw new Error("You can attach up to " + P2_C_MAX_IMAGES + " photos to one answer.");
+        found.ids.push(imageId); found.files.push(made[0].getId());
+        sheet.getRange(found.row, found.cols.image_ids).setNumberFormat("@").setValue(found.ids.join(","));
+        sheet.getRange(found.row, found.cols.drive_file_id).setNumberFormat("@").setValue(found.files.join(","));
+        sheet.getRange(found.row, found.cols.uploaded_at).setNumberFormat("@").setValue(now);
+        return { ok: true, image_id: imageId, count: found.ids.length };
+      }
+      _appendByHeader(sheet, { submission_id: "c:" + attempt, kind: kind === "assignment" ? "homework" : "quiz", student_id: student, lesson: lesson, question_id: qid,
+        drive_file_id: made[0].getId(), image_ids: imageId, uploaded_at: now });
+      return { ok: true, image_id: imageId, count: 1 };
+    }, UPLOAD_LOCK_WAIT_MS);
+    if (result.duplicate) _trashQuietly(made);
+    else cache.put(rk, String(used + 1), 3600);
+    return result;
+  } catch (err) {
+    _trashQuietly(made);
+    throw err;
+  }
+}
+
+// ---- get_quiz_review ---------------------------------------------------------
+
+function _p2cParse(s) { try { return JSON.parse(s); } catch (e) { return null; } }
+
+// Bare-slug spellings a QuizResults row for this lesson may carry. If Session 1's
+// alias resolver is loaded (p2AliasSlugs), old spellings are included too.
+function _p2cSlugCandidates(lessonPath) {
+  var out = [lessonPath.split("/").pop()];
+  if (typeof p2k_aliases === "function") {
+    try { (p2k_aliases(lessonPath) || []).forEach(function (k) { var s = String(k).split("/").pop(); if (out.indexOf(s) === -1) out.push(s); }); } catch (e) { /* optional */ }
+  }
+  return out;
+}
+
+// The student's own latest attempt, with answers. Nothing is returned until
+// they have submitted: with no matching row the answer is an error with no data.
+function p2_get_quiz_review(payload) {
+  p2_requireFlag("FF_DEFERRED_ANSWERS");
+  _requireStudentSession(payload);
+  var student = _normalizePhone(payload.student_id);
+  var lesson = _lessonPath(payload.lesson_path || payload.lesson);
+  var attempt = payload.client_id ? String(payload.client_id) : "";
+  var slugs = _p2cSlugCandidates(lesson);
+
+  var sheet = _quizResultsSheet();
+  if (sheet.getLastRow() < 2) throw new Error("Submit the quiz first to see the answers.");
+  var c = _headerIndex(sheet);
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  var row = null;
+  for (var i = values.length - 1; i >= 0; i--) {
+    var r = values[i];
+    if (!_phonesMatch(r[c.student_id - 1], student)) continue;
+    if (attempt) { if (String(r[c.dedupe_key - 1]) !== "c:" + attempt) continue; }
+    else if (slugs.indexOf(String(r[c.lesson - 1])) === -1) continue;
+    row = r; break;
+  }
+  if (!row) throw new Error("Submit the quiz first to see the answers.");
+
+  var attemptId = String(row[c.dedupe_key - 1]).replace(/^c:/, "");
+  var written = {};
+  var wsheet = _peekSheet("WrittenAnswers");
+  if (wsheet && wsheet.getLastRow() >= 2) {
+    var wc = _headerIndex(wsheet);
+    wsheet.getRange(2, 1, wsheet.getLastRow() - 1, wsheet.getLastColumn()).getValues().forEach(function (w) {
+      if (String(w[wc.submission_id - 1]) !== "c:" + attemptId || !_phonesMatch(w[wc.student_id - 1], student)) return;
+      written[String(w[wc.question_id - 1])] = {
+        awarded: w[wc.awarded - 1], max: w[wc.max - 1], note: String(w[wc.note - 1] || ""),
+        graded: String(w[wc.graded_at - 1] || "") !== ""
+      };
+    });
+  }
+
+  var entries = _p2cParse(String(row[c.questions_json - 1])) || [];
+  var items = entries.map(function (q, k) {
+    var it = { i: q.i !== undefined ? q.i : k, question: q.question, type: q.type || "mcq", chapter: q.chapter === undefined ? null : q.chapter,
+               your_answer: q.your_answer, correct_answer: q.correct_answer, explain: q.explain || "" };
+    if (q.type === "written") {
+      var w = written[String(q.qid)];
+      it.max = w && w.max !== "" && w.max != null ? Number(w.max) : (q.max || 1);
+      it.correct_answer = "";
+      if (w && w.graded) { it.status = "graded"; it.awarded = Number(w.awarded) || 0; it.note = w.note; it.is_correct = it.awarded >= it.max; }
+      else if (q.pending) { it.status = "pending"; it.is_correct = null; }
+      else { it.status = "wrong"; it.is_correct = false; }
+    } else {
+      it.is_correct = !!q.is_correct; it.status = q.is_correct ? "correct" : "wrong";
+    }
+    return it;
+  });
+  return { ok: true, review: { lesson: lesson, quiz_title: String(row[c.quiz_title - 1] || ""), client_id: attemptId,
+           score: Number(row[c.score - 1]), total: Number(row[c.total - 1]), items: items,
+           pending: items.filter(function (x) { return x.status === "pending"; }).length } };
+}
+
+
+// ============================================================================
+// ===== MERGED FROM Phase2_Grading.gs =====
+// ============================================================================
+
+// =====================================================================================
+// Phase2_Grading.gs  (Session 4: grading mode)
+//
+// Owned by S4. Lives next to Code.gs in the same Apps Script project (globals are shared).
+// Nothing here is routed until S5 adds the four `case` lines listed in handoff/S4-to-S5.md.
+//
+// Actions:
+//   admin_set_written_models  Quiz Maker -> server: model answer + max marks per written question
+//   admin_get_written_models  server -> Quiz Maker: read them back so editing a lesson keeps them
+//   admin_grading_queue       filtered list of written answers (pending / graded / all)
+//   admin_grade_written       set marks + note for one written answer (idempotent regrade)
+//   get_written_image         photo bytes (base64), ONLY for an admin or the owning student
+//
+// Why model answers are in their own tab: the public get_quiz action returns the quiz JSON
+// (with correct answers) to every student, so a model answer inside it would leak.
+// "WrittenModels" is only ever read by the admin actions in this file.
+//
+// Tabs (created on first use, headers added without touching existing rows):
+//   WrittenModels  lesson | question_id | max_marks | model_answer | prompt | updated_at
+//   WrittenAnswers submission_id | student_id | lesson | question_id | drive_file_id |
+//                  awarded | max | note | graded_at   (+ kind | graded_by added by this file)
+//     S3 creates the rows at submit time; awarded is blank until graded.
+//     submission_id = the attempt's dedupe_key (QuizResults for kind "quiz", Submissions for
+//     kind "homework"); blank kind means "quiz".
+//
+// Score rule: QuizResults.score/total as submitted by the page cover the AUTO-graded questions
+// only. Grading stores that once in base_score/base_total, then always sets
+//   score = base_score + sum(awarded of graded written answers)
+//   total = base_total + sum(max     of graded written answers)
+// so grading the same answer twice, or regrading, always lands on the same number.
+// =====================================================================================
+
+var WM_HEADERS = ["lesson", "question_id", "max_marks", "model_answer", "prompt", "updated_at"];
+var WA_HEADERS = ["submission_id", "student_id", "lesson", "question_id", "drive_file_id",
+                  "awarded", "max", "note", "graded_at"];
+var WA_EXTRA_HEADERS = ["kind", "graded_by", "uploaded_at", "image_ids"];
+var GRADING_QUEUE_LIMIT = 500;
+var GRADING_MAX_MODEL_CHARS = 5000;
+
+function _gCanon(l) { var s = String(l == null ? "" : l).trim().toLowerCase(); return typeof p2k_canon === "function" ? p2k_canon(s) : s; }
+function _gKind(v) { return String(v || "").trim().toLowerCase() === "homework" ? "homework" : "quiz"; }
+
+function _gModelsSheet() {
+  var sh = _sheetByName(_ss(), "WrittenModels", WM_HEADERS);
+  _ensureColumns(sh, WM_HEADERS);
+  return sh;
+}
+
+function _gAnswersSheet() {
+  var sh = _sheetByName(_dataSs(), "WrittenAnswers", WA_HEADERS);
+  _ensureColumns(sh, WA_HEADERS.concat(WA_EXTRA_HEADERS));
+  return sh;
+}
+
+function _gNum(v) {
+  if (v === "" || v === null || v === undefined) return null;
+  var n = Number(v);
+  return isFinite(n) ? n : null;
+}
+
+// ---- admin_set_written_models ---------------------------------------------------------
+// payload: {lesson, models: [{question_id, max_marks, model_answer, prompt}]}
+// Upsert by (lesson, question_id). Never deletes: a question removed from the quiz simply
+// stops being referenced, and old grades keep their max.
+function handleAdminSetWrittenModels(payload) {
+  _requireAdminAny(payload);
+  var lesson = _lessonPath(payload.lesson);
+  var models = payload.models;
+  if (!Array.isArray(models)) throw new Error("models must be a list.");
+  var clean = models.map(function (m) {
+    var qid = String(m && m.question_id != null ? m.question_id : "").trim();
+    if (!/^[A-Za-z0-9_-]{1,60}$/.test(qid)) throw new Error("Invalid question_id.");
+    var max = _gNum(m.max_marks);
+    if (max === null || max <= 0 || max > 100) throw new Error("max_marks must be between 0 and 100.");
+    var ans = String(m.model_answer == null ? "" : m.model_answer);
+    if (ans.length > GRADING_MAX_MODEL_CHARS) throw new Error("Model answer is too long.");
+    return { question_id: qid, max_marks: max, model_answer: ans, prompt: String(m.prompt == null ? "" : m.prompt).slice(0, 2000) };
+  });
+  return _withLock(function () {
+    var sh = _gModelsSheet();
+    var c = _needCols(sh, "WrittenModels", WM_HEADERS);
+    var existing = {};
+    if (sh.getLastRow() >= 2) {
+      sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getValues().forEach(function (r, i) {
+        existing[_gCanon(r[c.lesson - 1]) + "|" + String(r[c.question_id - 1]).trim()] = i + 2;
+      });
+    }
+    var now = _fmt(new Date(), TZ, true), added = 0, updated = 0;
+    clean.forEach(function (m) {
+      var row = existing[lesson + "|" + m.question_id];
+      if (row) {
+        sh.getRange(row, c.max_marks).setValue(m.max_marks);
+        sh.getRange(row, c.model_answer).setValue(m.model_answer);
+        sh.getRange(row, c.prompt).setValue(m.prompt);
+        sh.getRange(row, c.updated_at).setNumberFormat("@").setValue(now);
+        updated++;
+      } else {
+        _appendByHeader(sh, { lesson: lesson, question_id: m.question_id, max_marks: m.max_marks,
+                              model_answer: m.model_answer, prompt: m.prompt, updated_at: now });
+        existing[lesson + "|" + m.question_id] = sh.getLastRow();
+        added++;
+      }
+    });
+    return { ok: true, lesson: lesson, added: added, updated: updated };
+  });
+}
+
+// ---- admin_get_written_models ---------------------------------------------------------
+function handleAdminGetWrittenModels(payload) {
+  _requireAdminAny(payload);
+  var lesson = _lessonPath(payload.lesson), out = [];
+  var sh = _ss().getSheetByName("WrittenModels");
+  if (sh && sh.getLastRow() >= 2) {
+    _sheetValuesAsObjects(sh).forEach(function (r) {
+      if (_gCanon(r.lesson) === lesson) out.push({ question_id: String(r.question_id), max_marks: _gNum(r.max_marks), model_answer: String(r.model_answer || ""), prompt: String(r.prompt || "") });
+    });
+  }
+  return { ok: true, lesson: lesson, models: out };
+}
+
+function _gModelMap() {
+  var sh = _ss().getSheetByName("WrittenModels");
+  var out = {};
+  if (!sh || sh.getLastRow() < 2) return out;
+  _sheetValuesAsObjects(sh).forEach(function (r) {
+    out[_gCanon(r.lesson) + "|" + String(r.question_id).trim()] = {
+      max: _gNum(r.max_marks), model_answer: String(r.model_answer || ""), prompt: String(r.prompt || "") };
+  });
+  return out;
+}
+
+// ---- admin_grading_queue --------------------------------------------------------------
+// payload filters (all optional): year "Senior 1"|"Senior 2", group, lesson, student (a phone),
+// status "pending" (default) | "graded" | "all".
+function handleAdminGradingQueue(payload) {
+  _requireAdminAny(payload);
+  var status = String(payload.status || "pending").toLowerCase();
+  if (["pending", "graded", "all"].indexOf(status) === -1) throw new Error("Unknown status.");
+  var lessonF = payload.lesson ? _gCanon(payload.lesson) : "";
+  var yearF = String(payload.year || "").trim();
+  var studentF = payload.student ? _normalizePhone(payload.student) : "";   // NOT student_id: with a session, student_id is the ADMIN (adminCall overwrites it)
+
+  var allowed = null;                      // set of phone keys when filtering by group
+  if (payload.group) {
+    allowed = {};
+    var gk = _groupKey(String(payload.group));
+    _groupMembers(_ss().getSheetByName("Groups"), gk, null).forEach(function (m) { allowed[_phoneKey(m.phone)] = true; });
+  }
+
+  var people = {};
+  _sheetValuesAsObjects(_students()).forEach(function (r) {
+    var k = _phoneKey(r.phone);
+    if (k && !people.hasOwnProperty(k)) people[k] = { name: String(r.display_name || ""), year: String(r.year || "") };
+  });
+
+  var models = _gModelMap();
+  var sh = _dataSs().getSheetByName("WrittenAnswers");
+  var items = [], pending = 0, graded = 0;
+  if (sh && sh.getLastRow() >= 2) {
+    _sheetValuesAsObjects(sh).forEach(function (r) {
+      if (!r.submission_id || !r.question_id) return;
+      var pk = _phoneKey(r.student_id), p = people[pk] || { name: "", year: "" };
+      var lesson = _gCanon(r.lesson);
+      if (lessonF && lesson !== lessonF) return;
+      if (yearF && p.year !== yearF) return;
+      if (studentF && !_phonesMatch(r.student_id, studentF)) return;
+      if (allowed && !allowed[pk]) return;
+      var awarded = _gNum(r.awarded);
+      var isGraded = awarded !== null;
+      if (isGraded) graded++; else pending++;
+      if (status === "pending" && isGraded) return;
+      if (status === "graded" && !isGraded) return;
+      var m = models[lesson + "|" + String(r.question_id).trim()] || {};
+      items.push({
+        submission_id: String(r.submission_id), kind: _gKind(r.kind),
+        student_id: String(r.student_id), name: p.name, year: p.year,
+        lesson: lesson, question_id: String(r.question_id),
+        prompt: m.prompt || "", model_answer: m.model_answer || "",
+        max: m.max != null ? m.max : _gNum(r.max),
+        awarded: awarded, note: String(r.note || ""), graded_at: String(r.graded_at || ""),
+        has_image: !!String(r.drive_file_id || "").trim(),
+        image_count: String(r.drive_file_id || "").split(",").filter(String).length
+      });
+    });
+  }
+  items.sort(function (a, b) {
+    return a.lesson < b.lesson ? -1 : a.lesson > b.lesson ? 1 :
+      a.name < b.name ? -1 : a.name > b.name ? 1 :
+      a.submission_id < b.submission_id ? -1 : a.submission_id > b.submission_id ? 1 :
+      a.question_id < b.question_id ? -1 : a.question_id > b.question_id ? 1 : 0;
+  });
+  var truncated = items.length > GRADING_QUEUE_LIMIT;
+  return { ok: true, items: items.slice(0, GRADING_QUEUE_LIMIT), truncated: truncated,
+           counts: { pending: pending, graded: graded } };
+}
+
+// ---- admin_grade_written --------------------------------------------------------------
+// payload: {submission_id, question_id, awarded, note?, student?}   (student = the answer's owner, only to disambiguate)
+function handleAdminGradeWritten(payload) {
+  _requireAdminAny(payload);
+  var sid = String(payload.submission_id || "").trim();
+  var qid = String(payload.question_id || "").trim();
+  if (!sid || !qid) throw new Error("Missing submission_id or question_id.");
+  var awarded = _gNum(payload.awarded);
+  if (awarded === null || awarded < 0) throw new Error("Marks must be a number, 0 or more.");
+  awarded = Math.round(awarded * 100) / 100;
+  var note = String(payload.note == null ? "" : payload.note).slice(0, 1000);
+
+  return _withLock(function () {
+    var sh = _gAnswersSheet();
+    var c = _needCols(sh, "WrittenAnswers", WA_HEADERS.concat(WA_EXTRA_HEADERS));
+    var values = sh.getLastRow() >= 2 ? sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getValues() : [];
+    var rowIdx = -1;
+    for (var i = 0; i < values.length; i++) {
+      if (String(values[i][c.submission_id - 1]).trim() === sid && String(values[i][c.question_id - 1]).trim() === qid &&
+          (!payload.student || _phonesMatch(values[i][c.student_id - 1], payload.student))) { rowIdx = i; break; }
+    }
+    if (rowIdx < 0) throw new Error("Written answer not found.");
+    var row = values[rowIdx], r = rowIdx + 2;
+    var lesson = _gCanon(row[c.lesson - 1]);
+    var kind = _gKind(row[c.kind - 1]);
+    var model = _gModelMap()[lesson + "|" + qid];
+    var max = model && model.max != null ? model.max : _gNum(row[c.max - 1]);
+    if (max === null) throw new Error("No max marks set for this question. Sync the quiz from Quiz Maker first.");
+    if (awarded > max) throw new Error("Marks can't be more than " + max + ".");
+
+    var before = { awarded: _gNum(row[c.awarded - 1]), note: String(row[c.note - 1] || "") };
+    var now = _fmt(new Date(), TZ, true);
+    sh.getRange(r, c.awarded).setValue(awarded);
+    sh.getRange(r, c.max).setValue(max);
+    sh.getRange(r, c.note).setValue(note);
+    sh.getRange(r, c.graded_at).setNumberFormat("@").setValue(now);
+    sh.getRange(r, c.graded_by).setValue("admin");
+
+    var totals = _gRecomputeAttempt(sh, c, sid, kind);
+    _gAudit("grade_written", { submission_id: sid, question_id: qid }, before, { awarded: awarded, note: note });
+    return { ok: true, submission_id: sid, question_id: qid, awarded: awarded, max: max, attempt: totals };
+  });
+}
+
+// Recompute one attempt's score from base + graded written answers. Idempotent.
+function _gRecomputeAttempt(waSheet, wc, sid, kind) {
+  var sumA = 0, sumM = 0, n = 0, perQ = {};
+  if (waSheet.getLastRow() >= 2) {
+    waSheet.getRange(2, 1, waSheet.getLastRow() - 1, waSheet.getLastColumn()).getValues().forEach(function (r) {
+      if (String(r[wc.submission_id - 1]).trim() !== sid || _gKind(r[wc.kind - 1]) !== kind) return;
+      var a = _gNum(r[wc.awarded - 1]), m = _gNum(r[wc.max - 1]);
+      if (a === null || m === null) return;
+      sumA += a; sumM += m; n++;
+      perQ[String(r[wc.question_id - 1]).trim()] = { awarded: a, max: m, note: String(r[wc.note - 1] || "") };
+    });
+  }
+  var sheet, jsonCol;
+  if (kind === "homework") { sheet = _submissionsSheet(); jsonCol = "answers_json"; }
+  else { sheet = _quizResultsSheet(); jsonCol = "questions_json"; }
+  _ensureColumns(sheet, ["base_score", "base_total", "written_awarded", "written_max"]);
+  var c = _needCols(sheet, kind === "homework" ? "Submissions" : "QuizResults", ["dedupe_key", "score", "total", jsonCol, "base_score", "base_total", "written_awarded", "written_max"]);
+  if (sheet.getLastRow() < 2) return null;
+  var vals = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    if (String(vals[i][c.dedupe_key - 1]).trim() !== sid) continue;
+    var r = i + 2;
+    var baseS = _gNum(vals[i][c.base_score - 1]), baseT = _gNum(vals[i][c.base_total - 1]);
+    if (baseS === null) {                                   // first grading of this attempt: remember the auto part
+      baseS = _gNum(vals[i][c.score - 1]) || 0; baseT = _gNum(vals[i][c.total - 1]) || 0;
+      sheet.getRange(r, c.base_score).setValue(baseS);
+      sheet.getRange(r, c.base_total).setValue(baseT);
+    }
+    sheet.getRange(r, c.score).setValue(Math.round((baseS + sumA) * 100) / 100);
+    sheet.getRange(r, c.total).setValue(Math.round((baseT + sumM) * 100) / 100);
+    sheet.getRange(r, c.written_awarded).setValue(sumA);
+    sheet.getRange(r, c.written_max).setValue(sumM);
+    // Correct/wrong list: update or append the written entries inside the stored JSON array.
+    var arr;
+    try { arr = JSON.parse(String(vals[i][c[jsonCol] - 1] || "[]")); } catch (e) { arr = []; }
+    if (!Array.isArray(arr)) arr = [];
+    Object.keys(perQ).forEach(function (qid) {
+      var g = perQ[qid], found = false;
+      arr.forEach(function (q) {
+        if (q && String(q.id != null ? q.id : q.qid) === qid) {
+          q.type = "written"; q.awarded = g.awarded; q.max = g.max; q.note = g.note;
+          q.correct = g.awarded >= g.max; q.is_correct = q.correct; q.partial = g.awarded > 0 && g.awarded < g.max; q.pending = false; found = true;
+        }
+      });
+      if (!found) arr.push({ id: qid, type: "written", awarded: g.awarded, max: g.max, note: g.note,
+                             correct: g.awarded >= g.max, partial: g.awarded > 0 && g.awarded < g.max, pending: false });
+    });
+    sheet.getRange(r, c[jsonCol]).setValue(JSON.stringify(arr));
+    return { score: baseS + sumA, total: baseT + sumM, graded_written: n };
+  }
+  return null;   // attempt row not found (written answer exists without an attempt row)
+}
+
+// ---- get_written_image ----------------------------------------------------------------
+// payload: {submission_id, question_id} plus EITHER admin credentials (token, or an admin's
+// student_id+session_token) OR the owning student's student_id+session_token.
+function handleGetWrittenImage(payload) {
+  var sid = String(payload.submission_id || "").trim(), qid = String(payload.question_id || "").trim();
+  if (!sid || !qid) throw new Error("Missing submission_id or question_id.");
+  var isAdmin = false;
+  try { _requireAdminAny(payload); isAdmin = true; } catch (e) { isAdmin = false; }
+  var sh = _dataSs().getSheetByName("WrittenAnswers");
+  if (!sh || sh.getLastRow() < 2) throw new Error("Not allowed.");
+  var hit = null;
+  _sheetValuesAsObjects(sh).forEach(function (r) {
+    if (!hit && String(r.submission_id).trim() === sid && String(r.question_id).trim() === qid) hit = r;
+  });
+  if (!hit) throw new Error("Not allowed.");                 // same message for "missing" and "not yours"
+  if (!isAdmin) {
+    _requireStudentSession(payload);
+    if (!_phonesMatch(hit.student_id, payload.student_id)) throw new Error("Not allowed.");
+  }
+  var files = String(hit.drive_file_id || "").split(",").map(function (s) { return s.trim(); }).filter(String);
+  var fid = files[Math.max(0, Math.min(files.length - 1, Math.floor(Number(payload.index) || 0)))];   // up to 3 photos per answer
+  if (!fid) throw new Error("No photo for this answer.");
+  var blob = DriveApp.getFileById(fid).getBlob();
+  return { ok: true, content_type: blob.getContentType(), data_base64: Utilities.base64Encode(blob.getBytes()) };
+}
+
+// Best-effort audit trail. Writes through S5's p2_audit so AuditLog keeps ONE header row
+// (at | who | action | target | before | after, docs/contract.md section 8).
+function _gAudit(action, ref, before, after) {
+  try {
+    if (typeof p2_audit === "function") p2_audit("admin", action, ref, before, after);
+  } catch (e) { /* auditing must never block grading */ }
+}
+
+// =====================================================================================
+// Integration glue (S5, Oct 21): contract-named entry points the router calls (_p2Call).
+// Grading and the queue sit behind FF_GRADING. Authoring (models) and the image fetch do not:
+// the Quiz Maker must be able to save model answers before the feature is switched on, and an
+// image row only exists once capture (FF_CAMERA) has been on.
+// =====================================================================================
+function p2_admin_grading_queue(payload) {
+  p2_requireFlag("FF_GRADING");
+  var res = handleAdminGradingQueue(payload || {});
+  (res.items || []).forEach(function (it) { it.student = it.student_id; });   // contract field name
+  return res;
+}
+function p2_admin_grade_written(payload) {
+  p2_requireFlag("FF_GRADING");
+  return handleAdminGradeWritten(payload || {});
+}
+function p2_admin_set_written_models(payload) { return handleAdminSetWrittenModels(payload || {}); }
+function p2_admin_get_written_models(payload) { return handleAdminGetWrittenModels(payload || {}); }
+function p2_get_written_image(payload) { return handleGetWrittenImage(payload || {}); }
+
+
+// ============================================================================
+// ===== MERGED FROM Phase2_Followup.gs =====
+// ============================================================================
+
+/* ==========================================================================
+   Phase2_Followup.gs — Session 2 (follow-up, student summary, parent log, monthly review)
+
+   Loaded next to Code.gs (Apps Script shares one global scope across .gs files), so this file
+   uses Code.gs helpers (_ss, _dataSs, _requireAdminAny, _withLock, _sheetByName, _appendByHeader,
+   _needCols, _phoneKey, _lessonPath, _cairoDate, _fmt, TZ ...). Every name defined HERE starts
+   with _p2fu / P2_FU_ or is one of the action handlers fixed by the contract (rollout-plan-v2 §3.3),
+   so it cannot collide with Code.gs or with the other Phase2_*.gs files.
+
+   Nothing here is routed yet: Session 5 owns the doPost router. The case lines to add are in
+   handoff/S2-to-S5.md. Handlers:
+
+     p2_admin_set_requirement             admin_set_requirement
+     p2_admin_log_parent_notification      admin_log_parent_notification        (FF_PARENT_LOG)
+     p2_admin_list_parent_notifications    admin_list_parent_notifications      (FF_PARENT_LOG)
+     p2_admin_student_summary             admin_student_summary
+     p2_admin_monthly_review              admin_monthly_review                 (FF_MONTHLY)
+   Wrappers that REPLACE two existing router cases (same action names, extra fields):
+     p2_admin_followup_overview         admin_followup_overview
+     p2_admin_followup_set_attendance    admin_followup_set_attendance
+
+   Sheets (created on first use): LessonRequirements, ParentNotifications, MonthlyReviews, AuditLog.
+   Reads WrittenAnswers (Session 4's tab) when it exists.
+   ========================================================================== */
+
+var P2_FU_REQ_HEADERS = ["lesson", "quiz_required", "homework_required", "due_override", "updated_at"];
+var P2_FU_NOTIF_HEADERS = ["student", "kind", "ref", "sent_at", "by", "note"];
+var P2_FU_MONTHLY_HEADERS = ["student", "month", "status", "sent_at", "note"];
+var P2_FU_AUDIT_HEADERS = ["who", "when", "action", "before", "after"];
+var P2_FU_KINDS = { quiz: 1, homework: 1, monthly: 1, custom: 1 };
+var P2_FU_MONTH_STATUS = { pending: 1, ready: 1, sent: 1, closed: 1 };
+var P2_FU_MAX_BATCH = 60;
+
+// Contract §3.1 alias map (full-path and bare-slug form). Used only when Session 1 has not published
+// its own resolver as a global function _resolveLessonKey(raw) (see handoff/S2-to-S1.md).
+var P2_FU_G2 = "programming/baccalaureate/grade-2-secondary/";
+var P2_FU_ALIAS_FALLBACK = (function () {
+  var m = {};
+  var pairs = [
+    ["lesson-1-development-of-information-technology-and-social-transformation", "chapter-1-lesson-1-development-of-information-technology-and-social-transformation"],
+    ["lesson-2-how-ai-works", "chapter-1-lesson-2-how-ai-works"],
+    ["chaper-1-lesson-3-ai-in-daily-life-and-industry", "chapter-1-lesson-3-ai-in-daily-life-and-industry"]
+  ];
+  pairs.forEach(function (p) { m[P2_FU_G2 + p[0]] = P2_FU_G2 + p[1]; m[p[0]] = p[1]; });
+  return m;
+})();
+
+// ---- small helpers -------------------------------------------------------------------------
+function _p2fuClean(raw) { return String(raw == null ? "" : raw).trim().toLowerCase().replace(/\\/g, "/").replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, ""); }
+function _p2fuCanon(raw) {
+  var s = _p2fuClean(raw);
+  if (typeof p2k_canon === "function") { try { var k = p2k_canon(s); if (k) return _p2fuClean(k); } catch (e) {} }
+  if (typeof _resolveLessonKey === "function") { try { var r = _resolveLessonKey(s); if (r) return _p2fuClean(r); } catch (e) {} }
+  return P2_FU_ALIAS_FALLBACK.hasOwnProperty(s) ? P2_FU_ALIAS_FALLBACK[s] : s;
+}
+function _p2fuSlug(raw) { var s = _p2fuCanon(raw); return s.indexOf("/") < 0 ? s : s.slice(s.lastIndexOf("/") + 1); }
+function _p2fuNorm(h) { return String(h == null ? "" : h).trim().toLowerCase().replace(/[\s-]+/g, "_"); }
+function _p2fuRows(sheet) {
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  var vals = sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn()).getValues();
+  var hd = vals[0].map(_p2fuNorm), out = [];
+  for (var i = 1; i < vals.length; i++) {
+    var o = { _row: i + 1 };
+    for (var j = 0; j < hd.length; j++) if (hd[j]) o[hd[j]] = vals[i][j];
+    out.push(o);
+  }
+  return out;
+}
+function _p2fuFlag(name) { return p2_flag(name); }
+function _p2fuNeedFlag(name) { p2_requireFlag(name); }
+function _p2fuWho(payload) { return payload.token ? "token" : String(payload.student_id || ""); }
+function _p2fuNow() { return _fmt(new Date(), TZ, true); }
+function _p2fuToday() { return _fmt(new Date(), TZ, false); }
+function _p2fuYmd(y, m, d) { return y + "-" + (m < 10 ? "0" : "") + m + "-" + (d < 10 ? "0" : "") + d; }
+function _p2fuAddDays(ymd, n) {
+  var p = ymd.split("-").map(Number), t = new Date(Date.UTC(p[0], p[1] - 1, p[2] + n));
+  return _p2fuYmd(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
+}
+function _p2fuDow(ymd) { var p = ymd.split("-").map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay(); }
+// Weeks run Saturday -> Friday (contract §3.4).
+function _p2fuWeek(ymd) {
+  var back = (_p2fuDow(ymd) + 1) % 7, start = _p2fuAddDays(ymd, -back);
+  return { start: start, end: _p2fuAddDays(start, 6) };
+}
+function _p2fuMonthRange(month) {
+  var m = /^(\d{4})-(\d{2})$/.exec(String(month || "").trim());
+  if (!m || +m[2] < 1 || +m[2] > 12) throw new Error('month must look like "2026-10".');
+  var y = +m[1], mo = +m[2], last = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+  return { from: _p2fuYmd(y, mo, 1), to: _p2fuYmd(y, mo, last), month: m[1] + "-" + m[2] };
+}
+function _p2fuCheckYmd(v, label) {
+  var s = String(v == null ? "" : v).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new Error(label + " must look like 2026-12-31.");
+  return s;
+}
+function _p2fuBool(v, dflt) {
+  if (v === undefined || v === null || v === "") return dflt;
+  if (v === true || v === false) return v;
+  var s = String(v).trim().toLowerCase();
+  return !(s === "false" || s === "0" || s === "no" || s === "off");
+}
+
+function _p2fuAudit(ss, payload, action, before, after, target) {
+  // One shared AuditLog (p2_audit, contract section 8). Never breaks the action it records.
+  try { p2_audit(_p2fuWho(payload), action, target || "", before, after); } catch (e) { /* ignore */ }
+}
+
+// ---- LessonRequirements -------------------------------------------------------------------
+// lesson -> {quiz_required, homework_required, due_override}. A lesson with no row: both required.
+function _p2fuRequirements(ss) {
+  var out = {};
+  var sh = ss.getSheetByName("LessonRequirements");
+  _p2fuRows(sh).forEach(function (r) {
+    var k = _p2fuCanon(r.lesson);
+    if (!k || out.hasOwnProperty(k)) return;
+    out[k] = { lesson: k, quiz_required: _p2fuBool(r.quiz_required, true), homework_required: _p2fuBool(r.homework_required, true),
+               due_override: String(r.due_override == null ? "" : r.due_override).trim() };
+  });
+  return out;
+}
+function _p2fuReq(map, lesson) {
+  var r = map[_p2fuCanon(lesson)];
+  return r || { quiz_required: true, homework_required: true, due_override: "" };
+}
+
+function p2_admin_set_requirement(payload) {
+  _requireAdminAny(payload);
+  var lesson = _p2fuCanon(_lessonPath(payload.lesson));
+  var due = payload.due_override === undefined ? undefined : String(payload.due_override == null ? "" : payload.due_override).trim();
+  if (due !== undefined && due !== "") due = _p2fuCheckYmd(due, "due_override");
+  return _withLock(function () {
+    var ss = _ss();
+    var sh = _followupSheet(ss, "LessonRequirements", P2_FU_REQ_HEADERS);
+    _ensureColumns(sh, P2_FU_REQ_HEADERS);
+    var c = _needCols(sh, "LessonRequirements", P2_FU_REQ_HEADERS);
+    var existing = null;
+    _p2fuRows(sh).forEach(function (r) { if (!existing && _p2fuCanon(r.lesson) === lesson) existing = r; });
+    var before = existing ? { quiz_required: _p2fuBool(existing.quiz_required, true), homework_required: _p2fuBool(existing.homework_required, true), due_override: String(existing.due_override || "") } : null;
+    var rec = {
+      quiz_required: _p2fuBool(payload.quiz_required, before ? before.quiz_required : true),
+      homework_required: _p2fuBool(payload.homework_required, before ? before.homework_required : true),
+      due_override: due === undefined ? (before ? before.due_override : "") : due
+    };
+    var now = _p2fuNow();
+    if (existing) {
+      sh.getRange(existing._row, c.quiz_required).setValue(rec.quiz_required);
+      sh.getRange(existing._row, c.homework_required).setValue(rec.homework_required);
+      sh.getRange(existing._row, c.due_override).setNumberFormat("@").setValue(rec.due_override);
+      sh.getRange(existing._row, c.updated_at).setNumberFormat("@").setValue(now);
+    } else {
+      _appendByHeader(sh, { lesson: lesson, quiz_required: rec.quiz_required, homework_required: rec.homework_required, due_override: rec.due_override, updated_at: now });
+    }
+    _p2fuAudit(ss, payload, "set_requirement", before, Object.assign({ lesson: lesson }, rec));
+    return { ok: true, requirement: Object.assign({ lesson: lesson }, rec) };
+  });
+}
+
+// ---- ParentNotifications ------------------------------------------------------------------
+function _p2fuNotifOut(r) {
+  return { student: String(r.student == null ? "" : r.student), kind: String(r.kind || ""), ref: String(r.ref == null ? "" : r.ref),
+           sent_at: String(r.sent_at == null ? "" : r.sent_at), by: String(r.by || ""), note: String(r.note == null ? "" : r.note) };
+}
+function _p2fuNotifications(ss) {
+  return _p2fuRows(ss.getSheetByName("ParentNotifications")).map(function (r) { var o = _p2fuNotifOut(r); o._row = r._row; return o; });
+}
+
+// Create or edit: one entry per (student, kind, ref). A repeat call with the same triple edits it.
+function p2_admin_log_parent_notification(payload) {
+  _requireAdminAny(payload);
+  _p2fuNeedFlag("FF_PARENT_LOG");
+  var digits = _normalizePhone(payload.student);
+  if (digits.length < 10) throw new Error("Missing student phone.");
+  var key = _phoneKey(digits);
+  var kind = String(payload.kind == null ? "" : payload.kind).trim().toLowerCase();
+  if (!P2_FU_KINDS.hasOwnProperty(kind)) throw new Error('kind must be "quiz", "homework", "monthly" or "custom".');
+  var note = String(payload.note == null ? "" : payload.note).slice(0, 500);
+  var ref = String(payload.ref == null ? "" : payload.ref).trim().toLowerCase();
+  if (ref.length > 200) throw new Error("ref is too long.");
+  // A custom entry has no natural key, so each one gets its own (time + random) — two in the same second must not merge.
+  if (!ref) ref = kind === "custom" ? "custom-" + _p2fuNow() + "-" + String(Utilities.getUuid()).slice(0, 6) : "";
+  var sentAt = String(payload.sent_at == null ? "" : payload.sent_at).trim();
+  if (sentAt && !/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$/.test(sentAt)) throw new Error("sent_at must look like 2026-10-21 or 2026-10-21 18:30:00.");
+  return _withLock(function () {
+    var ss = _ss();
+    var sh = _followupSheet(ss, "ParentNotifications", P2_FU_NOTIF_HEADERS);
+    _ensureColumns(sh, P2_FU_NOTIF_HEADERS);
+    var c = _needCols(sh, "ParentNotifications", P2_FU_NOTIF_HEADERS);
+    var hit = null;
+    _p2fuRows(sh).forEach(function (r) {
+      if (!hit && _phoneKey(r.student) === key && String(r.kind).trim().toLowerCase() === kind && String(r.ref == null ? "" : r.ref).trim().toLowerCase() === ref) hit = r;
+    });
+    var when = sentAt || _p2fuNow();
+    if (hit) {
+      if (sentAt || payload.sent_at === undefined) sh.getRange(hit._row, c.sent_at).setNumberFormat("@").setValue(sentAt || String(hit.sent_at));
+      sh.getRange(hit._row, c.by).setValue(_p2fuWho(payload));
+      if (payload.note !== undefined) sh.getRange(hit._row, c.note).setNumberFormat("@").setValue(note);
+      var edited = _p2fuNotifOut(_p2fuRows(sh).filter(function (r) { return r._row === hit._row; })[0]);
+      return { ok: true, created: false, notification: edited };
+    }
+    var rec = { student: _canonicalPhone(digits) || digits, kind: kind, ref: ref, sent_at: when, by: _p2fuWho(payload), note: note };
+    _appendByHeader(sh, rec);
+    return { ok: true, created: true, notification: rec };
+  });
+}
+
+// Filters: student, kind, ref, from/to (sent_at date). not_notified_students: [phones] -> the subset with
+// NO entry for (kind, ref) — the page's «لم يُبلَّغ بعد» filter.
+function p2_admin_list_parent_notifications(payload) {
+  _requireAdminAny(payload);
+  _p2fuNeedFlag("FF_PARENT_LOG");
+  var ss = _ss(), rows = _p2fuNotifications(ss);
+  var key = payload.student ? _phoneKey(_normalizePhone(payload.student)) : "";
+  var kind = String(payload.kind || "").trim().toLowerCase(), ref = String(payload.ref || "").trim().toLowerCase();
+  var from = payload.from ? _p2fuCheckYmd(payload.from, "from") : "", to = payload.to ? _p2fuCheckYmd(payload.to, "to") : "";
+  var list = rows.filter(function (r) {
+    if (key && _phoneKey(r.student) !== key) return false;
+    if (kind && r.kind !== kind) return false;
+    if (ref && r.ref.toLowerCase() !== ref) return false;
+    var d = r.sent_at.slice(0, 10);
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  });
+  list.sort(function (a, b) { return a.sent_at < b.sent_at ? 1 : (a.sent_at > b.sent_at ? -1 : b._row - a._row); });
+  var limit = Math.min(Math.max(parseInt(payload.limit, 10) || 500, 1), 2000);
+  var out = { ok: true, notifications: list.slice(0, limit).map(function (r) { var o = Object.assign({}, r); delete o._row; return o; }) };
+  if (Array.isArray(payload.not_notified_students)) {
+    var have = {};
+    rows.forEach(function (r) { if ((!kind || r.kind === kind) && (!ref || r.ref.toLowerCase() === ref)) have[_phoneKey(r.student)] = true; });
+    out.not_notified = payload.not_notified_students.filter(function (p) { return !have[_phoneKey(_normalizePhone(p))]; });
+  }
+  return out;
+}
+
+// ---- schedule helpers (the same rules as followup-logic.js, needed to decide "past due" on the server) ----
+function _p2fuNextSessionYmd(today, hm, weekday, time) {
+  if (weekday === null || weekday === undefined || weekday === "") return "";
+  for (var i = 0; i < 8; i++) {
+    var d = _p2fuAddDays(today, i);
+    if (_p2fuDow(d) !== +weekday) continue;
+    if (i === 0 && time && String(time) <= hm) continue;       // today's session already started
+    return d;
+  }
+  return "";
+}
+function _p2fuHwDue(settings, today, hm, cfg) {
+  var o = String(settings.hw_deadline_override || "").trim();
+  if (o) return o;
+  var next = _p2fuNextSessionYmd(today, hm, settings.weekday, settings.time);
+  return next ? _p2fuAddDays(next, -(+cfg.hw_days_before || 1)) : "";
+}
+
+// ---- Student summary ----------------------------------------------------------------------
+// Everything is loaded once into `X`, so a batch (monthly review of a group) costs one pass over the sheets.
+function _p2fuLoad(ss, dataSs) {
+  var X = { ss: ss, today: _p2fuToday(), hm: _fmt(new Date(), TZ, true).slice(11, 16) };
+  X.cfg = _followupSettings();
+  X.students = {};
+  _sheetValuesAsObjects(_students()).forEach(function (r) {
+    var k = _phoneKey(r.phone);
+    if (!k || X.students.hasOwnProperty(k)) return;
+    X.students[k] = { phone: _restoreLeadingZero(String(r.phone == null ? "" : r.phone).trim()), name: String(r.display_name == null ? "" : r.display_name).trim(),
+                      year: String(r.year == null ? "" : r.year).trim(), parent_phone: _restoreLeadingZero(String(r.parent_phone == null ? "" : r.parent_phone).trim()),
+                      admin: _isTruthyFlag(r.is_admin) };
+  });
+  // groups + settings
+  var gSheet = ss.getSheetByName("Groups"), spellings = _groupSpellings(gSheet), byKey = {};
+  (gSheet && gSheet.getLastRow() >= 2 ? _sheetValuesAsObjects(gSheet) : []).forEach(function (m) {
+    var gk = _groupKey(m.group), pk = _phoneKey(m.phone);
+    if (!gk || !pk) return;
+    var g = byKey[gk] = byKey[gk] || { group: spellings[gk] || String(m.group), key: gk, members: [], seen: {} };
+    if (g.seen[pk]) return; g.seen[pk] = true; g.members.push(pk);
+    if (!X.students.hasOwnProperty(pk)) X.students[pk] = { phone: _restoreLeadingZero(String(m.phone).trim()), name: String(m.name == null ? "" : m.name).trim(), year: "", parent_phone: "", admin: false };
+  });
+  var gs = ss.getSheetByName("GroupSettings"), settingsByKey = {};
+  (gs && gs.getLastRow() >= 2 ? _sheetValuesAsObjects(gs) : []).forEach(function (r) {
+    var k = _groupKey(r.group_key || r.group); if (k && !settingsByKey.hasOwnProperty(k)) settingsByKey[k] = _groupSettingsFromRow(r);
+  });
+  X.groups = Object.keys(byKey).map(function (k) { return { group: byKey[k].group, key: k, members: byKey[k].members, settings: settingsByKey[k] || _emptyGroupSettings() }; });
+  X.req = _p2fuRequirements(ss);
+  X.notifs = _p2fuNotifications(ss);
+  X.monthly = _p2fuRows(ss.getSheetByName("MonthlyReviews"));
+  X.written = _p2fuRows(dataSs.getSheetByName("WrittenAnswers"));   // lives next to QuizResults (contract v1.5)
+
+  // raw results (columns only, like the overview)
+  X.quiz = {}; X.hw = {};      // phoneKey -> [{slug, subject, date, time, score, total, idx}]
+  var qc = _readColumns(dataSs.getSheetByName("QuizResults"), ["student_id", "lesson"], ["subject", "date", "start_time", "score", "total"], "QuizResults");
+  function num(v) { var n = parseFloat(v); return isFinite(n) ? n : null; }
+  for (var i = 0; i < qc.n; i++) {
+    var qk = _phoneKey(qc.col.student_id[i]); if (!qk) continue;
+    (X.quiz[qk] = X.quiz[qk] || []).push({ slug: _p2fuSlug(qc.col.lesson[i]), subject: String(qc.col.subject[i] || "").trim().toLowerCase(),
+      date: _cairoDate(qc.col.date[i]), time: String(_cairoTime(qc.col.start_time[i]) || ""), score: num(qc.col.score[i]), total: num(qc.col.total[i]), idx: i });
+  }
+  var sc = _readColumns(dataSs.getSheetByName("Submissions"), ["student_id", "lesson"], ["subject", "date", "score", "total"], "Submissions");
+  for (i = 0; i < sc.n; i++) {
+    var sk = _phoneKey(sc.col.student_id[i]); if (!sk) continue;
+    (X.hw[sk] = X.hw[sk] || []).push({ slug: _p2fuSlug(sc.col.lesson[i]), subject: String(sc.col.subject[i] || "").trim().toLowerCase(),
+      date: _cairoDate(sc.col.date[i]), score: num(sc.col.score[i]), total: num(sc.col.total[i]), idx: i });
+  }
+  // attendance + watch
+  X.att = {}; X.watch = {};
+  _p2fuRows(ss.getSheetByName("Attendance")).forEach(function (r) {
+    var k = _phoneKey(r.phone), m = String(r.mode || "").trim().toLowerCase(); if (!k || (m !== "center" && m !== "online")) return;
+    (X.att[k] = X.att[k] || []).push({ lesson: _p2fuCanon(r.lesson), mode: m, date: String(r.marked_at || "").slice(0, 10) });
+  });
+  _p2fuRows(ss.getSheetByName("WatchProgress")).forEach(function (r) {
+    var k = _phoneKey(r.phone), p = parseFloat(r.pct); if (!k || !isFinite(p)) return;
+    (X.watch[k] = X.watch[k] || []).push({ lesson: _p2fuCanon(r.lesson), pct: p, date: String(r.updated_at || "").slice(0, 10) });
+  });
+  // lesson-path lookup for bare slugs (soft-fails when GitHub is down)
+  X.pathBySlug = {};
+  try {
+    _allLessonsFromGithub().lessons.forEach(function (l) {
+      var kk = _firstSegment(l.lesson) + "|" + _p2fuSlug(l.lesson);
+      (X.pathBySlug[kk] = X.pathBySlug[kk] || []).push(_p2fuCanon(l.lesson));
+    });
+  } catch (e) { X.lessonsError = String(e.message || e); }
+  X.locks = _lockIndex(ss); X.ent = _entitlementIndex(ss); X.statuses = _paymentStatuses(ss);
+  return X;
+}
+function _p2fuPathOf(X, subject, slug) {
+  var arr = X.pathBySlug[subject + "|" + slug];
+  return arr && arr.length === 1 ? arr[0] : "";
+}
+function _p2fuInRange(d, from, to) { return d && d >= from && d <= to; }
+function _p2fuRound(n) { return n === null ? null : Math.round(n * 100) / 100; }
+
+function _p2fuSummaryFor(X, key, from, to) {
+  var st = X.students[key];
+  if (!st) throw new Error("Student not found.");
+  // quizzes: every attempt in the range, grouped by lesson; the latest attempt counts (same rule as the overview)
+  var qBy = {};
+  (X.quiz[key] || []).forEach(function (r) {
+    if (!_p2fuInRange(r.date, from, to)) return;
+    var k = r.subject + "|" + r.slug; (qBy[k] = qBy[k] || []).push(r);
+  });
+  var quizzes = Object.keys(qBy).sort().map(function (k) {
+    var rows = qBy[k], last = rows[0];
+    rows.forEach(function (r) { if ((r.date + " " + r.time) > (last.date + " " + last.time) || ((r.date + " " + r.time) === (last.date + " " + last.time) && r.idx > last.idx)) last = r; });
+    var pct = last.total ? last.score / last.total * 100 : null;
+    return { lesson: last.slug, subject: last.subject, path: _p2fuPathOf(X, last.subject, last.slug), date: last.date, score: last.score, total: last.total,
+             pct: _p2fuRound(pct), attempts: rows.length };
+  });
+  var pcts = quizzes.filter(function (q) { return q.pct !== null; }).map(function (q) { return q.pct; });
+  var quizAvg = pcts.length ? _p2fuRound(pcts.reduce(function (a, b) { return a + b; }, 0) / pcts.length) : null;
+
+  var hBy = {};
+  (X.hw[key] || []).forEach(function (r) {
+    if (!_p2fuInRange(r.date, from, to)) return;
+    var k = r.subject + "|" + r.slug; (hBy[k] = hBy[k] || []).push(r);
+  });
+  var homework = Object.keys(hBy).sort().map(function (k) {
+    var rows = hBy[k], last = rows[0];
+    rows.forEach(function (r) { if (r.date > last.date || (r.date === last.date && r.idx > last.idx)) last = r; });
+    return { lesson: last.slug, subject: last.subject, path: _p2fuPathOf(X, last.subject, last.slug), date: last.date, score: last.score, total: last.total, submissions: rows.length };
+  });
+
+  // required items that are missing: only lessons the student is EXPECTED to have done
+  // = the homework & quiz lessons of the student's groups + any lesson with a due date up to `to`.
+  var expected = {};
+  X.groups.forEach(function (g) {
+    if (g.members.indexOf(key) < 0) return;
+    var due = _p2fuHwDue(g.settings, X.today, X.hm, X.cfg);
+    // Oct 22: homework and quiz lessons are chosen separately (null = follows review_lessons).
+    var rv = g.settings.review_lessons || [], hwL = g.settings.hw_lessons || rv, qzL = g.settings.quiz_lessons || rv;
+    hwL.concat(qzL).forEach(function (l) {
+      var c = _p2fuCanon(l); if (!c) return;
+      var e = expected[c] = expected[c] || { lesson: c, group_due: "", hw: false, quiz: false };
+      if (due && (!e.group_due || due < e.group_due)) e.group_due = due;
+    });
+    hwL.forEach(function (l) { var c = _p2fuCanon(l); if (c && expected[c]) expected[c].hw = true; });
+    qzL.forEach(function (l) { var c = _p2fuCanon(l); if (c && expected[c]) expected[c].quiz = true; });
+  });
+  Object.keys(X.req).forEach(function (l) {
+    var r = X.req[l]; if (r.due_override && r.due_override <= to && !expected[l]) expected[l] = { lesson: l, group_due: "", hw: true, quiz: true };
+  });
+  function everDone(rowsByKey, subject, slug) { return !!(rowsByKey || []).some(function (r) { return r.slug === slug && (r.subject === "" || r.subject === subject) && (!r.date || r.date <= to); }); }
+  var exp = Object.keys(expected).sort().map(function (l) {
+    var rq = _p2fuReq(X.req, l), subject = _firstSegment(l), slug = _p2fuSlug(l);
+    var due = rq.due_override || expected[l].group_due || "";
+    var quizDone = everDone(X.quiz[key], subject, slug), hwDone = everDone(X.hw[key], subject, slug);
+    var duePassed = !due || X.today > due;
+    var needQ = rq.quiz_required && expected[l].quiz !== false, needH = rq.homework_required && expected[l].hw !== false;   // not in that group's list = not expected
+    return { lesson: l, quiz: { required: needQ, done: quizDone, missed: needQ && !quizDone && duePassed },
+             homework: { required: needH, done: hwDone, due: due, missed: needH && !hwDone && duePassed } };
+  });
+
+  // attendance, watch, video access
+  var att = (X.att[key] || []).filter(function (a) { return !a.date || _p2fuInRange(a.date, from, to); });
+  var watch = (X.watch[key] || []).filter(function (w) { return !w.date || _p2fuInRange(w.date, from, to); });
+  var watchBest = {};
+  watch.forEach(function (w) { if (!watchBest.hasOwnProperty(w.lesson) || w.pct > watchBest[w.lesson]) watchBest[w.lesson] = w.pct; });
+  var watchList = Object.keys(watchBest).sort().map(function (l) { return { lesson: l, pct: _p2fuRound(watchBest[l]) }; });
+  var watchAvg = watchList.length ? _p2fuRound(watchList.reduce(function (a, w) { return a + w.pct; }, 0) / watchList.length) : null;
+  var accessLessons = {};
+  att.forEach(function (a) { accessLessons[a.lesson] = 1; });
+  watchList.forEach(function (w) { accessLessons[w.lesson] = 1; });
+  exp.forEach(function (e) { accessLessons[e.lesson] = 1; });
+  var access = Object.keys(accessLessons).sort().map(function (l) {
+    var s = _lessonLockState(X.locks, l);
+    return { lesson: l, can_watch: !s.video_locked || _entitlementCovers(X.ent, X.statuses, key, l, X.ss, X.today) };
+  });
+
+  // written answers (Session 4's tab; absent => zeros)
+  var w = { pending: 0, graded: 0, awarded: 0, max: 0, items: [] };
+  X.written.forEach(function (r) {
+    if (_phoneKey((r.student_id || r.student)) !== key) return;
+    var graded = !(r.awarded === "" || r.awarded == null), aw = parseFloat(r.awarded), mx = parseFloat(r.max);
+    if (graded) { w.graded++; if (isFinite(aw)) w.awarded += aw; if (isFinite(mx)) w.max += mx; } else w.pending++;
+    w.items.push({ lesson: _p2fuCanon(r.lesson), question: String(r.question_id == null ? "" : r.question_id), graded: graded, awarded: graded && isFinite(aw) ? aw : null, max: isFinite(mx) ? mx : null });
+  });
+
+  var notifs = X.notifs.filter(function (n) { return _phoneKey(n.student) === key && _p2fuInRange(n.sent_at.slice(0, 10), from, to); })
+    .map(function (n) { var o = Object.assign({}, n); delete o._row; return o; });
+  var center = att.filter(function (a) { return a.mode === "center"; }).length;
+  var totals = {
+    quiz_count: quizzes.length, quiz_avg_pct: quizAvg,
+    quiz_required: exp.filter(function (e) { return e.quiz.required; }).length, quiz_missed: exp.filter(function (e) { return e.quiz.missed; }).length,
+    homework_count: homework.length,
+    homework_required: exp.filter(function (e) { return e.homework.required; }).length, homework_missed: exp.filter(function (e) { return e.homework.missed; }).length,
+    attendance_center: center, attendance_online: att.length - center, watch_avg_pct: watchAvg,
+    written_pending: w.pending, written_graded: w.graded
+  };
+  var gOut = X.groups.filter(function (g) { return g.members.indexOf(key) >= 0; }).map(function (g) { return { group: g.group, key: g.key }; });
+  return { student: { phone: st.phone, name: st.name, year: st.year, parent_phone: st.parent_phone }, groups: gOut, range: { from: from, to: to },
+           totals: totals, quizzes: quizzes, homework: homework, expected: exp, attendance: att, watch: watchList, video_access: access, written: w, notifications: notifs };
+}
+
+function p2_admin_student_summary(payload) {
+  _requireAdminAny(payload);
+  var digits = _normalizePhone(payload.student);
+  if (digits.length < 10) throw new Error("Missing student phone.");
+  var today = _p2fuToday();
+  var from = payload.from ? _p2fuCheckYmd(payload.from, "from") : today.slice(0, 8) + "01";
+  var to = payload.to ? _p2fuCheckYmd(payload.to, "to") : today;
+  if (from > to) throw new Error("from must not be after to.");
+  var X = _p2fuLoad(_ss(), _dataSs());
+  var out = _p2fuSummaryFor(X, _phoneKey(digits), from, to);
+  out.ok = true;
+  if (X.lessonsError) out.lessons_error = X.lessonsError;
+  return out;
+}
+
+// ---- Monthly review -----------------------------------------------------------------------
+// op "get" (default): {month, student | group} -> one summary per student for that month + the review status.
+// op "mark": {student, month, status, note} -> upsert MonthlyReviews (status "sent" also logs a parent notification).
+function p2_admin_monthly_review(payload) {
+  _requireAdminAny(payload);
+  _p2fuNeedFlag("FF_MONTHLY");
+  var r = _p2fuMonthRange(payload.month);
+  var today = _p2fuToday(), to = r.to > today ? today : r.to;
+  var op = String(payload.op || "get").trim().toLowerCase();
+  if (op === "mark") return _p2fuMonthlyMark(payload, r);
+  if (op !== "get") throw new Error('op must be "get" or "mark".');
+  var ss = _ss(), X = _p2fuLoad(ss, _dataSs()), keys = [];
+  if (payload.student) keys = [_phoneKey(_normalizePhone(payload.student))];
+  else if (payload.group) {
+    var gk = _groupKey(payload.group), hit = X.groups.filter(function (g) { return g.key === gk; })[0];
+    if (!hit) throw new Error("Group not found.");
+    keys = hit.members.slice();
+  } else throw new Error("Give a student or a group.");
+  if (keys.length > P2_FU_MAX_BATCH) throw new Error("Too many students in one request (max " + P2_FU_MAX_BATCH + ").");
+  var out = keys.map(function (k) {
+    var s = _p2fuSummaryFor(X, k, r.from, to);
+    var row = X.monthly.filter(function (m) { return _phoneKey(m.student) === k && String(m.month).trim() === r.month; })[0];
+    var rev = { status: row ? String(row.status || "pending") : "pending", sent_at: row ? String(row.sent_at || "") : "", note: row ? String(row.note || "") : "" };
+    return { student: s.student, summary: s, review: rev };
+  });
+  return { ok: true, month: r.month, range: { from: r.from, to: to }, closed: to < r.to ? false : true, reviews: out };
+}
+function _p2fuMonthlyMark(payload, r) {
+  var digits = _normalizePhone(payload.student);
+  if (digits.length < 10) throw new Error("Missing student phone.");
+  var status = String(payload.status == null ? "" : payload.status).trim().toLowerCase();
+  if (!P2_FU_MONTH_STATUS.hasOwnProperty(status)) throw new Error('status must be "pending", "ready", "sent" or "closed".');
+  var note = String(payload.note == null ? "" : payload.note).slice(0, 500), key = _phoneKey(digits);
+  return _withLock(function () {
+    var ss = _ss();
+    var sh = _followupSheet(ss, "MonthlyReviews", P2_FU_MONTHLY_HEADERS);
+    _ensureColumns(sh, P2_FU_MONTHLY_HEADERS);
+    var c = _needCols(sh, "MonthlyReviews", P2_FU_MONTHLY_HEADERS);
+    var hit = null;
+    _p2fuRows(sh).forEach(function (m) { if (!hit && _phoneKey(m.student) === key && String(m.month).trim() === r.month) hit = m; });
+    var now = _p2fuNow(), sent = status === "sent" ? now : (hit ? String(hit.sent_at || "") : "");
+    if (hit) {
+      sh.getRange(hit._row, c.status).setValue(status);
+      sh.getRange(hit._row, c.sent_at).setNumberFormat("@").setValue(sent);
+      if (payload.note !== undefined) sh.getRange(hit._row, c.note).setNumberFormat("@").setValue(note);
+    } else {
+      _appendByHeader(sh, { student: _canonicalPhone(digits) || digits, month: r.month, status: status, sent_at: sent, note: note });
+    }
+    if (status === "sent" && _p2fuFlag("FF_PARENT_LOG")) {
+      p2_admin_log_parent_notification({ token: payload.token, student_id: payload.student_id, session_token: payload.session_token,
+                                         student: digits, kind: "monthly", ref: r.month, note: note });
+    }
+    return { ok: true, review: { student: digits, month: r.month, status: status, sent_at: sent, note: payload.note !== undefined ? note : (hit ? String(hit.note || "") : "") } };
+  });
+}
+
+// ---- admin_followup_overview, plus what Session 2 needs on the page -----------------------------
+// Adds: flags, week (Sat..Fri), requirements (also merged into lessons[path].quiz_required / homework_required /
+// due_override, default true), parent_log (phoneKey -> [{kind, ref, sent_at, note}], newest first).
+function p2_admin_followup_overview(payload) {
+  var o = handleAdminFollowupOverview(payload);     // does its own admin check
+  var ss = _ss();
+  o.flags = { FF_PARENT_LOG: _p2fuFlag("FF_PARENT_LOG"), FF_MONTHLY: _p2fuFlag("FF_MONTHLY") };
+  o.week = _p2fuWeek(o.today);
+  var req = _p2fuRequirements(ss);
+  o.requirements = req;
+  Object.keys(o.lessons || {}).forEach(function (p) {
+    var r = _p2fuReq(req, p);
+    o.lessons[p].quiz_required = r.quiz_required; o.lessons[p].homework_required = r.homework_required; o.lessons[p].due_override = r.due_override;
+  });
+  o.parent_log = {};
+  if (o.flags.FF_PARENT_LOG) {
+    var wanted = {};
+    Object.keys(o.students || {}).forEach(function (k) { wanted[k] = true; });
+    _p2fuNotifications(ss).sort(function (a, b) { return a.sent_at < b.sent_at ? 1 : -1; }).forEach(function (n) {
+      var k = _phoneKey(n.student); if (!wanted[k]) return;
+      (o.parent_log[k] = o.parent_log[k] || []).push({ kind: n.kind, ref: n.ref, sent_at: n.sent_at, note: n.note });
+    });
+  }
+  return o;
+}
+
+// ---- admin_followup_set_attendance with the weekly center rule -------------------------------
+// 1. More than one center student in a request is a "bulk center": it needs payload.week_confirm equal to this
+//    week's start date (Saturday) — the page makes the teacher confirm the week explicitly.
+// 2. Center rows created by this feature expire on the Friday of that week (Entitlements + QuizAccess, source
+//    "attendance", only rows with an empty expires_at, so an existing end date is never changed).
+// 3. Every decision is written to AuditLog (who, when, before -> after).
+function p2_admin_followup_set_attendance(payload) {
+  _requireAdminAny(payload);
+  var items = Array.isArray(payload.items) ? payload.items : [];
+  var week = _p2fuWeek(_p2fuToday());
+  var centers = items.filter(function (it) { return String(it && it.mode != null ? it.mode : "").trim().toLowerCase() === "center"; });
+  var grant = payload.grant !== false;
+  if (grant && centers.length > 1 && String(payload.week_confirm || "") !== week.start) {
+    throw new Error("Bulk center needs this week's confirmation (week_confirm = " + week.start + ", the week " + week.start + " to " + week.end + ").");
+  }
+  var lesson = _lessonPath(payload.lesson), ss = _ss();
+  var before = {};
+  _p2fuRows(ss.getSheetByName("Attendance")).forEach(function (r) {
+    if (String(r.lesson || "").trim().toLowerCase() === lesson) before[_phoneKey(r.phone)] = String(r.mode || "");
+  });
+  var res = handleAdminFollowupSetAttendance(payload);
+  var keys = {};
+  centers.forEach(function (it) { keys[_phoneKey(_normalizePhone(it.phone))] = true; });
+  if (grant && Object.keys(keys).length) _withLock(function () { _p2fuExpireCenterRows(ss, lesson, keys, week.end); });
+  items.forEach(function (it) {
+    var k = _phoneKey(_normalizePhone(it && it.phone)), mode = String(it && it.mode != null ? it.mode : "").trim().toLowerCase();
+    _p2fuAudit(ss, payload, mode === "" ? "attendance_clear" : "attendance_" + mode, { lesson: lesson, phone: k, mode: before[k] || "" },
+               { lesson: lesson, phone: k, mode: mode, expires_at: mode === "center" && grant ? week.end : "" });
+  });
+  res.week = week; res.expires_at = grant && centers.length ? week.end : "";
+  return res;
+}
+function _p2fuExpireCenterRows(ss, lesson, keys, endYmd) {
+  [["Entitlements", ENT_HEADERS, "scope"], ["QuizAccess", QUIZ_ACCESS_HEADERS, "lesson"]].forEach(function (t) {
+    var sh = ss.getSheetByName(t[0]);
+    if (!sh || sh.getLastRow() < 2) return;
+    var c = _needCols(sh, t[0], t[1]);
+    sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getValues().forEach(function (r, i) {
+      if (String(r[c.source - 1]).trim() !== ATTENDANCE_SOURCE) return;
+      if (String(r[c[t[2]] - 1]).trim().toLowerCase() !== lesson) return;
+      if (!keys[_phoneKey(r[c.phone - 1])]) return;
+      if (String(r[c.expires_at - 1]).trim() !== "") return;
+      sh.getRange(i + 2, c.expires_at).setNumberFormat("@").setValue(endYmd);
+    });
+  });
+}
