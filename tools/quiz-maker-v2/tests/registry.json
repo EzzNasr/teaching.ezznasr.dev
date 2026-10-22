@@ -617,6 +617,17 @@
         "node",
         "tests/test_integration_s2.js"
       ]
+    },
+    {
+      "id": "R-023",
+      "title": "Homework lessons and quiz lessons are chosen separately per group; legacy groups follow the shared list; summary expects each kind only for its own lessons",
+      "status": "active",
+      "owner": "S2",
+      "cmd": [
+        "node",
+        "tests/test_R023_split_lessons.js"
+      ],
+      "note": "Page side (two blocks, independent add/remove) is in e2e_p2_followup.py (R-007 entry)."
     }
   ]
 }
