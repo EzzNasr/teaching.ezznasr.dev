@@ -226,6 +226,904 @@
   .ac-cl small { margin-left: auto; color: var(--ink-dim); font: 600 12px var(--sans); }
   .ac-cq { margin: 0 0 0 22px; padding: 4px 10px; border-left: 3px solid var(--line-strong); color: var(--ink-dim); font: 600 12px var(--sans); }
 </style>
+<style id="mx-redesign">
+/* ==========================================================================
+   Visual layer only. Loaded after dashboard.css and scoped to html[data-theme]
+   so it wins on specificity without touching markup, IDs, or JS hooks.
+   ========================================================================== */
+html[data-theme] {
+  --mx-bg: #f5f4f0;
+  --mx-surface: #ffffff;
+  --mx-surface-2: #faf9f6;
+  --mx-line: #e7e4dc;
+  --mx-line-strong: #d6d2c7;
+  --mx-ink: #15171c;
+  --mx-ink-2: #3b3f47;
+  --mx-muted: #737781;
+  --mx-accent: #2b54e0;
+  --mx-accent-soft: #e9eefe;
+  --mx-accent-ink: #ffffff;
+  --mx-good: #17804f;
+  --mx-good-soft: #e5f4ec;
+  --mx-mid: #a3670d;
+  --mx-mid-soft: #fbf1df;
+  --mx-low: #c03a17;
+  --mx-low-soft: #fceae4;
+  --mx-shadow: 0 1px 2px rgba(20, 22, 28, .04), 0 2px 8px rgba(20, 22, 28, .04);
+  --mx-shadow-lg: 0 10px 30px -12px rgba(20, 22, 28, .18);
+  --mx-r: 14px;
+  --mx-r-sm: 10px;
+  --mx-font: "Manrope", "Cairo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mx-mono: "DM Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  --mx-bg: #0d0f12;
+  --mx-surface: #15181d;
+  --mx-surface-2: #1a1e24;
+  --mx-line: #252a32;
+  --mx-line-strong: #323844;
+  --mx-ink: #eceef1;
+  --mx-ink-2: #c4c8cf;
+  --mx-muted: #8b919c;
+  --mx-accent: #7d9bff;
+  --mx-accent-soft: rgba(125, 155, 255, .14);
+  --mx-accent-ink: #0d0f12;
+  --mx-good: #4fcf8e;
+  --mx-good-soft: rgba(79, 207, 142, .13);
+  --mx-mid: #f0b44c;
+  --mx-mid-soft: rgba(240, 180, 76, .13);
+  --mx-low: #ff7a59;
+  --mx-low-soft: rgba(255, 122, 89, .13);
+  --mx-shadow: 0 1px 0 rgba(255, 255, 255, .02) inset, 0 1px 2px rgba(0, 0, 0, .3);
+  --mx-shadow-lg: 0 16px 40px -16px rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+
+html[data-theme] body {
+  background: var(--mx-bg);
+  color: var(--mx-ink);
+  font-family: var(--mx-font);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+html[data-theme] ::selection { background: var(--mx-accent-soft); color: var(--mx-ink); }
+html[data-theme] :focus-visible {
+  outline: 2px solid var(--mx-accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ---- Top bar -------------------------------------------------------------- */
+html[data-theme] .d-bar {
+  position: sticky; top: 0; z-index: 40;
+  background: color-mix(in srgb, var(--mx-bg) 82%, transparent);
+  -webkit-backdrop-filter: saturate(160%) blur(12px);
+  backdrop-filter: saturate(160%) blur(12px);
+  border-bottom: 1px solid var(--mx-line);
+  box-shadow: none;
+}
+html[data-theme] .d-bar-in {
+  max-width: var(--d-w); margin: 0 auto;
+  display: flex; align-items: center; gap: 20px;
+  padding: 12px 24px; min-height: 60px;
+}
+html[data-theme] .d-brand {
+  display: inline-flex; align-items: center; gap: 10px;
+  color: var(--mx-ink); text-decoration: none;
+  font-weight: 800; font-size: 15px; letter-spacing: -.01em; white-space: nowrap;
+}
+html[data-theme] .d-brand-mark {
+  display: inline-grid; place-items: center;
+  width: 32px; height: 32px; border-radius: 9px;
+  background: var(--mx-ink); color: var(--mx-bg);
+  box-shadow: none;
+}
+html[data-theme] .d-brand-mark svg { width: 18px; height: 18px; }
+html[data-theme] .d-brand small {
+  font-family: var(--mx-mono); font-size: 10.5px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--mx-muted);
+  border: 1px solid var(--mx-line-strong); border-radius: 999px;
+  padding: 2px 8px; margin-left: 2px;
+  background: transparent;
+}
+html[data-theme] .d-nav {
+  display: flex; align-items: center; gap: 2px;
+  padding: 4px; border-radius: 12px;
+  background: var(--mx-surface); border: 1px solid var(--mx-line);
+  overflow-x: auto; scrollbar-width: none;
+}
+html[data-theme] .d-nav::-webkit-scrollbar { display: none; }
+html[data-theme] .d-nav a {
+  color: var(--mx-muted); text-decoration: none;
+  font-size: 13.5px; font-weight: 600; white-space: nowrap;
+  padding: 7px 12px; border-radius: 8px;
+  transition: color .15s, background-color .15s;
+  background: transparent; border: 0;
+}
+html[data-theme] .d-nav a:hover { color: var(--mx-ink); background: var(--mx-surface-2); }
+html[data-theme] .d-nav a[aria-current="page"] {
+  color: var(--mx-ink); background: var(--mx-bg);
+  box-shadow: inset 0 0 0 1px var(--mx-line-strong);
+}
+html[data-theme] .d-nav a[lang="ar"] { font-family: "Cairo", var(--mx-font); }
+html[data-theme] .d-spacer { flex: 1 1 auto; }
+html[data-theme] .theme-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 36px; padding: 0 14px; border-radius: 10px;
+  background: var(--mx-surface); color: var(--mx-ink-2);
+  border: 1px solid var(--mx-line); box-shadow: none;
+  font: 600 13px/1 var(--mx-font); cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+html[data-theme] .theme-toggle:hover { border-color: var(--mx-line-strong); color: var(--mx-ink); }
+html[data-theme] .theme-toggle-icon { display: inline-flex; }
+
+/* ---- Shell & header ------------------------------------------------------- */
+html[data-theme] .dash-shell {
+  max-width: var(--d-w); margin: 0 auto;
+  padding: 36px 24px 96px;
+}
+html[data-theme] .dash-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+  margin: 0 0 24px; padding: 0 0 24px;
+  border-bottom: 1px solid var(--mx-line);
+}
+html[data-theme] .dash-head h1 {
+  margin: 0; color: var(--mx-ink);
+  font-family: var(--mx-font); font-weight: 800;
+  font-size: clamp(28px, 4vw, 40px); line-height: 1.05; letter-spacing: -.03em;
+}
+html[data-theme] .dash-head p {
+  margin: 10px 0 0; color: var(--mx-muted);
+  font-size: 15px; line-height: 1.55; max-width: 60ch;
+}
+
+/* ---- Year tabs (segmented control) --------------------------------------- */
+html[data-theme] .dash-tabs {
+  display: inline-flex; flex-wrap: wrap; gap: 4px;
+  padding: 4px; margin: 0 0 20px;
+  background: var(--mx-surface); border: 1px solid var(--mx-line);
+  border-radius: 12px; box-shadow: var(--mx-shadow);
+}
+html[data-theme] .dash-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: 8px; border: 0;
+  background: transparent; color: var(--mx-muted);
+  font: 600 13.5px/1 var(--mx-font); cursor: pointer;
+  transition: background-color .15s, color .15s;
+}
+html[data-theme] .dash-tab:hover { color: var(--mx-ink); background: var(--mx-surface-2); }
+html[data-theme] .dash-tab small {
+  font-family: var(--mx-mono); font-size: 11px; font-weight: 500;
+  min-width: 22px; padding: 3px 6px; border-radius: 6px; text-align: center;
+  background: var(--mx-surface-2); color: var(--mx-muted);
+  border: 1px solid var(--mx-line);
+}
+html[data-theme] .dash-tab.is-active { background: var(--mx-ink); color: var(--mx-bg); }
+html[data-theme] .dash-tab.is-active small {
+  background: color-mix(in srgb, var(--mx-bg) 16%, transparent);
+  border-color: transparent; color: var(--mx-bg);
+}
+
+/* ---- KPI stats ------------------------------------------------------------ */
+html[data-theme] .dash-stats {
+  display: grid; gap: 0;
+  grid-template-columns: repeat(var(--d-kpis), minmax(0, 1fr));
+  background: var(--mx-surface); border: 1px solid var(--mx-line);
+  border-radius: var(--mx-r); box-shadow: var(--mx-shadow);
+  overflow: hidden; margin: 0 0 16px;
+}
+html[data-theme] .dash-stat {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 20px 22px; background: transparent; border: 0; border-radius: 0;
+  box-shadow: none; min-width: 0;
+}
+html[data-theme] .dash-stat + .dash-stat { border-left: 1px solid var(--mx-line); }
+html[data-theme] .dash-stat span {
+  font-family: var(--mx-mono); font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--mx-muted);
+}
+html[data-theme] .dash-stat b {
+  font-family: var(--mx-font); font-weight: 800; color: var(--mx-ink);
+  font-size: clamp(26px, 3.2vw, 34px); line-height: 1.05; letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+html[data-theme] .dash-stat b.is-good { color: var(--mx-good); }
+html[data-theme] .dash-stat b.is-low { color: var(--mx-low); }
+html[data-theme] .dash-stat em { font-style: normal; font-size: 12.5px; color: var(--mx-muted); }
+@media (max-width: 760px) {
+  html[data-theme] .dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme] .dash-stat + .dash-stat { border-left: 0; }
+  html[data-theme] .dash-stat:nth-child(even) { border-left: 1px solid var(--mx-line); }
+  html[data-theme] .dash-stat:nth-child(n+3) { border-top: 1px solid var(--mx-line); }
+}
+
+/* ---- Notes / errors / empty ---------------------------------------------- */
+html[data-theme] .dash-note {
+  margin: 0 0 20px; padding: 12px 16px 12px 40px; position: relative;
+  border-radius: var(--mx-r-sm); font-size: 13px; line-height: 1.55;
+  background: var(--mx-mid-soft); color: var(--mx-ink-2);
+  border: 1px solid color-mix(in srgb, var(--mx-mid) 28%, transparent);
+}
+html[data-theme] .dash-note::before {
+  content: ""; position: absolute; left: 16px; top: 16px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--mx-mid);
+}
+html[data-theme] .dash-err {
+  margin: 0 0 16px; padding: 16px 18px; border-radius: var(--mx-r);
+  background: var(--mx-low-soft); color: var(--mx-ink);
+  border: 1px solid color-mix(in srgb, var(--mx-low) 30%, transparent);
+  font-size: 14px; line-height: 1.6;
+}
+html[data-theme] .dash-empty {
+  padding: 28px 20px; text-align: center;
+  border: 1px dashed var(--mx-line-strong); border-radius: var(--mx-r-sm);
+  color: var(--mx-muted); font-size: 14px; background: var(--mx-surface-2);
+}
+
+/* ---- Sections ------------------------------------------------------------- */
+html[data-theme] .dash-section {
+  margin: 0 0 20px; padding: 22px;
+  background: var(--mx-surface); border: 1px solid var(--mx-line);
+  border-radius: var(--mx-r); box-shadow: var(--mx-shadow);
+  scroll-margin-top: 130px;
+}
+html[data-theme] .d-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; }
+html[data-theme] .d-sec-head h2 {
+  display: inline-flex; align-items: center; gap: 10px; margin: 0;
+  font-family: var(--mx-font); font-weight: 800; color: var(--mx-ink);
+  font-size: 18px; letter-spacing: -.02em; line-height: 1.2;
+}
+html[data-theme] .d-count {
+  font-family: var(--mx-mono); font-size: 11.5px; font-weight: 500;
+  padding: 3px 8px; border-radius: 999px;
+  background: var(--mx-surface-2); color: var(--mx-muted);
+  border: 1px solid var(--mx-line);
+}
+html[data-theme] .dash-section-note {
+  margin: 6px 0 16px; color: var(--mx-muted); font-size: 13.5px; line-height: 1.55; max-width: 72ch;
+}
+
+/* Roster is a <details> */
+html[data-theme] details.rv-roster > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  list-style: none; cursor: pointer; margin: -4px; padding: 4px; border-radius: 10px;
+}
+html[data-theme] details.rv-roster > summary::-webkit-details-marker { display: none; }
+html[data-theme] details.rv-roster > summary::marker { content: ""; }
+html[data-theme] .rv-caret {
+  width: 30px; height: 30px; flex: none; border-radius: 8px;
+  border: 1px solid var(--mx-line); background: var(--mx-surface-2);
+  display: inline-grid; place-items: center; position: relative;
+}
+html[data-theme] .rv-caret::before {
+  content: ""; width: 7px; height: 7px;
+  border-right: 2px solid var(--mx-muted); border-bottom: 2px solid var(--mx-muted);
+  transform: translateY(-2px) rotate(45deg); transition: transform .2s;
+}
+html[data-theme] details.rv-roster[open] .rv-caret::before { transform: translateY(2px) rotate(-135deg); }
+html[data-theme] details.rv-roster:not([open]) .dash-section-note { display: none; }
+html[data-theme] details.rv-roster[open] > summary { margin-bottom: 0; }
+
+/* ---- Filters -------------------------------------------------------------- */
+html[data-theme] .dash-filters {
+  display: grid; gap: 12px; align-items: end;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.6fr) auto;
+  margin: 0 0 20px; padding: 16px;
+  background: var(--mx-surface); border: 1px solid var(--mx-line);
+  border-radius: var(--mx-r); box-shadow: var(--mx-shadow);
+}
+html[data-theme] .dash-filters label {
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  font-family: var(--mx-mono); font-size: 10.5px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--mx-muted);
+}
+html[data-theme] .dash-select,
+html[data-theme] .dash-search {
+  width: 100%; height: 40px; padding: 0 12px; box-sizing: border-box;
+  background: var(--mx-surface-2); color: var(--mx-ink);
+  border: 1px solid var(--mx-line); border-radius: 10px;
+  font: 500 14px/1 var(--mx-font); text-transform: none; letter-spacing: 0;
+  box-shadow: none; transition: border-color .15s, box-shadow .15s, background-color .15s;
+}
+html[data-theme] .dash-select {
+  -webkit-appearance: none; appearance: none; padding-right: 34px; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--mx-muted) 50%), linear-gradient(135deg, var(--mx-muted) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%;
+  background-size: 5px 5px; background-repeat: no-repeat;
+}
+html[data-theme] .dash-search::placeholder { color: var(--mx-muted); opacity: .8; }
+html[data-theme] .dash-select:hover,
+html[data-theme] .dash-search:hover { border-color: var(--mx-line-strong); }
+html[data-theme] .dash-select:focus,
+html[data-theme] .dash-search:focus {
+  outline: none; border-color: var(--mx-accent); background-color: var(--mx-surface);
+  box-shadow: 0 0 0 3px var(--mx-accent-soft);
+}
+html[data-theme] .dash-clear {
+  height: 40px; padding: 0 16px; border-radius: 10px; cursor: pointer; white-space: nowrap;
+  background: transparent; color: var(--mx-ink-2);
+  border: 1px solid var(--mx-line-strong); font: 600 13.5px/1 var(--mx-font);
+  transition: background-color .15s, color .15s, border-color .15s;
+}
+html[data-theme] .dash-clear:hover { background: var(--mx-ink); color: var(--mx-bg); border-color: var(--mx-ink); }
+@media (max-width: 900px) {
+  html[data-theme] .dash-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme] .dash-filters label:nth-of-type(4) { grid-column: 1 / -1; }
+  html[data-theme] .dash-clear { grid-column: 1 / -1; }
+}
+
+/* ---- Sticky jump nav ------------------------------------------------------ */
+html[data-theme] .d-tabs-wrap {
+  position: sticky; top: 61px; z-index: 30;
+  margin: 0 -24px 20px; padding: 10px 24px;
+  background: color-mix(in srgb, var(--mx-bg) 86%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--mx-line);
+}
+html[data-theme] .d-tabs {
+  display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
+}
+html[data-theme] .d-tabs::-webkit-scrollbar { display: none; }
+html[data-theme] .d-tabs a {
+  flex: none; padding: 7px 12px; border-radius: 999px;
+  color: var(--mx-muted); text-decoration: none; white-space: nowrap;
+  font-size: 13px; font-weight: 600;
+  border: 1px solid transparent; background: transparent;
+  transition: color .15s, background-color .15s, border-color .15s;
+}
+html[data-theme] .d-tabs a:hover { color: var(--mx-ink); background: var(--mx-surface); border-color: var(--mx-line); }
+html[data-theme] .d-tabs a.is-on {
+  color: var(--mx-accent); background: var(--mx-accent-soft);
+  border-color: color-mix(in srgb, var(--mx-accent) 25%, transparent);
+}
+
+/* ---- Lists & rows --------------------------------------------------------- */
+html[data-theme] .d-list {
+  display: flex; flex-direction: column; gap: 0;
+  border: 1px solid var(--mx-line); border-radius: var(--mx-r-sm);
+  overflow: hidden; background: var(--mx-surface);
+}
+html[data-theme] .d-scroll { max-height: 420px; overflow-y: auto; scrollbar-width: thin; }
+html[data-theme] .d-list > * + * { border-top: 1px solid var(--mx-line); }
+html[data-theme] .dash-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 14px 16px; margin: 0;
+  background: transparent; border: 0; border-radius: 0; box-shadow: none;
+  transition: background-color .12s;
+}
+html[data-theme] .dash-row.is-clickable { cursor: pointer; }
+html[data-theme] .dash-row.is-clickable:hover { background: var(--mx-surface-2); }
+html[data-theme] .dash-row.is-selected {
+  background: var(--mx-accent-soft);
+  box-shadow: inset 3px 0 0 var(--mx-accent);
+}
+html[data-theme] .dash-row-main { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+html[data-theme] .dash-row-title {
+  color: var(--mx-ink); font-weight: 700; font-size: 14.5px; line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+html[data-theme] .dash-row-sub { color: var(--mx-muted); font-size: 12.5px; line-height: 1.45; }
+html[data-theme] .at-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+html[data-theme] .at-trail {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+  color: var(--mx-muted); font-size: 12.5px; line-height: 1.4;
+}
+html[data-theme] .at-trail > i {
+  width: 3px; height: 3px; border-radius: 50%; background: var(--mx-line-strong);
+  display: inline-block; font-style: normal;
+}
+
+html[data-theme] .dash-badge {
+  flex: none; display: inline-flex; align-items: center;
+  height: 26px; padding: 0 10px; border-radius: 999px;
+  font-family: var(--mx-mono); font-size: 11.5px; font-weight: 500; white-space: nowrap;
+  color: var(--mx-ink-2); background: var(--mx-surface-2);
+  border: 1px solid var(--mx-line);
+}
+
+html[data-theme] .dash-score {
+  flex: none; display: inline-flex; flex-direction: column; align-items: flex-end; justify-content: center;
+  min-width: 64px; padding: 6px 10px; border-radius: 10px;
+  font-family: var(--mx-mono); font-weight: 600; font-size: 14px; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--mx-ink); background: var(--mx-surface-2); border: 1px solid var(--mx-line);
+}
+html[data-theme] .dash-score small { font-size: 10.5px; font-weight: 500; opacity: .75; margin-top: 2px; }
+html[data-theme] .dash-score.is-good { color: var(--mx-good); background: var(--mx-good-soft); border-color: transparent; }
+html[data-theme] .dash-score.is-mid  { color: var(--mx-mid);  background: var(--mx-mid-soft);  border-color: transparent; }
+html[data-theme] .dash-score.is-low  { color: var(--mx-low);  background: var(--mx-low-soft);  border-color: transparent; }
+
+html[data-theme] .dash-rank {
+  flex: none; width: 28px; height: 28px; border-radius: 8px;
+  display: inline-grid; place-items: center;
+  font-family: var(--mx-mono); font-size: 12px; font-weight: 600;
+  color: var(--mx-muted); background: var(--mx-surface-2); border: 1px solid var(--mx-line);
+}
+html[data-theme] .d-list > .dash-row:nth-child(-n+3) .dash-rank {
+  color: var(--mx-low); background: var(--mx-low-soft); border-color: transparent;
+}
+html[data-theme] .dash-missed-q { color: var(--mx-ink); font-weight: 600; font-size: 14px; line-height: 1.45; }
+
+html[data-theme] .dash-sub-text {
+  margin-top: 6px; padding: 10px 12px; border-radius: 8px;
+  background: var(--mx-surface-2); border: 1px solid var(--mx-line);
+  color: var(--mx-ink-2); font-size: 13.5px; line-height: 1.55; white-space: pre-wrap;
+}
+html[data-theme] .dash-link {
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 12px; border-radius: 8px;
+  color: var(--mx-accent); background: var(--mx-accent-soft);
+  font-size: 12.5px; font-weight: 700; text-decoration: none;
+  transition: filter .15s;
+}
+html[data-theme] .dash-link::after { content: "\2197"; font-weight: 600; }
+html[data-theme] .dash-link:hover { filter: brightness(.95); }
+
+/* Expand toggle on attempt rows */
+html[data-theme] .dash-toggle {
+  flex: none; display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12.5px; font-weight: 600; color: var(--mx-muted); white-space: nowrap;
+}
+html[data-theme] .dash-toggle::after {
+  content: ""; width: 6px; height: 6px;
+  border-right: 1.75px solid currentColor; border-bottom: 1.75px solid currentColor;
+  transform: translateY(-2px) rotate(45deg); transition: transform .2s;
+}
+html[data-theme] .dash-toggle.is-open { color: var(--mx-accent); }
+html[data-theme] .dash-toggle.is-open::after { transform: translateY(1px) rotate(-135deg); }
+html[data-theme] .dash-attempt { background: transparent; }
+html[data-theme] .dash-row[aria-expanded="true"] { background: var(--mx-surface-2); }
+
+/* Attempt detail */
+html[data-theme] .dash-detail {
+  padding: 4px 16px 16px; background: var(--mx-surface-2);
+  border-top: 1px dashed var(--mx-line); display: flex; flex-direction: column; gap: 8px;
+}
+html[data-theme] .dash-detail-h {
+  padding-top: 12px; font-family: var(--mx-mono); font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--mx-muted);
+}
+html[data-theme] .dash-q-group {
+  margin-top: 6px; color: var(--mx-ink-2); font-size: 13px; font-weight: 700;
+}
+html[data-theme] .dash-ok-list { margin-top: 4px; }
+html[data-theme] .dash-ok-list > summary {
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  color: var(--mx-good); font-size: 13px; font-weight: 700; padding: 6px 0;
+}
+html[data-theme] .dash-ok-list[open] > summary { margin-bottom: 6px; }
+
+/* Bars (assignment completion) */
+html[data-theme] .dash-chapter { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; background: transparent; border: 0; }
+html[data-theme] .dash-chapter-top {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  color: var(--mx-muted); font-family: var(--mx-mono); font-size: 12px;
+}
+html[data-theme] .dash-chapter-top b {
+  font-family: var(--mx-font); font-size: 14.5px; font-weight: 700; color: var(--mx-ink);
+}
+html[data-theme] .dash-bar {
+  height: 6px; border-radius: 999px; overflow: hidden;
+  background: var(--mx-line); border: 0;
+}
+html[data-theme] .dash-bar-fill {
+  height: 100%; border-radius: inherit; background: var(--mx-mid);
+  transition: width .5s cubic-bezier(.2, .7, .2, 1);
+}
+html[data-theme] .dash-bar-fill.is-good { background: var(--mx-good); }
+html[data-theme] .dash-bar-fill.is-low { background: var(--mx-low); }
+
+/* Pager */
+html[data-theme] .dash-more {
+  display: block; width: 100%; margin-top: 12px; height: 42px; cursor: pointer;
+  border-radius: 10px; border: 1px dashed var(--mx-line-strong);
+  background: transparent; color: var(--mx-ink-2);
+  font: 600 13.5px/1 var(--mx-font);
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+html[data-theme] .dash-more:hover { background: var(--mx-surface-2); border-style: solid; color: var(--mx-ink); }
+html[data-theme] .dash-more[hidden] { display: none; }
+
+/* Primary button used by the re-login state */
+html[data-theme] .qz-next {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 44px; padding: 0 20px; border-radius: 10px; border: 0; cursor: pointer;
+  background: var(--mx-ink); color: var(--mx-bg);
+  font: 700 14px/1 var(--mx-font); box-shadow: var(--mx-shadow-lg);
+  transition: transform .15s, filter .15s;
+}
+html[data-theme] .qz-next:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+/* ---- Loading state -------------------------------------------------------- */
+html[data-theme] .dash-loading-state {
+  min-height: 62vh; display: grid; place-items: center; padding: 24px 0;
+}
+html[data-theme] .dash-loading-card {
+  width: min(100%, 440px); padding: 32px;
+  display: flex; flex-direction: column; align-items: center; gap: 22px; text-align: center;
+  background: var(--mx-surface); border: 1px solid var(--mx-line);
+  border-radius: 18px; box-shadow: var(--mx-shadow-lg);
+}
+html[data-theme] .dash-loading-art { position: relative; width: 56px; height: 56px; }
+html[data-theme] .dash-loading-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 3px solid var(--mx-line); border-top-color: var(--mx-accent);
+  animation: mx-spin 0.9s linear infinite;
+}
+html[data-theme] .dash-loading-core {
+  position: absolute; inset: 18px; border-radius: 50%; background: var(--mx-accent);
+  animation: mx-pulse 1.4s ease-in-out infinite;
+}
+html[data-theme] .dash-loading-copy { display: flex; flex-direction: column; gap: 6px; }
+html[data-theme] .dash-loading-title {
+  margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -.02em; color: var(--mx-ink);
+}
+html[data-theme] .dash-loading-note { margin: 0; font-size: 13.5px; color: var(--mx-muted); }
+html[data-theme] .dash-loading-dots { display: inline-flex; gap: 3px; margin-left: 4px; vertical-align: middle; }
+html[data-theme] .dash-loading-dots i {
+  width: 4px; height: 4px; border-radius: 50%; background: currentColor;
+  animation: mx-dot 1.2s ease-in-out infinite;
+}
+html[data-theme] .dash-loading-dots i:nth-child(2) { animation-delay: .15s; }
+html[data-theme] .dash-loading-dots i:nth-child(3) { animation-delay: .3s; }
+html[data-theme] .dash-loading-meter { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+html[data-theme] .dash-loading-meter-label {
+  display: flex; justify-content: space-between;
+  font-family: var(--mx-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--mx-muted);
+}
+html[data-theme] .dash-loadbar { height: 4px; border-radius: 999px; overflow: hidden; background: var(--mx-line); }
+html[data-theme] .dash-loadbar-fill {
+  height: 100%; width: 40%; border-radius: inherit; background: var(--mx-accent);
+  animation: mx-slide 1.4s cubic-bezier(.4, 0, .2, 1) infinite;
+}
+@keyframes mx-spin { to { transform: rotate(360deg); } }
+@keyframes mx-pulse { 0%, 100% { transform: scale(.85); opacity: .7; } 50% { transform: scale(1); opacity: 1; } }
+@keyframes mx-dot { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@keyframes mx-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+
+/* ---- Small screens -------------------------------------------------------- */
+@media (max-width: 640px) {
+  html[data-theme] .d-bar-in { flex-wrap: wrap; gap: 10px; padding: 10px 16px; }
+  html[data-theme] .d-nav { order: 3; width: 100%; }
+  html[data-theme] .d-spacer { display: none; }
+  html[data-theme] .theme-toggle { margin-left: auto; }
+  html[data-theme] .theme-toggle-label { display: none; }
+  html[data-theme] .theme-toggle { width: 36px; padding: 0; justify-content: center; }
+  html[data-theme] .dash-shell { padding: 24px 16px 72px; }
+  html[data-theme] .dash-section { padding: 16px; }
+  html[data-theme] .d-tabs-wrap { top: 106px; margin: 0 -16px 16px; padding: 8px 16px; }
+  html[data-theme] .dash-filters { grid-template-columns: 1fr; }
+  html[data-theme] .dash-filters label:nth-of-type(4) { grid-column: auto; }
+  html[data-theme] .dash-row { padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme] *, html[data-theme] *::before, html[data-theme] *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition: none !important;
+  }
+}
+
+/* ==========================================================================
+   Video access page: re-map the page's own tokens onto the shared palette so
+   every existing .ac-* rule picks up the new look, then refine components.
+   ========================================================================== */
+html[data-theme] {
+  --surface: var(--mx-surface);
+  --surface-strong: var(--mx-surface);
+  --surface-soft: var(--mx-surface-2);
+  --ink: var(--mx-ink);
+  --ink-dim: var(--mx-muted);
+  --line: var(--mx-line);
+  --line-strong: var(--mx-line-strong);
+  --accent: var(--mx-accent);
+  --accent-2: var(--mx-accent);
+  --accent-soft: var(--mx-accent-soft);
+  --good: var(--mx-good);
+  --low: var(--mx-low);
+  --warn: var(--mx-mid);
+  --shadow-soft: var(--mx-shadow);
+  --sans: var(--mx-font);
+  --mono: var(--mx-mono);
+}
+
+/* Stats: 6 KPIs -> 3 columns on mid widths */
+@media (min-width: 761px) and (max-width: 1040px) {
+  html[data-theme] .dash-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  html[data-theme] .dash-stat + .dash-stat { border-left: 0; }
+  html[data-theme] .dash-stat:not(:nth-child(3n+1)) { border-left: 1px solid var(--mx-line); }
+  html[data-theme] .dash-stat:nth-child(n+4) { border-top: 1px solid var(--mx-line); }
+}
+
+/* Sections: padding lives on the card now, so drop the per-child gutters */
+html[data-theme] #dashboard .dash-section { padding: 22px; }
+html[data-theme] #dashboard .dash-section > *:not(h2):not(.dash-section-note):not(.dash-empty) { margin-left: 0; margin-right: 0; }
+html[data-theme] #dashboard .dash-section > h2 {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 0 0 4px; padding: 0; border: 0; background: transparent;
+  font: 800 18px/1.25 var(--mx-font); letter-spacing: -.02em; color: var(--mx-ink);
+}
+html[data-theme] .ac-count {
+  display: inline-flex; align-items: center; margin-left: 0;
+  padding: 3px 8px; border-radius: 999px;
+  background: var(--mx-surface-2); color: var(--mx-muted);
+  border: 1px solid var(--mx-line);
+  font: 500 11.5px/1.2 var(--mx-mono); letter-spacing: 0;
+}
+html[data-theme] #dashboard .dash-section-note { margin: 4px 0 18px; }
+html[data-theme] #dashboard .dash-section > .dash-empty { margin: 8px 0 0; }
+
+/* Section tabs */
+html[data-theme] .ac-tabs { margin-bottom: 20px; max-width: 100%; }
+
+/* Filters bar */
+html[data-theme] .dash-filters {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 14px;
+  grid-template-columns: none; padding: 14px;
+  background: var(--mx-surface-2); box-shadow: none; margin: 0 0 18px;
+}
+html[data-theme] .dash-filters > label { flex: 1 1 200px; }
+html[data-theme] .dash-filters > label:first-child { flex: 2 1 260px; }
+html[data-theme] .dash-filters .dash-select,
+html[data-theme] .dash-filters .dash-search { background-color: var(--mx-surface); }
+html[data-theme] .ac-fgroup {
+  font: 500 10.5px var(--mx-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--mx-muted);
+}
+
+/* Segmented controls (year bar, group-by) */
+html[data-theme] .ac-seg {
+  gap: 4px; padding: 4px; border-radius: 12px;
+  background: var(--mx-surface); border: 1px solid var(--mx-line); box-shadow: var(--mx-shadow);
+}
+html[data-theme] .dash-filters .ac-seg { box-shadow: none; padding: 3px; }
+html[data-theme] .ac-seg-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px; padding: 8px 14px;
+  color: var(--mx-muted); font: 600 13px/1 var(--mx-font);
+  transition: background-color .15s, color .15s;
+}
+html[data-theme] .dash-filters .ac-seg-btn { padding: 7px 12px; font-size: 12.5px; }
+html[data-theme] .ac-seg-btn:hover { color: var(--mx-ink); background: var(--mx-surface-2); }
+html[data-theme] .ac-seg-btn.is-active { color: var(--mx-bg); background: var(--mx-ink); box-shadow: none; }
+html[data-theme] .ac-seg-btn small { font: 500 10.5px var(--mx-mono); padding: 2px 6px; }
+html[data-theme] .ac-yearbar { margin: 0 0 18px; }
+
+/* Help disclosure */
+html[data-theme] .ac-help {
+  margin: 0 0 20px; padding: 0 18px;
+  border: 1px solid var(--mx-line); border-radius: var(--mx-r);
+  background: var(--mx-surface); box-shadow: var(--mx-shadow);
+}
+html[data-theme] .ac-help summary {
+  display: flex; align-items: center; gap: 10px; padding: 14px 0;
+  list-style: none; font: 700 13.5px var(--mx-font); color: var(--mx-ink);
+}
+html[data-theme] .ac-help summary::-webkit-details-marker { display: none; }
+html[data-theme] .ac-help summary::before {
+  content: "?"; display: inline-grid; place-items: center; flex: none;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--mx-accent-soft); color: var(--mx-accent);
+  font: 700 12px/1 var(--mx-mono);
+}
+html[data-theme] .ac-help ul { margin: 0 0 16px; padding-left: 20px; font: 13px/1.75 var(--mx-font); color: var(--mx-ink-2); }
+html[data-theme] .ac-help li::marker { color: var(--mx-line-strong); }
+
+/* Toast */
+html[data-theme] .ac-toast {
+  top: 72px; z-index: 35; display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-radius: 12px;
+  border: 1px solid var(--mx-line); background: var(--mx-surface); color: var(--mx-ink);
+  box-shadow: var(--mx-shadow-lg); font: 600 13px/1.5 var(--mx-font);
+}
+html[data-theme] .ac-toast::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--mx-muted); }
+html[data-theme] .ac-toast.is-ok { color: var(--mx-ink); border-color: color-mix(in srgb, var(--mx-good) 35%, transparent); background: var(--mx-good-soft); }
+html[data-theme] .ac-toast.is-ok::before { background: var(--mx-good); }
+html[data-theme] .ac-toast.is-err { color: var(--mx-ink); border-color: color-mix(in srgb, var(--mx-low) 35%, transparent); background: var(--mx-low-soft); }
+html[data-theme] .ac-toast.is-err::before { background: var(--mx-low); }
+
+/* Badges and chips */
+html[data-theme] .ac-badge,
+html[data-theme] .ac-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: 999px; border: 1px solid var(--mx-line);
+  background: var(--mx-surface-2); color: var(--mx-ink-2);
+  font: 500 11px/1.2 var(--mx-mono); letter-spacing: .02em;
+}
+html[data-theme] .ac-badge { padding: 5px 10px; text-transform: uppercase; }
+html[data-theme] .ac-chip { padding: 6px 11px; }
+html[data-theme] .ac-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .55; }
+html[data-theme] .ac-badge.is-good, html[data-theme] .ac-chip.is-good { color: var(--mx-good); background: var(--mx-good-soft); border-color: transparent; }
+html[data-theme] .ac-badge.is-warn, html[data-theme] .ac-chip.is-warn { color: var(--mx-mid);  background: var(--mx-mid-soft);  border-color: transparent; }
+html[data-theme] .ac-badge.is-bad,  html[data-theme] .ac-chip.is-bad  { color: var(--mx-low);  background: var(--mx-low-soft);  border-color: transparent; }
+html[data-theme] .ac-badge.is-good::before, html[data-theme] .ac-badge.is-warn::before, html[data-theme] .ac-badge.is-bad::before { opacity: 1; }
+
+/* Cards */
+html[data-theme] .ac-card {
+  margin: 0 0 12px; padding: 18px 20px;
+  border: 1px solid var(--mx-line); border-radius: var(--mx-r);
+  background: var(--mx-surface); transition: border-color .15s;
+}
+html[data-theme] .ac-card:hover { border-color: var(--mx-line-strong); }
+html[data-theme] .ac-who b { font: 800 15px/1.3 var(--mx-font); letter-spacing: -.01em; color: var(--mx-ink); }
+html[data-theme] .ac-who span { margin-top: 4px; font: 400 11.5px var(--mx-mono); color: var(--mx-muted); }
+html[data-theme] .ac-fields { gap: 14px 22px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--mx-line); }
+html[data-theme] .ac-field dt { font: 500 10.5px var(--mx-mono); letter-spacing: .08em; color: var(--mx-muted); }
+html[data-theme] .ac-field dd { margin-top: 5px; font: 600 13.5px/1.45 var(--mx-font); color: var(--mx-ink); }
+html[data-theme] .ac-field dd small { font: 400 11.5px/1.5 var(--mx-mono); color: var(--mx-muted); }
+html[data-theme] .ac-note {
+  padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--mx-mid) 28%, transparent);
+  border-left: 3px solid var(--mx-mid); border-radius: 10px;
+  background: var(--mx-mid-soft); color: var(--mx-ink-2); font: 13px/1.6 var(--mx-font);
+}
+
+/* Buttons */
+html[data-theme] .ac-actions { gap: 8px; margin-top: 16px; }
+html[data-theme] .ac-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 34px; padding: 0 14px; border-radius: 9px;
+  border: 1px solid var(--mx-line-strong); background: var(--mx-surface); color: var(--mx-ink-2);
+  font: 600 12.5px/1 var(--mx-font); white-space: nowrap; cursor: pointer;
+  transition: background-color .15s, border-color .15s, color .15s, filter .15s;
+}
+html[data-theme] .ac-btn:hover { border-color: var(--mx-ink); color: var(--mx-ink); background: var(--mx-surface-2); }
+html[data-theme] .ac-btn.primary,
+html[data-theme] .ac-btn.primary:hover { color: var(--mx-bg); background: var(--mx-ink); border-color: var(--mx-ink); }
+html[data-theme] .ac-btn.primary:hover { filter: brightness(1.15); }
+html[data-theme] .ac-btn.danger { color: var(--mx-low); border-color: color-mix(in srgb, var(--mx-low) 40%, var(--mx-line)); background: transparent; }
+html[data-theme] .ac-btn.danger:hover { background: var(--mx-low-soft); border-color: var(--mx-low); }
+html[data-theme] .ac-btn.danger.solid,
+html[data-theme] .ac-btn.danger.solid:hover { color: #fff; background: var(--mx-low); border-color: var(--mx-low); }
+html[data-theme="dark"] .ac-btn.danger.solid,
+html[data-theme="dark"] .ac-btn.danger.solid:hover { color: var(--mx-bg); }
+html[data-theme] .ac-btn[disabled],
+html[data-theme] .ac-btn[disabled]:hover { opacity: .5; cursor: not-allowed; filter: none; }
+html[data-theme] .ac-line-actions .ac-btn { min-height: 30px; padding: 0 11px; font-size: 12px; }
+
+/* Inline panels and form controls */
+html[data-theme] .ac-panel {
+  margin-top: 16px; padding: 16px 18px;
+  border: 1px solid var(--mx-line); border-radius: 12px; background: var(--mx-surface-2);
+}
+html[data-theme] .ac-panel > p { font: 13px/1.65 var(--mx-font); color: var(--mx-ink-2); }
+html[data-theme] .ac-row label,
+html[data-theme] .ac-form-row label,
+html[data-theme] .ac-pickwrap,
+html[data-theme] .ac-mh {
+  font: 500 10.5px var(--mx-mono); letter-spacing: .08em; color: var(--mx-muted);
+}
+html[data-theme] .ac-input {
+  min-height: 38px; padding: 8px 12px; box-sizing: border-box;
+  border: 1px solid var(--mx-line); border-radius: 10px;
+  background: var(--mx-surface); color: var(--mx-ink);
+  font: 500 13.5px/1.35 var(--mx-font);
+  transition: border-color .15s, box-shadow .15s;
+}
+html[data-theme] .ac-input:hover { border-color: var(--mx-line-strong); }
+html[data-theme] .ac-input:focus { outline: none; border-color: var(--mx-accent); box-shadow: 0 0 0 3px var(--mx-accent-soft); }
+html[data-theme] .ac-input::placeholder { color: var(--mx-muted); opacity: .8; }
+html[data-theme] .ac-radio { padding: 10px 12px; margin: 6px 0; border: 1px solid var(--mx-line); border-radius: 10px; background: var(--mx-surface); font: 600 13.5px/1.4 var(--mx-font); transition: border-color .15s, background-color .15s; }
+html[data-theme] .ac-radio:hover { border-color: var(--mx-line-strong); }
+html[data-theme] .ac-radio:has(input:checked) { border-color: var(--mx-accent); background: var(--mx-accent-soft); }
+html[data-theme] .ac-radio small { font: 400 11.5px var(--mx-mono); color: var(--mx-muted); }
+html[data-theme] .ac-check { font: 500 13px/1.5 var(--mx-font); color: var(--mx-ink-2); }
+html[data-theme] .ac-check input, html[data-theme] .ac-pickitem input { accent-color: var(--mx-accent); }
+html[data-theme] .ac-preview {
+  padding: 11px 14px; border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--mx-accent) 25%, transparent);
+  background: var(--mx-accent-soft); color: var(--mx-ink); font: 600 13px/1.55 var(--mx-font);
+}
+html[data-theme] .ac-hint { font: 13px/1.5 var(--mx-font); color: var(--mx-muted); }
+
+/* Multi-select picker */
+html[data-theme] .ac-pick > summary.ac-input { display: flex; align-items: center; justify-content: space-between; }
+html[data-theme] .ac-pick > summary::after { float: none; color: var(--mx-muted); font-size: 11px; }
+html[data-theme] .ac-pickpanel {
+  padding: 12px; border: 1px solid var(--mx-line); border-radius: 12px;
+  background: var(--mx-surface); box-shadow: var(--mx-shadow-lg);
+}
+html[data-theme] .ac-picktools span { font: 500 11px var(--mx-mono); color: var(--mx-muted); }
+html[data-theme] .ac-picklist { border-top: 1px solid var(--mx-line); scrollbar-width: thin; }
+html[data-theme] .ac-pickitem { padding: 9px 6px; border-radius: 6px; border-bottom: 1px solid var(--mx-line); font: 600 13px/1.35 var(--mx-font); transition: background-color .12s; }
+html[data-theme] .ac-pickitem:hover { background: var(--mx-surface-2); }
+html[data-theme] .ac-pickitem small { font: 400 11px var(--mx-mono); color: var(--mx-muted); }
+
+/* Group headers */
+html[data-theme] .ac-group-h {
+  margin: 26px 0 10px; padding: 10px 14px; border-radius: 10px;
+  background: var(--mx-accent-soft); color: var(--mx-accent); font: 800 13.5px var(--mx-font);
+}
+html[data-theme] .ac-group-h:first-of-type { margin-top: 8px; }
+html[data-theme] .ac-sec-h {
+  margin: 28px 0 12px; padding: 11px 16px; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--sc) 22%, var(--mx-line));
+  border-left: 4px solid var(--sc);
+  background: color-mix(in srgb, var(--sc) 8%, var(--mx-surface));
+  font: 800 14.5px var(--mx-font); letter-spacing: -.01em; color: var(--mx-ink);
+}
+html[data-theme] .ac-sec-h:first-of-type { margin-top: 8px; }
+html[data-theme] .ac-sec-h em { font: 400 11.5px var(--mx-mono); font-style: normal; color: var(--mx-muted); }
+html[data-theme] .ac-sec-h .ac-count, html[data-theme] .ac-group-h .ac-count { margin-left: auto; }
+html[data-theme] .ac-gives { font: 600 13.5px/1.75 var(--mx-font); color: var(--mx-ink-2); }
+
+/* Collapsible groups */
+html[data-theme] .ac-grp {
+  margin: 0 0 10px; border: 1px solid var(--mx-line); border-radius: var(--mx-r);
+  background: var(--mx-surface); transition: border-color .15s;
+}
+html[data-theme] .ac-grp:hover { border-color: var(--mx-line-strong); }
+html[data-theme] .ac-grp > summary { padding: 14px 18px; transition: background-color .12s; }
+html[data-theme] .ac-grp > summary:hover { background: var(--mx-surface-2); }
+html[data-theme] .ac-grp[open] > summary { border-bottom: 1px solid var(--mx-line); background: var(--mx-surface-2); }
+html[data-theme] .ac-grp-caret {
+  display: inline-grid; place-items: center; flex: none;
+  width: 26px; height: 26px; border-radius: 7px;
+  border: 1px solid var(--mx-line); background: var(--mx-surface);
+  color: var(--mx-muted); font-size: 10px;
+}
+html[data-theme] .ac-grp-title b { font: 800 14.5px/1.3 var(--mx-font); letter-spacing: -.01em; color: var(--mx-ink); }
+html[data-theme] .ac-grp-title small { margin-top: 3px; font: 400 11.5px var(--mx-mono); color: var(--mx-muted); }
+html[data-theme] .ac-grp-meta { font: 500 11.5px/1.55 var(--mx-mono); color: var(--mx-muted); }
+html[data-theme] .ac-grp-meta b { color: var(--mx-ink); font-weight: 600; }
+
+/* Row lists */
+html[data-theme] .ac-lines { border: 1px solid var(--mx-line); border-radius: 12px; background: var(--mx-surface); }
+html[data-theme] .ac-grp .ac-lines { border: 0; border-radius: 0 0 var(--mx-r) var(--mx-r); margin: 0; }
+html[data-theme] .ac-lines-head {
+  padding: 9px 18px; background: var(--mx-surface-2); border-bottom: 1px solid var(--mx-line);
+  font: 500 10.5px var(--mx-mono); letter-spacing: .08em; color: var(--mx-muted);
+}
+html[data-theme] .ac-line { padding: 14px 18px; transition: background-color .12s; }
+html[data-theme] .ac-item { border-bottom: 1px solid var(--mx-line); }
+html[data-theme] .ac-item:last-child { border-bottom: 0; }
+html[data-theme] .ac-item:hover > .ac-line { background: var(--mx-surface-2); }
+html[data-theme] .ac-cell b { font: 700 13.5px/1.4 var(--mx-font); color: var(--mx-ink); }
+html[data-theme] .ac-cell small { margin-top: 3px; font: 400 11.5px/1.45 var(--mx-mono); color: var(--mx-muted); }
+html[data-theme] .ac-line .ac-who b { font: 800 14.5px/1.35 var(--mx-font); }
+html[data-theme] .ac-item > .ac-panel, html[data-theme] .ac-item > .ac-note { margin: 0 18px 16px; }
+html[data-theme] .ac-lines-headonly { border-radius: 10px; }
+html[data-theme] .ac-tools { gap: 8px; margin: 0 0 10px; }
+
+/* Members */
+html[data-theme] .ac-members { gap: 6px; margin-top: 10px; }
+html[data-theme] .ac-member {
+  padding: 5px 11px; border: 1px solid var(--mx-line); border-radius: 999px;
+  background: var(--mx-surface-2); color: var(--mx-ink); font: 600 12.5px var(--mx-font);
+}
+html[data-theme] .ac-member small { font: 400 10.5px var(--mx-mono); color: var(--mx-muted); }
+
+/* Chapters, nested quiz rows, coverage */
+html[data-theme] .ac-ch { margin: 24px 0 10px; padding: 0 2px 8px; border-bottom: 1px solid var(--mx-line-strong); }
+html[data-theme] .ac-ch b { font: 800 15.5px var(--mx-font); letter-spacing: -.02em; color: var(--mx-ink); }
+html[data-theme] .ac-ch span { font: 500 11.5px var(--mx-mono); color: var(--mx-muted); }
+html[data-theme] .ac-subrow {
+  margin: 12px 0 0 12px; padding: 10px 14px;
+  border: 1px solid var(--mx-line); border-left: 3px solid var(--mx-accent);
+  border-radius: 0 10px 10px 0; background: var(--mx-surface-2);
+}
+html[data-theme] .ac-subtag { font: 500 10.5px var(--mx-mono); letter-spacing: .08em; color: var(--mx-accent); }
+html[data-theme] .ac-subtxt { font: 600 13.5px var(--mx-font); color: var(--mx-ink); }
+html[data-theme] .ac-cov { padding: 8px 18px 16px; }
+html[data-theme] .ac-cov summary { font: 700 13.5px var(--mx-font); color: var(--mx-ink); }
+html[data-theme] .ac-cl { padding: 9px 6px; border-bottom: 1px solid var(--mx-line); font: 600 13.5px var(--mx-font); color: var(--mx-ink); }
+html[data-theme] .ac-cl.is-no { color: var(--mx-muted); }
+html[data-theme] .ac-cl small { font: 500 11.5px var(--mx-mono); color: var(--mx-muted); }
+html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px solid var(--mx-line-strong); font: 500 12.5px var(--mx-font); color: var(--mx-muted); }
+
+@media (max-width: 640px) {
+  html[data-theme] #dashboard .dash-section { padding: 16px; }
+  html[data-theme] .ac-card { padding: 16px; }
+  html[data-theme] .ac-line { padding: 12px 14px; }
+  html[data-theme] .ac-grp > summary { padding: 12px 14px; }
+  html[data-theme] .ac-item > .ac-panel, html[data-theme] .ac-item > .ac-note { margin: 0 14px 14px; }
+  html[data-theme] .ac-line > .ac-cell[data-label]::before { font: 500 10px var(--mx-mono); letter-spacing: .08em; }
+  html[data-theme] .ac-toast { top: 112px; }
+  html[data-theme] .ac-seg { width: 100%; box-sizing: border-box; }
+  html[data-theme] .ac-seg-btn { flex: 1; padding: 8px 6px; }
+}
+</style>
 </head>
 <body>
 
@@ -1085,850 +1983,4 @@
     var yes = [], no = [];
     allLessonsList(d).forEach(function (l) {
       var ok = mine.some(function (a) { return covers(a, l.lesson); }), y = yearOf(l.lesson);
-      if (ok) yes.push(l); else if (y && (!yr || y === yr)) no.push(l);
-    });
-    function block(title, list, granted) {
-      var kids = [];
-      byChapter(list, function (l) { return l.lesson; }).forEach(function (ch) {
-        kids.push(chapterHead(ch.title, countLabel(ch.items.length, "lesson", "lessons")));
-        ch.items.forEach(function (l) {
-          kids.push(el("div", { class: "ac-cl" + (granted ? "" : " is-no") }, [lessonShort(l.lesson), el("small", {}, [yearOf(l.lesson)])]));
-          if (granted) { var q = quizBy[l.lesson]; kids.push(el("div", { class: "ac-cq" }, ["Quiz \u00b7 " + (q ? (q.locked ? "locked" : "open") : "no gate")])); }
-        });
-      });
-      var det = el("details", {}, [el("summary", {}, [title + "  \u00b7  " + list.length])].concat(kids.length ? kids : [el("p", { class: "ac-hint" }, ["None."])]));
-      if (granted) det.setAttribute("open", "");
-      return det;
-    }
-    var terms = mine.filter(function (a) { var s = subScope(a.scope); return s && s.kind === "t"; });
-    return el("div", { class: "ac-cov" }, [block("Granted", yes, true), block("Not granted", no, false)]
-      .concat(terms.length ? [el("p", { class: "ac-hint" }, ["Also has " + terms.map(function (a) { return scopeInfo(a.scope).title; }).join(", ") + " \u2014 which lessons that covers is decided by the server, so it isn't counted above."])] : []));
-  }
-
-  function accessPanel(d) {
-    var f = STATE.filters.access;
-    var mode = STATE.view.access;
-    var base = d.access.filter(function (a) {
-      var ok = f.status === "all" ||
-        (f.status === "active" && a.state === "active") ||
-        (f.status === "ending" && a.state === "active" && a.days_left !== null && a.days_left <= 7) ||
-        (f.status === "expired" && a.state === "expired") ||
-        (f.status === "problem" && (a.state === "cancelled" || a.state === "invalid"));
-      return ok && matches(f.q, [a.name, a.phone, a.scope, a.payment_id, a.source]);
-    });
-    var counts = yearCounts(base, function (flt, a) { return sectionPass(d, flt, a.scope); });
-    var list = base.filter(function (a) { return sectionPass(d, STATE.year, a.scope); });
-
-    var wrap = el("div", {});
-    wrap.appendChild(yearBar(counts));
-    var groupBy = el("div", { class: "ac-fgroup" }, ["Group by", segmented([["lesson", "Lesson"], ["person", "Person"]], mode, function (v) { STATE.view.access = v; STATE.open = null; render(); }, "data-view", "Group by")]);
-    wrap.appendChild(filtersNode("access", [["active", "Active now"], ["ending", "Ending within 7 days"], ["expired", "Expired"], ["problem", "Cancelled / needs fixing"], ["all", "Everything"]], "Name, phone or lesson", groupBy));
-
-    var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, [mode === "person" ? "Each student and what they can watch" : "Each lesson and who can watch it", el("span", { class: "ac-count" }, [String(list.length) + " of " + d.access.length])]),
-      el("p", { class: "dash-section-note" }, ["Split by year, then grouped by " + (mode === "person" ? "student" : "lesson") + ". Click a group to fold it."]),
-    ]);
-    if (!list.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, [d.access.length ? "Nothing matches this filter." : "Nobody has been given access yet."]));
-      wrap.appendChild(section);
-      return wrap;
-    }
-    var keys = [], body = [], seenP = {};
-    bySection(list, function (a) { return sectionOf(a.scope); }).forEach(function (sec) {
-      var groups = groupAccessRows(sec.items, mode);
-      body.push(sectionHead(sec.name, (mode === "person" ? countLabel(groups.length, "student", "students") + "  \u00b7  " : "") + countLabel(sec.items.length, "grant", "grants")));
-      body.push(el("div", { class: "ac-lines is-access ac-lines-headonly" }, [linesHead([mode === "person" ? "Lesson" : "Student", "Status", "Until", "How", ""])]));
-      groups.forEach(function (g) {
-        var hasOpen = !!STATE.open && g.rows.some(function (a) { return STATE.open.indexOf("acc:" + a.phone + "|" + a.scope + ":") === 0; });
-        var lines = el("div", { class: "ac-lines is-access" }, g.rows.map(function (a) { return accessRow(d, a, mode); }));
-        var kids = [lines];
-        if (mode === "person" && !seenP[keyOf(g.sample.phone)]) { seenP[keyOf(g.sample.phone)] = 1; kids.push(coverageBlock(d, g.sample)); }
-        body.push(collapsible("acc:" + mode + ":" + sec.name + ":" + g.gk, accessGroupHead(d, g, mode), kids, hasOpen, keys));
-      });
-    });
-    if (keys.length > 1) section.appendChild(expandTools(keys));
-    body.forEach(function (n) { section.appendChild(n); });
-    wrap.appendChild(section);
-    return wrap;
-  }
-
-  // ---- HISTORY ----------------------------------------------------------------------------------------
-
-  function historyRow(d, p) {
-    var si = scopeInfo(p.scope), key = "pay:" + p.payment_id;
-    var accessText = null, accessSub = "";
-    if (p.status === "approved" || p.status === "revoked" || p.access_state) {
-      if (p.access_until) { accessText = p.access_until === "never" ? "Never expires" : "until " + p.access_until; accessSub = p.access_state === "active" ? "currently active" : p.access_state === "expired" ? "expired" : p.access_state; }
-      else accessText = p.status === "revoked" ? "Access removed" : "No access row found";
-    }
-    var asked = el("div", { class: "ac-who" }, [
-      el("b", {}, [si.title]),
-      el("span", {}, ["ref " + dash(p.reference) + (p.note ? "  \u00b7  " + (subScope(p.scope) ? "amount " : "") + p.note : "") + "  \u00b7  #" + p.payment_id]),
-    ]);
-    var item = el("div", { class: "ac-item", "data-history": p.payment_id });
-    var actions = el("div", { class: "ac-line-actions" }, []);
-    var canRevoke = p.status === "approved" && p.access_state === "active";
-    if (canRevoke) {
-      var rv = el("button", { class: "ac-btn danger", type: "button", "data-open": "revoke-pay" }, ["Revoke\u2026"]);
-      rv.addEventListener("click", function () { openPanel(key + ":revoke"); });
-      actions.appendChild(rv);
-    }
-    item.appendChild(el("div", { class: "ac-line" }, [
-      el("div", { class: "ac-cell ac-cell-main" }, [whoBlock(p.name, p.phone, p.known_student)]),
-      el("div", { class: "ac-cell" }, [asked]),
-      el("div", { class: "ac-cell ac-cell-badge" }, [badge(payBadge(p.status))]),
-      lineCell("Timeline", "Asked " + dash(p.created_at), p.status === "pending" ? "not decided yet" : "decided " + dash(p.decided_at)),
-      accessText ? lineCell("Access it gave", accessText, accessSub) : lineCell("Access it gave", "\u2014", ""),
-      actions,
-    ]));
-    if (canRevoke && STATE.open === key + ":revoke") {
-      var yes = el("button", { class: "ac-btn danger solid", type: "button", "data-do": "revoke" }, ["Yes, revoke access"]);
-      yes.addEventListener("click", function () {
-        yes.disabled = true;
-        run({ action: "admin_revoke_access", payment_id: p.payment_id }, "Revoked the access from payment " + p.payment_id + " (" + (p.name || p.phone) + ").", yes);
-      });
-      item.appendChild(el("div", { class: "ac-panel", "data-panel": "revoke" }, [
-        el("p", {}, [el("b", {}, ["Revoke the access this payment gave?"]), " " + (p.name || p.phone) + " loses it on their next page load. The request stays here, marked revoked."]),
-        el("div", { class: "ac-actions" }, [yes, cancelBtn()]),
-      ]));
-    } else if (p.status === "pending") {
-      item.appendChild(el("div", { class: "ac-note" }, ["Waiting for you \u2014 decide it under Requests."]));
-    }
-    return item;
-  }
-
-  function historyPanel(d) {
-    var f = STATE.filters.history;
-    var base = d.payments.filter(function (p) {
-      return (f.status === "all" || p.status === f.status) && matches(f.q, [p.name, p.phone, p.reference, p.scope, p.payment_id, p.note]);
-    });
-    var counts = yearCounts(base, function (flt, p) { return sectionPass(d, flt, p.scope); });
-    var list = base.filter(function (p) { return sectionPass(d, STATE.year, p.scope); });
-    var wrap = el("div", {});
-    wrap.appendChild(yearBar(counts));
-    wrap.appendChild(filtersNode("history", [["all", "All requests"], ["pending", "Waiting"], ["approved", "Approved"], ["rejected", "Rejected"], ["revoked", "Revoked"]], "Name, phone, reference or lesson"));
-    var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, ["Every payment request", el("span", { class: "ac-count" }, [String(list.length) + " of " + d.payments.length])]),
-      el("p", { class: "dash-section-note" }, ["The full record, split by year: who asked, what they wrote, what you decided and when. Newest first."]),
-    ]);
-    if (!list.length) section.appendChild(el("div", { class: "dash-empty" }, [d.payments.length ? "Nothing matches this filter." : "No payment requests yet."]));
-    bySection(list, function (p) { return sectionOf(p.scope); }).forEach(function (sec) {
-      section.appendChild(sectionHead(sec.name, countLabel(sec.items.length, "request", "requests")));
-      section.appendChild(el("div", { class: "ac-lines is-history" }, [linesHead(["Student", "Asked for", "Status", "Timeline", "Access it gave", ""])]
-        .concat(sec.items.map(function (p) { return historyRow(d, p); }))));
-    });
-    wrap.appendChild(section);
-    return wrap;
-  }
-
-  // ---- QUIZ GATE --------------------------------------------------------------------------------------
-
-  function quizLockPanel(lesson, isNew) {
-    var box = el("div", { class: "ac-panel", "data-panel": "quiz-lock" });
-    var note = isNew
-      ? "This lesson has no quiz gate yet. Adding one starts it LOCKED \u2014 open it yourself right before the test."
-      : "Locking stops new submissions at once (a page already open can't sneak one through). Unlocking lets students in immediately.";
-    var goLock = el("button", { class: "ac-btn danger solid", type: "button" }, [isNew ? "Add gate, start locked" : "Lock it"]);
-    var goOpen = el("button", { class: "ac-btn primary", type: "button" }, [isNew ? "Add gate, start open" : "Open it"]);
-    function fire(locked, btn) {
-      btn.disabled = true;
-      run({ action: "admin_set_quiz_lock", lesson: lesson, locked: locked },
-        pretty(lesson) + "'s quiz is now " + (locked ? "locked." : "open."), btn);
-    }
-    goLock.addEventListener("click", function () { fire(true, goLock); });
-    goOpen.addEventListener("click", function () { fire(false, goOpen); });
-    box.appendChild(el("p", {}, [note]));
-    box.appendChild(el("div", { class: "ac-actions" }, isNew ? [goOpen, goLock, cancelBtn()] : [goLock, goOpen, cancelBtn()]));
-    return box;
-  }
-
-  function quizAddForm(d) {
-    var already = {};
-    d.quizzes.forEach(function (q) { already[q.lesson] = 1; });
-    var all = allLessonsList(d).filter(function (l) { return !already[l.lesson]; });
-    var tracks = allTracksList(d);
-    var f = STATE.filters.quizAdd;
-
-    var trackSel = el("select", { class: "ac-input", "aria-label": "Filter by track" },
-      [el("option", { value: "" }, ["All tracks"])].concat(tracks.map(function (t) { return el("option", { value: t }, [pretty(t)]); })));
-    trackSel.value = f.track;
-    var search = el("input", { class: "ac-input", type: "text", placeholder: "Filter by name or path\u2026", "aria-label": "Filter lessons", "data-search": "quizAdd" });
-    search.value = f.q;
-
-    var yearSel = lessonYearSelect(f.year);
-    var visible = all.filter(function (l) {
-      if (f.track && l.track !== f.track) return false;
-      if (!yearPass(f.year, l.lesson)) return false;
-      if (f.q && l.lesson.indexOf(f.q.toLowerCase()) === -1) return false;
-      return true;
-    });
-    var sel = el("select", { class: "ac-input", id: "qz-lesson-sel" }, [el("option", { value: "" }, [visible.length ? "Choose a lesson\u2026" : "No lessons match this filter"])]
-      .concat(lessonOptionGroups(visible))
-      .concat([el("option", { value: "__custom" }, ["Type a path\u2026"])]));
-    var custom = el("input", { class: "ac-input", type: "text", placeholder: "programming/other/some-lesson", hidden: "" });
-    var go = el("button", { class: "ac-btn primary", type: "button" }, ["Gate this quiz\u2026"]);
-    function value() { return sel.value === "__custom" ? custom.value.trim() : sel.value; }
-    trackSel.addEventListener("change", function () { f.track = trackSel.value; render(); });
-    yearSel.addEventListener("change", function () { f.year = yearSel.value; render(); });
-    search.addEventListener("input", function () {
-      f.q = search.value;
-      var pos = search.selectionStart;
-      render();
-      var again = document.querySelector('[data-search="quizAdd"]');
-      if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
-    });
-    sel.addEventListener("change", function () { custom.hidden = sel.value !== "__custom"; go.disabled = !value(); });
-    custom.addEventListener("input", function () { go.disabled = !value(); });
-    go.disabled = true;
-    go.addEventListener("click", function () { openPanel("qz:" + value() + ":new"); });
-
-    var note = d.lessons_error
-      ? "Couldn't read the full lesson list from GitHub (" + d.lessons_error + ") \u2014 showing only lessons already known here. You can still type a path."
-      : "A lesson with no gate behaves as it always has \u2014 open. Add one to control it.";
-    return el("div", { class: "dash-section" }, [
-      el("h2", {}, ["Gate another quiz"]),
-      el("p", { class: "dash-section-note" }, [note]),
-      el("div", { class: "ac-row" }, [el("label", {}, ["Track", trackSel]), el("label", {}, ["Year", yearSel]), el("label", {}, ["Search", search])]),
-      el("div", { class: "ac-row" }, [el("label", {}, ["Lesson", sel, custom]), go]),
-      STATE.open && STATE.open.slice(0, 3) === "qz:" && STATE.open.slice(-4) === ":new" ? quizLockPanel(STATE.open.slice(3, -4), true) : null,
-    ]);
-  }
-
-  function quizRow(q) {
-    var key = "qz:" + q.lesson;
-    var item = el("div", { class: "ac-item", "data-quiz": q.lesson });
-    var toggle = el("button", { class: "ac-btn " + (q.locked ? "primary" : "danger"), type: "button" }, [q.locked ? "Open it\u2026" : "Lock it\u2026"]);
-    toggle.addEventListener("click", function () { openPanel(key); });
-    item.appendChild(el("div", { class: "ac-line" }, [
-      el("div", { class: "ac-cell ac-cell-main" }, [el("div", { class: "ac-who" }, [el("b", {}, [pretty(q.lesson)]), el("span", {}, [q.lesson])])]),
-      el("div", { class: "ac-cell ac-cell-badge" }, [badge(q.locked ? { text: "Locked", cls: "is-good" } : { text: "Open", cls: "is-warn" })]),
-      lineCell("Last changed", dash(q.updated_at), ""),
-      el("div", { class: "ac-line-actions" }, [toggle]),
-    ]));
-    if (STATE.open === key) item.appendChild(quizLockPanel(q.lesson, false));
-    return item;
-  }
-
-  function quizzesPanel(d) {
-    var counts = yearCounts(d.quizzes, function (flt, q) { return yearPass(flt, q.lesson); });
-    var shown = d.quizzes.filter(function (q) { return yearPass(STATE.year, q.lesson); })
-      .sort(function (a, b) { return cmpLessons(a.lesson, b.lesson); });
-    var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, ["Quiz gate", el("span", { class: "ac-count" }, [String(d.counts.quizzes_locked) + " locked of " + d.quizzes.length])]),
-      el("p", { class: "dash-section-note" }, ["Separate from the video lock \u2014 this controls whether the QUIZ ITSELF can be opened and submitted. Most useful right at test time."]),
-    ]);
-    if (!d.quizzes.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, ["No quiz has been gated yet. Every quiz is open by default \u2014 add a gate below only for the ones you want to control."]));
-    } else if (!shown.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, ["No gated quizzes for this year."]));
-    }
-    bySection(shown, function (q) { return sectionOf(q.lesson); }).forEach(function (sec) {
-      var locked = sec.items.filter(function (q) { return q.locked; }).length;
-      section.appendChild(sectionHead(sec.name, locked + " locked of " + sec.items.length));
-      section.appendChild(el("div", { class: "ac-lines is-quiz" }, [linesHead(["Quiz", "Gate", "Last changed", ""])].concat(sec.items.map(quizRow))));
-    });
-    return el("div", {}, [yearBar(counts), section, quizAddForm(d)]);
-  }
-
-  // ---- GROUPS -------------------------------------------------------------------------------------------
-
-  function groupApplyPanel(d, g, mode) {
-    var isQuiz = mode === "quiz-grant" || mode === "quiz-revoke";
-    var isGrant = mode === "grant" || mode === "quiz-grant";
-
-    // Year filter narrows the dropdown in place, so the duration etc. the teacher already set survives.
-    var gy = STATE.filters.groupScope;
-    // Quiz gate is per-lesson only (no folder/site-wide wildcard) \u2014 mirrors the Quizzes sheet.
-    var scopeOpts = { lessonsOnly: isQuiz, placeholder: isQuiz ? "Choose a lesson\u2026" : "Choose\u2026" };
-    var scopeSel = el("select", { class: "ac-input" }, scopeOptionNodes(d, gy.year, scopeOpts));
-    var yearSel = lessonYearSelect(gy.year);
-    yearSel.addEventListener("change", function () {
-      gy.year = yearSel.value;
-      refillSelect(scopeSel, scopeOptionNodes(d, gy.year, scopeOpts));
-      update();
-    });
-    var preview = el("div", { class: "ac-preview" });
-    var go, term;
-    function describeWhat(scope) { return isQuiz ? "the \u201c" + pretty(scope) + "\u201d quiz" : scopeInfo(scope).title; }
-    function update() {
-      if (isGrant) {
-        var t = term.term();
-        preview.textContent = scopeSel.value ? "Every member of \u201c" + g.group + "\u201d (" + g.members.length + ") will be able to " + (isQuiz ? "open and submit " + describeWhat(scopeSel.value) + " even while it's locked for everyone else, " : "watch " + describeWhat(scopeSel.value) + " ") + term.describe(d.today, "") + "." : "Choose what this unlocks.";
-        go.disabled = !(scopeSel.value && t);
-      } else {
-        preview.textContent = scopeSel.value ? "Removes " + (isQuiz ? "the early-access override for " : "access to ") + describeWhat(scopeSel.value) + " from every member of \u201c" + g.group + "\u201d (only members who currently have it)." : "Choose what to take away.";
-        go.disabled = !scopeSel.value;
-      }
-    }
-    scopeSel.addEventListener("change", update);
-    if (isGrant) {
-      term = termControls("gap-" + g.group, update, "30");
-      go = el("button", { class: "ac-btn primary", type: "button" }, [isQuiz ? "Give the group quiz access" : "Give the group access"]);
-      go.addEventListener("click", function () {
-        var t = term.term();
-        go.disabled = true;
-        var action = isQuiz ? "admin_group_grant_quiz_access" : "admin_group_grant_access";
-        var payload = isQuiz ? { action: action, group: g.group, lesson: scopeSel.value } : { action: action, group: g.group, scope: scopeSel.value };
-        run(Object.assign(payload, t),
-          function (r) { return "Gave " + r.count + " " + (r.count === 1 ? "member" : "members") + " of \u201c" + g.group + "\u201d " + (isQuiz ? "quiz access to " + describeWhat(r.lesson) : "access to " + scopeInfo(r.scope).title) + (r.expires_at ? " until " + r.expires_at : ", no end date") + "."; }, go);
-      });
-    } else {
-      go = el("button", { class: "ac-btn danger solid", type: "button" }, ["Revoke from the whole group"]);
-      go.addEventListener("click", function () {
-        go.disabled = true;
-        var action = isQuiz ? "admin_group_revoke_quiz_access" : "admin_group_revoke_access";
-        var payload = isQuiz ? { action: action, group: g.group, lesson: scopeSel.value } : { action: action, group: g.group, scope: scopeSel.value };
-        run(payload,
-          function (r) { return "Removed " + (isQuiz ? "quiz access to " + describeWhat(r.lesson) : "access to " + scopeInfo(r.scope).title) + " from " + r.removed_students + " " + (r.removed_students === 1 ? "member" : "members") + " of \u201c" + g.group + "\u201d."; }, go);
-      });
-    }
-    update();
-    return el("div", { class: "ac-panel" }, [
-      el("p", {}, [el("b", {}, [isGrant ? "Give the whole group " + (isQuiz ? "quiz access." : "access.") : "Revoke the whole group's " + (isQuiz ? "quiz access." : "access.")]), isGrant ? " Applies to every current member, and to anyone you add to the group later (ending on the same date)." : " A member who doesn't have this is simply skipped. Students added later won\u2019t get it either."]),
-      el("div", { class: "ac-row" }, [el("label", {}, ["Year", yearSel]), el("label", {}, [isQuiz ? "Which quiz" : "What", scopeSel])]),
-      isGrant ? term.node : null, preview,
-      el("div", { class: "ac-actions" }, [go, cancelBtn()]),
-    ]);
-  }
-
-  // A dropdown checklist of students: search, tick any number, "select all shown".
-  // options: [{ phone, name, sub }]. Selection lives in the closure, so typing in the
-  // search box never loses ticks. onChange(count) fires on every change.
-  function studentPicker(options, opts) {
-    opts = opts || {};
-    var chosen = {};
-    var count = 0;
-    var summaryLabel = el("span", {}, [opts.placeholder || "Choose students\u2026"]);
-    var summary = el("summary", { class: "ac-input" }, [summaryLabel]);
-    var search = el("input", { class: "ac-input", type: "search", placeholder: "Search name, phone or year\u2026", "aria-label": "Search students" });
-    var counter = el("span", {}, ["0 selected"]);
-    var rows = options.map(function (o) {
-      var box = el("input", { type: "checkbox", value: o.phone });
-      var row = el("label", { class: "ac-pickitem", "data-q": ((o.name || "") + " " + o.phone + " " + (o.sub || "")).toLowerCase() },
-        [box, el("span", {}, [o.name || "No name", el("small", {}, [o.phone + (o.sub ? "  \u00b7  " + o.sub : "")])])]);
-      box.addEventListener("change", function () { if (box.checked) chosen[o.phone] = 1; else delete chosen[o.phone]; refresh(); });
-      return { row: row, box: box, phone: o.phone, year: o.year || "" };
-    });
-    function refresh() {
-      count = Object.keys(chosen).length;
-      counter.textContent = count + " selected";
-      summaryLabel.textContent = count ? plural(count, "student") + " selected" : (opts.placeholder || "Choose students\u2026");
-      if (opts.onChange) opts.onChange(count);
-    }
-    function shown() { return rows.filter(function (r) { return !r.row.hidden; }); }
-    // Year filter (Senior 1 / Senior 2 / ...), built from the years that actually occur in this list.
-    var yc = {}, noneCount = 0;
-    options.forEach(function (o) { if (o.year) yc[o.year] = (yc[o.year] || 0) + 1; else noneCount++; });
-    var yearKeys = Object.keys(yc).sort();
-    var yearSel = options.length && (yearKeys.length || noneCount)
-      ? el("select", { class: "ac-input", "aria-label": "Filter students by year", "data-roster-year": "" },
-          [el("option", { value: "" }, ["All years (" + options.length + ")"])]
-            .concat(yearKeys.map(function (y) { return el("option", { value: y }, [y + " (" + yc[y] + ")"]); }))
-            .concat(noneCount ? [el("option", { value: "__none__" }, ["No year set (" + noneCount + ")"])] : []))
-      : null;
-    function applyFilter() {
-      var q = search.value.trim().toLowerCase(), yf = yearSel ? yearSel.value : "";
-      rows.forEach(function (r) {
-        var hide = (q && r.row.getAttribute("data-q").indexOf(q) === -1) || (yf && (yf === "__none__" ? r.year : r.year !== yf));
-        r.row.hidden = !!hide;
-      });
-    }
-    search.addEventListener("input", applyFilter);
-    if (yearSel) yearSel.addEventListener("change", applyFilter);
-    var all = el("button", { class: "ac-btn", type: "button" }, ["Select all shown"]);
-    var none = el("button", { class: "ac-btn", type: "button" }, ["Clear"]);
-    all.addEventListener("click", function () { shown().forEach(function (r) { r.box.checked = true; chosen[r.phone] = 1; }); refresh(); });
-    none.addEventListener("click", function () { rows.forEach(function (r) { r.box.checked = false; }); chosen = {}; refresh(); });
-    var list = el("div", { class: "ac-picklist" }, rows.length ? rows.map(function (r) { return r.row; })
-      : [el("p", { class: "ac-hint" }, [opts.empty || "No students to show."])]);
-    var panel = el("div", { class: "ac-pickpanel" }, [search, yearSel, el("div", { class: "ac-picktools" }, [all, none, counter]), list]);
-    var box = el("details", { class: "ac-pick" }, [summary, panel]);
-    box.addEventListener("toggle", function () {
-      var sec = box.closest ? box.closest(".dash-section") : null;
-      if (sec) sec.classList.toggle("has-open-pick", box.open);
-    });
-    return {
-      node: box,
-      selected: function () { return Object.keys(chosen); },
-      reset: function () { rows.forEach(function (r) { r.box.checked = false; }); chosen = {}; refresh(); },
-    };
-  }
-
-  function rosterEmptyText(d, fallback) {
-    return d.roster === undefined
-      ? "The student list didn\u2019t come from the server. Paste the new Code.gs into Apps Script, deploy a New version, then reload this page."
-      : fallback;
-  }
-  function rosterOptions(d, exceptPhones) {
-    var skip = {};
-    (exceptPhones || []).forEach(function (p) { skip[keyOf(p)] = 1; });
-    return (d.roster || []).filter(function (r) { return !skip[keyOf(r.phone)]; })
-      .map(function (r) { return { phone: r.phone, name: r.name, sub: r.year, year: r.year || "" }; });
-  }
-  function keyOf(phone) { return String(phone || "").replace(/\D/g, "").slice(-10); }
-  // One remembered group grant -> words. g: { kind: "access"|"quiz", target, expires_at ("" = never) }
-  function grantText(g) {
-    var what = g.kind === "quiz" ? "Quiz: " + pretty(g.target) : scopeInfo(g.target).title;
-    return what + (g.expires_at ? " until " + g.expires_at : ", no end date");
-  }
-  function inheritedText(list) {
-    return list && list.length ? " They also got what the group already has: " + list.map(grantText).join("; ") + "." : "";
-  }
-  function yearForPhone(d, phone) {
-    var k = keyOf(phone);
-    var r = (d.roster || []).filter(function (x) { return keyOf(x.phone) === k; })[0];
-    return r ? (r.year || "") : "";
-  }
-
-  // Wide scopes first, then lessons in chapter/lesson order, each lesson's quiz right under its video access.
-  function sortGrants(list) {
-    var wide = function (x) { return isWide(x.target) || subScope(x.target) ? 0 : 1; };
-    return list.slice().sort(function (a, b) {
-      return wide(a) - wide(b) || (wide(a) ? cmpLessons(a.target, b.target) : (a.target < b.target ? -1 : a.target > b.target ? 1 : 0)) || (a.kind === b.kind ? 0 : a.kind === "quiz" ? 1 : -1);
-    });
-  }
-
-  function groupCard(d, g) {
-    var key = "grp:" + g.group;
-    var card = el("div", { class: "ac-card", "data-group": g.group }, [
-      el("div", { class: "ac-top" }, [el("div", { class: "ac-who" }, [el("b", {}, [g.group]), el("span", {}, [memberSummary(d, g)])])]),
-    ]);
-    card.appendChild(memberBlock(d, g));
-
-    // What this group gives. Anyone added to the group from now on gets all of it automatically.
-    var gives;
-    if (g.grants === undefined) {
-      gives = el("div", { class: "ac-note" }, ["This page can\u2019t see what the group gives yet. Paste the newest Code.gs into Apps Script and deploy a New version, then reload."]);
-    } else if (!g.grants.length) {
-      gives = el("div", { class: "ac-note" }, ["This group doesn\u2019t give anything to new members yet. Use \u201cGive this group access\u201d below; anyone you add afterwards gets it too."]);
-    } else {
-      gives = el("div", { class: "ac-panel", "data-group-gives": g.group }, [
-        el("p", {}, [el("b", {}, ["Anyone added to this group gets:"])]),
-        el("ul", { class: "ac-gives" }, sortGrants(g.grants).map(function (x) { return el("li", x.kind === "quiz" ? { style: "margin-left:18px;list-style:circle;font-weight:500" } : {}, [grantText(x)]); })),
-        el("p", {}, ["Each ends on the same date as the group\u2019s own. Removing a student from the group does not take away access they already have \u2014 revoke it under \u201cWho has access\u201d."]),
-      ]);
-    }
-    card.appendChild(gives);
-
-    // Add: pick from the roster (students not already in this group), or type a phone for someone without an account yet.
-    var addPick = studentPicker(rosterOptions(d, g.members.map(function (m) { return m.phone; })), {
-      placeholder: "Choose students to add\u2026", empty: rosterEmptyText(d, "Everyone in the roster is already in this group."),
-      onChange: function (n) { addBtn.disabled = !n && !phoneIn.value.trim(); addBtn.textContent = n ? "Add " + n : "Add"; },
-    });
-    var phoneIn = el("input", { class: "ac-input", type: "tel", placeholder: "or type a phone number", "aria-label": "Phone to add" });
-    var addBtn = el("button", { class: "ac-btn primary", type: "button" }, ["Add"]);
-    addBtn.disabled = true;
-    phoneIn.addEventListener("input", function () { addBtn.disabled = !addPick.selected().length && !phoneIn.value.trim(); });
-    addBtn.addEventListener("click", function () {
-      var phones = addPick.selected();
-      if (phoneIn.value.trim()) phones.push(phoneIn.value.trim());
-      if (!phones.length) return;
-      addBtn.disabled = true;
-      run({ action: "admin_group_add", group: g.group, phones: phones },
-        function (r) { return "Added " + plural(r.count, "student") + " to \u201c" + g.group + "\u201d" + (r.already.length ? " (" + r.already.length + " already in it)" : "") + "." + inheritedText(r.count ? r.inherited : null); }, addBtn);
-    });
-
-    // Remove: tick any number of current members.
-    var rmPick = studentPicker(g.members.map(function (m) {
-      var yr = yearForPhone(d, m.phone);
-      return { phone: m.phone, name: m.name || "Unknown", year: yr, sub: [yr, m.known_student === false ? "no account yet" : ""].filter(Boolean).join("  \u00b7  ") };
-    }), {
-      placeholder: "Choose members to remove\u2026", empty: "No members yet.",
-      onChange: function (n) { rmBtn.disabled = !n; rmBtn.textContent = n ? "Remove " + n : "Remove"; },
-    });
-    var rmBtn = el("button", { class: "ac-btn danger", type: "button" }, ["Remove"]);
-    rmBtn.disabled = true;
-    rmBtn.addEventListener("click", function () {
-      var phones = rmPick.selected();
-      if (!phones.length) return;
-      rmBtn.disabled = true;
-      run({ action: "admin_group_remove", group: g.group, phones: phones },
-        function (r) { return "Removed " + plural(r.removed, "student") + " from \u201c" + g.group + "\u201d."; }, rmBtn);
-    });
-
-    var grantBtn = el("button", { class: "ac-btn primary", type: "button" }, ["Give this group access\u2026"]);
-    var revokeBtn = el("button", { class: "ac-btn danger", type: "button" }, ["Revoke from this group\u2026"]);
-    var quizGrantBtn = el("button", { class: "ac-btn primary", type: "button" }, ["Give this group quiz access\u2026"]);
-    var quizRevokeBtn = el("button", { class: "ac-btn danger", type: "button" }, ["Revoke quiz access from this group\u2026"]);
-    grantBtn.addEventListener("click", function () { openPanel(key + ":grant"); });
-    revokeBtn.addEventListener("click", function () { openPanel(key + ":revoke"); });
-    quizGrantBtn.addEventListener("click", function () { openPanel(key + ":quiz-grant"); });
-    quizRevokeBtn.addEventListener("click", function () { openPanel(key + ":quiz-revoke"); });
-
-    card.appendChild(el("div", { class: "ac-row" }, [el("div", { class: "ac-pickwrap" }, ["Add students", addPick.node]), el("label", {}, ["\u00a0", phoneIn]), addBtn]));
-    if (g.members.length) card.appendChild(el("div", { class: "ac-row" }, [el("div", { class: "ac-pickwrap" }, ["Remove students", rmPick.node]), rmBtn]));
-    var openMode = STATE.open === key + ":grant" ? "grant" : STATE.open === key + ":revoke" ? "revoke"
-      : STATE.open === key + ":quiz-grant" ? "quiz-grant" : STATE.open === key + ":quiz-revoke" ? "quiz-revoke" : null;
-    if (openMode) card.appendChild(groupApplyPanel(d, g, openMode));
-    else card.appendChild(el("div", { class: "ac-actions" }, [grantBtn, revokeBtn, quizGrantBtn, quizRevokeBtn]));
-    return card;
-  }
-
-  function groupCreateForm(d) {
-    var name = el("input", { class: "ac-input", type: "text", placeholder: "e.g. Grade 2 \u2014 Section A", "aria-label": "New group name" });
-    var go = el("button", { class: "ac-btn primary", type: "button" }, ["Create group"]);
-    var phone = el("input", { class: "ac-input", type: "tel", placeholder: "or type a phone number", "aria-label": "Phone to add" });
-    function count() { return pick.selected().length + (phone.value.trim() ? 1 : 0); }
-    function sync() { var n = count(); go.disabled = !name.value.trim() || !n; go.textContent = n ? "Create group with " + n : "Create group"; }
-    var pick = studentPicker(rosterOptions(d), { placeholder: "Choose students\u2026", empty: rosterEmptyText(d, "No registered students yet."), onChange: sync });
-    name.addEventListener("input", sync);
-    phone.addEventListener("input", sync);
-    go.disabled = true;
-    go.addEventListener("click", function () {
-      var phones = pick.selected();
-      if (phone.value.trim()) phones.push(phone.value.trim());
-      if (!name.value.trim() || !phones.length) return;
-      go.disabled = true;
-      run({ action: "admin_group_add", group: name.value.trim(), phones: phones },
-        function (r) { return "Created \u201c" + r.group + "\u201d with " + plural(r.count, "student") + "." + inheritedText(r.count ? r.inherited : null); }, go);
-    });
-    return el("div", { class: "dash-section" }, [
-      el("h2", {}, ["New group"]),
-      el("p", { class: "dash-section-note" }, ["Name it, tick the students from your roster, and create. You can add or remove students later from the group's own card."]),
-      el("div", { class: "ac-row" }, [el("label", {}, ["Group name", name]), el("div", { class: "ac-pickwrap" }, ["Students", pick.node]), el("label", {}, ["\u00a0", phone]), go]),
-    ]);
-  }
-
-  function memberYearPass(d, flt, m) {
-    if (!flt) return true;
-    var y = yearForPhone(d, m.phone);
-    return flt === "__none__" ? !y : y === flt;
-  }
-  function memberSummary(d, g) {
-    var by = {};
-    g.members.forEach(function (m) { var y = yearForPhone(d, m.phone) || "No year set"; by[y] = (by[y] || 0) + 1; });
-    var ys = orderedYears(Object.keys(by).filter(function (k) { return k !== "No year set"; })).concat(by["No year set"] ? ["No year set"] : []);
-    return countLabel(g.members.length, "student", "students") + (ys.length ? "  \u00b7  " + ys.map(function (y) { return y + ": " + by[y]; }).join("  \u00b7  ") : "");
-  }
-  function memberBlock(d, g) {
-    if (!g.members.length) return el("p", { class: "ac-hint" }, ["No members yet."]);
-    var by = {};
-    g.members.forEach(function (m) {
-      if (!memberYearPass(d, STATE.year, m)) return;
-      var y = yearForPhone(d, m.phone) || "No year set";
-      (by[y] = by[y] || []).push(m);
-    });
-    var order = orderedYears(Object.keys(by).filter(function (k) { return k !== "No year set"; })).concat(by["No year set"] ? ["No year set"] : []);
-    if (!order.length) return el("p", { class: "ac-hint" }, ["No members from this year in this group."]);
-    var kids = [];
-    order.forEach(function (y) {
-      if (order.length > 1 || STATE.year) kids.push(el("div", { class: "ac-mh" }, [y + "  \u00b7  " + by[y].length]));
-      kids.push(el("div", { class: "ac-members" }, by[y].map(function (m) {
-        return el("span", { class: "ac-member" }, [m.name || "Unknown", el("small", {}, [m.phone + (m.known_student === false ? "  \u00b7  no account yet" : "")])]);
-      })));
-    });
-    return el("div", {}, kids);
-  }
-
-  function groupsPanel(d) {
-    var pass = function (flt, g) { return !flt || g.members.some(function (m) { return memberYearPass(d, flt, m); }); };
-    var counts = yearCounts(d.groups, pass);
-    var shown = d.groups.filter(function (g) { return pass(STATE.year, g); });
-    var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, ["Groups", el("span", { class: "ac-count" }, [STATE.year ? shown.length + " of " + d.groups.length : String(d.groups.length)])]),
-      el("p", { class: "dash-section-note" }, ["Classify students, then grant or revoke access for the whole group in one action. Members are split by the year on their account."]),
-    ]);
-    if (!d.groups.length) section.appendChild(el("div", { class: "dash-empty" }, ["No groups yet \u2014 create one below."]));
-    else if (!shown.length) section.appendChild(el("div", { class: "dash-empty" }, ["No group has members from this year."]));
-    shown.forEach(function (g) { section.appendChild(groupCard(d, g)); });
-    return el("div", {}, [yearBar(counts), section, groupCreateForm(d)]);
-  }
-
-  // ---- LESSONS ------------------------------------------------------------------------------------------
-
-  function lessonLockPanel(lesson, isNew, ownLocked) {
-    ownLocked = ownLocked || [];
-    var box = el("div", { class: "ac-panel", "data-panel": "lesson-lock" });
-    var note = isNew
-      ? "This lesson has no lock yet. Locking it closes every video in it \u2014 existing, or added later from the Quiz Maker \u2014 until you open it. The quiz gate is separate and untouched either way."
-      : "Locking closes every video in this lesson at once, including ones you never toggled on their own (those stay closed regardless). Opening lets everyone in, unless a video was locked on its own \u2014 that one stays locked. The quiz gate below is separate and untouched either way.";
-    var goLock = el("button", { class: "ac-btn danger solid", type: "button" }, [isNew ? "Add lock, start closed" : "Lock it"]);
-    var goOpen = el("button", { class: "ac-btn primary", type: "button" }, [isNew ? "Add row, start open" : "Open it"]);
-    // A video can be locked on its own, and opening the lesson does NOT open it. Say so here and
-    // let the teacher open those videos in the same click (ticked by default: that is what
-    // "open this lesson" almost always means).
-    var alsoBox = null, alsoRow = null;
-    if (ownLocked.length) {
-      alsoBox = el("input", { type: "checkbox", id: "lsn-also-open" });
-      alsoBox.checked = true;   // el() drops empty attributes, so set the property
-      alsoRow = el("label", { class: "ac-check", for: "lsn-also-open" }, [alsoBox, el("span", {}, ["Also open the " + (ownLocked.length === 1 ? "video" : ownLocked.length + " videos") + " locked on their own: " + ownLocked.map(function (v) { return (SLOT_LABEL[v.slot] || v.slot).toLowerCase(); }).join(", ")])]);
-    }
-    function fire(locked, btn) {
-      btn.disabled = true;
-      var calls = [{ action: "admin_set_lesson_lock", lesson: lesson, locked: locked }];
-      var alsoVideos = !locked && alsoBox && alsoBox.checked;
-      if (alsoVideos) ownLocked.forEach(function (v) { calls.push({ action: "admin_set_video", lesson: lesson, slot: v.slot, locked: false }); });
-      runMany(calls, pretty(lesson) + " is now " + (locked ? "locked." : "open.") + (alsoVideos ? " Its videos are open too." : ""), btn);
-    }
-    goLock.addEventListener("click", function () { fire(true, goLock); });
-    goOpen.addEventListener("click", function () { fire(false, goOpen); });
-    box.appendChild(el("p", {}, [note]));
-    if (alsoRow) box.appendChild(el("p", {}, [alsoRow]));
-    box.appendChild(el("div", { class: "ac-actions" }, isNew ? [goOpen, goLock, cancelBtn()] : [goLock, goOpen, cancelBtn()]));
-    return box;
-  }
-
-  // One video's own lock (the Videos row's "locked" cell). This is the switch that was missing:
-  // videos are born locked, and the lesson-level switch above can never open one of them.
-  function videoLockPanel(lesson, v, lessonLocked) {
-    var label = SLOT_LABEL[v.slot] || v.slot;
-    var box = el("div", { class: "ac-panel", "data-panel": "video-lock" });
-    var note = v.locked
-      ? "Opening the " + label.toLowerCase() + " lets everyone watch it." + (lessonLocked ? " The lesson itself is still locked, so it stays closed until you open the lesson too." : "")
-      : "Locking the " + label.toLowerCase() + " closes just this video. Students need approved access to watch it.";
-    var go = el("button", { class: "ac-btn " + (v.locked ? "primary" : "danger solid"), type: "button" }, [v.locked ? "Open it" : "Lock it"]);
-    go.addEventListener("click", function () {
-      go.disabled = true;
-      run({ action: "admin_set_video", lesson: lesson, slot: v.slot, locked: !v.locked },
-        "The " + label.toLowerCase() + " for " + pretty(lesson) + " is now " + (v.locked ? "open." : "locked."), go);
-    });
-    box.appendChild(el("p", {}, [note]));
-    box.appendChild(el("div", { class: "ac-actions" }, [go, cancelBtn()]));
-    return box;
-  }
-
-  function lessonsPanel(d) {
-    var lockByLesson = {};
-    (d.lesson_locks || []).forEach(function (l) { lockByLesson[l.lesson] = l; });
-    var quizByLesson = {};
-    d.quizzes.forEach(function (q) { quizByLesson[q.lesson] = q; });
-    var videosByLesson = {};
-    d.videos.forEach(function (v) { (videosByLesson[v.lesson] = videosByLesson[v.lesson] || []).push(v); });
-
-    var f = STATE.filters.lessons;
-    var all0 = allLessonsList(d);
-    var tracks = allTracksList(d);
-    var trackSel = el("select", { class: "ac-input", "aria-label": "Filter by track" },
-      [el("option", { value: "" }, ["All tracks"])].concat(tracks.map(function (t) { return el("option", { value: t }, [pretty(t)]); })));
-    trackSel.value = f.track;
-    var search = el("input", { class: "ac-input", type: "text", placeholder: "Filter by name or path\u2026", "aria-label": "Filter lessons", "data-search": "lessons", value: f.q });
-    trackSel.addEventListener("change", function () { f.track = trackSel.value; render(); });
-    search.addEventListener("input", function () {
-      f.q = search.value;
-      var pos = search.selectionStart;
-      render();
-      var again = document.querySelector('[data-search="lessons"]');
-      if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
-    });
-
-    var pre = all0.filter(function (l) {
-      if (f.track && l.track !== f.track) return false;
-      var q = f.q.trim().toLowerCase();
-      if (q && l.lesson.indexOf(q) === -1 && pretty(l.lesson).toLowerCase().indexOf(q) === -1) return false;
-      return true;
-    });
-    var counts = yearCounts(pre, function (flt, l) { return yearPass(flt, l.lesson); });
-    var all = sortLessonsByYear(pre.filter(function (l) { return yearPass(STATE.year, l.lesson); }));
-
-    var section = el("div", { class: "dash-section" }, [
-      el("h2", {}, ["Lessons", el("span", { class: "ac-count" }, [String(d.counts.lessons_locked) + " locked of " + all0.length])]),
-      el("p", { class: "dash-section-note" }, [d.lessons_error
-        ? "Couldn't read the full lesson list from GitHub (" + d.lessons_error + ") \u2014 showing only lessons already known here."
-        : "Locking a lesson closes every video in it, whether or not a video exists yet. The quiz gate on each card is separate and overrides this \u2014 a quiz can stay locked while its lesson is open, or open while its lesson is locked."]),
-      el("div", { class: "ac-row" }, [el("label", {}, ["Track", trackSel]), el("label", {}, ["Search", search])]),
-    ]);
-
-    if (!all.length) {
-      section.appendChild(el("div", { class: "dash-empty" }, [all0.length ? "Nothing matches this filter." : "No lessons found."]));
-      return el("div", {}, [yearBar(counts), section]);
-    }
-
-    bySection(all, function (l) { return sectionOf(l.lesson); }).forEach(function (sec) {
-      var lockedN = sec.items.filter(function (l) { var k = lockByLesson[l.lesson]; return k && k.locked; }).length;
-      section.appendChild(sectionHead(sec.name, lockedN + " locked of " + sec.items.length));
-      byChapter(sec.items, function (l) { return l.lesson; }).forEach(function (ch) {
-      section.appendChild(chapterHead(ch.title, countLabel(ch.items.length, "lesson", "lessons") + "  ·  " + ch.items.filter(function (l) { return lockByLesson[l.lesson] && lockByLesson[l.lesson].locked; }).length + " locked"));
-      ch.items.forEach(function (l) {
-        var lock = lockByLesson[l.lesson];
-        var locked = !!(lock && lock.locked);
-        var quiz = quizByLesson[l.lesson];
-        var quizLocked = !!(quiz && quiz.locked);
-        var vids = (videosByLesson[l.lesson] || []).slice().sort(function (a, b) { return a.slot < b.slot ? -1 : 1; });
-        var key = "lsn:" + l.lesson;
-        var qkey = "qz:" + l.lesson;
-
-        var card = el("div", { class: "ac-card", "data-lesson": l.lesson }, [
-          el("div", { class: "ac-top" }, [
-            el("div", { class: "ac-who" }, [el("b", {}, [lessonShort(l.lesson)]), el("span", {}, [l.lesson])]),
-            badge(locked ? { text: "Lesson locked", cls: "is-good" } : { text: "Lesson open", cls: "is-warn" }),
-          ]),
-        ]);
-
-        var chips = vids.length
-          ? vids.map(function (v) {
-              var effLocked = v.locked || locked;
-              var extra = v.locked ? (locked ? "" : "locked on its own \u2014 the lesson being open doesn't open it") : (locked ? "via lesson lock" : "");
-              return chip(SLOT_LABEL[v.slot] || v.slot, effLocked ? "Locked" : "Open to everyone", effLocked ? "is-good" : "is-warn", extra);
-            })
-          : [chip("Videos", "None yet", "", "added from the Quiz Maker \u2014 locking the lesson now means one added later starts locked too")];
-        card.appendChild(el("div", { class: "ac-chips" }, chips));
-
-        var lockToggle = el("button", { class: "ac-btn " + (locked ? "" : "primary"), type: "button" }, [lock ? (locked ? "Open it\u2026" : "Lock it\u2026") : "Lock this lesson\u2026"]);
-        lockToggle.addEventListener("click", function () { openPanel(key); });
-        var quizToggle = el("button", { class: "ac-btn " + (quizLocked ? "" : "danger"), type: "button" }, [quiz ? (quizLocked ? "Open the quiz\u2026" : "Lock the quiz\u2026") : "Gate this quiz\u2026"]);
-        quizToggle.addEventListener("click", function () { openPanel(qkey); });
-        card.appendChild(el("div", { class: "ac-subrow" }, [el("span", { class: "ac-subtag" }, ["Quiz"]),
-          el("span", { class: "ac-subtxt" }, [quiz ? (quizLocked ? "Locked — students need quiz access" : "Open to everyone") : "No gate — open to everyone"]),
-          badge(quiz ? (quizLocked ? { text: "Locked", cls: "is-good" } : { text: "Open", cls: "is-warn" }) : { text: "No gate", cls: "" }), quizToggle]));
-
-        var ownLocked = vids.filter(function (v) { return v.locked; });
-        var videoToggles = vids.map(function (v) {
-          var b = el("button", { class: "ac-btn " + (v.locked ? "primary" : ""), type: "button", "data-video-toggle": v.slot }, [(v.locked ? "Open " : "Lock ") + (SLOT_LABEL[v.slot] || v.slot).toLowerCase() + "\u2026"]);
-          b.addEventListener("click", function () { openPanel("vid:" + l.lesson + ":" + v.slot); });
-          return b;
-        });
-        var openVideo = vids.filter(function (v) { return STATE.open === "vid:" + l.lesson + ":" + v.slot; })[0];
-
-        if (STATE.open === key) card.appendChild(lessonLockPanel(l.lesson, !lock, ownLocked));
-        else if (STATE.open === qkey) card.appendChild(quizLockPanel(l.lesson, !quiz));
-        else if (openVideo) card.appendChild(videoLockPanel(l.lesson, openVideo, locked));
-        else card.appendChild(el("div", { class: "ac-actions" }, [lockToggle].concat(videoToggles)));
-
-        section.appendChild(card);
-      });
-      });
-    });
-    return el("div", {}, [yearBar(counts), section]);
-  }
-
-  // ---- GIVE ACCESS ------------------------------------------------------------------------------------
-
-  function grantPanel(d) {
-    var gy = STATE.filters.grant;
-    var grantOpts = { custom: true };
-    var phone = el("input", { class: "ac-input", type: "tel", id: "gr-phone", placeholder: "01xxxxxxxxx", "aria-label": "Student phone", autocomplete: "off" });
-    var scopeSel = el("select", { class: "ac-input", id: "gr-scope", "aria-label": "What it covers" }, scopeOptionNodes(d, gy.year, grantOpts));
-    var yearSel = lessonYearSelect(gy.year);
-    yearSel.id = "gr-year";
-    yearSel.addEventListener("change", function () {
-      gy.year = yearSel.value;
-      refillSelect(scopeSel, scopeOptionNodes(d, gy.year, grantOpts));
-      update();
-    });
-    var custom = el("input", { class: "ac-input", type: "text", id: "gr-custom", placeholder: "programming/other/some-lesson", "aria-label": "Lesson path", hidden: "" });
-    var preview = el("div", { class: "ac-preview", "aria-live": "polite" });
-    var term;
-    function scopeValue() { return scopeSel.value === "__custom" ? custom.value.trim() : scopeSel.value; }
-    function update() {
-      custom.hidden = scopeSel.value !== "__custom";
-      var t = term.term(), s = scopeValue();
-      preview.textContent = phone.value.trim() && s ? phone.value.trim() + " will be able to watch " + scopeInfo(s).title + " " + term.describe(d.today, "") + "." : "Fill in the phone number and what it covers.";
-      go.disabled = !(phone.value.trim() && s && t);
-    }
-    term = termControls("gr", update, "30");
-    var go = el("button", { class: "ac-btn primary", type: "button", "data-do": "grant" }, ["Give access"]);
-    go.addEventListener("click", function () {
-      var t = term.term();
-      if (!t) return;
-      go.disabled = true;
-      STATE.toast = null;
-      refreshToast();
-      api(Object.assign({ action: "admin_grant_access", phone: phone.value.trim(), scope: scopeValue() }, t)).then(
-        function (r) {
-          setToast(true, (r.known_student ? r.name + " (" + r.phone + ")" : r.phone + " \u2014 no account with this number yet; it will apply when they register") +
-            " now has " + scopeInfo(r.scope).title + (r.expires_at ? " until " + r.expires_at : " with no end date") + ".");
-          return load(true);
-        },
-        function (err) { setToast(false, (err && err.message) || "That didn't work."); refreshToast(); go.disabled = false; }
-      );
-    });
-    [phone, scopeSel, custom].forEach(function (n) { n.addEventListener("input", update); n.addEventListener("change", update); });
-    update();
-    return el("div", { class: "dash-section" }, [
-      el("h2", {}, ["Give access by hand"]),
-      el("p", { class: "dash-section-note" }, ["For a cash payment, a scholarship, or fixing a mistake \u2014 no request needed. Works for a number that hasn't registered yet."]),
-      el("div", { class: "ac-form-row" }, [el("label", {}, ["Student's phone", phone]), el("label", {}, ["Year", yearSel]), el("label", {}, ["What it covers", scopeSel, custom])]),
-      term.node, preview, el("div", { class: "ac-actions" }, [go]),
-    ]);
-  }
-
-  // ---- page ------------------------------------------------------------------------------------------
-
-  function render() {
-    var root = document.getElementById("dashboard");
-    var y = window.scrollY;
-    var d = STATE.data;
-    root.innerHTML = "";
-    root.hidden = false;
-    var c = d.counts;
-    var people = {};
-    d.access.forEach(function (a) { if (a.state === "active") people[a.phone.replace(/\D/g, "").slice(-10)] = 1; });
-    root.appendChild(el("div", { class: "dash-head" }, [el("div", {}, [
-      el("h1", {}, ["Lesson access"]),
-      el("p", {}, ["Who can get into which lessons, the payments behind it, and how to take access away. Today is " + d.today + " (Cairo)."]),
-    ])]));
-    var t = toastNode();
-    if (t) root.appendChild(t);
-    if (d.lessons_error) root.appendChild(el("div", { class: "ac-note", style: "margin:0 0 16px" }, [el("b", {}, ["The full lesson list didn\u2019t load, so dropdowns only show lessons already known here. "]), d.lessons_error]));
-    root.appendChild(helpBlock());
-    var perYear = function (fn) { return "S1: " + fn("Senior 1") + "  \u00b7  S2: " + fn("Senior 2"); };
-    var pendingBy = function (y) { return d.payments.filter(function (p) { return p.status === "pending" && sectionPass(d, y, p.scope); }).length; };
-    var peopleBy = function (y) { var s = {}; d.access.forEach(function (a) { if (a.state === "active" && sectionPass(d, y, a.scope)) s[keyOf(a.phone)] = 1; }); return Object.keys(s).length; };
-    var soonBy = function (y) { return d.access.filter(function (a) { return a.state === "active" && a.days_left !== null && a.days_left <= 7 && sectionPass(d, y, a.scope); }).length; };
-    var lessonsLockedBy = function (y) { return (d.lesson_locks || []).filter(function (l) { return l.locked && yearPass(y, l.lesson); }).length; };
-    var quizzesLockedBy = function (y) { return d.quizzes.filter(function (q) { return q.locked && yearPass(q.lesson ? y : "", q.lesson); }).length; };
-    root.appendChild(el("div", { class: "dash-stats" }, [
-      statCard(c.pending, "requests waiting for you", perYear(pendingBy)),
-      statCard(Object.keys(people).length, "students with active access", perYear(peopleBy)),
-      statCard(c.ending_soon, "ending within 7 days", perYear(soonBy)),
-      statCard(c.lessons_locked, "lessons locked", perYear(lessonsLockedBy)),
-      statCard(c.videos_locked + " / " + c.videos_open, "videos locked / open"),
-      statCard(c.quizzes_locked, "quizzes currently locked", perYear(quizzesLockedBy)),
-    ]));
-    root.appendChild(tabsNode(d));
-    var panel = STATE.tab === "requests" ? requestsPanel(d)
-      : STATE.tab === "access" ? accessPanel(d)
-      : STATE.tab === "history" ? historyPanel(d)
-      : STATE.tab === "lessons" ? lessonsPanel(d)
-      : STATE.tab === "quizzes" ? quizzesPanel(d)
-      : STATE.tab === "groups" ? groupsPanel(d)
-      : grantPanel(d);
-    root.appendChild(panel);
-    window.scrollTo(0, y);
-  }
-
-  function renderError(message) {
-    var root = document.getElementById("dashboard");
-    root.innerHTML = "";
-    root.hidden = false;
-    root.appendChild(el("div", { class: "dash-err" }, [message]));
-  }
-
-  function renderNeedsRelogin() {
-    var root = document.getElementById("dashboard");
-    root.innerHTML = "";
-    root.hidden = false;
-    var btn = el("button", { class: "qz-next", type: "button" }, ["Log out & sign in again \u2192"]);
-    btn.addEventListener("click", function () { window.AuthEngine.clearSession(); location.reload(); });
-    root.appendChild(el("div", { class: "dash-err" }, ["Your saved sign-in is missing a session token. Log in again to refresh it (phone and password stay the same)."]));
-    root.appendChild(btn);
-  }
-
-  function renderLoading() {
-    var root = document.getElementById("dashboard");
-    root.innerHTML = "";
-    root.hidden = false;
-    root.appendChild(el("div", { class: "dash-loading-state", role: "status", "aria-live": "polite" }, [
-      el("div", { class: "dash-loading-card" }, [
-        el("div", { class: "dash-loading-art", "aria-hidden": "true" }, [el("span", { class: "dash-loading-ring" }), el("span", { class: "dash-loading-core" })]),
-        el("div", { class: "dash-loading-copy" }, [
-          el("h1", { class: "dash-loading-title" }, ["Loading lesson access"]),
-          el("p", { class: "dash-loading-note" }, ["Reading payments, access and lessons", el("span", { class: "dash-loading-dots", "aria-hidden": "true" }, [el("i"), el("i"), el("i")])]),
-        ]),
-      ]),
-    ]));
-  }
-
-  window.AuthEngine.mount("#authgate", function (session) {
-    document.getElementById("authgate").remove();
-    if (!session.session_token) { renderNeedsRelogin(); return; }
-    // Convenience only: the server re-checks is_admin on every call.
-    if (session.is_admin === false) { location.href = "student.html"; return; }
-    STATE.session = session;
-    load(false);
-  });
-})();
-</script>
-
-</body>
-</html>
+      if (ok) yes.push(l); else if (y && (!yr || y === yr)) no.push
