@@ -291,7 +291,7 @@
  *                       One row per WhatsApp group (= a Groups tab group). weekday
  *                       0=Sun..6=Sat, time "HH:MM" Cairo, current_lesson = one full
  *                       lesson path (attendance + watch + free center unlock),
- *                       review_lessons = JSON array of lesson paths (homework + quiz).
+ *                       review_lessons = JSON array of lesson paths (union of homework + quiz). hw_lessons / quiz_lessons = optional JSON arrays (blank = follow review_lessons).
  *   "FollowupTemplates" key | body | updated_at   (saved overrides only; a missing
  *                       row = the built-in default wording kept in the page)
  * - admin_followup_overview {} -> raw facts for every group's lessons in ONE round
@@ -515,7 +515,7 @@ var PLAIN_TEXT_HEADERS = {
   group_key: 1, kind: 1, target: 1,
   // Attendance + WatchProgress + GroupSettings + FollowupTemplates ("18:00" must not become a time cell)
   mode: 1, marked_at: 1, first_at: 1, time: 1,
-  current_lesson: 1, review_lessons: 1, watch_deadline_override: 1, hw_deadline_override: 1,
+  current_lesson: 1, review_lessons: 1, hw_lessons: 1, quiz_lessons: 1, watch_deadline_override: 1, hw_deadline_override: 1,
   key: 1, body: 1,
 };
 // Of those, the ones that hold phone numbers (a leading 0 is easily lost).
@@ -2916,7 +2916,8 @@ function handleAdminAccessOverview(payload) {
 var ATTENDANCE_HEADERS = ["lesson", "phone", "mode", "marked_at"];
 var WATCH_HEADERS = ["phone", "lesson", "pct", "duration_s", "first_at", "updated_at"];
 var GROUPSETTINGS_HEADERS = ["group_key", "group", "weekday", "time", "current_lesson", "review_lessons", "note",
-                             "parents_contacted", "watch_deadline_override", "hw_deadline_override", "updated_at"];
+                             "parents_contacted", "watch_deadline_override", "hw_deadline_override", "updated_at",
+                             "hw_lessons", "quiz_lessons"];   // Oct 22: homework and quiz lessons chosen separately; blank cell = follow review_lessons
 var FOLLOWUP_TEMPLATE_HEADERS = ["key", "body", "updated_at"];
 var ATTENDANCE_MODES = { center: 1, online: 1 };
 var ATTENDANCE_SOURCE = "attendance";
@@ -3016,7 +3017,7 @@ function _jsonArrayOfPaths(v) {
 
 // {group_key: settings} from the GroupSettings tab. Missing = defaults (weekday null = not set yet).
 function _emptyGroupSettings() {
-  return { weekday: null, time: "", current_lesson: "", review_lessons: [], note: "", parents_contacted: false,
+  return { weekday: null, time: "", current_lesson: "", review_lessons: [], hw_lessons: null, quiz_lessons: null, note: "", parents_contacted: false,
            watch_deadline_override: "", hw_deadline_override: "" };
 }
 
@@ -3027,6 +3028,9 @@ function _groupSettingsFromRow(r) {
   s.time = _hhmmOf(r.time);
   try { s.current_lesson = r.current_lesson ? _lessonPath(r.current_lesson) : ""; } catch (e) { s.current_lesson = ""; }
   s.review_lessons = _jsonArrayOfPaths(r.review_lessons);
+  // blank cell = never split = follows review_lessons (null); "[]" = explicitly none
+  s.hw_lessons = String(r.hw_lessons == null ? "" : r.hw_lessons).trim() === "" ? null : _jsonArrayOfPaths(r.hw_lessons);
+  s.quiz_lessons = String(r.quiz_lessons == null ? "" : r.quiz_lessons).trim() === "" ? null : _jsonArrayOfPaths(r.quiz_lessons);
   s.note = String(r.note == null ? "" : r.note);
   s.parents_contacted = _isTruthyFlag(r.parents_contacted);
   var wo = _ymdOf(r.watch_deadline_override), ho = _ymdOf(r.hw_deadline_override);
@@ -3202,7 +3206,7 @@ function handleAdminFollowupOverview(payload) {
   var used = [];
   groups.forEach(function (g) {
     var s = g.settings;
-    [s.current_lesson].concat(s.review_lessons).forEach(function (l) { if (l && used.indexOf(l) === -1) used.push(l); });
+    [s.current_lesson].concat(s.review_lessons, s.hw_lessons || [], s.quiz_lessons || []).forEach(function (l) { if (l && used.indexOf(l) === -1) used.push(l); });
   });
   var allLessons = [], lessonsError = "", ghFlags = {};
   try {
@@ -3496,6 +3500,18 @@ function handleAdminFollowupSaveGroup(payload) {
     if (payload.review_lessons.length > MAX_REVIEW_LESSONS) throw new Error("At most " + MAX_REVIEW_LESSONS + " homework & quiz lessons per group.");
     payload.review_lessons.forEach(function (l) { var p = _lessonPath(l); if (review.indexOf(p) === -1) review.push(p); });
   }
+  // hw_lessons / quiz_lessons: absent or null = follow review_lessons (stored blank); an array (even empty) = that exact list.
+  function _splitList(v, label) {
+    if (v === undefined || v === null || v === "") return null;
+    if (!Array.isArray(v)) throw new Error(label + " must be a list of lesson paths.");
+    if (v.length > MAX_REVIEW_LESSONS) throw new Error("At most " + MAX_REVIEW_LESSONS + " " + label + " per group.");
+    var o = []; v.forEach(function (l) { var p = _lessonPath(l); if (o.indexOf(p) === -1) o.push(p); }); return o;
+  }
+  var hwLessons = _splitList(payload.hw_lessons, "homework lessons"), quizLessons = _splitList(payload.quiz_lessons, "quiz lessons");
+  if (hwLessons || quizLessons) {   // a split group: review_lessons is always the union, so older readers still see every lesson
+    (hwLessons || review).concat(quizLessons || review).forEach(function (p) { if (review.indexOf(p) === -1) review.push(p); });
+    if (review.length > MAX_REVIEW_LESSONS * 2) throw new Error("Too many lessons for one group.");
+  }
   var note = String(payload.note == null ? "" : payload.note);
   if (note.length > MAX_GROUP_NOTE) throw new Error("The group note is too long (max " + MAX_GROUP_NOTE + " characters).");
   var contacted = payload.parents_contacted === true || String(payload.parents_contacted).toUpperCase() === "TRUE";
@@ -3504,7 +3520,7 @@ function handleAdminFollowupSaveGroup(payload) {
 
   // Soft check against the real lesson list: a typo should be noticed, but GitHub being down must not block saving.
   var warnings = [];
-  var wanted = (current ? [current] : []).concat(review);
+  var wanted = (current ? [current] : []).concat(review, hwLessons || [], quizLessons || []);
   if (wanted.length) {
     try {
       var known = {};
@@ -3523,7 +3539,7 @@ function handleAdminFollowupSaveGroup(payload) {
     _ensureColumns(sheet, GROUPSETTINGS_HEADERS);
     var c = _needCols(sheet, "GroupSettings", GROUPSETTINGS_HEADERS);
     var rec = { group_key: gkey, group: spellings[gkey], weekday: weekday === null ? "" : weekday, time: time,
-                current_lesson: current, review_lessons: JSON.stringify(review), note: note, parents_contacted: contacted,
+                current_lesson: current, review_lessons: JSON.stringify(review), hw_lessons: hwLessons === null ? "" : JSON.stringify(hwLessons), quiz_lessons: quizLessons === null ? "" : JSON.stringify(quizLessons), note: note, parents_contacted: contacted,
                 watch_deadline_override: watchOverride, hw_deadline_override: hwOverride, updated_at: _fmt(new Date(), TZ, true) };
     var row = 0;
     if (sheet.getLastRow() >= 2) {
@@ -3537,7 +3553,7 @@ function handleAdminFollowupSaveGroup(payload) {
     } else {
       _appendByHeader(sheet, rec);
     }
-    var out = { ok: true, settings: { weekday: weekday, time: time, current_lesson: current, review_lessons: review, note: note,
+    var out = { ok: true, settings: { weekday: weekday, time: time, current_lesson: current, review_lessons: review, hw_lessons: hwLessons, quiz_lessons: quizLessons, note: note,
                 parents_contacted: contacted, watch_deadline_override: watchOverride, hw_deadline_override: hwOverride } };
     if (warnings.length) out.warnings = warnings;
     return out;

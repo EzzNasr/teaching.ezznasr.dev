@@ -225,14 +225,23 @@
     var byStudent = f && f[k];
     return (byStudent && path && (byStudent[path] || byStudent[String(path).toLowerCase()])) || {};
   }
-  function reviewList(gs) {
-    var r = gs && gs.review_lessons;
+  function pathList(r) {
     if (typeof r === 'string') { try { r = JSON.parse(r); } catch (e) { r = r ? [r] : []; } }
     if (!Array.isArray(r)) r = [];
     var seen = {}, out = [];
     r.forEach(function (x) { x = String(x || '').trim(); if (x && !seen[x]) { seen[x] = 1; out.push(x); } });
     return out;
   }
+  // The group's shared "previous lessons" list, and (Oct 22) the separate homework / quiz lists.
+  // hw_lessons / quiz_lessons: null, undefined or "" = never split = follow review_lessons; an array (even []) = exactly that.
+  function reviewList(gs) { return pathList(gs && gs.review_lessons); }
+  function kindList(gs, key) {
+    var v = gs && gs[key];
+    return (v === null || v === undefined || v === '') ? reviewList(gs) : pathList(v);
+  }
+  function hwList(gs) { return kindList(gs, 'hw_lessons'); }
+  function quizList(gs) { return kindList(gs, 'quiz_lessons'); }
+  function allReviewLessons(gs) { return pathList(reviewList(gs).concat(hwList(gs), quizList(gs))); }
   function mergeOverride(gs, ymd) { var o = {}; for (var k in gs) o[k] = gs[k]; o.hw_deadline_override = ymd; return o; }
   function hasFlag(meta, key) { return !meta || meta[key] !== false; }   // unknown meta → assume present
 
@@ -276,21 +285,23 @@
     }
 
     var homework = [], quiz = [];
-    reviewList(gs).forEach(function (R) {
+    var hwSet = {}, quizSet = {};
+    hwList(gs).forEach(function (x) { hwSet[x] = 1; }); quizList(gs).forEach(function (x) { quizSet[x] = 1; });
+    allReviewLessons(gs).forEach(function (R) {
       var f = factsFor(overview, student, R), meta = lessonMeta(overview, R);
       // Phase 2: a lesson can carry its own due date (meta.due_override) and can make the quiz and/or the
       // homework optional (meta.quiz_required / meta.homework_required === false). Optional items are never
       // "missing"/"absent"; a missing flag means required (the old behaviour).
       var dlR = (meta && meta.due_override) ? groupDeadlines(mergeOverride(gs, meta.due_override), now, overview && overview.settings) : dl;
       var hwOver = !!(dlR.hw && dlR.hw.state === 'overdue');
-      if (hasFlag(meta, 'has_assignment')) {
+      if (hwSet[R] && hasFlag(meta, 'has_assignment')) {
         var hw = f.homework || {}, done = !!hw.submitted, hwReq = !(meta && meta.homework_required === false);
         homework.push({
           lesson: R, state: done ? 'homework_done' : (hwReq ? 'homework_missing' : 'homework_optional'), submitted: done, at: hw.at || null,
           required: hwReq, due: !done && hwReq && hwOver, deadline_state: dlR.hw ? dlR.hw.state : null
         });
       }
-      if (hasFlag(meta, 'has_quiz')) {
+      if (quizSet[R] && hasFlag(meta, 'has_quiz')) {
         var q = f.quiz || {}, taken = !!q.taken, qReq = !(meta && meta.quiz_required === false);
         var score = taken ? num(q.score) : null, total = taken ? num(q.total) : null;
         var p = (taken && total) ? (score / total) * 100 : null;
@@ -456,6 +467,7 @@
     cairoToday: cairoToday, nextSession: nextSession, groupDeadlines: groupDeadlines,
     deadlineState: deadlineState, deadlineWhen: deadlineWhen,
     studentVerdicts: studentVerdicts, studentSummary: studentSummary, groupSummary: groupSummary,
-    mergeSettings: mergeSettings
+    mergeSettings: mergeSettings,
+    hwList: hwList, quizList: quizList, allReviewLessons: allReviewLessons
   };
 }));

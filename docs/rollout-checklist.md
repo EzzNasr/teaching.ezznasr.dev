@@ -62,4 +62,14 @@ Turn one on, test, leave it on. Turning a flag off is the instant rollback for t
 3. Grading tab: own page linked from `master.html` (default) or inside `followup.html`.
 4. Senior 1 group assignment: screen (default) or mapping from you.
 5. Photos in a Drive folder under your account, retention 6 months after the month closes (default yes).
-6. Stray `grade-1-secondary/lesson-1-development-...` folder: keep until S1's audit says nothing references it (default).
+6. ~~Stray `grade-1-secondary/lesson-1-development-...` folder~~ — removed (it was empty; the lesson lives under grade 2 as `chapter-1-lesson-1-...`).
+
+## 8. Delivering a build (replaces the old APPLY.txt files)
+1. Unzip over the repo root, accepting "replace".
+2. `node scripts/run_registry.js` — expect no FAIL (SKIP/XFAIL/TODO are normal without `--e2e`).
+3. Apps Script: paste every `apps_script/*.gs` that changed (`Code.gs`, `Phase2_*.gs`), then Deploy -> Manage deployments -> pencil -> New version.
+   Feature flags in Script Properties (`FF_CAMERA`, `FF_DEFERRED_ANSWERS`, `FF_GRADING`, `FF_PARENT_LOG`, `FF_MONTHLY`): `1` = on, missing = off.
+4. Quiz Maker -> "Sync site assets" if any template under `assets_templates/` changed. Answer Yes.
+5. `python tools/quiz-maker-v2/check_asset_drift.py` must print "In sync."
+6. Commit, push, hard-refresh. Then section 5 above.
+Notes: homework and quiz lessons are picked separately per group on the follow-up page (`hw_lessons` / `quiz_lessons` columns are added on first save). `FF_CAMERA` / `FF_DEFERRED_ANSWERS` stay off until legacy `quiz.html` answers are stripped (`strip_embedded_answers.py`). Browser tests R-E17/E19/E20 only fail in the offline sandbox.

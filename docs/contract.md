@@ -187,3 +187,13 @@ same file. S5 reads all handoffs before each integration build.
 - v1: first publication.
 - v1.2: `Code.gs` rule corrected to match plan S1 item 2 (S1 edits the key-comparing functions; S5 the router).
 - v1.1: removed a reference to a non-existent `scripts/sync_assets.py`; S3 may add `capture.js` to the two sync lists.
+
+
+## v1.5 (Oct 22): homework and quiz lessons are separate
+`GroupSettings` gains two columns, `hw_lessons` and `quiz_lessons` (JSON arrays of lesson paths).
+- Blank cell / `null` in the API = the group was never split: both kinds follow `review_lessons` (old behaviour).
+- An array, even `[]`, is exactly that list (`[]` = nothing of that kind is checked).
+- `admin_followup_save_group` accepts `hw_lessons` / `quiz_lessons`; omitting them stores blank (back to "follow"). The page always sends the full settings object, so a normal save keeps the split.
+- `review_lessons` is kept as the UNION of both lists on every split save, so older readers still see every lesson.
+- Readers: use `FollowupLogic.hwList/quizList/allReviewLessons` (JS) or `g.settings.hw_lessons || g.settings.review_lessons` (Apps Script). `admin_student_summary.expected[]` only marks a quiz/homework as required for lessons in that kind's list.
+- The page ids: `#fu-role-hw`, `#fu-role-quiz`, `#pick-hw-N`, `#pick-quiz-N`, `#fu-add-hw`, `#fu-add-quiz`.

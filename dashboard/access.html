@@ -672,11 +672,41 @@
     );
   }
 
+  // ---- old/typo'd lesson keys -> one lesson -------------------------------------------------------
+  // assets/lesson-aliases.json maps renamed keys ("lesson-1-...", "chaper-1-lesson-3-...") to the current
+  // "chapter-N-lesson-M-..." key. The server already does this; doing it here too means a grant, quiz or
+  // video stored under the old spelling can never show up as a second row for the same lesson.
+  var ALIASES = null;
+  function loadAliases() {
+    if (ALIASES) return Promise.resolve(ALIASES);
+    return fetch("/assets/lesson-aliases.json", { cache: "no-cache" })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .catch(function () { return {}; })
+      .then(function (j) { ALIASES = j && typeof j === "object" ? j : {}; delete ALIASES._comment; return ALIASES; });
+  }
+  function canonKey(k) {
+    var s = String(k == null ? "" : k), l = s.toLowerCase();
+    return ALIASES && Object.prototype.hasOwnProperty.call(ALIASES, l) ? ALIASES[l] : s;
+  }
+  function canonOverview(d) {
+    (d.access || []).forEach(function (a) { if (a.scope) a.scope = canonKey(a.scope); });
+    (d.payments || []).forEach(function (p) { if (p.scope) p.scope = canonKey(p.scope); });
+    ["quizzes", "videos", "lesson_locks", "all_lessons"].forEach(function (name) {
+      var list = d[name];
+      if (!list) return;
+      list.forEach(function (x) { if (x.lesson) x.lesson = canonKey(x.lesson); });
+      if (name === "videos") return;            // several videos (slots) per lesson are normal
+      var seen = {};
+      d[name] = list.filter(function (x) { if (!x.lesson) return true; if (seen[x.lesson]) return false; seen[x.lesson] = 1; return true; });
+    });
+    return d;
+  }
+
   function load(quiet) {
     if (!quiet) renderLoading();
-    return api({ action: "admin_access_overview" }).then(
+    return loadAliases().then(function () { return api({ action: "admin_access_overview" }); }).then(
       function (data) {
-        STATE.data = data;
+        STATE.data = canonOverview(data);
         if (!STATE.tab) { var t0 = null; try { t0 = sessionStorage.getItem("access-tab"); } catch (e) {} STATE.tab = t0 || (data.counts.pending > 0 ? "requests" : "access"); }
         render();
       },

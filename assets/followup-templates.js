@@ -411,14 +411,21 @@
    * Every placeholder of PLACEHOLDERS is present in the result ("" when there is
    * no data), so a message never shows a raw {name} for a known placeholder.
    */
+  // Oct 22: homework and quiz lessons are separate lists; null/undefined = follows review_lessons.
+  function listFor(gs, key) {
+    var v = gs && gs[key];
+    if (v === null || v === undefined || v === "") v = gs && gs.review_lessons;
+    return Array.isArray(v) ? v : [];
+  }
+
   function buildContext(input) {
     input = input || {};
     var student = input.student || {}, group = input.group || {}, gs = group.settings || {};
     var useIso = isoOn(input);
     var now = input.now || new Date();
     var cur = gs.current_lesson || "";
-    var rev = Array.isArray(gs.review_lessons) ? gs.review_lessons : [];
     var role = roleOfKind(input.kind);
+    var rev = role === "quiz" ? listFor(gs, "quiz_lessons") : listFor(gs, "hw_lessons");
     var lesson = input.lesson || (role === "session" ? cur : (rev[0] || cur));
     var fact = factsFor(input.facts, lesson);
     var quiz = fact.quiz && fact.quiz.taken ? fact.quiz : null;
@@ -462,7 +469,7 @@
 
   function buildLists(input, ctx, useIso) {
     var gs = (input.group && input.group.settings) || {};
-    var rev = Array.isArray(gs.review_lessons) ? gs.review_lessons : [];
+    var rev = listFor(gs, "hw_lessons");
     var lessons = input.lessons || {};
     function list(paths, tpl, flag) {
       var shown = paths.filter(function (p) { return p && lessonFlag(lessons, p, flag); });
@@ -574,7 +581,6 @@
     var templates = ctx.templates || {};
     var useIso = isoOn(input);
     var gs = (input.group && input.group.settings) || {};
-    var rev = Array.isArray(gs.review_lessons) ? gs.review_lessons : [];
 
     // Which lesson does this template talk about?
     if (!input.lesson) {
@@ -583,7 +589,7 @@
       else if (role === "homework" || role === "quiz") {
         var arr = role === "homework" ? (v && v.homework) : (v && v.quiz);
         var hit = (arr || []).filter(function (x) { return x && templateForState(x.state) === kind; })[0];
-        input.lesson = (hit && hit.lesson) || rev[0] || "";
+        input.lesson = (hit && hit.lesson) || (role === "quiz" ? listFor(gs, "quiz_lessons") : listFor(gs, "hw_lessons"))[0] || "";
       } else input.lesson = gs.current_lesson || "";
     }
 
