@@ -1,4 +1,4 @@
-// R-024  dashboard/access.html merges old/typo'd lesson keys into the current lesson (one row, not two).
+// R-025  dashboard/access.html merges old/typo'd lesson keys into the current lesson (one row, not two).
 // Pulls loadAliases/canonKey/canonOverview straight out of the page and runs them on sample data.
 // Usage: node tests/test_access_alias_client.js [site root]
 const fs = require('fs'), path = require('path'), vm = require('vm');

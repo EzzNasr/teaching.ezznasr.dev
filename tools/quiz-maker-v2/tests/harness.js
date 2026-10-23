@@ -96,7 +96,13 @@ function load(codeGsPath, opts = {}) {
     const dir = require('path').dirname(codeGsPath);
     fs.readdirSync(dir).filter(f => /^Phase2_.*\.gs$/.test(f)).sort().forEach(f => files.push(require('path').join(dir, f)));
   }
-  files.forEach(f => vm.runInContext(fs.readFileSync(f, 'utf8'), ctx, { filename: require('path').basename(f) }));
+  // Layout-proof: Code.gs may have the Phase2_*.gs files merged into it, and the standalone copies may be deleted.
+  // A missing Phase2_*.gs is skipped when Code.gs already defines that code; any other missing file is still an error.
+  const merged = files.length && fs.existsSync(files[0]) && /^function p2_flag\b/m.test(fs.readFileSync(files[0], 'utf8'));
+  files.forEach(f => {
+    if (!fs.existsSync(f) && merged && /^Phase2_.*\.gs$/.test(require('path').basename(f))) return;
+    vm.runInContext(fs.readFileSync(f, 'utf8'), ctx, { filename: require('path').basename(f) });
+  });
   const post = payload => JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify(payload) } }).text);
   const setNow = iso => { if (!opts.clock) throw new Error("load(..., { clock: true }) is needed before setNow"); nowMs = iso === null ? null : new Date(iso).getTime(); };
   return { ctx, post, getSS, props, cache, drive, lockState, setNow, files };

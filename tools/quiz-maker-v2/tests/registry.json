@@ -639,6 +639,18 @@
         "tests/test_R024_written_totals.js"
       ],
       "note": "Authoring side (bulk paste WRITTEN:/Marks:/Model:, models split from the page) is in tests/test_written_authoring.py (R-S4a); the homework page side in e2e_capture.py."
+    },
+    {
+      "id": "R-025",
+      "title": "access.html merges old/typo'd lesson keys into the current lesson (one row, not two)",
+      "status": "active",
+      "owner": "S1",
+      "cmd": [
+        "node",
+        "tests/test_access_alias_client.js",
+        "../.."
+      ],
+      "note": "Was unregistered and failing: commit 8bbd0ec had silently removed the alias block from dashboard/access.html. Restored; registered so it cannot regress unnoticed. (Its header used to say R-024, which is the written-totals case.)"
     }
   ]
 }

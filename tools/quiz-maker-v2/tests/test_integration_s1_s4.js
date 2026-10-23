@@ -109,7 +109,8 @@ const rows = (ss, name) => { const s = ss.getSheetByName(name); if (!s) return n
 // ---------------------------------------------------------------------------------------------
 // The WrittenAnswers header contract between S3 (writer) and S4 (reader)
 {
-  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'apps_script', 'Phase2_Grading.gs'), 'utf8');
+  const gsd = require('path').join(__dirname, '..', 'apps_script'), grf = require('path').join(gsd, 'Phase2_Grading.gs');
+  const src = require('fs').readFileSync(require('fs').existsSync(grf) ? grf : require('path').join(gsd, 'Code.gs'), 'utf8');   // merged into Code.gs once the part is deleted
   const m = /var WA_HEADERS = (\[[^\]]*\])/.exec(src);
   const hs = m ? JSON.parse(m[1].replace(/\s+/g, ' ')) : [];
   t('WrittenAnswers headers S4 reads: student_id (not "student"); S3 must write exactly these (contract 3, v1.3)',

@@ -3,7 +3,8 @@
 const fs = require('fs'), os = require('os'), pathMod = require('path'), crypto = require('crypto');
 const { load } = require('./harness');
 const tmp = pathMod.join(fs.mkdtempSync(pathMod.join(os.tmpdir(), 'keys-')), 'all.gs');
-fs.writeFileSync(tmp, process.argv.slice(2).map(p => fs.readFileSync(p, 'utf8')).join('\n'));
+// a Phase2_*.gs that was merged into Code.gs and then deleted is skipped
+fs.writeFileSync(tmp, process.argv.slice(2).filter((p, i) => i === 0 || fs.existsSync(p)).map(p => fs.readFileSync(p, 'utf8')).join('\n'));
 let pass = 0, fail = 0;
 const t = (name, cond, extra) => { (cond ? pass++ : fail++); console.log((cond ? 'PASS ' : 'FAIL ') + name + (cond ? '' : '  -> ' + (extra || ''))); };
 const H = s => crypto.createHash('sha256').update(s).digest('hex');

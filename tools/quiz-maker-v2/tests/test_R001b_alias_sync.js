@@ -14,9 +14,12 @@ const MUST = {   // old -> canonical (plan 3.1)
   'lesson-2-how-ai-works': G2 + 'chapter-1-lesson-2-how-ai-works',
   'chaper-1-lesson-3-ai-in-daily-life-and-industry': G2 + 'chapter-1-lesson-3-ai-in-daily-life-and-industry',
 };
-const jp = path.join(root, 'assets', 'lesson-aliases.json'), gp = path.join(root, 'tools', 'quiz-maker-v2', 'apps_script', 'Phase2_Keys.gs');
+const gsDir = path.join(root, 'tools', 'quiz-maker-v2', 'apps_script');
+const jp = path.join(root, 'assets', 'lesson-aliases.json');
+// The alias code is in Phase2_Keys.gs, or in Code.gs once Phase2_Keys.gs was merged in and deleted.
+const gp = fs.existsSync(path.join(gsDir, 'Phase2_Keys.gs')) ? path.join(gsDir, 'Phase2_Keys.gs') : path.join(gsDir, 'Code.gs');
 t('assets/lesson-aliases.json exists', fs.existsSync(jp));
-t('Phase2_Keys.gs exists', fs.existsSync(gp));
+t('the file holding the alias map exists (' + path.basename(gp) + ')', fs.existsSync(gp));
 if (fs.existsSync(jp) && fs.existsSync(gp)) {
   let json = {}, err = ''; try { json = JSON.parse(fs.readFileSync(jp, 'utf8')); } catch (e) { err = e.message; }
   t('the JSON parses', !err, err);
@@ -24,7 +27,7 @@ if (fs.existsSync(jp) && fs.existsSync(gp)) {
   const map = Object.fromEntries(Object.entries(raw).filter(([k]) => !k.startsWith('_')));   // ignore "_comment"
   const ctx = vm.createContext({}); let gerr = '';
   try { vm.runInContext(fs.readFileSync(gp, 'utf8'), ctx); } catch (e) { gerr = e.message; }
-  t('Phase2_Keys.gs loads alone', !gerr, gerr);
+  t(path.basename(gp) + ' loads alone', !gerr, gerr);
   const gsMap = ctx.P2_LESSON_ALIASES || {};
   t('P2_LESSON_ALIASES is defined', !!ctx.P2_LESSON_ALIASES);
   t('the JSON and the .gs map are identical (R-001b)', JSON.stringify(Object.entries(map).sort()) === JSON.stringify(Object.entries(gsMap).sort()));

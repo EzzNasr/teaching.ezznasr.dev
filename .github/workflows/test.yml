@@ -1,0 +1,37 @@
+name: tests
+# Every push and pull request must pass the master gate (scripts/test_all.sh) before it is safe to merge into main,
+# which GitHub Pages serves. See docs/TESTING.md.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gate:
+    name: Gate (syntax + regression registry)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Phase 2 sections of Code.gs match Phase2_*.gs
+        run: python scripts/sync_phase2.py --check
+      - name: Master gate
+        run: bash scripts/test_all.sh --strict
+
+  browser:
+    name: Browser tests (Playwright)
+    runs-on: ubuntu-latest
+    # Informational until it has been seen green once on GitHub's runners (three of these timed out in an offline
+    # sandbox). When it is green, delete the next line and it becomes a required check like `gate`.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install playwright && python -m playwright install --with-deps chromium
+      - run: node scripts/run_registry.js --e2e

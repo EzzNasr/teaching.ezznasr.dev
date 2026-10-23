@@ -66,7 +66,7 @@ const norm = x => x.replace(/\r\n/g, '\n').split('\n').map(l => l.replace(/\s+$/
 // --- hygiene of every Phase2_*.gs (contract section 1)
 {
   const gs = fs.readdirSync(dir).filter(f => /^Phase2_.*\.gs$/.test(f));
-  t('Phase2_Core.gs exists', gs.includes('Phase2_Core.gs'));
+  if (!MERGED) t('Phase2_Core.gs exists', gs.includes('Phase2_Core.gs'));
   const names = f => [...fs.readFileSync(path.join(dir, f), 'utf8').matchAll(/^(?:function\s+([A-Za-z_$][\w$]*)|var\s+([A-Za-z_$][\w$]*))/gm)].map(m => m[1] || m[2]);
   // Contract v1.3: S1 and S4 shipped these names before integration. Waived by name (no collisions, tested above);
   // any NEW unprefixed global in a Phase2 file still fails. S2 and S3 must use p2f_ / p2c_.
@@ -83,7 +83,7 @@ const norm = x => x.replace(/\r\n/g, '\n').split('\n').map(l => l.replace(/\s+$/
     // copies are identical, so a fix made in one place and not the other fails here instead of silently winning in Apps Script.
     const codeSrc = norm(fs.readFileSync(path.join(dir, 'Code.gs'), 'utf8'));
     const drift = gs.filter(f => !codeSrc.includes(norm(fs.readFileSync(path.join(dir, f), 'utf8'))));
-    t('merged Code.gs contains every Phase2_*.gs verbatim (no drift between the copies)', !drift.length, 'differs from Code.gs: ' + drift.join(', '));
+    t('merged Code.gs contains every Phase2_*.gs verbatim (no drift between the copies)', !drift.length, 'differs from Code.gs: ' + drift.join(', ') + '  -> run: python scripts/sync_phase2.py');
     const realDups = dups.filter(d => { const m = /\(([^&]+) & ([^)]+)\)/.exec(d); return m && !m.slice(1).some(f => gs.includes(f.trim())); });
     t('no global name is defined twice outside the merged copies', !realDups.length, realDups.join(', '));
   } else t('no global name is defined in two .gs files', !dups.length, dups.join(', '));

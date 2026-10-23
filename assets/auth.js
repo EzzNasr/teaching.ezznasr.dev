@@ -400,16 +400,16 @@
     " .aew-avatar{width:24px;height:24px;border-radius:50%;background:var(--accent,#7c5cff);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;flex-shrink:0;}" +
     "#" +
     WIDGET_ID +
-    " .aew-name{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+    " .aew-name{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
     "#" +
     WIDGET_ID +
-    " .aew-menu{position:absolute;right:0;top:calc(100% + 8px);min-width:220px;background:var(--panel-soft,#fff);border:1px solid var(--line,#ddd);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;display:none;}" +
+    " .aew-menu{position:absolute;right:0;top:calc(100% + 8px);min-width:200px;background:var(--panel-soft,#fff);border:1px solid var(--line,#ddd);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;display:none;}" +
     "#" +
     WIDGET_ID +
     " .aew-menu.open{display:block;}" +
     "#" +
     WIDGET_ID +
-    " .aew-menu-item{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:none;border:none;padding:15px 18px;font-family:inherit;font-size:14.5px;color:var(--ink,#111);cursor:pointer;}" +
+    " .aew-menu-item{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:none;border:none;padding:11px 14px;font-family:inherit;font-size:12.5px;color:var(--ink,#111);cursor:pointer;}" +
     "#" +
     WIDGET_ID +
     " .aew-menu-item:hover:not(:disabled){background:var(--line,#eee);}" +
@@ -425,38 +425,6 @@
     "#" +
     WIDGET_ID +
     " .aew-logout{color:var(--status-fail,#c1443b);}" +
-    "#" +
-    WIDGET_ID +
-    " .aew-pill{display:flex;align-items:stretch;background:var(--panel-soft,#f2f2f2);border:1px solid var(--line,#ddd);border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.16);overflow:hidden;font-size:15px;min-height:52px;}" +
-    "#" +
-    WIDGET_ID +
-    " .aew-dash{display:flex;align-items:center;gap:8px;border:none;cursor:pointer;background:var(--accent,#7c5cff);color:#fff;font-family:inherit;font-size:15px;font-weight:800;letter-spacing:.02em;padding:0 22px;text-decoration:none;white-space:nowrap;transition:filter .15s ease;}" +
-    "#" +
-    WIDGET_ID +
-    " .aew-dash:hover{filter:brightness(1.08);}" +
-    "#" +
-    WIDGET_ID +
-    " .aew-dash svg{width:20px;height:20px;flex-shrink:0;}" +
-    "#" +
-    WIDGET_ID +
-    " .aew-pill .aew-toggle{border:none;border-radius:0;box-shadow:none;background:transparent;padding:6px 14px 6px 10px;font-size:14px;gap:10px;}" +
-    "#" +
-    WIDGET_ID +
-    " .aew-pill .aew-toggle:hover{background:var(--line,#eee);}" +
-    "#" +
-    WIDGET_ID +
-    " .aew-pill .aew-avatar{width:34px;height:34px;font-size:13px;}#" +
-    WIDGET_ID +
-    " .aew-chev{width:12px;height:12px;opacity:.6;flex-shrink:0;}" +
-    "@media (max-width:520px){#" +
-    WIDGET_ID +
-    "{right:10px;}#" +
-    WIDGET_ID +
-    " .aew-pill .aew-name{display:none;}#" +
-    WIDGET_ID +
-    " .aew-dash{padding:0 18px;font-size:15px;}#" +
-    WIDGET_ID +
-    " .aew-pill .aew-toggle{padding:6px 12px 6px 9px;min-width:44px;}}" +
     ".aew-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;}" +
     ".aew-modal{background:var(--panel-soft,#fff);border:1px solid var(--line,#ddd);border-radius:16px;padding:28px 26px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.28);font-family:var(--sans,sans-serif);position:relative;box-sizing:border-box;}" +
     ".aew-modal h3{margin:0 0 4px;font-size:16px;color:var(--ink,#111);font-family:var(--sans,sans-serif);}" +
@@ -510,6 +478,26 @@
     ".aew-signedout{cursor:default;gap:8px;animation:qz-fadeup .25s ease-out;}" +
     ".aew-signedout .aew-avatar{background:var(--ink-dim,#888);}";
 
+  // ---- compact signed-in pill (dashboard-first) ----
+  WIDGET_CSS += [
+    "#auth-engine-widget{right:12px;transition:transform .28s ease,opacity .28s ease;}",
+    "#auth-engine-widget.aew-hide{transform:translateY(-170%);opacity:0;pointer-events:none;}",
+    "#auth-engine-widget .aew-pill{display:flex;align-items:center;gap:3px;padding:3px;border-radius:999px;background:var(--panel-soft,#fff);border:1px solid var(--line,#ddd);box-shadow:0 2px 10px rgba(0,0,0,.10);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);}",
+    "#auth-engine-widget .aew-av{display:flex;align-items:center;gap:7px;height:30px;padding:0 9px 0 0;border:none;background:transparent;border-radius:999px;color:var(--ink,#111);font-family:inherit;font-size:12px;cursor:pointer;}",
+    "#auth-engine-widget .aew-av:hover{background:var(--line,#eee);}",
+    "#auth-engine-widget .aew-av .aew-avatar{width:28px;height:28px;font-size:10.5px;}",
+    "#auth-engine-widget .aew-av .aew-name{max-width:110px;font-size:12px;}",
+    "#auth-engine-widget .aew-chev{width:9px;height:9px;opacity:.55;flex-shrink:0;}",
+    "#auth-engine-widget .aew-dash{display:flex;align-items:center;gap:6px;height:30px;padding:0 13px;border-radius:999px;background:var(--accent,#7c5cff);color:#fff;font-family:inherit;font-size:12.5px;font-weight:600;letter-spacing:.01em;text-decoration:none;white-space:nowrap;transition:filter .15s ease;}",
+    "#auth-engine-widget .aew-dash:hover{filter:brightness(1.1);}",
+    "#auth-engine-widget .aew-dash svg{width:14px;height:14px;flex-shrink:0;}",
+    "#auth-engine-widget .aew-menu{min-width:170px;border-radius:14px;}",
+    "#auth-engine-widget .aew-menu-name{padding:11px 14px 8px;font-size:11.5px;color:var(--ink-dim,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}",
+    "#auth-engine-widget .aew-menu-item{padding:11px 14px;font-size:13px;}",
+    "@media (max-width:640px){#auth-engine-widget .aew-av .aew-name{display:none;}#auth-engine-widget .aew-av{padding:0 7px 0 0;gap:5px;}}",
+    "@media (max-width:520px){#auth-engine-widget{right:8px;}#auth-engine-widget .aew-dash{padding:0 11px;font-size:12px;}}"
+  ].join("");
+
   function injectWidgetStyle() {
     if (document.getElementById(WIDGET_STYLE_ID)) return;
     var style = document.createElement("style");
@@ -546,17 +534,16 @@
     var widget;
 
     if (session) {
-      // Dashboard-first pill: one big "Dashboard" button, then the student's
-      // name + chevron which opens the small account menu (Log out).
       var dashLink = el("a", { class: "aew-dash", href: "/dashboard/student.html" }, [
         "Dashboard",
       ]);
       dashLink.insertAdjacentHTML(
         "afterbegin",
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
       );
 
       var menu = el("div", { class: "aew-menu" }, [
+        el("div", { class: "aew-menu-name" }, [session.student_name]),
         el("button", { class: "aew-menu-item aew-logout", type: "button" }, [
           "Log out",
         ]),
@@ -565,7 +552,7 @@
       var toggleBtn = el(
         "button",
         {
-          class: "aew-toggle",
+          class: "aew-av",
           type: "button",
           "aria-haspopup": "true",
           "aria-expanded": "false",
@@ -582,7 +569,7 @@
       );
 
       widget = el("div", { id: WIDGET_ID }, [
-        el("div", { class: "aew-pill" }, [dashLink, toggleBtn]),
+        el("div", { class: "aew-pill" }, [toggleBtn, dashLink]),
         menu,
       ]);
 
@@ -621,6 +608,24 @@
     }
 
     document.body.appendChild(widget);
+    // Slide the pill out of the way while scrolling down; it returns on scroll up.
+    if (!window.__aewScroll) {
+      window.__aewScroll = true;
+      var lastY = window.scrollY || 0;
+      window.addEventListener("scroll", function () {
+        var w = document.getElementById(WIDGET_ID);
+        if (!w) return;
+        var y = window.scrollY || 0;
+        if (y > lastY + 8 && y > 120) {
+          w.classList.add("aew-hide");
+          var m = w.querySelector(".aew-menu");
+          if (m) m.classList.remove("open");
+        } else if (y < lastY - 8 || y <= 120) {
+          w.classList.remove("aew-hide");
+        }
+        lastY = y;
+      }, { passive: true });
+    }
   }
 
   // Reusable phone -> login/register flow, rendered inside a floating
