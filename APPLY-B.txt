@@ -1,0 +1,6 @@
+Restores the dashboard redesign (access.html + master.html) that commit 8bbd0ec removed.
+FIRST check your copies are still untouched since then, from the repo root:
+    git log --oneline -3 -- dashboard/access.html dashboard/master.html
+If the newest commit listed is 8bbd0ec (or older): safe, unzip over the repo root.
+If a NEWER commit touches them: do not overwrite; send me that output.
+After applying:  bash scripts/test_all.sh --strict   (R-025 turns green), then open both pages as admin.
