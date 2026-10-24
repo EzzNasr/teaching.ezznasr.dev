@@ -23,6 +23,7 @@
       <button data-tab="session" class="on">Session</button>
       <button data-tab="requests">Requests<span id="pendBadge" class="badge" hidden>0</span></button>
       <button data-tab="flagged">Flagged</button>
+      <button data-tab="roster">Roster</button>
       <button data-tab="calib">Calibrate room</button>
       <button id="logout">Log out</button>
     </nav>
@@ -52,6 +53,20 @@
     <section id="t-flagged" hidden>
       <div class="card"><h2>Flagged check-ins</h2><div id="flagList"></div><div id="flagMsg" class="msg" role="status"></div>
         <div class="row" style="margin-top:12px"><button id="flagRefresh">Refresh</button></div></div>
+    </section>
+
+    <section id="t-roster" hidden>
+      <div class="card">
+        <h2>Roster</h2>
+        <div class="row">
+          <div><label for="rosCourse">Course</label><select id="rosCourse"><option value="">All courses</option></select></div>
+          <div><label for="rosLimit">Last lectures</label><select id="rosLimit"><option>10</option><option selected>30</option><option>60</option><option>100</option></select></div>
+          <div><label for="rosSearch">Search name or ID</label><input id="rosSearch" type="search" autocomplete="off"></div>
+        </div>
+        <div class="row" style="margin-top:12px"><button id="rosRefresh">Refresh</button><button id="rosCsv" class="pri">Export CSV</button></div>
+        <div id="rosMsg" class="msg" role="status"></div>
+        <div id="rosTable"></div>
+      </div>
     </section>
 
     <section id="t-calib" hidden>
