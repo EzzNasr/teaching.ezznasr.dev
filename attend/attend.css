@@ -1,0 +1,24 @@
+:root{--bg:#0f172a;--fg:#f8fafc;--mut:#94a3b8;--ok:#16a34a;--bad:#dc2626;--pri:#2563eb;--card:#1e293b}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:480px;margin:0 auto;padding:16px;min-height:100vh;display:flex;flex-direction:column;gap:14px}
+#clock{font-size:44px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums;margin-top:8px}
+#sub{text-align:center;color:var(--mut);min-height:1.4em;font-size:14px}
+#welcome{text-align:center;font-size:20px;font-weight:600;min-height:1.4em}
+label{display:block;color:var(--mut);font-size:14px;margin-bottom:4px}
+input{width:100%;min-height:56px;font-size:24px;padding:8px 14px;border-radius:12px;border:2px solid #334155;background:var(--card);color:var(--fg);letter-spacing:2px}
+input[readonly]{opacity:.7}
+button{min-height:48px;min-width:48px;border:0;border-radius:14px;font:inherit;font-weight:600;color:#fff;cursor:pointer;touch-action:manipulation}
+button:disabled{opacity:.4;cursor:not-allowed}
+#save{min-height:120px;font-size:28px;background:var(--pri);border-radius:20px}
+#save.ok{background:var(--ok)}
+.row{display:flex;gap:10px}
+.row button{flex:1;background:var(--card);border:1px solid #334155;font-size:15px}
+#msg{min-height:3em;text-align:center;font-size:17px;padding:10px;border-radius:12px}
+#msg.err{background:#450a0a;color:#fecaca}
+#msg.ok{background:#052e16;color:#bbf7d0}
+#msg.info{background:var(--card)}
+#note{text-align:center;color:var(--mut);font-size:12px;margin-top:auto}
+[hidden]{display:none!important}
+#name{letter-spacing:0;font-size:18px}
+#change.pri{background:var(--pri);border-color:var(--pri)}

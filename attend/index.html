@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Attendance</title>
+<link rel="stylesheet" href="attend.css">
+</head>
+<body>
+<main>
+  <div id="clock" aria-live="off">--:--</div>
+  <div id="sub"></div>
+  <div id="welcome"></div>
+  <div id="idbox">
+    <label for="sid">Student ID</label>
+    <input id="sid" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="12">
+  </div>
+  <div id="namebox">
+    <label for="name">Name (optional, first time only)</label>
+    <input id="name" maxlength="60" autocomplete="name">
+  </div>
+  <button id="save" disabled>SAVE ATTENDANCE</button>
+  <div class="row">
+    <button id="signup" type="button">Sign up (first time)</button>
+    <button id="change" type="button">Change device</button>
+  </div>
+  <div id="msg" class="info" role="status" aria-live="polite"></div>
+  <div id="note">Device, location and timing are logged for each check-in.</div>
+</main>
+<script src="../contract/att_config.js"></script>
+<script src="../contract/att_api.js"></script>
+<script src="attend.js"></script>
+</body>
+</html>

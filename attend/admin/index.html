@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Attendance Admin</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<main id="app">
+  <section id="login" class="card" hidden>
+    <h2>Admin login</h2>
+    <label for="tok">Admin token</label>
+    <input id="tok" type="password" autocomplete="off">
+    <div class="row" style="margin-top:12px"><button id="loginBtn" class="pri">Log in</button></div>
+    <div id="loginMsg" class="msg" role="status"></div>
+  </section>
+
+  <div id="panel" hidden>
+    <nav>
+      <h1>Attendance Admin</h1>
+      <button data-tab="session" class="on">Session</button>
+      <button data-tab="requests">Requests<span id="pendBadge" class="badge" hidden>0</span></button>
+      <button data-tab="flagged">Flagged</button>
+      <button data-tab="calib">Calibrate room</button>
+      <button id="logout">Log out</button>
+    </nav>
+
+    <section id="t-session">
+      <div class="card">
+        <h2>Start session</h2>
+        <div class="row">
+          <div><label for="course">Course</label><input id="course" list="courses" autocomplete="off"><datalist id="courses"></datalist></div>
+          <div><label for="room">Room</label><select id="room"></select></div>
+        </div>
+        <div class="row" style="margin-top:12px"><button id="startBtn" class="pri">Start &amp; show QR</button><button id="resumeBtn" hidden>Back to projector</button></div>
+        <div id="startMsg" class="msg" role="status"></div>
+      </div>
+      <div id="summary" class="card" hidden>
+        <h2>Session summary</h2>
+        <div id="sumText"></div>
+        <div class="row" style="margin-top:12px"><button id="csvBtn" class="pri">Export CSV</button></div>
+        <div id="csvMsg" class="msg"></div>
+      </div>
+    </section>
+
+    <section id="t-requests" hidden>
+      <div class="card"><h2>Device-change requests</h2><div id="reqList"></div><div id="reqMsg" class="msg" role="status"></div></div>
+    </section>
+
+    <section id="t-flagged" hidden>
+      <div class="card"><h2>Flagged check-ins</h2><div id="flagList"></div><div id="flagMsg" class="msg" role="status"></div>
+        <div class="row" style="margin-top:12px"><button id="flagRefresh">Refresh</button></div></div>
+    </section>
+
+    <section id="t-calib" hidden>
+      <div class="card">
+        <h2>Room calibration</h2>
+        <p class="msg">Stand in the middle of the hall, then tap Calibrate. About 10 readings are collected (about 15 s). Keep still.</p>
+        <label for="calRoom">Room</label><input id="calRoom" list="roomNames" autocomplete="off"><datalist id="roomNames"></datalist>
+        <div class="row" style="margin-top:12px"><button id="calBtn" class="pri">Calibrate</button></div>
+        <div id="calMsg" class="msg" role="status"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<section id="proj" hidden>
+  <div id="pinfo"></div>
+  <canvas id="qr" width="10" height="10" aria-label="Attendance QR code"></canvas>
+  <div id="prot"><div id="protbar"></div></div>
+  <div id="pclock">--:--</div>
+  <div id="pcount">Registered 0 / Present 0 | Flagged 0</div>
+  <div id="pctl">
+    <button id="fsBtn">Fullscreen</button>
+    <button id="reqBtn">Requests<span id="pBadge" class="badge" hidden>0</span></button>
+    <button id="hideBtn">Admin panel</button>
+    <button id="closeBtn" class="bad">Close session</button>
+  </div>
+</section>
+
+<script src="../../contract/att_config.js"></script>
+<script src="../../contract/att_api.js"></script>
+<script src="token.js"></script>
+<script src="qr.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
