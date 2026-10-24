@@ -29,6 +29,7 @@ function lecture(course, whenIso, attendees) {
 lecture("Computer Organization", "2026-10-11T09:00:00.000Z", [students[0], students[1], students[3]]);
 lecture("Computer Organization", "2026-10-18T09:00:00.000Z", [students[0], students[3]]);
 lecture("Math", "2026-10-19T07:00:00.000Z", [students[0], students[1]]);
+lecture("Computer Organization", "2026-10-18T11:00:00.000Z", [students[3]]);   // 2nd session, same course + same day: merges into the 18 Oct lecture
 D({ action: "att_signup", ticket: gas.ctx.att_makeTicket_("S", "", Math.floor(Date.now() / 1000) + 60), student_id: "10003", name: "Nour Samir", secret: "n".repeat(64), fp: "n", geo });   // registered, never attends
 
 // ---------- mini DOM ----------
@@ -71,18 +72,22 @@ const find = (id) => rows().slice(1).find(r => r.children[0].textContent.include
   for (let i = 0; i < 60 && !rows().length; i++) await sleep(25);
   ok(!byId.rosTable.hidden && byId["t-roster"].hidden === false, "Roster tab opens and loads");
   const head = cells(rows()[0]);
-  ok(head.length === 3 + 3, "header: Student, Present, %, + 3 lecture columns (" + head.length + ")");
+  ok(head.length === 3 + 3, "two sessions on 18 Oct (same course) = ONE lecture column; header has 3 lecture columns (" + head.length + ")");
   ok(/Sun 11 Oct/.test(head[3]) && /Sun 18 Oct/.test(head[4]) && /Mon 19 Oct/.test(head[5]), "lecture columns are dated, oldest to newest: " + head.slice(3).join(" | "));
   ok(/Computer Organization/.test(head[3]) && /Math/.test(head[5]), "each column shows its course");
   ok(rows().length - 1 === 4, "all 4 registered students listed (including the one who never attended)");
   const mona = cells(find("10001")), nour = cells(find("10003")), omar = cells(find("10002"));
   ok(/Mona Ali/.test(mona[0]) && /10001/.test(mona[0]), "row shows name AND ID: " + mona[0]);
   ok(mona[1] === "3 / 3" && mona[2] === "100%", "Mona present 3 / 3 = 100%");
-  ok(mona.slice(3).every(c => /^12:05$|^10:00$/.test(c) || /\d\d:\d\d/.test(c)) && /12:05/.test(mona[3]), "present cells show the check-in time in Cairo time: " + mona.slice(3).join(","));
+  ok(mona.slice(3).every(c => c === "\u2713"), "attended cells show a tick, no time: " + mona.slice(3).join(","));
   ok(omar[1] === "2 / 3" && omar[3] !== "\u2013" && omar[4] === "\u2013" && omar[5] !== "\u2013", "Omar present on 11 Oct and 19 Oct, absent 18 Oct (dash)");
   ok(nour[1] === "0 / 3" && nour[2] === "0%" && nour.slice(3).every(c => c === "\u2013"), "Nour never attended: 0 / 3, all dashes");
   const names = rows().slice(1).map(r => r.children[0].children[0].textContent);
   ok(JSON.stringify(names) === JSON.stringify([...names].sort((a, b) => a.localeCompare(b))), "sorted by name: " + names.join(", "));
+
+  byId.rosLimit.value = "2"; byId.rosLimit.onchange();
+  ok(cells(rows()[0]).length === 5 && /Mon 19 Oct/.test(cells(rows()[0])[4]) && cells(find("10001"))[1] === "2 / 2", "'Show most recent 2' keeps only the 2 newest lectures");
+  byId.rosLimit.value = "30"; byId.rosLimit.onchange();
 
   byId.rosSearch.value = "omar"; byId.rosSearch._l.input(); await sleep(10);
   ok(rows().length - 1 === 1 && /Omar/.test(rows()[1].textContent), "search by name filters the list");
@@ -101,7 +106,7 @@ const find = (id) => rows().slice(1).find(r => r.children[0].textContent.include
   ok(downloads.length === 1 && /^roster_\d{4}-\d\d-\d\d\.csv$/.test(downloads[0].name), "CSV export downloads: " + downloads[0].name);
   const csv = downloads[0].text.replace(/^\ufeff/, "").split("\r\n");
   ok(csv[0].startsWith("student_id,name,present,total,percent,2026-10-11") && csv[0].includes("2026-10-19"), "CSV header has the lecture dates");
-  ok(csv.some(l => l.startsWith("10001,Mona Ali,3,3,100,")) && csv.some(l => l.startsWith("10003,Nour Samir,0,3,0,,,")), "CSV rows: IDs, names, counts, times / blanks");
+  ok(csv.some(l => l.startsWith("10001,Mona Ali,3,3,100,")) && csv.some(l => l.startsWith("10003,Nour Samir,0,3,0,Absent,Absent,Absent")), "CSV rows: IDs, names, counts, Present/Absent");
   ok(csv.some(l => l.includes("'=cmd|calc")) && !csv.some(l => /(^|,)=cmd/.test(l)), "CSV neutralises a name that starts with '=' (spreadsheet formula injection)");
   console.log("\n" + pass + " roster page checks passed"); process.exit(0);
 })().catch(e => { console.error("\nFAIL:", e.message); process.exit(1); });

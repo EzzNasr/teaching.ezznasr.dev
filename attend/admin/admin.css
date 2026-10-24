@@ -41,5 +41,4 @@ th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-a
 table.ros{width:auto;min-width:100%;font-size:14px;white-space:nowrap}
 .ros th{color:var(--mut);font-weight:600}
 .ros th small,.ros td.l small{display:block;color:var(--mut);font-weight:400;font-size:12px}
-.ros th.l,.ros td.l{position:sticky;left:0;background:var(--card);z-index:1}
-.ros td.pre{color:#bbf7d0}.ros td.rev{color:#fde68a}.ros td.abs{color:var(--mut);text-align:center}
+.ros td.pre{color:#bbf7d0;font-weight:700;text-align:center}.ros td.abs{color:var(--mut);text-align:center}

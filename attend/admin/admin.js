@@ -234,7 +234,8 @@
   var fTime = new Intl.DateTimeFormat("en-GB", { timeZone: CFG.TZ, hour: "2-digit", minute: "2-digit", hour12: false });
   function loadRoster() {
     msg("rosMsg", "Loading...");
-    A("att_roster", { course: $("rosCourse").value, limit: Number($("rosLimit").value) || 30 }).then(function (r) {
+    // Always fetch plenty of sessions; "show last N" is applied after same-day sessions are merged into one lecture.
+    A("att_roster", { course: $("rosCourse").value, limit: 200 }).then(function (r) {
       if (!r.ok) return msg("rosMsg", "Could not load: " + (r.code || "error"), "err");
       R.d = r;
       var sel = $("rosCourse"), keep = sel.value; clear(sel);
@@ -244,16 +245,26 @@
       renderRoster();
     });
   }
+  // One lecture = one course on one (Cairo) day, however many sessions were started for it.
   function rosterModel() {
-    var d = R.d, q = $("rosSearch").value.trim().toLowerCase(), mark = {};
-    d.marks.forEach(function (m) { mark[m[0] + "|" + m[1]] = { t: m[2], st: m[3] }; });
+    var d = R.d, q = $("rosSearch").value.trim().toLowerCase(), lim = Number($("rosLimit").value) || 30;
+    var groups = [], idx = {};
+    d.sessions.forEach(function (x) {
+      var k = (x.course || "") + "|" + fDate.format(new Date(x.start_utc));
+      if (!(k in idx)) { idx[k] = groups.length; groups.push({ start_utc: x.start_utc, course: x.course, ids: {} }); }
+      groups[idx[k]].ids[x.session_id] = 1;
+    });
+    groups = groups.slice(-lim);
+    var gOf = {}; groups.forEach(function (g, i) { Object.keys(g.ids).forEach(function (id) { gOf[id] = i; }); });
+    var here = {}; // "groupIndex|studentId" -> attended
+    d.marks.forEach(function (m) { if (m[0] in gOf) here[gOf[m[0]] + "|" + m[1]] = true; });
     var rows = d.students.filter(function (s) { return !q || String(s.student_id).toLowerCase().indexOf(q) >= 0 || String(s.name || "").toLowerCase().indexOf(q) >= 0; })
       .map(function (s) {
-        var cells = d.sessions.map(function (x) { return mark[x.session_id + "|" + s.student_id] || null; });
+        var cells = groups.map(function (g, i) { return !!here[i + "|" + s.student_id]; });
         var n = cells.filter(Boolean).length;
-        return { id: s.student_id, name: s.name || "", cells: cells, n: n, pct: d.sessions.length ? Math.round(100 * n / d.sessions.length) : 0 };
+        return { id: s.student_id, name: s.name || "", cells: cells, n: n, pct: groups.length ? Math.round(100 * n / groups.length) : 0 };
       }).sort(function (a, b) { return (a.name || "\uffff").localeCompare(b.name || "\uffff") || String(a.id).localeCompare(String(b.id)); });
-    return { sessions: d.sessions, rows: rows };
+    return { sessions: groups, rows: rows };
   }
   function renderRoster() {
     var box = $("rosTable"); clear(box);
@@ -261,8 +272,7 @@
     msg("rosMsg", m.rows.length + " student" + (m.rows.length === 1 ? "" : "s") + " \u00b7 " + m.sessions.length + " lecture" + (m.sessions.length === 1 ? "" : "s"));
     if (!m.rows.length) return;
     var t = mk("table", null, "ros"), h = mk("tr");
-    var th0 = mk("th", "Student", "l"); h.appendChild(th0);
-    h.appendChild(mk("th", "Present")); h.appendChild(mk("th", "%"));
+    h.appendChild(mk("th", "Student", "l")); h.appendChild(mk("th", "Present")); h.appendChild(mk("th", "%"));
     m.sessions.forEach(function (x) {
       var th = mk("th", fDay.format(new Date(x.start_utc))); th.appendChild(mk("small", x.course || "")); h.appendChild(th);
     });
@@ -271,11 +281,7 @@
       var tr = mk("tr"), td0 = mk("td", null, "l");
       td0.appendChild(mk("b", r.name || "(no name)")); td0.appendChild(mk("small", String(r.id))); tr.appendChild(td0);
       tr.appendChild(mk("td", r.n + " / " + m.sessions.length)); tr.appendChild(mk("td", r.pct + "%"));
-      r.cells.forEach(function (c) {
-        if (!c) { tr.appendChild(mk("td", "\u2013", "abs")); return; }
-        var rev = c.st === "review";
-        tr.appendChild(mk("td", fTime.format(new Date(c.t)) + (rev ? " \u2691" : ""), rev ? "rev" : "pre"));
-      });
+      r.cells.forEach(function (c) { tr.appendChild(c ? mk("td", "\u2713", "pre") : mk("td", "\u2013", "abs")); });
       t.appendChild(tr);
     });
     box.appendChild(t);
@@ -288,10 +294,10 @@
   function exportRoster() {
     if (!R.d) return msg("rosMsg", "Nothing loaded yet.", "err");
     var m = rosterModel();
-    var head = ["student_id", "name", "present", "total", "percent"].concat(m.sessions.map(function (x) { return fDate.format(new Date(x.start_utc)) + " " + fTime.format(new Date(x.start_utc)) + " " + (x.course || ""); }));
+    var head = ["student_id", "name", "present", "total", "percent"].concat(m.sessions.map(function (x) { return fDate.format(new Date(x.start_utc)) + " " + (x.course || ""); }));
     var lines = [head.map(csvCell).join(",")];
     m.rows.forEach(function (r) {
-      lines.push([r.id, r.name, r.n, m.sessions.length, r.pct].concat(r.cells.map(function (c) { return c ? fTime.format(new Date(c.t)) + (c.st === "review" ? " (flagged)" : "") : ""; })).map(csvCell).join(","));
+      lines.push([r.id, r.name, r.n, m.sessions.length, r.pct].concat(r.cells.map(function (c) { return c ? "Present" : "Absent"; })).map(csvCell).join(","));
     });
     var blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
     var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -356,7 +362,7 @@
     $("rosRefresh").onclick = loadRoster;
     $("rosCsv").onclick = exportRoster;
     $("rosCourse").onchange = loadRoster;
-    $("rosLimit").onchange = loadRoster;
+    $("rosLimit").onchange = function () { if (R.d) renderRoster(); else loadRoster(); };
     $("rosSearch").addEventListener("input", function () { if (R.d) renderRoster(); });
     $("fsBtn").onclick = function () { var d = document.documentElement; (document.fullscreenElement ? document.exitFullscreen() : (d.requestFullscreen && d.requestFullscreen())); };
     $("reqBtn").onclick = function () { hideProjector("requests"); };
