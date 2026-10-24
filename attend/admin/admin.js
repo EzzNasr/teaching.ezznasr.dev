@@ -69,10 +69,11 @@
     loadRooms(); tab("session");
   }
   function tab(name) {
-    ["session", "requests", "flagged", "calib"].forEach(function (n) { $("t-" + n).hidden = n !== name; });
+    ["session", "requests", "flagged", "roster", "calib"].forEach(function (n) { $("t-" + n).hidden = n !== name; });
     Array.prototype.forEach.call(document.querySelectorAll("nav [data-tab]"), function (b) { b.classList.toggle("on", b.getAttribute("data-tab") === name); });
     if (name === "requests") loadRequests();
     if (name === "flagged") loadFlagged();
+    if (name === "roster") loadRoster();
   }
 
   // ---------- session + projector ----------
@@ -226,6 +227,79 @@
     });
   }
 
+  // ---------- roster: every student x every lecture ----------
+  var R = { d: null };
+  var fDay = new Intl.DateTimeFormat("en-GB", { timeZone: CFG.TZ, weekday: "short", day: "2-digit", month: "short" });
+  var fDate = new Intl.DateTimeFormat("en-CA", { timeZone: CFG.TZ, year: "numeric", month: "2-digit", day: "2-digit" });
+  var fTime = new Intl.DateTimeFormat("en-GB", { timeZone: CFG.TZ, hour: "2-digit", minute: "2-digit", hour12: false });
+  function loadRoster() {
+    msg("rosMsg", "Loading...");
+    A("att_roster", { course: $("rosCourse").value, limit: Number($("rosLimit").value) || 30 }).then(function (r) {
+      if (!r.ok) return msg("rosMsg", "Could not load: " + (r.code || "error"), "err");
+      R.d = r;
+      var sel = $("rosCourse"), keep = sel.value; clear(sel);
+      var all = mk("option", "All courses"); all.value = ""; sel.appendChild(all);
+      (r.courses || []).forEach(function (c) { var o = mk("option", c); o.value = c; sel.appendChild(o); });
+      sel.value = keep;
+      renderRoster();
+    });
+  }
+  function rosterModel() {
+    var d = R.d, q = $("rosSearch").value.trim().toLowerCase(), mark = {};
+    d.marks.forEach(function (m) { mark[m[0] + "|" + m[1]] = { t: m[2], st: m[3] }; });
+    var rows = d.students.filter(function (s) { return !q || String(s.student_id).toLowerCase().indexOf(q) >= 0 || String(s.name || "").toLowerCase().indexOf(q) >= 0; })
+      .map(function (s) {
+        var cells = d.sessions.map(function (x) { return mark[x.session_id + "|" + s.student_id] || null; });
+        var n = cells.filter(Boolean).length;
+        return { id: s.student_id, name: s.name || "", cells: cells, n: n, pct: d.sessions.length ? Math.round(100 * n / d.sessions.length) : 0 };
+      }).sort(function (a, b) { return (a.name || "\uffff").localeCompare(b.name || "\uffff") || String(a.id).localeCompare(String(b.id)); });
+    return { sessions: d.sessions, rows: rows };
+  }
+  function renderRoster() {
+    var box = $("rosTable"); clear(box);
+    var m = rosterModel();
+    msg("rosMsg", m.rows.length + " student" + (m.rows.length === 1 ? "" : "s") + " \u00b7 " + m.sessions.length + " lecture" + (m.sessions.length === 1 ? "" : "s"));
+    if (!m.rows.length) return;
+    var t = mk("table", null, "ros"), h = mk("tr");
+    var th0 = mk("th", "Student", "l"); h.appendChild(th0);
+    h.appendChild(mk("th", "Present")); h.appendChild(mk("th", "%"));
+    m.sessions.forEach(function (x) {
+      var th = mk("th", fDay.format(new Date(x.start_utc))); th.appendChild(mk("small", x.course || "")); h.appendChild(th);
+    });
+    t.appendChild(h);
+    m.rows.forEach(function (r) {
+      var tr = mk("tr"), td0 = mk("td", null, "l");
+      td0.appendChild(mk("b", r.name || "(no name)")); td0.appendChild(mk("small", String(r.id))); tr.appendChild(td0);
+      tr.appendChild(mk("td", r.n + " / " + m.sessions.length)); tr.appendChild(mk("td", r.pct + "%"));
+      r.cells.forEach(function (c) {
+        if (!c) { tr.appendChild(mk("td", "\u2013", "abs")); return; }
+        var rev = c.st === "review";
+        tr.appendChild(mk("td", fTime.format(new Date(c.t)) + (rev ? " \u2691" : ""), rev ? "rev" : "pre"));
+      });
+      t.appendChild(tr);
+    });
+    box.appendChild(t);
+  }
+  function csvCell(v) {
+    var s = String(v == null ? "" : v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function exportRoster() {
+    if (!R.d) return msg("rosMsg", "Nothing loaded yet.", "err");
+    var m = rosterModel();
+    var head = ["student_id", "name", "present", "total", "percent"].concat(m.sessions.map(function (x) { return fDate.format(new Date(x.start_utc)) + " " + fTime.format(new Date(x.start_utc)) + " " + (x.course || ""); }));
+    var lines = [head.map(csvCell).join(",")];
+    m.rows.forEach(function (r) {
+      lines.push([r.id, r.name, r.n, m.sessions.length, r.pct].concat(r.cells.map(function (c) { return c ? fTime.format(new Date(c.t)) + (c.st === "review" ? " (flagged)" : "") : ""; })).map(csvCell).join(","));
+    });
+    var blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "roster_" + fDate.format(new Date()) + ".csv"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    msg("rosMsg", "Roster exported.", "ok");
+  }
+
   // ---------- CSV ----------
   function exportCSV() {
     A("att_export", { session_id: S.sess }).then(function (r) {
@@ -279,6 +353,11 @@
     $("csvBtn").onclick = exportCSV;
     $("calBtn").onclick = calibrate;
     $("flagRefresh").onclick = loadFlagged;
+    $("rosRefresh").onclick = loadRoster;
+    $("rosCsv").onclick = exportRoster;
+    $("rosCourse").onchange = loadRoster;
+    $("rosLimit").onchange = loadRoster;
+    $("rosSearch").addEventListener("input", function () { if (R.d) renderRoster(); });
     $("fsBtn").onclick = function () { var d = document.documentElement; (document.fullscreenElement ? document.exitFullscreen() : (d.requestFullscreen && d.requestFullscreen())); };
     $("reqBtn").onclick = function () { hideProjector("requests"); };
     $("hideBtn").onclick = function () { hideProjector("session"); };
