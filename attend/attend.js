@@ -30,7 +30,7 @@
   var $ = function (i) { return document.getElementById(i); };
   var el = { clock: $("clock"), sub: $("sub"), welcome: $("welcome"), sid: $("sid"), save: $("save"),
     signup: $("signup"), change: $("change"), msg: $("msg"), name: $("name"), namebox: $("namebox") };
-  var st = { secret: null, fp: null, id: null, recognized: false, ticket: null, ticketExp: 0,
+  var st = { secret: null, fp: null, id: null, name: "", recognized: false, ticket: null, ticketExp: 0,
     closeMs: 0, offset: 0, busy: false, dead: false };
 
   function say(text, kind) { el.msg.textContent = text || ""; el.msg.className = kind || "info"; }
@@ -94,7 +94,8 @@
       return loadAll("att_id");
     }).then(function (id) {
       if (id && CFG.ID_REGEX.test(id)) { st.id = id; st.recognized = true; saveAll("att_id", id); }
-    });
+      return loadAll("att_name");
+    }).then(function (n) { if (st.recognized && n) st.name = String(n).slice(0, 60); });
   }
   // Spec 4: fp = SHA-256 hex of screen|tz|lang|hwConcurrency|webglRenderer.
   // ASSUMPTION: "screen" = widthxheight (CSS px).
@@ -158,7 +159,7 @@
   function render() {
     el.sid.value = st.id || el.sid.value;
     el.sid.readOnly = st.recognized;
-    el.welcome.textContent = st.recognized ? "Welcome, " + st.id : "";
+    el.welcome.textContent = st.recognized ? "Welcome, " + (st.name || st.id) : "";
     el.signup.hidden = st.recognized;
     el.change.hidden = st.recognized;
     el.namebox.hidden = st.recognized;
@@ -170,8 +171,8 @@
   }
   var ROUTE = { ID_TAKEN: 1, ID_BOUND_OTHER_DEVICE: 1, DEVICE_UNKNOWN: 1 };   // -> change-device flow
   function toChangeDevice(id) {
-    if (st.recognized) saveAll("att_id", "");
-    st.recognized = false; st.id = null; render(); el.sid.value = id || el.sid.value;
+    if (st.recognized) { saveAll("att_id", ""); saveAll("att_name", ""); }
+    st.recognized = false; st.id = null; st.name = ""; render(); el.sid.value = id || el.sid.value;
     el.signup.hidden = false; el.change.hidden = false; el.change.className = "pri";
   }
   function errMsg(r, id) {
@@ -183,6 +184,7 @@
   }
   function success(r) {
     st.done = true;
+    if (r.name) { st.name = String(r.name).slice(0, 60); saveAll("att_name", st.name); render(); }
     el.save.classList.add("ok"); el.save.textContent = "\u2713 Saved";
     el.save.disabled = true; el.signup.hidden = true; el.change.hidden = true;
     el.sub.textContent = r.server_utc ? tf.format(new Date(r.server_utc)) : tf.format(new Date(srvNow()));
@@ -218,7 +220,8 @@
     busy(true); say("Registering\u2026", "info");
     return ctx(true).then(function (c) { return api.call("att_signup", pSignup(id, c)); }).then(function (r) {
       if (!r.ok) { errMsg(r, id); return busy(false); }
-      st.id = id; st.recognized = true; return saveAll("att_id", id).then(function () {
+      st.id = id; st.recognized = true; st.name = el.name.value.trim().slice(0, 60); if (st.name) saveAll("att_name", st.name);
+      return saveAll("att_id", id).then(function () {
         render(); busy(false); return attend();   // ASSUMPTION: ticket reusable for signup then attend
       });
     });

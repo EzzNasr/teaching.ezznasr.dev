@@ -251,7 +251,16 @@ function att_attend_(p) {
     flags.forEach(function (f) { att_logFlag_(s.session_id, sid, f, dist == null ? "" : "dist_m=" + Math.round(dist)); });
     att_safeNotify_("flag", { session_id: s.session_id, student_id: sid, flags: flags, status: status });
   }
-  return att_ok_({ status: "recorded", server_utc: res.server_utc }); // flags are NEVER returned
+  // name is additive (not in spec §4): lets the student page say "Welcome, <name>". Flags are NEVER returned.
+  return att_ok_({ status: "recorded", server_utc: res.server_utc, name: att_studentName_(sid) });
+}
+
+/** Display name for a student id (cached 60 s). */
+function att_studentName_(sid) {
+  var c = att_cget_("att:n:" + sid); if (c) return c.n;
+  var r = att_rows_("AttStudents").filter(function (x) { return x.student_id === sid; })[0];
+  var n = r ? String(r.name || "") : "";
+  att_cput_("att:n:" + sid, { n: n }); return n;
 }
 
 function att_changeDevice_(p) {

@@ -38,7 +38,8 @@ Status: written to MASTER-SPEC; **not yet executed in Apps Script** — run the 
 12. `att_change_device` is idempotent per student (an existing pending request returns its `req_id`). Approving a request whose secret matches the student's own revoked device re-activates that row instead of duplicating it.
 13. `att_export` columns: `student_id,name,server_utc,status,flags,dist_m,acc` (UTC; cells starting with `= + - @` are prefixed with `'`).
 14. **`att_roster` (added after the spec, required by the admin Roster tab):** admin-only `{token, course?, limit?}` → `{ok, courses[], sessions[{session_id,start_utc,course}] oldest→newest (last `limit`, default 30, max 200), students[{student_id,name}] (all registered), marks[[session_id,student_id,server_utc,status]]}`.
-15. `att_close_session` is idempotent; sets `close_utc` to the actual close time.
+15. `att_attend` success also returns `name` (additive; empty string if none) so the student page can greet by name.
+16. `att_close_session` is idempotent; sets `close_utc` to the actual close time.
 
 ## For S5
 - Delete `AttStubs.gs`; add the one-line hook and regex edit in `Code.gs`; the Telegram `ad:/dd:` branch calls `att_decideFromTelegram_`.
