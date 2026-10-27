@@ -31,6 +31,13 @@ const post = async body => {
     r = await post({ action: a });                                   // no token: must be refused, and must NOT be "not implemented"
     t(a + ': refused without admin token, and the handler is deployed', r.ok === false && !r.not_implemented && !/Unknown action|Not implemented/i.test(r.error || ''), JSON.stringify(r));
   }
+  // Attendance (Attendance.gs): proves the 4 att*.gs files are pasted AND the router hook is deployed. Writes nothing.
+  r = await post({ action: 'att_status', session_id: 'S-SMOKE-NONE' });
+  t('att_status answers NO_SESSION (Attendance.gs deployed + routed)', r.ok === false && r.code === 'NO_SESSION', JSON.stringify(r));
+  r = await post({ action: 'att_rooms' });
+  t('att_rooms refused without admin token (UNAUTHORIZED, not "Unknown action")', r.ok === false && r.code === 'UNAUTHORIZED', JSON.stringify(r));
+  r = await post({ action: 'att_roster' });
+  t('att_roster refused without admin token', r.ok === false && r.code === 'UNAUTHORIZED', JSON.stringify(r));
   r = await post({ action: 'login_student', phone: '01000000000', password_hash: '0'.repeat(64) });
   t('login with a bogus account is rejected and returns no session', r.ok === false && !r.session_token, JSON.stringify(r));
   r = await post({ action: 'get_quiz', lesson: '__smoke_no_such_lesson__' });

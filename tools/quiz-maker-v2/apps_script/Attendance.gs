@@ -3,7 +3,7 @@
  * All sheet values are written as text (see AttSetup.gs); numbers are re-parsed with Number() on read.
  */
 var ATT_C = {
-  WINDOW_SEC: 10, GRACE_SEC: 3, TICKET_SEC: 90, SESSION_MIN: 5,
+  WINDOW_SEC: 10, GRACE_SEC: 3, TICKET_SEC: 180, SESSION_MIN: 5,
   GEO_RADIUS_M: 100, GEO_WEAK_ACC_M: 150, ID_REGEX: /^[0-9]{4,12}$/,
   NAME_MAX: 60, TOKEN_LEN: 16, CACHE_SEC: 60, LOCK_MS: 25000,
 };

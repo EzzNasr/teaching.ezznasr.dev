@@ -210,6 +210,8 @@
     if (!guard()) return Promise.resolve();
     var id = st.recognized ? st.id : readId();
     if (!id) return say(MESSAGES.BAD_ID, "err"), Promise.resolve();
+    // First-timer who typed ID + name and tapped the big button: register them instead of bouncing them with an error.
+    if (!st.recognized && el.name.value.trim()) return signup();
     busy(true); say("Saving\u2026", "info");
     return ctx(true).then(function (c) { return api.call("att_attend", pAttend(id, c)); }).then(function (r) {
       if (r.ok) { st.id = id; st.recognized = true; saveAll("att_id", id); return success(r); }
