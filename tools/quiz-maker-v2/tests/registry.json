@@ -651,6 +651,46 @@
         "../.."
       ],
       "note": "Was unregistered and failing: commit 8bbd0ec had silently removed the alias block from dashboard/access.html. Restored; registered so it cannot regress unnoticed. (Its header used to say R-024, which is the written-totals case.)"
+    },
+    {
+      "id": "R-A01",
+      "title": "Attendance flags (AttFlags.gs): GEO_FAR/WEAK/DENIED, SAME_PHONE_MULTI_ID, IDENTICAL_COORDS, REPEATED",
+      "cmd": [
+        "node",
+        "../../tests/attendance/flags.test.js"
+      ],
+      "status": "active",
+      "owner": "S5"
+    },
+    {
+      "id": "R-A02",
+      "title": "Attendance end to end: real .gs + real client crypto/api, Telegram ad:/dd:, flags, roster, export",
+      "cmd": [
+        "node",
+        "../../tests/attendance/e2e.test.js"
+      ],
+      "status": "active",
+      "owner": "S5"
+    },
+    {
+      "id": "R-A03",
+      "title": "Attendance admin roster page against the real server code",
+      "cmd": [
+        "node",
+        "../../tests/attendance/admin_roster.test.js"
+      ],
+      "status": "active",
+      "owner": "S5"
+    },
+    {
+      "id": "R-A04",
+      "title": "Code.gs routes att_* to att_dispatch_ and Telegram ad:/dd: taps to att_decideFromTelegram_ (payments ap:/rj: unchanged)",
+      "cmd": [
+        "node",
+        "tests/test_attendance_wiring.js"
+      ],
+      "status": "active",
+      "owner": "S5"
     }
   ]
 }

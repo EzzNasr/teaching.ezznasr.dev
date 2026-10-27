@@ -423,42 +423,52 @@ function handleTelegramUpdate(e, update) {
     if (!secret || !e || !e.parameter || e.parameter.tg !== secret) return _json({ ok: true });
     var cq = update && update.callback_query;
     if (!cq || !cq.from || !cq.data) return _json({ ok: true });
-    if (_tgAdminIds().indexOf(String(cq.from.id)) === -1) return _json({ ok: true });
 
-    var m = /^(ap|rj):(\S+)$/.exec(String(cq.data));
+    // ap:/rj: = payment approve/reject (payments bot); ad:/dd: = attendance device approve/deny (attendance bot, AttTelegram.gs).
+    var m = /^(ap|rj|ad|dd):(\S+)$/.exec(String(cq.data));
     if (!m) return _json({ ok: true });
+    var isAtt = m[1] === "ad" || m[1] === "dd";
+    var adminIds = isAtt ? att_tgAdminIds_() : _tgAdminIds();
+    var call = isAtt ? att_tgCall_ : _tgCall;
+    if (adminIds.indexOf(String(cq.from.id)) === -1) return _json({ ok: true });
+
     // Apps Script answers a POST with a redirect, which Telegram counts as a failure and
     // RETRIES. Each update_id is handled once; retries are ignored.
     var seenKey = "tgu:" + update.update_id, cache = CacheService.getScriptCache();
     if (cache.get(seenKey)) return _json({ ok: true });
     cache.put(seenKey, "1", 21600);
-    var approve = m[1] === "ap";
+    var approve = m[1] === "ap" || m[1] === "ad";
     console.log("telegram tap: " + m[1] + " " + m[2] + " from " + cq.from.id);
     // Clear the button spinner FIRST — the sheet work below can take several seconds
     // and Telegram drops the spinner-clearing call if it comes too late.
-    _tgCall("answerCallbackQuery", { callback_query_id: cq.id });
+    call("answerCallbackQuery", { callback_query_id: cq.id });
     var chatId = cq.message && cq.message.chat ? cq.message.chat.id : cq.from.id;
     try {
-      handleAdminDecidePayment({
-        token: _props().getProperty("ADMIN_TOKEN"),
-        payment_id: m[2],
-        decision: approve ? "approve" : "reject",
-      });
-      var verdict = approve ? "\u2705 Approved" : "\u274c Rejected";
+      var verdict;
+      if (isAtt) {
+        verdict = att_decideFromTelegram_(m[2], approve);   // returns the verdict line itself, never throws
+      } else {
+        handleAdminDecidePayment({
+          token: _props().getProperty("ADMIN_TOKEN"),
+          payment_id: m[2],
+          decision: approve ? "approve" : "reject",
+        });
+        verdict = approve ? "\u2705 Approved" : "\u274c Rejected";
+      }
       if (cq.message) {
-        _tgCall("editMessageText", {
+        call("editMessageText", {
           chat_id: chatId, message_id: cq.message.message_id,
           text: String(cq.message.text || "") + "\n\n" + verdict,
           entities: cq.message.entities || [],
         });
       } else {
-        _tgCall("sendMessage", { chat_id: chatId, text: verdict });
+        call("sendMessage", { chat_id: chatId, text: verdict });
       }
     } catch (err) {
       console.error("telegram decision failed: " + err);
       var msg = String(err.message || err);
       if (!/already (approved|rejected|revoked)/i.test(msg)) {   // a stale tap is not worth a message
-        _tgCall("sendMessage", { chat_id: chatId, text: "\u26a0\ufe0f " + msg.slice(0, 300) });
+        call("sendMessage", { chat_id: chatId, text: "\u26a0\ufe0f " + msg.slice(0, 300) });
       }
     }
   } catch (err) {
@@ -1376,6 +1386,8 @@ function doPost(e) {
         return _json(_p2Call("p2_admin_migrate_lesson_keys", payload));
 
       default:
+        // Attendance system (Attendance.gs): every action is prefixed att_ and answers its own {ok, code} shape.
+        if (String(payload.action || "").indexOf("att_") === 0) return _json(att_dispatch_(payload));
         return _json({ ok: false, error: "Unknown action: " + payload.action });
     }
   } catch (err) {
@@ -5115,8 +5127,6 @@ function p2_admin_migrate_lesson_keys(payload) {
 // ============================================================================
 // ===== MERGED FROM Phase2_Capture.gs =====
 // ============================================================================
-
-// ============================================================================
 // Phase2_Capture.gs  (Session 3: student capture + deferred answers)
 //
 // Paste into the same Apps Script project as Code.gs (File > New > Script).
@@ -5152,9 +5162,10 @@ function _p2cWrittenSheet() { return _gAnswersSheet(); }   // S4 owns the tab la
 // Stable id for a question: its own "id" if it has one, else its position.
 function _p2cQid(q, i) {
   if (q && q.id !== undefined && q.id !== null && q.id !== "") return String(q.id);
-  if (q && q.qid !== undefined && q.qid !== null && q.qid !== "") return String(q.qid);
+  if (q && q.qid !== undefined && q.qid !== null && q.qid !== "") return String(q.qid);   // written questions carry qid, not id
   return String(i);
 }
+
 function _p2cMaxMarks(q) {
   var m = Number(q && q.max_marks);
   return isFinite(m) && m >= 1 ? Math.min(100, Math.floor(m)) : 1;
@@ -5474,8 +5485,6 @@ function p2_get_quiz_review(payload) {
            pending: items.filter(function (x) { return x.status === "pending"; }).length } };
 }
 
-
-// ============================================================================
 // ===== MERGED FROM Phase2_Grading.gs =====
 // ============================================================================
 

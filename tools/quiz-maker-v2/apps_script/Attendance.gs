@@ -1,5 +1,5 @@
 /* Attendance.gs — Session 1 (backend core). Implements MASTER-SPEC §2–§4. Entry point: att_dispatch_(payload).
- * Depends only through the §5 interface on: att_runFlags_(ctx) and att_notify_(event,data)  (AttStubs.gs until S2 lands).
+ * Depends only through the §5 interface on: att_runFlags_(ctx) and att_notify_(event,data)  (AttFlags.gs / AttTelegram.gs).
  * All sheet values are written as text (see AttSetup.gs); numbers are re-parsed with Number() on read.
  */
 var ATT_C = {
@@ -180,6 +180,7 @@ function att_signup_(p) {
   if (!ATT_C.ID_REGEX.test(sid)) return att_err_("BAD_ID");
   var secret = String(p.secret || ""); if (secret.length < 8) return att_err_("BAD_REQUEST", "Missing device secret");
   var name = String(p.name || "").trim().slice(0, ATT_C.NAME_MAX);
+  if (!name) return att_err_("NAME_REQUIRED", "Name required");
   var hash = att_sha256Hex_(secret), deviceId = "D-" + hash.slice(0, 16), nowIso = att_iso_();
   var res = att_withLock_(function () {
     if (att_rows_("AttStudents").some(function (x) { return x.student_id === sid; })) return att_err_("ID_TAKEN");
@@ -206,8 +207,11 @@ function att_attend_(p) {
   var s = att_getSession_(t.s); if (!s) return att_err_("NO_SESSION");
   if (!att_isOpen_(s, Date.now())) return att_err_("SESSION_CLOSED");
   var sid = String(p.student_id || "").trim(), secret = String(p.secret || "");
+  if (!ATT_C.ID_REGEX.test(sid)) return att_err_("BAD_ID");
   var dev = secret ? att_getDevice_(att_sha256Hex_(secret)) : null;
   var hard = null;
+  // A first-timer (ID and device both unknown) is not an incident: tell the page to register them, log nothing.
+  if (!dev && !att_rows_("AttStudents").some(function (x) { return x.student_id === sid; })) return att_err_("UNKNOWN_STUDENT");
   if (!dev) hard = "DEVICE_UNKNOWN";
   else if (dev.status !== "active") hard = (dev.student_id === sid) ? "ID_BOUND_OTHER_DEVICE" : "DEVICE_UNKNOWN";
   else if (dev.student_id !== sid) hard = "DEVICE_ID_CONFLICT";
@@ -301,6 +305,12 @@ function att_startSession_(p) {
   var room = null;
   if (p.room_id) { room = att_getRoom_(p.room_id); if (!room) return att_err_("NO_ROOM"); }
   var start = new Date(), close = new Date(start.getTime() + ATT_C.SESSION_MIN * 60000);
+  // Double-tap / second tab: an identical session (same course + room) opened in the last 20 s is returned, not duplicated.
+  var courseIn = String(p.course || "").slice(0, 100), roomIn = room ? room.room_id : "";
+  var twin = att_rows_("AttSessions").filter(function (x) {
+    return x.status === "open" && x.course === courseIn && x.room_id === roomIn && start.getTime() - Date.parse(x.start_utc) <= 20000;
+  }).pop();
+  if (twin) return att_ok_({ session_id: twin.session_id, session_key: att_sessionKey_(twin.session_id), start_utc: twin.start_utc, close_utc: twin.close_utc });
   var sid = "S-" + start.getTime().toString(36).toUpperCase() + Utilities.getUuid().slice(0, 4).toUpperCase();
   var s = { session_id: sid, course: String(p.course || "").slice(0, 100), room_id: room ? room.room_id : "", start_utc: att_iso_(start), close_utc: att_iso_(close),
     status: "open", hall_lat: room ? room.lat : "", hall_lng: room ? room.lng : "" };
@@ -407,8 +417,15 @@ function att_decideRequest_(p) {
   var r = att_decide_(String(p.req_id || ""), d === "approve");
   return r.ok ? att_ok_({}) : r;
 }
-/** Called by Code.gs handleTelegramUpdate for ad:/dd: callbacks (admin already verified there). */
-function att_decideFromTelegram_(reqId, approve) { return att_decide_(String(reqId || ""), !!approve); }
+/** Called by Code.gs handleTelegramUpdate for ad:/dd: callbacks (admin already verified there).
+ *  Returns the verdict line to append to the Telegram message (never throws). */
+function att_decideFromTelegram_(reqId, approve) {
+  var r;
+  try { r = att_decide_(String(reqId || ""), !!approve); } catch (e) { console.error("decideFromTelegram: " + e); return "\u26A0\uFE0F Not " + (approve ? "approved" : "denied") + ": server error"; }
+  if (r && r.ok) return (approve ? "\u2705 Approved" : "\u274C Denied") + " \u2014 ID " + r.student_id;
+  var why = { ALREADY_DECIDED: "already decided", NO_REQUEST: "request not found", DEVICE_BOUND_OTHER_ID: "that device is bound to another ID", BUSY: "server busy, try again" }[r && r.code] || (r && r.code) || "error";
+  return "\u26A0\uFE0F Not " + (approve ? "approved" : "denied") + ": " + why;
+}
 
 function att_flagged_(p) {
   var names = {}; att_rows_("AttStudents").forEach(function (s) { names[s.student_id] = s.name; });

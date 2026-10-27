@@ -19,6 +19,8 @@
     TICKET_EXPIRED: "QR expired. Scan the screen again.",
     DEVICE_BOUND_OTHER_ID: "DETECTED: this device is registered to another student. Both IDs have been recorded and sent for review.",
     DEVICE_ID_CONFLICT: "DETECTED: this device is registered to another student. Both IDs have been recorded and sent for review.",
+    UNKNOWN_STUDENT: "First time here? Type your name, then tap Sign up (first time).",
+    NAME_REQUIRED: "Type your name to sign up.",
     DEVICE_UNKNOWN: "This device is not recognized for that ID. Tap Change device to request approval.",
     CHANGE_PENDING: "Request sent. Show your student ID to the instructor.",
     GEO_NOTE: "Your location could not be verified inside the lecture hall. This has been recorded for review.",
@@ -180,6 +182,7 @@
     if (r.code === "TICKET_EXPIRED" || r.code === "TOKEN_EXPIRED") { kill(MESSAGES.QR_EXPIRED); return; }
     var own = st.recognized ? st.id : id;
     if (ROUTE[r.code]) toChangeDevice(id);
+    if (r.code === "UNKNOWN_STUDENT" && el.name) { el.signup.hidden = false; el.namebox.hidden = false; try { el.name.focus(); } catch (e) {} }
     say(fmt(MESSAGES[r.code] || (r.code === "NETWORK" ? MESSAGES.NETWORK : MESSAGES.GENERIC), own), "err");
   }
   function success(r) {
@@ -217,6 +220,7 @@
     if (!guard()) return Promise.resolve();
     var id = readId();
     if (!id) return say(MESSAGES.BAD_ID, "err"), Promise.resolve();
+    if (!el.name.value.trim()) { say(MESSAGES.NAME_REQUIRED, "err"); return Promise.resolve(); }
     busy(true); say("Registering\u2026", "info");
     return ctx(true).then(function (c) { return api.call("att_signup", pSignup(id, c)); }).then(function (r) {
       if (!r.ok) { errMsg(r, id); return busy(false); }

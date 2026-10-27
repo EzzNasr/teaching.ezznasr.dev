@@ -1,10 +1,12 @@
 // Minimal Apps Script emulator: loads the real .gs files into a vm context.
 const vm = require("vm"), fs = require("fs"), crypto = require("crypto");
-const GS_DIR = process.env.GS_DIR || "/mnt/user-data/outputs";
+const GS_DIR = process.env.GS_DIR || require("path").join(__dirname, "..", "..", "tools", "quiz-maker-v2", "apps_script");
 const signed = buf => Array.from(buf).map(b => (b > 127 ? b - 256 : b));
 const unsigned = arr => Buffer.from(arr.map(b => (b + 256) % 256));
 function build() {
-  const sheets = {}, props = { ADMIN_TOKEN: "adm-secret" }, cache = {};
+  const sheets = {}, props = { ADMIN_TOKEN: "adm-secret", ATT_TG_BOT_TOKEN: "NEWBOT:token", ATT_TG_ADMIN_IDS: "111" }, cache = {};
+  // Telegram capture: gas.sent = messages (chat/text/markup/token), gas.tgCalls = every API call, gas.triggers = one-shot triggers created
+  const sent = [], tgCalls = [], triggers = [];
   class Sheet {
     constructor(n) { this.name = n; this._g = []; this._cols = 0; }
     getLastRow() { return this._g.filter(r => r.some(c => c !== "")).length ? this._g.length : 0; }
@@ -35,14 +37,28 @@ function build() {
       base64DecodeWebSafe: s => signed(Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64")),
       newBlob: arr => ({ getDataAsString: () => unsigned(arr).toString("utf8") }),
       getUuid: () => crypto.randomUUID(),
+      formatDate: (d, tz, f) => new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d),
     },
     PropertiesService: { getScriptProperties: () => ({ getProperty: k => (k in props ? props[k] : null), setProperty: (k, v) => { props[k] = String(v); } }) },
     CacheService: { getScriptCache: () => ({ get: k => (k in cache ? cache[k] : null), put: (k, v) => { cache[k] = v; }, remove: k => { delete cache[k]; } }) },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
     SpreadsheetApp: { openById: () => ss, getActiveSpreadsheet: () => ss },
+    UrlFetchApp: {
+      fetch: (url, opt) => {
+        const m = /\/bot(.+?)\/(\w+)$/.exec(url), body = JSON.parse(opt.payload);
+        tgCalls.push({ token: m[1], method: m[2], body });
+        if (m[2] === "sendMessage") sent.push({ chat: String(body.chat_id), text: body.text, markup: body.reply_markup || null, token: m[1] });
+        return { getResponseCode: () => 200 };
+      },
+    },
+    ScriptApp: {
+      newTrigger: fn => ({ timeBased: () => ({ after: ms => ({ create: () => { const t = { fn, ms, getHandlerFunction: () => fn }; triggers.push(t); return t; } }) }) }),
+      getProjectTriggers: () => triggers.slice(),
+      deleteTrigger: t => { const i = triggers.indexOf(t); if (i >= 0) triggers.splice(i, 1); },
+    },
   };
   vm.createContext(ctx);
-  ["AttSetup.gs", "Attendance.gs", "AttStubs.gs"].forEach(f => vm.runInContext(fs.readFileSync(GS_DIR + "/" + f, "utf8"), ctx, { filename: f }));
-  return { ctx, sheets, props, run: code => vm.runInContext(code, ctx) };
+  ["AttSetup.gs", "Attendance.gs", "AttFlags.gs", "AttTelegram.gs"].forEach(f => vm.runInContext(fs.readFileSync(GS_DIR + "/" + f, "utf8"), ctx, { filename: f }));
+  return { ctx, sheets, props, sent, tgCalls, triggers, run: code => vm.runInContext(code, ctx) };
 }
 module.exports = { build };

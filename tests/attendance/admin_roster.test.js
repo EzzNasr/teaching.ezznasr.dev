@@ -2,7 +2,7 @@
 const assert = require("assert"), fs = require("fs"), path = require("path"), vm = require("vm"), nodeCrypto = require("crypto");
 process.env.ATT_SINGLE = "1";
 const { build } = require("./gas_emulator.js");
-const site = path.join(__dirname, "..", "site"), adminDir = path.join(site, "attend/admin");
+const site = path.join(__dirname, "..", ".."), adminDir = path.join(site, "attend/admin");
 const gas = build(), D = o => gas.ctx.att_dispatch_(o), A = { token: "adm-secret" };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let pass = 0; const ok = (c, m) => { assert.ok(c, m); pass++; console.log("  ok  " + m); };
