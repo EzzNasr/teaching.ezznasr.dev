@@ -428,8 +428,8 @@ function handleTelegramUpdate(e, update) {
     var m = /^(ap|rj|ad|dd):(\S+)$/.exec(String(cq.data));
     if (!m) return _json({ ok: true });
     var isAtt = m[1] === "ad" || m[1] === "dd";
-    var adminIds = isAtt ? att_tgAdminIds_() : _tgAdminIds();
-    var call = isAtt ? att_tgCall_ : _tgCall;
+    var adminIds = isAtt ? attt_adminIds_() : _tgAdminIds();
+    var call = isAtt ? attt_call_ : _tgCall;
     if (adminIds.indexOf(String(cq.from.id)) === -1) return _json({ ok: true });
 
     // Apps Script answers a POST with a redirect, which Telegram counts as a failure and
@@ -1206,6 +1206,8 @@ function doPost(e) {
 
   _lessonTagsCache = null;   // per-request cache — see _lessonTagsMap
 
+  var attOut = att_route_(e, payload);   // AttendanceAll.gs: att_* actions + the attendance bot webhook (?att_tg=); null for everything else
+  if (attOut) return attOut;
   if (payload && payload.update_id !== undefined) return handleTelegramUpdate(e, payload);   // Telegram webhook
 
   try {
@@ -6467,4 +6469,850 @@ function _p2fuExpireCenterRows(ss, lesson, keys, endYmd) {
       sh.getRange(i + 2, c.expires_at).setNumberFormat("@").setValue(endYmd);
     });
   });
+}
+
+// ============================================================================
+// ===== MERGED FROM Phase3_Flags.gs =====
+// ============================================================================
+
+// Phase3_Flags.gs  (Session S1, Phase 3)
+// Makes the Phase 2 feature switches visible and one-click fixable. Nothing here changes a flag's name or meaning
+// (contract: Follow-up V3 section 2.3-1). Flags are Script Properties; "1" or "true" = on, anything else = off.
+//
+//   p3_setup_enable_followup_flags()   run ONCE from the Apps Script editor: turns the five flags on, logs before/after.
+//   p3_flag_status()                   read-only: what each flag is right now (also logged).
+//   p3_admin_flag_status(payload)      same, as an admin-only action (router line goes in HANDOFF-S1.md).
+//
+// FF_CAMERA note: docs/rollout-checklist.md holds it back until a low-end Android and iOS Safari test passes. Turning it on
+// here is the owner's decision; the log line below repeats the reminder.
+
+var P3_FOLLOWUP_FLAGS = ["FF_PARENT_LOG", "FF_MONTHLY", "FF_DEFERRED_ANSWERS", "FF_CAMERA", "FF_GRADING"];
+
+function _p3FlagOn(raw) { return raw === "1" || String(raw).toLowerCase() === "true"; }
+
+function _p3FlagSnapshot() {
+  var props = PropertiesService.getScriptProperties(), out = {};
+  P3_FOLLOWUP_FLAGS.forEach(function (n) {
+    var raw = props.getProperty(n);
+    out[n] = { raw: raw === null || raw === undefined ? null : String(raw), on: _p3FlagOn(raw) };
+  });
+  return out;
+}
+
+function p3_flag_status() {
+  var snap = _p3FlagSnapshot();
+  P3_FOLLOWUP_FLAGS.forEach(function (n) { Logger.log(n + " = " + (snap[n].raw === null ? "(not set)" : snap[n].raw) + "  ->  " + (snap[n].on ? "ON" : "OFF")); });
+  return { ok: true, flags: snap };
+}
+
+function p3_admin_flag_status(payload) {
+  _requireAdminAny(payload);
+  return p3_flag_status();
+}
+
+function p3_setup_enable_followup_flags() {
+  var before = _p3FlagSnapshot(), props = PropertiesService.getScriptProperties(), changed = [];
+  P3_FOLLOWUP_FLAGS.forEach(function (n) {
+    if (!before[n].on) { props.setProperty(n, "1"); changed.push(n); }
+  });
+  var after = _p3FlagSnapshot();
+  Logger.log("BEFORE: " + JSON.stringify(before));
+  Logger.log("AFTER:  " + JSON.stringify(after));
+  Logger.log(changed.length ? "Turned ON: " + changed.join(", ") : "Nothing to change: all five flags were already on.");
+  if (changed.indexOf("FF_CAMERA") >= 0) Logger.log("Reminder: FF_CAMERA was held back on purpose (docs/rollout-checklist.md: test on a low-end Android and iOS Safari).");
+  var audited = false;
+  if (typeof p2_audit === "function") audited = p2_audit("editor", "p3_enable_followup_flags", "script-properties", before, after) === true;
+  return { ok: true, changed: changed, before: before, after: after, audited: audited };
+}
+
+
+// ============================================================================
+// ===== MERGED FROM Phase3_Roles.gs =====
+// ============================================================================
+
+// Phase 3 / S3 - Assistant role. Paste into Apps Script as its own file (any order).
+// Contract: docs/followup-v3 plan, section 2.3.  Only declarations here - nothing runs at load time.
+//
+// An ASSISTANT is a normal student account whose Students-sheet `role` cell says "assistant".
+//   - is_admin is NEVER touched: it stays blank, so every admin-only check keeps refusing them.
+//   - The ONLY way in is Code.gs's _requireAdminSession (reached by _requireAdminAny), which calls
+//     p3_assistantAllows() below. It lets a valid, non-stale assistant session through ONLY when
+//     payload.action is in P3_STAFF_ALLOW. Everything else stays admin-only (deny by default).
+//   - The ADMIN_TOKEN (desktop app) path is untouched: _requireAdmin is never consulted for roles.
+//   - The role is re-read from the sheet on every call, so removing it takes effect on the next call.
+
+// The actions an assistant may call. S3 owns this list; nobody else edits it.
+var P3_STAFF_ALLOW = [
+  "admin_followup_overview",
+  "admin_followup_set_attendance",
+  "admin_followup_save_group",
+  "admin_followup_save_templates",
+  "admin_student_summary",
+  "admin_monthly_review",
+  "admin_set_requirement",
+  "admin_log_parent_notification",
+  "admin_list_parent_notifications",
+  "admin_grading_queue",
+  "admin_grade_written",
+  "admin_get_written_models",
+  "get_written_image"
+];
+
+var P3_ROLE_ASSISTANT = "assistant";
+
+function _p3IsStaffAction(action) {
+  return typeof action === "string" && P3_STAFF_ALLOW.indexOf(action) !== -1;
+}
+
+// "admin" | "assistant" | "student" for one Students-sheet row. c = the _studentCols map.
+// A sheet without a `role` column simply has no assistants.
+function _p3RoleOfRow(row, c) {
+  if (c.is_admin && _isTruthyFlag(row[c.is_admin - 1])) return "admin";
+  if (c.role && String(row[c.role - 1] == null ? "" : row[c.role - 1]).trim().toLowerCase() === P3_ROLE_ASSISTANT) return "assistant";
+  return "student";
+}
+
+// Called from _requireAdminSession AFTER the session token has matched. True only for a real
+// assistant (never an admin - admins already passed) asking for an allow-listed action.
+function p3_assistantAllows(row, c, payload) {
+  return _p3RoleOfRow(row, c) === "assistant" && _p3IsStaffAction(payload && payload.action);
+}
+
+// "admin" | "assistant" | "student" | "none" | "stale". Never throws for a bad session.
+function p3_session_role(payload) {
+  if (!payload || !payload.student_id || !payload.session_token) return "none";
+  var values = _students().getDataRange().getValues();
+  var c = _studentCols(values[0]);
+  var target = _normalizePhone(payload.student_id);
+  for (var i = 1; i < values.length; i++) {
+    if (_phonesMatch(values[i][c.phone - 1], target)) {
+      if (String(values[i][c.session_token - 1]) !== String(payload.session_token)) return "stale";
+      return _p3RoleOfRow(values[i], c);
+    }
+  }
+  return "none";
+}
+
+// Router action `p3_session_role`: the page asks "what am I?" so a cached session can't go stale.
+function p3_action_session_role(payload) {
+  return { ok: true, role: p3_session_role(payload) };
+}
+
+// Decorates a login / register / reset / profile reply with `role` (admin|assistant|student).
+// Signature matches the router hook _p2Post(name, resp, payload). Never throws, never fails a login.
+function p3_withRole(resp, payload) {
+  try {
+    if (!resp || resp.ok === false || !resp.student_id) return resp;
+    var values = _students().getDataRange().getValues();
+    var c = _studentCols(values[0]);
+    var target = _normalizePhone(resp.student_id);
+    for (var i = 1; i < values.length; i++) {
+      if (_phonesMatch(values[i][c.phone - 1], target)) { resp.role = _p3RoleOfRow(values[i], c); return resp; }
+    }
+    resp.role = resp.is_admin ? "admin" : "student";
+  } catch (err) {
+    if (resp && typeof resp === "object") resp.role = resp.is_admin ? "admin" : "student";
+  }
+  return resp;
+}
+
+// Adds the `role` header if missing (same additive, self-healing pattern as session_token / is_admin).
+// Returns the 1-based column number. Never touches existing rows.
+function _p3EnsureRoleColumn(sheet) {
+  var last = sheet.getLastColumn();
+  var headers = sheet.getRange(1, 1, 1, last).getValues()[0];
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i]).trim() === "role") return i + 1;
+  }
+  if (typeof sheet.getMaxColumns === "function" && last >= sheet.getMaxColumns()) sheet.insertColumnAfter(last);
+  sheet.getRange(1, last + 1).setValue("role");
+  return last + 1;
+}
+
+function _p3Who(payload) {
+  return payload && payload.student_id ? String(payload.student_id) : "admin-token";
+}
+
+// admin_only. payload: {phone, role}  role: "assistant" | "" (or "student") to remove.
+// The target must already be a student account. Admins can't be changed here, and "admin" can
+// never be granted through the web: is_admin stays a by-hand flag in the Sheet.
+function p3_admin_set_role(payload) {
+  _requireAdminAny(payload);
+  payload = payload || {};
+  var phone = _normalizePhone(payload.phone);
+  if (!phone) throw new Error("Missing phone number.");
+  var role = String(payload.role == null ? "" : payload.role).trim().toLowerCase();
+  if (role === "student") role = "";
+  if (role === "admin") throw new Error("Admin can only be set by hand in the Students sheet.");
+  if (role !== "" && role !== P3_ROLE_ASSISTANT) throw new Error("Unknown role.");
+  var res = _withLock(function () {
+    var sheet = _students();
+    var roleCol = _p3EnsureRoleColumn(sheet);
+    var found = _findStudentRow(sheet, phone);
+    if (!found) throw new Error("No student account with that phone number.");
+    if (found.is_admin) throw new Error("This account is an admin; its role can't be changed here.");
+    var cur = sheet.getRange(found.row, roleCol, 1, 1).getValues()[0][0];
+    var before = String(cur == null ? "" : cur).trim().toLowerCase();
+    if (before !== P3_ROLE_ASSISTANT) before = "";
+    sheet.getRange(found.row, roleCol).setValue(role);
+    return {
+      ok: true, phone: _restoreLeadingZero(String(found.phone)), name: String(found.display_name == null ? "" : found.display_name),
+      role: role === "" ? "student" : role, changed: before !== role
+    };
+  });
+  if (res.changed) p2_audit(_p3Who(payload), "p3_admin_set_role", res.phone, { role: res.role === "student" ? P3_ROLE_ASSISTANT : "" }, { role: res.role === "student" ? "" : res.role });
+  return res;
+}
+
+// admin_only. Lists staff (admins read-only + assistants) and the allow-list the role grants.
+function p3_admin_list_staff(payload) {
+  _requireAdminAny(payload);
+  var values = _students().getDataRange().getValues();
+  var c = _studentCols(values[0]);
+  var staff = [];
+  for (var i = 1; i < values.length; i++) {
+    var role = _p3RoleOfRow(values[i], c);
+    if (role === "student") continue;
+    staff.push({
+      phone: _restoreLeadingZero(String(values[i][c.phone - 1])),
+      name: String(values[i][c.display_name - 1] == null ? "" : values[i][c.display_name - 1]),
+      role: role,
+      year: c.year ? String(values[i][c.year - 1] || "") : ""
+    });
+  }
+  return { ok: true, staff: staff, allow: P3_STAFF_ALLOW.slice() };
+}
+
+
+// ============================================================================
+// ===== MERGED FROM Phase3_Recovery.gs =====
+// ============================================================================
+
+// ============================================================================
+// Phase3_Recovery.gs  (Phase 3, Session 2)
+//
+// Finds homework that students handed in but that never reached the Submissions
+// sheet, and gets it back where that is possible.
+//
+//   p3_diagnose_submissions()        READ-ONLY (except the report tab it writes). Run from the editor.
+//   p3_restore_submissions(opts)     dry-run by default. Wraps the existing _restoreFromDrive.
+//   p3_admin_backfill_submission(p)  admin-only manual row for a student who shows you their result.
+//
+// Router actions (paste into Code.gs doPost with the other Phase 3 cases, see HANDOFF-S2.md):
+//   p3_admin_diagnose_submissions / p3_admin_restore_submissions / p3_admin_backfill_submission
+//
+// The three failure cases (plan section 1.4):
+//   A  the submission reached the server: a "--meta.json" is in the Drive SUBMISSIONS folder but the
+//      Submissions sheet has no row.                          -> p3_restore_submissions
+//   B  photos landed (WrittenAnswers rows) but the submission itself was never posted.
+//                                                              -> p3_admin_backfill_submission
+//   C  nothing reached the server. Only the student's browser has it.
+//                                                              -> the page re-sends it on the next visit
+//                                                                 (assign.js), or p3_admin_backfill_submission
+//
+// Also reports H2 (a group lesson key that matches no lesson folder) and H3 (which spreadsheet the
+// dashboards are reading Submissions / QuizResults from).
+//
+// Uses only helpers that already exist in Code.gs. New names carry the p3_ prefix.
+// ============================================================================
+
+var P3_REC_TAB = "RecoveryReport";
+var P3_REC_HEADERS = ["checked_at", "kind", "student", "name", "group", "lesson", "case", "due", "due_passed", "detail"];
+var P3_REC_DRIVE_LIMIT_MS = 4 * 60 * 1000;   // Apps Script stops at 6 minutes
+
+// ---- small helpers --------------------------------------------------------------------------------
+
+function _p3rSlug(raw) { return _p2fuSlug(raw); }
+function _p3rSubject(raw) { return String(raw == null ? "" : raw).trim().toLowerCase(); }
+
+// Every "--meta.json" in the submissions folder, indexed by phoneKey|subject|slug.
+function _p3rIndexDriveMeta() {
+  var out = { byKey: {}, scanned: 0, files: 0, timedOut: false, error: "" };
+  var started = Date.now();
+  try {
+    var it = _folder("SUBMISSIONS_FOLDER_ID").getFiles();
+    while (it.hasNext()) {
+      if (Date.now() - started > P3_REC_DRIVE_LIMIT_MS) { out.timedOut = true; break; }
+      var f = it.next();
+      out.files++;
+      var name = String(f.getName() || "");
+      if (name.slice(-"--meta.json".length) !== "--meta.json") continue;
+      out.scanned++;
+      var d;
+      try { d = JSON.parse(f.getBlob().getDataAsString()); } catch (e) { continue; }
+      if (!d || !d.student_id) continue;
+      var k = [_phoneKey(d.student_id), _p3rSubject(d.subject), _p3rSlug(d.lesson)].join("|");
+      (out.byKey[k] = out.byKey[k] || []).push({ file: name, submitted_time: d.submitted_time || "", type: d.submission_type || "" });
+    }
+  } catch (e) {
+    out.error = String(e && e.message || e);
+  }
+  return out;
+}
+
+// ---- 1. diagnosis ----------------------------------------------------------------------------------
+
+// Core: returns the report object, touches nothing.
+function p3_diagnose_core() {
+  var ss = _ss(), dataSs = _dataSs();
+  var X = _p2fuLoad(ss, dataSs);
+  var drive = _p3rIndexDriveMeta();
+
+  // photos that landed: phoneKey|slug -> count of WrittenAnswers rows
+  var photos = {};
+  X.written.forEach(function (r) {
+    var pk = _phoneKey(r.student_id || r.student);
+    if (!pk) return;
+    var k = pk + "|" + _p3rSlug(r.lesson);
+    photos[k] = (photos[k] || 0) + 1;
+  });
+
+  var items = [], seen = {};
+  var counts = { A: 0, B: 0, C: 0, expected: 0, done: 0, due_passed_missing: 0 };
+
+  X.groups.forEach(function (g) {
+    var rv = g.settings.review_lessons || [];
+    var hwL = g.settings.hw_lessons || rv;
+    var groupDue = _p2fuHwDue(g.settings, X.today, X.hm, X.cfg);
+    hwL.forEach(function (raw) {
+      var lesson = _p2fuCanon(raw); if (!lesson) return;
+      var rq = _p2fuReq(X.req, lesson);
+      if (!rq.homework_required) return;                        // an optional homework cannot be "missing"
+      var subject = _firstSegment(lesson), slug = _p3rSlug(lesson);
+      var due = rq.due_override || groupDue || "";
+      var duePassed = !due || X.today > due;
+      g.members.forEach(function (pk) {
+        var st = X.students[pk]; if (!st || st.admin) return;
+        var once = pk + "|" + lesson; if (seen[once]) return; seen[once] = true;
+        counts.expected++;
+        var done = (X.hw[pk] || []).some(function (r) { return r.slug === slug && (r.subject === "" || r.subject === subject); });
+        if (done) { counts.done++; return; }
+        var dk = pk + "|" + subject + "|" + slug;
+        var metas = drive.byKey[dk] || drive.byKey[pk + "||" + slug] || [];
+        var nPhotos = photos[pk + "|" + slug] || 0;
+        var kase, detail;
+        if (metas.length) {
+          kase = "A";
+          detail = metas.length + " file(s) in Drive (" + metas[metas.length - 1].file + "), no Sheet row. Run p3_restore_submissions." +
+                   (nPhotos ? " Photos also found (" + nPhotos + ")." : "");
+        } else if (nPhotos) {
+          kase = "B";
+          detail = nPhotos + " photo answer(s) in WrittenAnswers but no submission. Ask the student for the score, then p3_admin_backfill_submission.";
+        } else {
+          kase = "C";
+          detail = "Nothing on the server. Only the student's own browser may still hold it: ask them to open the lesson page on the same device, or back-fill it by hand.";
+        }
+        counts[kase]++;
+        if (duePassed) counts.due_passed_missing++;
+        items.push({ student: st.phone, name: st.name, group: g.group, lesson: lesson, "case": kase, due: due, due_passed: duePassed, detail: detail });
+      });
+    });
+  });
+
+  // H2: a group lesson key that matches no lesson folder (a rename nobody aliased)
+  var h2 = [];
+  if (X.lessonsError) {
+    h2.push({ lesson: "", detail: "H2 skipped: the lesson list could not be read from GitHub (" + X.lessonsError + ")." });
+  } else {
+    var checked = {};
+    X.groups.forEach(function (g) {
+      (g.settings.review_lessons || []).concat(g.settings.hw_lessons || [], g.settings.quiz_lessons || []).forEach(function (raw) {
+        var lesson = _p2fuCanon(raw); if (!lesson || checked[lesson]) return; checked[lesson] = true;
+        var hit = X.pathBySlug[_firstSegment(lesson) + "|" + _p3rSlug(lesson)];
+        if (!hit || !hit.length) h2.push({ lesson: lesson, group: g.group, detail: "No lesson folder has this slug. Students' submissions are filed under the real folder name, so this lesson will always look missing. Fix the key or add an alias." });
+      });
+    });
+  }
+
+  // H3: which spreadsheet are Submissions / QuizResults being read from
+  function tabInfo(book, name) { var sh = book.getSheetByName(name); return { exists: !!sh, rows: sh ? Math.max(0, sh.getLastRow() - 1) : 0 }; }
+  var h3 = {
+    data_sheet_id: String(_props().getProperty("DATA_SHEET_ID") || ""),
+    students_sheet_id: String(_props().getProperty("STUDENTS_SHEET_ID") || ""),
+    dashboards_read_from: dataSs.getId(),
+    separate_data_sheet: !!_props().getProperty("DATA_SHEET_ID") && dataSs.getId() !== ss.getId(),
+    data: { Submissions: tabInfo(dataSs, "Submissions"), QuizResults: tabInfo(dataSs, "QuizResults"), WrittenAnswers: tabInfo(dataSs, "WrittenAnswers") },
+    students_book: { Submissions: tabInfo(ss, "Submissions"), QuizResults: tabInfo(ss, "QuizResults") },
+    note: ""
+  };
+  if (h3.separate_data_sheet && (h3.students_book.Submissions.rows || h3.students_book.QuizResults.rows)) {
+    h3.note = "Submissions/QuizResults rows also exist in the STUDENTS spreadsheet. If recent work went there, the dashboards (which read DATA_SHEET_ID) cannot see it.";
+  } else if (!h3.data.Submissions.rows) {
+    h3.note = "The Submissions tab the dashboards read is empty. Check DATA_SHEET_ID.";
+  }
+
+  return {
+    ok: true, checked_at: _fmt(new Date(), TZ, true), today: X.today,
+    summary: {
+      expected: counts.expected, done: counts.done,
+      missing: counts.A + counts.B + counts.C, missing_due_passed: counts.due_passed_missing,
+      case_A: counts.A, case_B: counts.B, case_C: counts.C,
+      drive_files: drive.files, drive_meta_scanned: drive.scanned, drive_timed_out: drive.timedOut, drive_error: drive.error
+    },
+    items: items, h2: h2, h3: h3
+  };
+}
+
+// Writes the report to the RecoveryReport tab (replaced every run) and to the log.
+function _p3rWriteReport(rep) {
+  var sh = _sheetByName(_dataSs(), P3_REC_TAB, P3_REC_HEADERS);
+  if (sh.getLastRow() > 1) sh.deleteRows(2, sh.getLastRow() - 1);
+  var rows = [];
+  var at = rep.checked_at;
+  rows.push([at, "summary", "", "", "", "", "", "", "", JSON.stringify(rep.summary)]);
+  rows.push([at, "h3", "", "", "", "", "", "", "", JSON.stringify(rep.h3)]);
+  rep.h2.forEach(function (h) { rows.push([at, "h2", "", "", h.group || "", h.lesson || "", "H2", "", "", h.detail]); });
+  rep.items.forEach(function (i) { rows.push([at, "missing", "'" + i.student, i.name, i.group, i.lesson, i["case"], i.due, i.due_passed ? "yes" : "no", i.detail]); });
+  var need = 1 + rows.length;
+  if (need > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), need - sh.getMaxRows());
+  sh.getRange(2, 1, rows.length, P3_REC_HEADERS.length).setValues(rows);
+  return rows.length;
+}
+
+// Run from the Apps Script editor. Logs a short summary; the details are in the RecoveryReport tab.
+function p3_diagnose_submissions() {
+  var rep = p3_diagnose_core();
+  var n = _p3rWriteReport(rep);
+  var s = rep.summary;
+  Logger.log("Diagnosis: " + s.expected + " expected homework | " + s.done + " found | " + s.missing + " missing (" + s.missing_due_passed + " past due)" +
+    " -> A (restorable from Drive): " + s.case_A + " | B (photos only): " + s.case_B + " | C (nothing on the server): " + s.case_C);
+  Logger.log("Drive: " + s.drive_meta_scanned + " submission files read" + (s.drive_timed_out ? " (STOPPED EARLY, run again)" : "") + (s.drive_error ? " | Drive error: " + s.drive_error : ""));
+  rep.h2.forEach(function (h) { Logger.log("H2: " + (h.lesson ? h.lesson + " - " : "") + h.detail); });
+  Logger.log("H3: dashboards read from " + rep.h3.dashboards_read_from + " | Submissions rows " + rep.h3.data.Submissions.rows + ", QuizResults rows " + rep.h3.data.QuizResults.rows + (rep.h3.note ? " | " + rep.h3.note : ""));
+  Logger.log("Wrote " + n + " rows to the " + P3_REC_TAB + " tab.");
+  return rep;
+}
+
+function p3_admin_diagnose_submissions(payload) {
+  _requireAdminAny(payload);
+  var rep = p3_diagnose_core();
+  if (payload && payload.write_report) _p3rWriteReport(rep);
+  return rep;
+}
+
+// ---- 2. restore (dry run by default) ----------------------------------------------------------------
+
+// opts: {days: 30 (0 = everything), dry_run: true, who?: audit name}. Returns {ok, dry_run, days, scanned, quiz_rows, submission_rows, stopped_early}.
+// dry_run:true runs the real _restoreFromDrive logic with row-writing switched off, so the counts are exactly
+// what a real run would add.
+function p3_restore_submissions(opts) {
+  opts = opts || {};
+  var days = opts.days === undefined || opts.days === null ? 30 : Math.max(0, parseInt(opts.days, 10) || 0);
+  var dry = opts.dry_run !== false;                     // anything but an explicit false is a dry run
+
+  var g = (typeof globalThis !== "undefined") ? globalThis : this;
+  var realAppend = g._appendByHeader, realLog = Logger.log;
+  var added = { QuizResults: 0, Submissions: 0 }, logged = "";
+  g._appendByHeader = function (sheet, rec) {
+    var name = ""; try { name = sheet.getName(); } catch (e) { /* ignore */ }
+    if (added.hasOwnProperty(name)) added[name]++;
+    return dry ? 0 : realAppend(sheet, rec);
+  };
+  Logger.log = function (m) { logged += String(m) + "\n"; };
+  try {
+    _restoreFromDrive(days);
+  } finally {
+    g._appendByHeader = realAppend;
+    Logger.log = realLog;
+  }
+  var scanned = /scanned (\d+)/.exec(logged);
+  var res = {
+    ok: true, dry_run: dry, days: days, scanned: scanned ? +scanned[1] : null,
+    quiz_rows: added.QuizResults, submission_rows: added.Submissions, stopped_early: /STOPPED EARLY/.test(logged)
+  };
+  Logger.log("Restore " + (dry ? "(DRY RUN - nothing written)" : "(APPLIED)") + ": " + res.quiz_rows + " quiz row(s), " + res.submission_rows + " submission row(s)" +
+    (res.stopped_early ? " | STOPPED EARLY (time limit) - run it again" : ""));
+  if (!dry) p2_audit(opts.who || "editor", "p3_restore_submissions", "days=" + days, "", res);
+  return res;
+}
+
+function p3_admin_restore_submissions(payload) {
+  _requireAdminAny(payload);
+  return p3_restore_submissions({ days: payload.days, dry_run: payload.dry_run, who: _p2fuWho(payload) });
+}
+
+// ---- 3. manual back-fill ---------------------------------------------------------------------------
+
+// payload: {student (phone), lesson (path or slug), score, total, note?, subject?, force?}
+// Writes ONE Submissions row, submission_type "graded", source "manual-backfill". Safe to repeat (same student/lesson/score).
+function p3_admin_backfill_submission(payload) {
+  _requireAdminAny(payload);
+  var digits = _normalizePhone(payload.student);
+  if (digits.length < 10) throw new Error("Missing student phone.");
+  var pk = _phoneKey(digits);
+  var student = null;
+  _sheetValuesAsObjects(_students()).forEach(function (r) { if (!student && _phoneKey(r.phone) === pk) student = r; });
+  if (!student) throw new Error("No student account has that phone.");
+
+  var lessonRaw = String(payload.lesson == null ? "" : payload.lesson).trim();
+  if (!lessonRaw) throw new Error("Missing lesson.");
+  var lesson = _p2fuCanon(lessonRaw.indexOf("/") >= 0 ? _lessonPath(lessonRaw) : lessonRaw);
+  var slug = _p3rSlug(lesson);
+  var subject = _p3rSubject(payload.subject) || (lesson.indexOf("/") >= 0 ? _firstSegment(lesson) : "");
+  if (!subject) throw new Error("Give the lesson as a full path (programming/...) or pass subject.");
+
+  var score = parseFloat(payload.score), total = parseFloat(payload.total);
+  if (!isFinite(score) || !isFinite(total) || score < 0 || total <= 0 || score > total) throw new Error("score must be between 0 and total (total above 0).");
+  var note = String(payload.note == null ? "" : payload.note).slice(0, 500);
+
+  var key = ["manual", pk, subject, slug, score, total].join("|");
+  return _withLock(function () {
+    var sheet = _submissionsSheet();
+    _ensureColumns(sheet, ["source"]);
+    var rows = _sheetValuesAsObjects(sheet);
+    var existing = rows.filter(function (r) { return _phoneKey(r.student_id) === pk && _p3rSubject(r.subject) === subject && _p3rSlug(r.lesson) === slug; });
+    if (existing.some(function (r) { return String(r.dedupe_key) === key; })) return { ok: true, duplicate: true };
+    if (existing.length && !payload.force) throw new Error("This student already has a submission for that lesson. Pass force:true to add another row.");
+    var now = new Date(), when = _fmt(now, TZ, true);
+    _appendByHeader(sheet, {
+      student_id: _restoreLeadingZero(String(student.phone == null ? "" : student.phone).trim()), name: String(student.display_name || ""), subject: subject, lesson: slug,
+      submission_type: "graded", text: "", text_truncated: false, url: "", note: "manual-backfill" + (note ? ": " + note : ""),
+      date: _fmt(now, TZ, false), submitted_time: when, score: score, total: total, answers_json: "[]",
+      dedupe_key: key, source: "manual-backfill"
+    });
+    p2_audit(_p2fuWho(payload), "p3_admin_backfill_submission", pk + "|" + subject + "|" + slug, "", { score: score, total: total, note: note });
+    return { ok: true, student: pk, subject: subject, lesson: slug, score: score, total: total };
+  }, UPLOAD_LOCK_WAIT_MS);
+}
+
+
+// ============================================================================
+// ===== MERGED FROM Phase3_BulkAccess.gs =====
+// ============================================================================
+
+/**
+ * Phase3_BulkAccess.gs  (Phase 3, session S4) — bulk lesson / quiz access.
+ *
+ * Paste next to Code.gs. Everything here is prefixed p3_ / _p3 / P3_ (frozen contract §2.3.6).
+ * Router lines are NOT in this file; they are listed in HANDOFF-S4.md ("Shared-file edits"):
+ *
+ *   case "p3_admin_bulk_preview": return _json(p3_admin_bulk_preview(payload));
+ *   case "p3_admin_bulk_grant":   return _json(p3_admin_bulk_grant(payload));
+ *   case "p3_admin_bulk_revoke":  return _json(p3_admin_bulk_revoke(payload));
+ *
+ * Request shape (all three actions):
+ *   { kind: "lesson" | "quiz",
+ *     lessons: [scope|lesson path, ...],        // lesson kind: same scopes admin_grant_access takes ("*", "a/b/*", "a/b/lesson")
+ *     groups:  [group name, ...],               // every current member is a target
+ *     members: [phone, ...],                    // individual students (any phone spelling)
+ *     expires_at? | days? | never?,             // grant only; same fields as the single grant
+ *     mode?: "grant" | "revoke" }               // preview only (default "grant")
+ *
+ * Reply: { ok, applied, skipped, failed:[{target,lesson,error}], ... }.
+ *
+ * Rules are NOT re-implemented for grants: every write goes through the existing single-grant
+ * internals _grantRaw (lessons) and _grantQuizRaw (quizzes), and group targets also call
+ * _rememberGroupGrant so students added to the group later inherit the access, exactly like
+ * admin_group_grant_access / admin_group_grant_quiz_access. The ONLY logic copied from Code.gs is the
+ * revoke row-deletion (the single revoke handlers take the lock themselves, so they cannot be called
+ * from inside our one lock) and the tiny "would this grant change anything" predictor used to skip no-ops.
+ */
+
+var P3_BULK_CAP = 400;   // max (distinct student x lesson) pairs per request
+
+// ---- input ------------------------------------------------------------------------------------
+
+function _p3bArr(v) {
+  if (v === undefined || v === null || v === "") return [];
+  return Array.isArray(v) ? v : [v];
+}
+
+function _p3bKind(payload) {
+  var k = String(payload.kind == null ? "" : payload.kind).trim().toLowerCase();
+  if (k !== "lesson" && k !== "quiz") throw new Error('kind must be "lesson" or "quiz".');
+  return k;
+}
+
+// Lessons -> canonical keys (deduped, order kept). Invalid input rejects the whole request: a typo
+// should never silently shrink the batch.
+function _p3bLessons(payload, kind) {
+  var seen = {}, out = [];
+  _p3bArr(payload.lessons).forEach(function (raw) {
+    var s = kind === "quiz" ? _lessonPath(raw) : _normalizeScope(raw);
+    if (!seen[s]) { seen[s] = 1; out.push(s); }
+  });
+  if (!out.length) throw new Error("Pick at least one " + (kind === "quiz" ? "quiz" : "lesson") + ".");
+  return out;
+}
+
+// Term fields, exactly as the single grant reads them.
+function _p3bTerm(payload) {
+  var explicit = payload.expires_at ? _cleanYmd(payload.expires_at) : "";
+  var days = explicit || payload.never === true ? 0 : _accessDays(payload);
+  return { explicit: explicit, days: days };
+}
+
+// Resolve targets to distinct phones. Returns
+//   { phones: [{phone, source, label}], groups: [{key, spelling, members:[phone]}], failed: [{target, lesson:"", error}] }
+// A phone reached through a group AND listed in members is ONE target (source = first group, so the
+// access stays tied to the group rule).
+function _p3bTargets(ss, payload) {
+  var failed = [], byPhone = {}, order = [], groups = [];
+  var gnames = _p3bArr(payload.groups), mphones = _p3bArr(payload.members);
+  if (!gnames.length && !mphones.length) throw new Error("Pick at least one group or student.");
+
+  if (gnames.length) {
+    var gsheet = ss.getSheetByName("Groups");
+    var spellings = _groupSpellings(gsheet);
+    var seenG = {};
+    gnames.forEach(function (name) {
+      var key = _groupKey(name);
+      if (!key || seenG[key]) return;
+      seenG[key] = 1;
+      var members = _groupMembers(gsheet, key);
+      if (!members.length) { failed.push({ target: String(name), lesson: "", error: "That group has no members yet." }); return; }
+      var spelling = spellings[key] || String(name);
+      var g = { key: key, spelling: spelling, members: [] };
+      members.forEach(function (m) {
+        var ph = _canonicalPhone(m.phone) || String(m.phone);
+        g.members.push(ph);
+        if (!byPhone[ph]) { byPhone[ph] = { phone: ph, source: "group:" + spelling, label: spelling }; order.push(ph); }
+      });
+      groups.push(g);
+    });
+  }
+  var seenM = {};
+  mphones.forEach(function (raw) {
+    if (_normalizePhone(raw).length < 10) { failed.push({ target: String(raw), lesson: "", error: "Enter the student's full phone number." }); return; }
+    var ph = _canonicalPhone(raw);
+    if (seenM[ph]) return;
+    seenM[ph] = 1;
+    if (!byPhone[ph]) { byPhone[ph] = { phone: ph, source: "manual", label: ph }; order.push(ph); }
+  });
+  return { phones: order.map(function (p) { return byPhone[p]; }), groups: groups, failed: failed };
+}
+
+function _p3bCapCheck(nPhones, nLessons) {
+  var pairs = nPhones * nLessons;
+  if (pairs > P3_BULK_CAP) {
+    throw new Error("Too many changes in one go (" + pairs + " = " + nPhones + " students × " + nLessons +
+      " items; the limit is " + P3_BULK_CAP + "). Split it into smaller batches.");
+  }
+  return pairs;
+}
+
+// ---- reading current state (one pass per sheet) -------------------------------------------------
+
+// Index of existing rows: list of {phone, key, ymd, row} for Entitlements (scope) or QuizAccess (lesson).
+function _p3bIndex(ss, kind) {
+  var name = kind === "quiz" ? "QuizAccess" : "Entitlements";
+  var keyCol = kind === "quiz" ? "lesson" : "scope";
+  var sheet = ss.getSheetByName(name);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  var c = _needCols(sheet, name, ["phone", keyCol, "expires_at"]);
+  var tz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  var out = [];
+  for (var i = 0; i < values.length; i++) {
+    out.push({ phone: values[i][c.phone - 1], key: _canonKey(String(values[i][c[keyCol] - 1]).trim().toLowerCase()),
+               ymd: _ymdOf(values[i][c.expires_at - 1], tz), row: i + 2 });
+  }
+  return out;
+}
+
+function _p3bFind(index, phone, key) {
+  for (var i = 0; i < index.length; i++) if (index[i].key === key && _phonesMatch(index[i].phone, phone)) return index[i];
+  return null;
+}
+
+// Mirrors the expiry arithmetic at the top of _grantRaw/_grantQuizRaw, ONLY to decide "would this change anything?".
+// The real write is always done by those functions.
+function _p3bTarget(found, explicit, days) {
+  var today = _todayCairo();
+  var existing = found ? found.ymd : null;
+  var target;
+  if (explicit) target = explicit;
+  else if (days) target = _addDays(existing && existing > today ? existing : today, days);
+  else target = "";
+  if (found && existing === "") target = "";
+  else if (found && existing && target !== "" && existing > target) target = existing;
+  return target;
+}
+
+// ---- preview ------------------------------------------------------------------------------------
+
+function _p3bBuildPlan(ss, payload, mode) {
+  var kind = _p3bKind(payload);
+  var lessons = _p3bLessons(payload, kind);
+  var term = mode === "revoke" ? { explicit: "", days: 0 } : _p3bTerm(payload);
+  var tg = _p3bTargets(ss, payload);
+  var pairs = _p3bCapCheck(tg.phones.length, lessons.length);
+  var index = _p3bIndex(ss, kind);
+  var items = [];
+  tg.phones.forEach(function (p) {
+    lessons.forEach(function (l) {
+      var found = _p3bFind(index, p.phone, l);
+      var change, expires = "";
+      if (mode === "revoke") {
+        change = found ? "revoke" : "skip";
+        expires = found ? found.ymd : "";
+      } else {
+        var target = _p3bTarget(found, term.explicit, term.days);
+        if (found && found.ymd === target) change = "skip";
+        else change = found ? "extend" : "create";
+        expires = target;
+      }
+      items.push({ phone: p.phone, lesson: l, change: change, expires_at: expires, source: p.source });
+    });
+  });
+  return { kind: kind, lessons: lessons, term: term, targets: tg, pairs: pairs, items: items };
+}
+
+function _p3bCounts(items) {
+  var n = { create: 0, extend: 0, revoke: 0, skip: 0 };
+  items.forEach(function (i) { n[i.change]++; });
+  return n;
+}
+
+// Read-only. Tells the UI exactly what apply would do.
+function p3_admin_bulk_preview(payload) {
+  _requireAdminAny(payload);
+  var mode = String(payload.mode || "grant").toLowerCase() === "revoke" ? "revoke" : "grant";
+  var plan = _p3bBuildPlan(_ss(), payload, mode);
+  var n = _p3bCounts(plan.items);
+  return { ok: true, mode: mode, kind: plan.kind, lessons: plan.lessons.length, students: plan.targets.phones.length,
+           total: plan.items.length, would_apply: n.create + n.extend + n.revoke, would_create: n.create, would_extend: n.extend,
+           would_revoke: n.revoke, would_skip: n.skip, failed: plan.targets.failed, cap: P3_BULK_CAP };
+}
+
+// ---- grant --------------------------------------------------------------------------------------
+
+function p3_admin_bulk_grant(payload) {
+  _requireAdminAny(payload);
+  var res = _withLock(function () {
+    var ss = _ss();
+    var plan = _p3bBuildPlan(ss, payload, "grant");
+    var failed = plan.targets.failed.slice();
+    var applied = 0, skipped = 0, created = 0, extended = 0;
+    var sourceOf = {};
+    plan.targets.phones.forEach(function (p) { sourceOf[p.phone] = p.source; });
+
+    plan.items.forEach(function (it) {
+      if (it.change === "skip") { skipped++; return; }
+      try {
+        if (plan.kind === "quiz") _grantQuizRaw(ss, it.phone, it.lesson, plan.term.explicit, plan.term.days, sourceOf[it.phone]);
+        else _grantRaw(ss, it.phone, it.lesson, plan.term.explicit, plan.term.days, sourceOf[it.phone]);
+        applied++;
+        if (it.change === "create") created++; else extended++;
+      } catch (e) {
+        failed.push({ target: it.phone, lesson: it.lesson, error: String(e && e.message || e) });
+      }
+    });
+
+    // Remember group rules (so later joiners inherit the access) — same call the group handlers make.
+    var rules = 0;
+    plan.targets.groups.forEach(function (g) {
+      plan.lessons.forEach(function (l) {
+        try {
+          _rememberGroupGrant(ss, g.key, g.spelling, plan.kind === "quiz" ? "quiz" : "access", l, plan.term.explicit, plan.term.days);
+          rules++;
+        } catch (e) {
+          failed.push({ target: g.spelling, lesson: l, error: "Group rule not saved: " + String(e && e.message || e) });
+        }
+      });
+    });
+    return { ok: true, kind: plan.kind, applied: applied, created: created, extended: extended, skipped: skipped,
+             failed: failed, group_rules: rules, students: plan.targets.phones.length, lessons: plan.lessons.length,
+             groups: plan.targets.groups.map(function (g) { return g.spelling; }) };
+  });
+  _p3bAudit(payload, "p3_admin_bulk_grant", res);
+  return res;
+}
+
+// ---- revoke -------------------------------------------------------------------------------------
+
+// INSIDE the lock. Deletes the matching rows for (phone, key); returns the removed rows' details
+// {removed, expires_at, pays}. Lesson kind also reports the payments behind them, so the caller can mark them revoked
+// (same bookkeeping as handleAdminRevokeAccess).
+function _p3bRevokeOne(ss, kind, phone, key) {
+  var name = kind === "quiz" ? "QuizAccess" : "Entitlements";
+  var keyCol = kind === "quiz" ? "lesson" : "scope";
+  var sheet = ss.getSheetByName(name);
+  if (!sheet || sheet.getLastRow() < 2) return { removed: 0, expires_at: "", pays: [] };
+  var c = _needCols(sheet, name, ["phone", keyCol, "expires_at"]);
+  var tz = sheet.getParent().getSpreadsheetTimeZone() || TZ;
+  var srcCol = kind === "quiz" ? 0 : (_headerIndex(sheet)["source"] || 0);
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  var rows = [], pays = [], ymd = "";
+  for (var i = 0; i < values.length; i++) {
+    if (!_phonesMatch(values[i][c.phone - 1], phone)) continue;
+    if (_canonKey(String(values[i][c[keyCol] - 1]).trim().toLowerCase()) !== key) continue;
+    rows.push(i + 2);
+    ymd = _ymdOf(values[i][c.expires_at - 1], tz) || "";
+    var src = srcCol ? _sourcePayment(values[i][srcCol - 1]) : "";
+    if (src) pays.push(src);
+  }
+  rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
+  return { removed: rows.length, expires_at: ymd, pays: pays };
+}
+
+function _p3bMarkPaymentsRevoked(ss, pays) {
+  var marked = [];
+  var pSheet = pays.length ? ss.getSheetByName("Payments") : null;
+  if (!pSheet || pSheet.getLastRow() < 2) return marked;
+  var pc = _needCols(pSheet, "Payments", ["payment_id", "status", "decided_at"]);
+  var pv = pSheet.getRange(2, 1, pSheet.getLastRow() - 1, pSheet.getLastColumn()).getValues();
+  var now = _fmt(new Date(), TZ, true);
+  for (var k = 0; k < pv.length; k++) {
+    var id = String(pv[k][pc.payment_id - 1]).trim();
+    if (pays.indexOf(id) === -1 || String(pv[k][pc.status - 1]).trim().toLowerCase() !== "approved") continue;
+    pSheet.getRange(k + 2, pc.status).setNumberFormat("@").setValue("revoked");
+    pSheet.getRange(k + 2, pc.decided_at).setNumberFormat("@").setValue(now);
+    marked.push(id);
+  }
+  return marked;
+}
+
+function p3_admin_bulk_revoke(payload) {
+  _requireAdminAny(payload);
+  var res = _withLock(function () {
+    var ss = _ss();
+    var plan = _p3bBuildPlan(ss, payload, "revoke");
+    var failed = plan.targets.failed.slice();
+    var applied = 0, skipped = 0, allPays = [];
+    var revoked = [];   // for the undo hint: what to re-grant
+
+    plan.items.forEach(function (it) {
+      if (it.change === "skip") { skipped++; return; }
+      try {
+        var r = _p3bRevokeOne(ss, plan.kind, it.phone, it.lesson);
+        if (!r.removed) { skipped++; return; }
+        applied++;
+        allPays = allPays.concat(r.pays);
+        revoked.push({ phone: it.phone, lesson: it.lesson, expires_at: r.expires_at });
+      } catch (e) {
+        failed.push({ target: it.phone, lesson: it.lesson, error: String(e && e.message || e) });
+      }
+    });
+    var paymentsRevoked = [];
+    try { paymentsRevoked = _p3bMarkPaymentsRevoked(ss, allPays); }
+    catch (e) { failed.push({ target: "payments", lesson: "", error: "Payment rows not marked revoked: " + String(e && e.message || e) }); }
+
+    // A group target also drops the group's standing rule for that item, like the group revoke handlers.
+    var rules = 0;
+    plan.targets.groups.forEach(function (g) {
+      plan.lessons.forEach(function (l) {
+        try { rules += _forgetGroupGrants(ss, g.key, plan.kind === "quiz" ? "quiz" : "access", l) > 0 ? 1 : 0; }
+        catch (e) { failed.push({ target: g.spelling, lesson: l, error: "Group rule not removed: " + String(e && e.message || e) }); }
+      });
+    });
+    return { ok: true, kind: plan.kind, applied: applied, skipped: skipped, failed: failed, revoked: revoked,
+             payments_revoked: paymentsRevoked, group_rules_removed: rules,
+             students: plan.targets.phones.length, lessons: plan.lessons.length };
+  });
+  _p3bAudit(payload, "p3_admin_bulk_revoke", res);
+  return res;
+}
+
+// ---- audit --------------------------------------------------------------------------------------
+
+function _p3bAudit(payload, action, res) {
+  try {
+    var who = payload.student_id && !payload.token ? payload.student_id : "token";
+    var target = _p3bArr(payload.groups).concat(_p3bArr(payload.members)).join(",").slice(0, 200);
+    p2_audit(who, action, target, "", {
+      kind: res.kind, lessons: _p3bArr(payload.lessons).slice(0, 50), applied: res.applied, skipped: res.skipped,
+      failed: (res.failed || []).length, never: payload.never === true, expires: payload.expires_at || "", days: payload.days || ""
+    });
+  } catch (e) { /* logging must never fail the action */ }
 }
