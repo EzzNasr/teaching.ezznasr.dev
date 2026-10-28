@@ -144,7 +144,7 @@
   }
   function mmss(ms) { var s = Math.max(0, Math.ceil(ms / 1000)); return ("0" + Math.floor(s / 60)).slice(-2) + ":" + ("0" + (s % 60)).slice(-2); }
   function kill(msg) {
-    st.dead = true; el.save.disabled = true; el.signup.disabled = true; el.change.disabled = true;
+    st.dead = true; setSending(false); el.save.disabled = true; el.signup.disabled = true; el.change.disabled = true;
     if (msg) say(msg, "err");
   }
   function tick() {
@@ -167,8 +167,14 @@
     el.namebox.hidden = st.recognized;
   }
   function readId() { var v = el.sid.value.trim(); return CFG.ID_REGEX.test(v) ? v : null; }
+  // "Do not close this window" banner + browser leave-warning while a request is in flight.
+  function warnLeave(e) { e.preventDefault(); e.returnValue = ""; return ""; }
+  function setSending(on) {
+    var b = $("sending"); if (b) b.hidden = !on;
+    try { window[on ? "addEventListener" : "removeEventListener"]("beforeunload", warnLeave); } catch (e) {}
+  }
   function busy(b) {
-    st.busy = b;
+    st.busy = b; setSending(b);
     [el.save, el.signup, el.change].forEach(function (x) { x.disabled = b || st.dead; });
   }
   var ROUTE = { ID_TAKEN: 1, ID_BOUND_OTHER_DEVICE: 1, DEVICE_UNKNOWN: 1 };   // -> change-device flow
@@ -186,7 +192,7 @@
     say(fmt(MESSAGES[r.code] || (r.code === "NETWORK" ? MESSAGES.NETWORK : MESSAGES.GENERIC), own), "err");
   }
   function success(r) {
-    st.done = true;
+    st.done = true; setSending(false);
     if (r.name) { st.name = String(r.name).slice(0, 60); saveAll("att_name", st.name); render(); }
     el.save.classList.add("ok"); el.save.textContent = "\u2713 Saved";
     el.save.disabled = true; el.signup.hidden = true; el.change.hidden = true;

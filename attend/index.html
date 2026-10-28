@@ -4,15 +4,30 @@
 <meta name="robots" content="noindex">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f172a">
-<title>Attendance</title>
+<meta name="theme-color" content="#0b1b33">
+<title>Lecture Attendance · Alexandria University, Faculty of Engineering</title>
 <link rel="stylesheet" href="attend.css">
 </head>
 <body>
+<div id="sending" role="alert" aria-live="assertive" hidden>
+  <span class="spin" aria-hidden="true"></span>
+  <span><b>Do not close this window.</b> Your attendance is being sent to the database&hellip;</span>
+</div>
+<div id="ribbon"></div>
+<header id="brand">
+  <svg class="emblem" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><circle cx="32" cy="32" r="30" fill="#0a1a34" stroke="#d4a84b" stroke-width="2"/><circle cx="32" cy="32" r="26" fill="none" stroke="#d4a84b" stroke-opacity=".35" stroke-width="1" stroke-dasharray="2 3"/><circle cx="32" cy="32" r="17.5" fill="none" stroke="#d4a84b" stroke-width="5" stroke-dasharray="5.5 5.5"/><circle cx="32" cy="32" r="14" fill="#0f2a52" stroke="#d4a84b" stroke-width="1.6"/><path d="M24.5 32.5l5 5 10-11" fill="none" stroke="#f0cf85" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <div class="uni">Alexandria University</div>
+  <div class="fac">Faculty of Engineering</div>
+  <div class="sys"><span></span>Smart Attendance System<span></span></div>
+</header>
 <main>
-  <div id="clock" aria-live="off">--:--</div>
-  <div id="sub"></div>
+  <h1 id="title"><span>Lecture Attendance</span></h1>
+  <section id="timer" class="card">
+    <div id="clock" aria-live="off">--:--</div>
+    <div id="sub"></div>
+  </section>
   <div id="welcome"></div>
+  <section class="card" id="form">
   <div id="idbox">
     <label for="sid">Student ID</label>
     <input id="sid" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="12">
@@ -21,6 +36,7 @@
     <label for="name">Name (first time only)</label>
     <input id="name" maxlength="60" autocomplete="name">
   </div>
+  </section>
   <button id="save" disabled>SAVE ATTENDANCE</button>
   <div class="row">
     <button id="signup" type="button">Sign up (first time)</button>
@@ -29,6 +45,14 @@
   <div id="msg" class="info" role="status" aria-live="polite"></div>
   <div id="note">Device, location and timing are logged for each check-in.</div>
 </main>
+<footer id="credit">
+  <div class="people">
+    <div><small>Developed by</small><b>Eng. EzzNasr</b></div>
+    <i></i>
+    <div><small>Under the supervision of</small><b>Dr. Hossam Eldein</b></div>
+  </div>
+  <div class="fine">Faculty of Engineering &middot; Alexandria University &middot; Attendance System project &middot; 2026</div>
+</footer>
 <script src="../contract/att_config.js"></script>
 <script src="../contract/att_api.js"></script>
 <script src="attend.js"></script>
