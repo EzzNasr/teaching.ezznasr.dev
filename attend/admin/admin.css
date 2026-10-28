@@ -42,3 +42,12 @@ table.ros{width:auto;min-width:100%;font-size:14px;white-space:nowrap}
 .ros th{color:var(--mut);font-weight:600}
 .ros th small,.ros td.l small{display:block;color:var(--mut);font-weight:400;font-size:12px}
 .ros td.pre{color:#bbf7d0;font-weight:700;text-align:center}.ros td.abs{color:var(--mut);text-align:center}
+/* Live activity feed */
+.feed{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto}
+#pfeed{width:min(720px,92vw);max-height:20vh;font-size:max(14px,2vmin)}
+#proj{padding-bottom:9vmin}
+.ev{display:flex;gap:10px;align-items:baseline;padding:6px 10px;border-radius:8px;border-left:5px solid}
+.ev time{font-variant-numeric:tabular-nums;opacity:.75;font-size:.85em;flex:none}
+.ev-reg{background:#422006;border-color:#facc15;color:#fef08a}
+.ev-att{background:#052e16;border-color:#22c55e;color:#bbf7d0}
+.ev-bad{background:#450a0a;border-color:#ef4444;color:#fecaca;font-weight:700}

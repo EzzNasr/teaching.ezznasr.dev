@@ -38,6 +38,7 @@
         <div class="row" style="margin-top:12px"><button id="startBtn" class="pri">Start &amp; show QR</button><button id="resumeBtn" hidden>Back to projector</button></div>
         <div id="startMsg" class="msg" role="status"></div>
       </div>
+      <div class="card"><h2>Live activity</h2><div id="sfeed" class="feed"><div class="msg">Start a session to see activity.</div></div></div>
       <div id="summary" class="card" hidden>
         <h2>Session summary</h2>
         <div id="sumText"></div>
@@ -87,6 +88,7 @@
   <div id="prot"><div id="protbar"></div></div>
   <div id="pclock">--:--</div>
   <div id="pcount">Registered 0 / Present 0 | Flagged 0</div>
+  <div id="pfeed" class="feed" aria-live="polite"></div>
   <div id="pctl">
     <button id="fsBtn">Fullscreen</button>
     <button id="reqBtn">Requests<span id="pBadge" class="badge" hidden>0</span></button>

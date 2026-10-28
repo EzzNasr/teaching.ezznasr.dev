@@ -138,7 +138,7 @@
   function drawQR(text) {
     var q = window.qrcode(0, "M"); q.addData(text); q.make();
     var n = q.getModuleCount(), quiet = 4, total = n + quiet * 2;
-    var px = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.58);
+    var px = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.44);
     var scale = Math.max(2, Math.floor(px / total)), size = total * scale;
     var c = $("qr"); c.width = size; c.height = size; c.style.width = size + "px"; c.style.height = size + "px";
     var g = c.getContext("2d"); if (!g) return;
@@ -153,8 +153,24 @@
     A("att_live", { session_id: S.sess }).then(function (r) {
       if (!r.ok) return;
       $("pcount").textContent = "Registered " + r.registered + " / Present " + r.present + " | Flagged " + r.flagged;
+      renderFeed(r.feed || []);
       var p = r.pending | 0;
       ["pBadge", "pendBadge"].forEach(function (id) { $(id).hidden = !p; $(id).textContent = p; });
+    });
+  }
+  // Activity feed: registered = yellow, attended = green, attempted cheating = red (server sends only first letter + last 2 digits).
+  var fTimeS = new Intl.DateTimeFormat("en-GB", { timeZone: CFG.TZ, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  function renderFeed(list) {
+    ["pfeed", "sfeed"].forEach(function (id) {
+      var box = $(id); if (!box) return; clear(box);
+      if (!list.length) { if (id === "sfeed") box.appendChild(mk("div", "No activity yet.", "msg")); return; }
+      list.forEach(function (e) {
+        var d = new Date(e.t), when = isNaN(d) ? "" : fTimeS.format(d), row, text;
+        if (e.k === "bad") { row = mk("div", null, "ev ev-bad"); text = "Attempted cheating detected and flagged \u00b7 " + (e.l || "?") + " \u00b7 ID \u2022\u2022" + (e.d || ""); }
+        else if (e.k === "reg") { row = mk("div", null, "ev ev-reg"); text = "Registered \u00b7 " + (e.n || "(no name)") + " \u00b7 " + e.id; }
+        else { row = mk("div", null, "ev ev-att"); text = "Attended \u00b7 " + (e.n || "(no name)") + " \u00b7 " + e.id; }
+        row.appendChild(mk("time", when)); row.appendChild(mk("span", text)); box.appendChild(row);
+      });
     });
   }
   function closeSession() {

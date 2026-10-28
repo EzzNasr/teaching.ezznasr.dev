@@ -58,7 +58,7 @@ function build() {
     },
   };
   vm.createContext(ctx);
-  ["AttSetup.gs", "Attendance.gs", "AttFlags.gs", "AttTelegram.gs"].forEach(f => vm.runInContext(fs.readFileSync(GS_DIR + "/" + f, "utf8"), ctx, { filename: f }));
+  (process.env.ATT_ALL ? ["AttendanceAll.gs"] : ["AttSetup.gs", "Attendance.gs", "AttFlags.gs", "AttTelegram.gs"]).forEach(f => vm.runInContext(fs.readFileSync(GS_DIR + "/" + f, "utf8"), ctx, { filename: f }));
   return { ctx, sheets, props, sent, tgCalls, triggers, run: code => vm.runInContext(code, ctx) };
 }
 module.exports = { build };
