@@ -45,6 +45,7 @@ def prop(k, v): raw("/__prop", {"key": k, "value": v})
 E.ASSETS["/assets/quiz.js"] = E.read(QM, "assets_templates", "quiz.js").replace("{{DRIVE_ENDPOINT}}", E.GAS)
 E.ASSETS["/assets/assign.js"] = E.read(QM, "assets_templates", "assign.js").replace("{{DRIVE_ENDPOINT}}", E.GAS)
 E.ASSETS["/assets/capture.js"] = E.read(QM, "assets_templates", "capture.js")
+E.ASSETS["/assets/upload-guard.js"] = E.read(QM, "assets_templates", "upload-guard.js")
 E.ASSETS["/assets/forms.css"] = E.read(QM, "assets_templates", "forms.css")
 
 
@@ -174,10 +175,24 @@ def run(browser, tmp):
 
     p.fail_uploads = 3   # postToDrive retries a dropped request twice by itself; 3 drops = a real failure
     pg.click("button:has-text('Submit quiz')")
+    # Upload guard: a full-screen "do not close this page" screen covers the page while it sends.
+    pg.wait_for_selector(".tug-back", timeout=5000)
+    check("guard: full-screen warning appears while the upload runs", "DO NOT close" in pg.inner_text(".tug-back") and pg.evaluate(
+        "(function(){var r=document.querySelector('.tug-back').getBoundingClientRect();return r.width>=window.innerWidth&&r.height>=window.innerHeight})()"))
+    check("guard: nothing underneath can be tapped (overlay is the top element)", pg.evaluate(
+        "document.elementFromPoint(window.innerWidth/2, window.innerHeight-5).closest('.tug-back') !== null"))
     # Phase 3 / S2: answers are posted FIRST and photos best-effort, so a failed photo never loses the submission.
+    pg.wait_for_selector(".tug-card.bad", timeout=20000)
+    check("guard: failed photo -> red screen, says the answers are saved, offers Try again",
+          "Answers saved" in pg.inner_text(".tug-card.bad") and pg.locator(".tug-btn:has-text('Try again')").count() == 1, pg.inner_text(".tug-back")[:200])
+    pg.click(".tug-btn:has-text('Close')")
+    check("guard: closing the failed screen leaves the page usable", pg.locator(".tug-back").count() == 0)
     pg.wait_for_selector("text=Send photos again", timeout=20000)
     check("R-014 failed upload: answers already submitted, photos can be re-sent", len(p.calls("upload_quiz_result")) == 1 and "Your answers are saved" in pg.inner_text("body"))
     pg.click("button:has-text('Send photos again')")
+    pg.wait_for_selector(".tug-card.ok", timeout=15000)
+    check("guard: success screen says it is safe to close", "You can close this page now" in pg.inner_text(".tug-card.ok"))
+    pg.click(".tug-btn:has-text('Continue')")
     pg.wait_for_selector("text=Pending grading", timeout=15000)
     check("re-sent photo went up and the retry button is gone", pg.locator("button:has-text('Send photos again')").count() == 0 and len(p.calls("upload_written_image")) >= 1)
     check("R-016 after submit the page shows the review (score + each question)", pg.locator(".qz-review__item").count() == 3, pg.inner_text("body")[:300])
@@ -219,6 +234,9 @@ def run(browser, tmp):
     pg.wait_for_selector(".tc-thumb img", timeout=15000)
     check("mobile width 375: no horizontal scroll with the widget", pg.evaluate("document.scrollingElement.scrollWidth <= window.innerWidth"))
     pg.click("button:has-text('Submit quiz')")
+    pg.wait_for_selector(".tug-card.ok", timeout=15000)
+    check("guard: 375px wide, no horizontal scroll while the screen is up", pg.evaluate("document.scrollingElement.scrollWidth <= window.innerWidth"))
+    pg.click(".tug-btn:has-text('Continue')")
     pg.wait_for_selector(".qz-review__item", timeout=15000)
     up = p.calls("upload_written_image")[-1]
     jpg = base64.b64decode(up["data_base64"])
@@ -251,6 +269,9 @@ def run(browser, tmp):
     pg.click("button:has-text('Use photo')")
     pg.wait_for_selector(".tc-thumb img")
     pg.click("button:has-text('Submit assignment')")
+    pg.wait_for_selector(".tug-card.ok", timeout=15000)
+    check("guard: homework submit + photo ends on the green screen", "Sent" in pg.inner_text(".tug-card.ok") or "\u2713" in pg.inner_text(".tug-card.ok"))
+    pg.click(".tug-btn:has-text('Continue')")
     pg.wait_for_function("document.body.innerText.indexOf('Saving your submission') === -1 && document.querySelector('.qz-summary')", timeout=15000)
     sub = p.calls("upload_submission")[0]
     ph = p.calls("upload_written_image")[0]

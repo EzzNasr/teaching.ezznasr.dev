@@ -248,9 +248,30 @@
     });
   }
 
+
+  // Full-screen "do not close this page" screen (upload-guard.js). Fetched in the background when the
+  // page mounts, so it is ready the moment a student presses Submit. If it can't load, every upload
+  // works exactly as before (the no-op handle below).
+  var GUARD_LIB = null;
+  function prefetchGuard() {
+    if (window.UploadGuard) { GUARD_LIB = window.UploadGuard; return; }
+    try {
+      var s = document.createElement("script");
+      s.src = "/assets/upload-guard.js?v=1";
+      s.onload = function () { GUARD_LIB = window.UploadGuard || null; };
+      document.head.appendChild(s);
+    } catch (e) { /* uploads still work without the screen */ }
+  }
+  function beginGuard(opts) {
+    if (GUARD_LIB) { try { return GUARD_LIB.begin(opts); } catch (e) { /* fall through */ } }
+    var n = { set: function () { return n; }, busy: function () { return n; }, success: function () { return n; }, fail: function () { return n; }, close: function () { return n; } };
+    return n;
+  }
+
   function mount(rootSelector) {
     var root = document.querySelector(rootSelector);
     if (!root) return;
+    prefetchGuard();
 
     var subject = root.getAttribute("data-subject") || null;
     var lesson = root.getAttribute("data-lesson") || null;
@@ -461,17 +482,23 @@
       // loses the submission: photoStatus becomes "later" and the student can
       // tap "Send photos again". Already-sent photos are skipped, and the server
       // ignores a re-sent one, so retrying is safe.
+      // Returns a Promise of the full-screen guard handle; the caller finishes it with finishGuard().
       function uploadPhotos() {
+        var g = beginGuard({ message: "\u0628\u0646\u0628\u0639\u062a \u0627\u0644\u0635\u0648\u0631\u2026 / Sending your photos\u2026" });
         var written = state.record.answers.filter(function (a) { return a.type === "written" && state.widgets[a.id]; });
-        if (!written.length) { state.photoStatus = null; return Promise.resolve(); }
-        var failedCount = 0;
+        if (!written.length) { state.photoStatus = null; return Promise.resolve(g); }
+        var failedCount = 0, sent = 0;
+        var total = written.reduce(function (n, a) { return n + state.widgets[a.id].pending(); }, 0);
+        g.set({ message: "\u0628\u0646\u0628\u0639\u062a \u0627\u0644\u0635\u0648\u0631\u2026 / Sending your photos\u2026", step: 0, total: total });
         state.photoStatus = "sending"; render();
         return written.reduce(function (chain, a) {
           return chain.then(function () {
             return state.widgets[a.id].upload(function (item, b64) {
+              g.set({ message: "\u0635\u0648\u0631\u0629 " + (sent + 1) + " \u0645\u0646 " + total + " / Photo " + (sent + 1) + " of " + total, step: sent, total: total });
               return postToDrive({ action: "upload_written_image", kind: "assignment", student_id: session.student_id, session_token: session.session_token,
                 lesson_path: location.pathname.split("/").filter(Boolean).filter(function (p) { return !/\.html?$/i.test(p); }).join("/"),
-                attempt_id: state.record.client_id, question_id: a.id, image_id: item.id, data_base64: b64, mime_type: "image/jpeg" });
+                attempt_id: state.record.client_id, question_id: a.id, image_id: item.id, data_base64: b64, mime_type: "image/jpeg" }, function () { g.busy(); })
+                .then(function (res) { sent++; g.set({ step: sent, total: total }); return res; });
             }).then(function (r) { if (!r || !r.ok) failedCount++; }, function () { failedCount++; });
           });
         }, Promise.resolve()).then(function () {
@@ -482,12 +509,35 @@
             state.widgets = {};
           }
           render();
+          return g;
         });
+      }
+
+      // Ends the full-screen screen once the whole send (answers + photos) is settled.
+      function finishGuard(g) {
+        if (state.syncStatus === "failed" || state.syncStatus === "not-configured") {
+          g.fail({
+            message: "\u0645\u0627\u0627\u062a\u0628\u0639\u062a\u0634 \u0644\u0633\u0647 / Not sent yet",
+            detail: state.syncStatus === "not-configured"
+              ? "Saved on this device. Delivery isn't set up yet \u2014 tell your teacher."
+              : "\u0625\u062c\u0627\u0628\u0627\u062a\u0643 \u0645\u062d\u0641\u0648\u0638\u0629 \u0639\u0644\u0649 \u0627\u0644\u062c\u0647\u0627\u0632. \u0627\u0636\u063a\u0637 \u00ab\u0627\u0628\u0639\u062a \u062a\u0627\u0646\u064a\u00bb. / Your answers are saved on this device. Tap Try again.",
+            retry: state.syncStatus === "failed" ? function () { sendRecord(); } : null
+          });
+        } else if (state.photoStatus === "later") {
+          g.fail({
+            message: "\u062a\u0645 \u062d\u0641\u0638 \u0625\u062c\u0627\u0628\u0627\u062a\u0643 \u2713 \u0644\u0643\u0646 \u0627\u0644\u0635\u0648\u0631 \u0644\u0633\u0647 \u0645\u0627\u0627\u062a\u0628\u0639\u062a\u0634 / Answers saved \u2713 \u2014 photos not sent yet",
+            detail: "\u0627\u0636\u063a\u0637 \u00ab\u0627\u0628\u0639\u062a \u062a\u0627\u0646\u064a\u00bb \u0644\u0645\u0627 \u0627\u0644\u0646\u062a \u064a\u0628\u0642\u0649 \u0623\u062d\u0633\u0646. / Tap Try again when your connection is better.",
+            retry: function () { uploadPhotos().then(finishGuard); }
+          });
+        } else {
+          g.success({});
+        }
       }
 
       // Posts state.record. Safe to call again (retry button): same
       // client_id, so the server ignores it if the first try landed.
       function sendRecord() {
+        var g = beginGuard({ message: "بنحفظ إجاباتك… / Saving your answers…" });
         state.syncStatus = "pending";
         state.busy = false;
         render();
@@ -495,16 +545,17 @@
         // with the same client_id — never a duplicate — while the page says it is
         // still saving.
         // The submission goes FIRST. Nothing about photos can stop it.
-        postToDrive(Object.assign({ action: "upload_submission" }, state.record), function () { state.busy = true; render(); })
+        postToDrive(Object.assign({ action: "upload_submission" }, state.record), function () { state.busy = true; g.busy(); render(); })
           .then(function () {
             state.busy = false; state.syncStatus = "ok";
             dequeueSubmission(state.record.client_id);
             render();
-            return uploadPhotos();
+            return uploadPhotos().then(finishGuard);
           }, function (err) {
             state.busy = false;
             state.syncStatus = (err && err.message === "not-configured") ? "not-configured" : "failed";
             render();
+            finishGuard(g);
           });
       }
 
@@ -535,7 +586,7 @@
         } else if (state.photoStatus === "later") {
           children.push(el("div", { class: "qz-error", dir: "auto" }, ["\u062a\u0645 \u062d\u0641\u0638 \u0625\u062c\u0627\u0628\u0627\u062a\u0643 \u2713 \u0627\u0644\u0635\u0648\u0631\u0629 \u0647\u062a\u062a\u0628\u0639\u062a \u0628\u0639\u062f\u064a\u0646. / Your answers are saved. The photos didn\u2019t go through yet \u2014 tap \u201cSend photos again\u201d."]));
           var photoBtn = el("button", { class: "qz-next", type: "button" }, ["Send photos again"]);
-          photoBtn.addEventListener("click", function () { photoBtn.disabled = true; uploadPhotos(); });
+          photoBtn.addEventListener("click", function () { photoBtn.disabled = true; uploadPhotos().then(finishGuard); });
           children.push(photoBtn);
         }
         if (state.syncStatus === "pending") {
@@ -658,6 +709,7 @@
             }
             btn.disabled = true;
             btn.textContent = "Uploading\u2026";
+            var preGuard = beginGuard({ message: "\u0628\u0646\u062c\u0647\u0632 \u0627\u0644\u0645\u0644\u0641\u2026 / Preparing your file\u2026" });
             fileToBase64(file).then(function (base64) {
               submitRecord({
                 submission_type: "file",
@@ -667,6 +719,7 @@
                 note: noteArea.value.trim() || null,
               });
             }).catch(function (err) {
+              preGuard.close();
               btn.disabled = false;
               btn.textContent = "Submit assignment \u2192";
               errorMsg.textContent = err.message || "Could not read that file.";
@@ -716,12 +769,18 @@
       // Posts a text/url/file record. Re-callable for the same record (retry
       // button) — the server drops it if the first try already landed.
       function sendPlain(record, onBusy) {
-        postToDrive(Object.assign({ action: "upload_submission" }, record), onBusy)
-          .then(function () { submitting = false; dequeueSubmission(record.client_id); renderConfirmation(true, true, true, record); })
+        var g = beginGuard({ message: "\u0628\u0646\u0628\u0639\u062a \u0627\u0644\u062a\u0633\u0644\u064a\u0645\u2026 / Uploading your submission\u2026" });
+        postToDrive(Object.assign({ action: "upload_submission" }, record), function () { if (onBusy) onBusy(); g.busy(); })
+          .then(function () { submitting = false; dequeueSubmission(record.client_id); renderConfirmation(true, true, true, record); g.success({}); })
           .catch(function (err) {
             submitting = false;
             var configured = err.message !== "not-configured";
             renderConfirmation(true, false, configured, record);
+            g.fail({
+              message: "\u0645\u0627\u0627\u062a\u0628\u0639\u062a\u0634 \u0644\u0633\u0647 / Not sent yet",
+              detail: configured ? undefined : "Saved on this device. Delivery isn't set up yet \u2014 tell your teacher.",
+              retry: configured ? function () { submitting = true; sendPlain(record, onBusy); } : null
+            });
           });
       }
 

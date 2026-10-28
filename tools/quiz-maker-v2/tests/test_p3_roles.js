@@ -7,7 +7,10 @@ let pass = 0, fail = 0;
 const t = (n, c, x) => { (c ? pass++ : fail++); console.log((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : '  -> ' + (x || ''))); };
 
 const APPS = path.join(__dirname, '..', 'apps_script');
-const CODE = path.join(APPS, 'Code.gs'), P3 = path.join(APPS, 'Phase3_Roles.gs');
+const CODE = path.join(APPS, 'Code.gs');
+// Phase3_Roles.gs may sit next to Code.gs, in chunks/, or already be merged into Code.gs (assembled layout).
+const P3 = [path.join(APPS, 'Phase3_Roles.gs'), path.join(APPS, 'chunks', 'Phase3_Roles.gs')].find(f => fs.existsSync(f));
+const MERGED = /^function p3_assistantAllows\b/m.test(fs.readFileSync(CODE, 'utf8'));
 const LISTED = ['admin_followup_overview', 'admin_followup_set_attendance', 'admin_followup_save_group', 'admin_followup_save_templates',
   'admin_student_summary', 'admin_monthly_review', 'admin_set_requirement', 'admin_log_parent_notification', 'admin_list_parent_notifications',
   'admin_grading_queue', 'admin_grade_written', 'admin_get_written_models', 'get_written_image'];
@@ -18,7 +21,7 @@ const NOT_AUTH = r => r && r.ok === false && r.error === 'Not authorized.';
 // Build the usual Phase 2 env, then load Phase3_Roles.gs into the SAME context (Apps Script: one global scope).
 function build() {
   const api = makeEnv();
-  require('vm').runInContext(fs.readFileSync(P3, 'utf8'), api.env.ctx, { filename: 'Phase3_Roles.gs' });
+  if (!MERGED) require('vm').runInContext(fs.readFileSync(P3, 'utf8'), api.env.ctx, { filename: 'Phase3_Roles.gs' });
   const ctx = api.env.ctx;
   const call = (fn, payload) => { try { return ctx[fn](payload); } catch (e) { return { ok: false, error: e.message }; } };
   api.call = call;
@@ -129,17 +132,17 @@ function build() {
 
 // ---- Code.gs wiring and hygiene
 {
-  const code = fs.readFileSync(CODE, 'utf8'), p3 = fs.readFileSync(P3, 'utf8');
+  const code = fs.readFileSync(CODE, 'utf8'), p3 = P3 ? fs.readFileSync(P3, 'utf8') : '';
   t('Code.gs guard calls p3_assistantAllows behind a typeof check (Phase3 file optional)', /typeof p3_assistantAllows === "function"/.test(code));
   // without the Phase 3 file, nothing changes for anyone
   const env = load(CODE, { clock: true });
   const ok = Object.keys(env.ctx).indexOf('p3_assistantAllows') === -1;
-  t('Code.gs alone has no p3_ globals (nothing silently depends on them)', ok);
+  if (!MERGED) t('Code.gs alone has no p3_ globals (nothing silently depends on them)', ok);
   // every top-level name in Phase3_Roles.gs is prefixed and does not collide with Code.gs
   const names = s => [...s.matchAll(/^(?:function\s+([A-Za-z_$][\w$]*)|var\s+([A-Za-z_$][\w$]*))/gm)].map(m => m[1] || m[2]);
   const mine = names(p3), theirs = new Set(names(code));
-  t('Phase3_Roles.gs globals are all p3_ / _p3 / P3_ prefixed', mine.every(n => /^(p3_|_p3|P3_)/.test(n)), mine.filter(n => !/^(p3_|_p3|P3_)/.test(n)).join(','));
-  t('Phase3_Roles.gs does not redefine anything in Code.gs', !mine.some(n => theirs.has(n)), mine.filter(n => theirs.has(n)).join(','));
+  if (!MERGED) t('Phase3_Roles.gs globals are all p3_ / _p3 / P3_ prefixed', mine.every(n => /^(p3_|_p3|P3_)/.test(n)), mine.filter(n => !/^(p3_|_p3|P3_)/.test(n)).join(','));
+  if (!MERGED) t('Phase3_Roles.gs does not redefine anything in Code.gs', !mine.some(n => theirs.has(n)), mine.filter(n => theirs.has(n)).join(','));
   // every listed handler is reached through the central guard (grep proof for the handoff)
   const missing = [];
   const hand = { admin_followup_overview: 'function handleAdminFollowupOverview', admin_followup_set_attendance: 'function p2_admin_followup_set_attendance', admin_followup_save_group: 'function handleAdminFollowupSaveGroup',

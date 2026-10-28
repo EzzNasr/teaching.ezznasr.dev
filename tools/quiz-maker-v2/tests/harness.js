@@ -103,6 +103,9 @@ function load(codeGsPath, opts = {}) {
     if (!fs.existsSync(f) && merged && /^Phase2_.*\.gs$/.test(require('path').basename(f))) return;
     vm.runInContext(fs.readFileSync(f, 'utf8'), ctx, { filename: require('path').basename(f) });
   });
+  // Code.gs's doPost calls att_route_ (AttendanceAll.gs). Tests that don't care about attendance get a no-op hook
+  // so the router keeps working; a test that loads AttendanceAll.gs itself (array form) keeps the real one.
+  if (typeof ctx.att_route_ !== 'function') vm.runInContext('function att_route_() { return null; }', ctx);
   const post = payload => JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify(payload) } }).text);
   const setNow = iso => { if (!opts.clock) throw new Error("load(..., { clock: true }) is needed before setNow"); nowMs = iso === null ? null : new Date(iso).getTime(); };
   return { ctx, post, getSS, props, cache, drive, lockState, setNow, files };

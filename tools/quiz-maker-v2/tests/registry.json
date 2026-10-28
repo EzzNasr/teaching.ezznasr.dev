@@ -766,6 +766,27 @@
         "node",
         "tests/test_p3_picker.js"
       ]
+    },
+    {
+      "id": "R-P3-ASST",
+      "title": "Assistant's working day: follow-up, mark contacted, group switch, summary, written answers + photo + grading, admin-only still refused",
+      "status": "active",
+      "owner": "S3",
+      "cmd": [
+        "node",
+        "tests/test_p3_assistant_flow.js"
+      ]
+    },
+    {
+      "id": "R-UG1",
+      "title": "Upload guard: full-screen do-not-close screen on file upload (warning, close-block, done, offline retry)",
+      "status": "active",
+      "needs": "playwright",
+      "owner": "upload-guard",
+      "cmd": [
+        "python",
+        "tests/e2e_upload_guard.py"
+      ]
     }
   ]
 }
