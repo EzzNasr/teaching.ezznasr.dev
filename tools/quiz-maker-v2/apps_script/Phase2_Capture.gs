@@ -208,6 +208,37 @@ function _p2cFindWrittenRow(sheet, attemptId, studentId, qid) {
   return null;
 }
 
+// Phase 3 / S2: the student page now posts the answers FIRST and the photos afterwards, so a written answer can
+// arrive with no photo at submit time (stored as a non-pending "wrong" entry whose max is already in the total).
+// When its photo lands later, flip it to pending and take its max back out of the total, exactly the state a
+// submit-with-photo would have produced. Never touches a graded entry. Best effort: a failure here must not
+// fail the upload (the review still shows the photo as pending via has_photo).
+function _p2cLatePhotoFlip(student, attempt, qid) {
+  try {
+    _withLock(function () {
+      var sheet = _quizResultsSheet();
+      if (!sheet || sheet.getLastRow() < 2) return;
+      var c = _headerIndex(sheet);
+      if (!c.dedupe_key || !c.student_id || !c.questions_json || !c.total) return;
+      var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+      for (var i = values.length - 1; i >= 0; i--) {
+        if (String(values[i][c.dedupe_key - 1]) !== "c:" + attempt || !_phonesMatch(values[i][c.student_id - 1], student)) continue;
+        var arr = _p2cParse(String(values[i][c.questions_json - 1])), hit = false, give = 0;
+        if (!Array.isArray(arr)) return;
+        arr.forEach(function (q) {
+          if (q && q.type === "written" && String(q.qid) === String(qid) && !q.pending && q.awarded === undefined) {
+            give = Number(q.max) || 0; q.pending = true; q.image_count = 1; q.your_answer = "[1 photo]"; hit = true;
+          }
+        });
+        if (!hit) return;
+        sheet.getRange(i + 2, c.questions_json).setValue(JSON.stringify(arr));
+        sheet.getRange(i + 2, c.total).setValue(Math.max(0, (Number(values[i][c.total - 1]) || 0) - give));
+        return;
+      }
+    }, UPLOAD_LOCK_WAIT_MS);
+  } catch (e) { /* best effort */ }
+}
+
 function p2_upload_written_image(payload) {
   p2_requireFlag("FF_CAMERA");
   _requireStudentSession(payload);
@@ -276,7 +307,7 @@ function p2_upload_written_image(payload) {
       return { ok: true, image_id: imageId, count: 1 };
     }, UPLOAD_LOCK_WAIT_MS);
     if (result.duplicate) _trashQuietly(made);
-    else cache.put(rk, String(used + 1), 3600);
+    else { cache.put(rk, String(used + 1), 3600); if (kind === "quiz") _p2cLatePhotoFlip(student, attempt, qid); }
     return result;
   } catch (err) {
     _trashQuietly(made);
@@ -331,7 +362,8 @@ function p2_get_quiz_review(payload) {
       if (String(w[wc.submission_id - 1]) !== "c:" + attemptId || !_phonesMatch(w[wc.student_id - 1], student)) return;
       written[String(w[wc.question_id - 1])] = {
         awarded: w[wc.awarded - 1], max: w[wc.max - 1], note: String(w[wc.note - 1] || ""),
-        graded: String(w[wc.graded_at - 1] || "") !== ""
+        graded: String(w[wc.graded_at - 1] || "") !== "",
+        has_photo: wc.image_ids ? String(w[wc.image_ids - 1] || "") !== "" : false   // Phase 3: a photo that arrived AFTER the submit
       };
     });
   }
@@ -345,7 +377,7 @@ function p2_get_quiz_review(payload) {
       it.max = w && w.max !== "" && w.max != null ? Number(w.max) : (q.max || 1);
       it.correct_answer = "";
       if (w && w.graded) { it.status = "graded"; it.awarded = Number(w.awarded) || 0; it.note = w.note; it.is_correct = it.awarded >= it.max; }
-      else if (q.pending) { it.status = "pending"; it.is_correct = null; }
+      else if (q.pending || (w && w.has_photo)) { it.status = "pending"; it.is_correct = null; }   // Phase 3: late photos (S2 posts answers first) still count as awaiting grading
       else { it.status = "wrong"; it.is_correct = false; }
     } else {
       it.is_correct = !!q.is_correct; it.status = q.is_correct ? "correct" : "wrong";

@@ -691,6 +691,81 @@
       ],
       "status": "active",
       "owner": "S5"
+    },
+    {
+      "id": "R-P3-F1",
+      "title": "S1 follow-up core: contacted state, week/month boundaries, filter sort order, flag notices, Phase3_Flags.gs against the real router",
+      "status": "active",
+      "owner": "S1",
+      "cmd": [
+        "node",
+        "tests/test_p3_followup.js",
+        "apps_script"
+      ]
+    },
+    {
+      "id": "R-P3-F2",
+      "title": "S1 follow-up page in a browser: contact chips, counter, filter+sort+hash, flag-off banner, monthly month boundary, required-rule guide",
+      "status": "active",
+      "needs": "playwright",
+      "owner": "S1",
+      "cmd": [
+        "python",
+        "tests/e2e_p3_followup.py"
+      ]
+    },
+    {
+      "id": "R-P3-ROLES",
+      "title": "Phase 3: assistant role allow-list, role column, admin-only role management",
+      "status": "active",
+      "owner": "S3",
+      "cmd": [
+        "node",
+        "tests/test_p3_roles.js"
+      ]
+    },
+    {
+      "id": "R-P3-B1",
+      "title": "S4 bulk access: preview/grant/revoke, dedupe, cap, group rules, audit",
+      "status": "active",
+      "owner": "S4",
+      "cmd": [
+        "node",
+        "tests/test_p3_bulk_access.js",
+        "apps_script/Code.gs",
+        "apps_script/Phase3_BulkAccess.gs"
+      ]
+    },
+    {
+      "id": "R-P3-B2",
+      "title": "S4 Bulk access tab in a browser: tick, preview, apply, revoke, give back",
+      "status": "active",
+      "needs": "playwright",
+      "owner": "S4",
+      "cmd": [
+        "python",
+        "tests/e2e_p3_bulk_access.py"
+      ]
+    },
+    {
+      "id": "R-P3-R1",
+      "title": "S2 submission recovery: diagnose/restore/backfill, upload order, pending queue",
+      "status": "active",
+      "owner": "S2",
+      "cmd": [
+        "node",
+        "tests/test_p3_recovery.js"
+      ]
+    },
+    {
+      "id": "R-P3-P1",
+      "title": "S2 compact lesson picker (combobox)",
+      "status": "active",
+      "owner": "S2",
+      "cmd": [
+        "node",
+        "tests/test_p3_picker.js"
+      ]
     }
   ]
 }

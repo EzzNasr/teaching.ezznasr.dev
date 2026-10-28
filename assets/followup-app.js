@@ -26,6 +26,9 @@
   var STATE = {
     session: null, data: null, fetchedAt: 0, loading: false,
     tab: null, open: null, filter: "all", q: "",
+    contact: "all",          // parent-contact filter: "all" | "pending" (not contacted) | "contacted"   (kept in the URL hash: cf=)
+    sort: "default",         // "default" | "nc" = not-contacted first, then most problems (kept in the URL hash: sort=nc)
+    hashRead: false,
     borrow: null,            // unclassified tab: group key whose lesson roles are used (local only)
     adding: {},              // group key -> true while the blank "add lesson" picker is shown
     editTime: {},            // group key -> true while the weekday/time editor is shown
@@ -243,7 +246,7 @@
         if (!d.facts[k][p]) d.facts[k][p] = { can_watch: true, attendance: null, watch_pct: null, quiz: { taken: false }, quiz_open: true, homework: { submitted: false } };
       });
     });
-    d.flags = d.flags || { FF_PARENT_LOG: true, FF_MONTHLY: true };
+    d.flags = d.flags || { FF_PARENT_LOG: true, FF_MONTHLY: true };   // MOCK ONLY: the live page never assumes a flag, it uses overview.flags from the server
     d.week = weekOfYmd(d.today);
     Object.keys(d.lessons).forEach(function (pth) {
       var r = MK.req[pth] || {};
@@ -352,6 +355,8 @@
   function errText(err) {
     var m = (err && err.message) || "حصل خطأ، جرّب تاني.";
     if (m === "Not authorized.") m = "الحساب ده مسجّل دخول بس مش أدمن. فعّل is_admin = TRUE في شيت Students.";
+    var fm = /Feature disabled: (FF_[A-Z_]+)/.exec(m);
+    if (fm) m = "الميزة دي متوقفة على السيرفر. افتح Apps Script ← Project Settings ← Script Properties وضيف " + fm[1] + " = 1، وبعدين اضغط تحديث.";
     return m;
   }
 
@@ -458,6 +463,16 @@
   function logItems(a) { return a.kind === "combined" ? (a.issues || []).map(logKind) : [logKind(a)]; }
   function logOf(pk) { return ((STATE.data && STATE.data.parent_log) || {})[pk] || []; }
   function loggedFor(pk, it) { var ref = String(it.ref).toLowerCase(); return logOf(pk).some(function (n) { return n.kind === it.kind && String(n.ref).toLowerCase() === ref; }); }
+  // Parent contact per student (S1). Derived once per render from parent_log by FollowupLogic (pure, tested).
+  //   state: "pending" (a due problem with no log entry) | "contacted" | "none" (nothing to contact about).  FF_PARENT_LOG off -> always "none".
+  function contactOf(st, ac) {
+    var lg = logOf(st.key), none = { state: "none", severity: 0, sum: { contacted_week: false, contacted_month: false, last_sent_at: "", last_kind: "", count: 0 } };
+    if (!flag("FF_PARENT_LOG") || !L().contactSummary) return none;
+    var issues = []; ac.dueNeg.forEach(function (a) { logItems(a).forEach(function (it) { issues.push(it); }); });
+    var sum = L().contactSummary(lg, STATE.data.today, STATE.data.week);
+    return { state: L().contactState(issues, lg, sum), severity: ac.dueNeg.length, sum: sum };
+  }
+  var CONTACT_FILTERS = [["all", "الكل"], ["pending", "⭕ لم يتم التواصل"], ["contacted", "✅ تم التواصل"]];
   // a group's year = the year of its members (mixed / unknown shown as their own groups in the menus)
   var YG_LABEL = { "1": "سينيور 1", "2": "سينيور 2", mixed: "مختلط", unknown: "بدون سنة" }, YG_ORDER = ["1", "2", "mixed", "unknown"];
   function groupYearKey(g) {
@@ -574,13 +589,14 @@
         quizabsent: (v.quiz || []).some(function (q) { return q.state === "quiz_absent"; }),
         notnotified: flag("FF_PARENT_LOG") && ac.dueNeg.some(function (a) { return logItems(a).some(function (it) { return !loggedFor(st.key, it); }); }),
       };
-      return { st: st, sm: sm, ck: ck, ac: ac, tags: tags };
+      return { st: st, sm: sm, ck: ck, ac: ac, tags: tags, contact: contactOf(st, ac) };
     });
     var counts = { unmarked: 0, unwatched: 0, hwmissing: 0, quizabsent: 0, noparent: 0, late: 0 };
     rows.forEach(function (r) { Object.keys(counts).forEach(function (k) { if (r.tags[k]) counts[k]++; }); });
     var cur = g.settings.current_lesson, anyTrack = false;
     rows.forEach(function (r) { var f = ((STATE.data.facts[r.st.key] || {})[cur]); if (f && f.watch_pct !== null && f.watch_pct !== undefined) anyTrack = true; });
-    return { dl: dl, rows: rows, counts: counts, noTracking: !!cur && rows.length > 0 && !anyTrack, g: g };
+    var cc = L().contactCounts ? L().contactCounts(rows.map(function (r) { return r.contact.state; })) : { pending: 0, contacted: 0, none: 0, total: 0 };
+    return { dl: dl, rows: rows, counts: counts, cc: cc, noTracking: !!cur && rows.length > 0 && !anyTrack, g: g };
   }
 
   // ---- actions: attendance / group save / templates --------------------------------------------
@@ -678,13 +694,22 @@
     if (visibleTabKeys().indexOf(NONE_TAB) >= 0) tab(NONE_TAB, "طلاب غير مصنفين", (d.unclassified || []).filter(yearPass).length);
   }
   function selectTab(key) {
-    STATE.tab = key; STATE.open = null; STATE.filter = "all"; STATE.q = ""; STATE.lessonQ = {};
+    STATE.tab = key; STATE.open = null; STATE.filter = "all"; STATE.q = ""; STATE.lessonQ = {}; STATE.contact = "all"; STATE.sort = "default";
     try { sessionStorage.setItem("fu-tab", key); } catch (e) {}
     writeHash(); renderTabs(); renderPage(); window.scrollTo(0, 0);
   }
   function writeHash() {
-    var h = (STATE.open ? "#student=" + STATE.open : "");
+    var parts = [];
+    if (STATE.open) parts.push("student=" + STATE.open);
+    if (STATE.contact !== "all") parts.push("cf=" + STATE.contact);
+    if (STATE.sort === "nc") parts.push("sort=nc");
+    var h = parts.length ? "#" + parts.join("&") : "";
     try { history.replaceState(null, "", location.pathname + location.search + h); } catch (e) {}
+  }
+  // restore the contact filter / sort from a shared link (first load only)
+  function readHashFilters() {
+    var c = /[#&]cf=(pending|contacted)\b/.exec(location.hash), s0 = /[#&]sort=nc\b/.test(location.hash);
+    STATE.contact = c ? c[1] : "all"; STATE.sort = s0 ? "nc" : "default";
   }
   function updatedLine() {
     var n = $("fu-updated");
@@ -694,34 +719,45 @@
   // ---- rendering: group page -------------------------------------------------------------------
   function lockChip(label, locked) { return el("span", { class: "fu-chip " + (locked ? "red" : "green") }, [(locked ? "🔒 " : "🔓 ") + label]); }
 
-  function lessonPicker(id, value, onPick, lessons) {
-    var pool = lessonsForYear(lessons);
-    var sel = el("select", { class: "fu-field fu-lesson-select", id: id, "aria-label": "اختيار الدرس", dir: "ltr" });
-    function fill(q) {
-      q = (q || "").trim().toLowerCase();
-      clear(sel);
-      sel.appendChild(el("option", { value: "" }, ["— اختار الدرس —"]));
-      var seen = {}, groups = {}, order = [];
-      pool.forEach(function (l) {
-        var hay = (lessonLabel(l.path) + " " + l.path).toLowerCase();
-        if (q && hay.indexOf(q) < 0 && l.path !== value) return;
-        var gl = lessonGroupLabel(l.path);
-        if (!groups[gl]) { groups[gl] = el("optgroup", { label: gl }); order.push(gl); }
-        groups[gl].appendChild(el("option", { value: l.path }, [lessonLabel(l.path)]));
-        seen[l.path] = 1;
-      });
-      order.forEach(function (gl) { sel.appendChild(groups[gl]); });
-      if (value && !seen[value]) {   // current value is outside the filter / search: keep it visible, flagged
-        var y = yearOfLesson(value), off = STATE.year !== "all" && y && y !== STATE.year;
-        sel.insertBefore(el("option", { value: value }, [lessonLabel(value) + (off ? "  (سينيور " + y + ")" : "")]), sel.childNodes[1] || null);
-      }
-      sel.value = value || "";
+  // Words a teacher might type for a lesson besides its title: "ch2 l1", "c2l1", "2.1", "الفصل 2", "سينيور 1" ...
+  function pickSearch(p) {
+    var s = lessonSlug(p), c = /chapter-(\d+)/i.exec(s), m = /lesson-(\d+)/i.exec(s), out = [s.replace(/-/g, " ")], y = yearOfLesson(p);
+    if (c && m) out.push("ch" + c[1], "l" + m[1], "c" + c[1] + "l" + m[1], "ch" + c[1] + "l" + m[1], c[1] + "." + m[1], "الفصل " + c[1], "الدرس " + m[1]);
+    else if (m) out.push("l" + m[1], "الدرس " + m[1]);
+    if (y) out.push("سينيور " + y, "senior " + y);
+    return out.join(" ");
+  }
+
+  // One control: a button showing the lesson name; it opens a searchable list (assets/lesson-combobox.js).
+  // opts: { allowEmpty, autoOpen, renderButton(item) } . If the combobox script did not load, a plain <select> is used instead.
+  function lessonPicker(id, value, onPick, lessons, opts) {
+    opts = opts || {};
+    var pool = lessonsForYear(lessons), seen = {}, items = [];
+    pool.forEach(function (l) {
+      if (seen[l.path]) return; seen[l.path] = 1;
+      items.push({ value: l.path, label: lessonLabel(l.path), group: lessonGroupLabel(l.path), search: pickSearch(l.path) });
+    });
+    if (value && !seen[value]) {   // current value is outside the Senior 1/2 filter: keep it visible, flagged
+      var y = yearOfLesson(value), off = STATE.year !== "all" && y && y !== STATE.year;
+      items.unshift({ value: value, label: lessonLabel(value), group: lessonGroupLabel(value), search: pickSearch(value), flag: off ? "سينيور " + y : "" });
     }
-    fill(STATE.lessonQ[id] || "");
+    if (window.LessonCombobox) {
+      return el("div", { class: "fu-pick" }, [window.LessonCombobox.create({
+        id: id, value: value || "", items: items, ariaLabel: "اختيار الدرس", allowEmpty: !!opts.allowEmpty, emptyOptionText: opts.emptyOptionText,
+        autoOpen: !!opts.autoOpen, renderButton: opts.renderButton, onPick: onPick,
+      })]);
+    }
+    var sel = el("select", { class: "fu-field fu-lesson-select", id: id, "aria-label": "اختيار الدرس", dir: "ltr" });
+    sel.appendChild(el("option", { value: "" }, ["— اختار الدرس —"]));
+    var groups = {}, order = [];
+    items.forEach(function (it) {
+      if (!groups[it.group]) { groups[it.group] = el("optgroup", { label: it.group }); order.push(it.group); }
+      groups[it.group].appendChild(el("option", { value: it.value }, [it.label + (it.flag ? "  (" + it.flag + ")" : "")]));
+    });
+    order.forEach(function (gl) { sel.appendChild(groups[gl]); });
+    sel.value = value || "";
     sel.addEventListener("change", function () { onPick(sel.value); });
-    var search = el("input", { class: "fu-field fu-search-lessons", type: "search", placeholder: "🔍 ابحث عن درس…", value: STATE.lessonQ[id] || "", "aria-label": "بحث في الدروس", dir: "auto" });
-    search.addEventListener("input", function () { STATE.lessonQ[id] = search.value; fill(search.value); });
-    return el("div", { class: "fu-pick" }, [search, sel]);
+    return el("div", { class: "fu-pick" }, [sel]);
   }
 
   function nextSessionCard(g, V) {
@@ -776,55 +812,83 @@
     var u = []; hw.concat(quiz).forEach(function (p) { if (p && u.indexOf(p) < 0) u.push(p); });
     return saveGroup(g, Object.assign({ hw_lessons: hw, quiz_lessons: quiz, review_lessons: u }, extra || {}), { reload: true });
   }
+  // Read-only view (an unclassified group): just say when a lesson is optional.
   function reqControls(path, i, ro, kind) {
     var meta = lessonInfo(path) || {}, q = meta.quiz_required !== false, h = meta.homework_required !== false;
-    if (ro) return el("div", { class: "fu-chips", style: "margin-top:6px" }, [kind === "quiz" && !q ? el("span", { class: "fu-chip grey" }, ["الكويز اختياري"]) : null, kind === "hw" && !h ? el("span", { class: "fu-chip grey" }, ["الواجب اختياري"]) : null]);
-    if (kind === "quiz") return el("div", { class: "fu-req", "data-req": i, "data-kind": "quiz" }, [reqSwitch("req-quiz-" + i, "الكويز مطلوب", q, function (v) { setRequirement(path, { quiz_required: v }); })]);
-    var due = el("input", { class: "fu-field", type: "date", id: "req-due-" + i, value: meta.due_override || "", "aria-label": "ميعاد تسليم مخصص للدرس", style: "direction:ltr" });
-    due.addEventListener("change", function () { setRequirement(path, { due_override: due.value }); });
-    return el("div", { class: "fu-req", "data-req": i, "data-kind": "hw" }, [
-      reqSwitch("req-hw-" + i, "الواجب مطلوب", h, function (v) { setRequirement(path, { homework_required: v }); }),
-      el("label", {}, [el("span", { class: "fu-dim" }, ["ميعاد تسليم مخصص للدرس ده (اختياري)"]), due]),
-    ]);
+    return el("div", { class: "fu-chips", style: "margin-top:6px" }, [kind === "quiz" && !q ? el("span", { class: "fu-chip grey" }, ["الكويز اختياري"]) : null, kind === "hw" && !h ? el("span", { class: "fu-chip grey" }, ["الواجب اختياري"]) : null]);
   }
+
+  // ONE row per homework / quiz lesson: [ lesson name (opens the list) ][ required switch ][ 📅 ][ ✕ ].
+  // The custom due date (homework only) is hidden until the 📅 button is tapped. Same ids and same
+  // admin_set_requirement / admin_followup_save_group payloads as before.
+  function lessonRow(kind, path, i, all, list, commit) {
+    var isHw = kind === "hw", meta = lessonInfo(path) || {};
+    var req = isHw ? meta.homework_required !== false : meta.quiz_required !== false;
+    var reqName = isHw ? "الواجب مطلوب" : "الكويز مطلوب";
+    var line = el("div", { class: "fu-lessonline" + (req ? "" : " is-optional"), "data-req": i, "data-kind": kind });
+    line.appendChild(lessonPicker("pick-" + kind + "-" + i, path, function (v) { var nx = list.slice(); if (v) nx[i] = v; else nx.splice(i, 1); commit(nx); }, all, {
+      renderButton: function (it) {
+        var inf = lessonInfo(it.value), kids = [];
+        if (!isHw && inf) kids.push(el("span", { class: "fu-lockdot", title: inf.quiz_locked ? "الكويز مقفول" : "الكويز مفتوح" }, [inf.quiz_locked ? "🔒" : "🔓"]));
+        kids.push(it.label);
+        if (!req) kids.push("  · اختياري");
+        return kids;
+      },
+    }));
+    var chk = el("input", { type: "checkbox", id: (isHw ? "req-hw-" : "req-quiz-") + i, role: "switch", "aria-label": reqName });
+    chk.checked = req;
+    chk.addEventListener("change", function () { setRequirement(path, isHw ? { homework_required: chk.checked } : { quiz_required: chk.checked }); });
+    line.appendChild(el("label", { class: "fu-miniswitch", title: reqName }, [chk, el("span", { class: "trk", "aria-hidden": "true" })]));
+    var extra = null;
+    if (isHw) {
+      var due = el("input", { class: "fu-field", type: "date", id: "req-due-" + i, value: meta.due_override || "", "aria-label": "ميعاد تسليم مخصص للدرس", style: "direction:ltr" });
+      due.addEventListener("change", function () { setRequirement(path, { due_override: due.value }); });
+      extra = el("div", { class: "fu-lessonextra", hidden: "hidden" }, [el("label", {}, [el("span", { class: "fu-dim" }, ["ميعاد تسليم مخصص للدرس ده (اختياري)"]), due])]);
+      var cal = el("button", { class: "fu-ibtn" + (meta.due_override ? " has-date" : ""), type: "button", "data-cal": i, "aria-expanded": "false", "aria-controls": "req-due-" + i,
+        "aria-label": "ميعاد تسليم مخصص" + (meta.due_override ? ": " + meta.due_override : ""), title: meta.due_override ? "ميعاد مخصص: " + meta.due_override : "ميعاد تسليم مخصص" }, ["📅"]);
+      cal.addEventListener("click", function () {
+        var opening = extra.hasAttribute("hidden");
+        if (opening) extra.removeAttribute("hidden"); else extra.setAttribute("hidden", "hidden");
+        cal.setAttribute("aria-expanded", opening ? "true" : "false"); cal.setAttribute("aria-pressed", opening ? "true" : "false");
+      });
+      line.appendChild(cal);
+    }
+    line.appendChild(el("button", { class: "fu-ibtn", type: "button", "aria-label": "حذف الدرس", "data-remove": i, "data-kind": kind, onclick: function () { var nx = list.slice(); nx.splice(i, 1); commit(nx); } }, ["✕"]));
+    return el("div", { class: "fu-lessonrow", "data-row": i }, [line, extra]);
+  }
+
   function rolesCard(g, V) {
-    var d = STATE.data, s = g.settings, all = d.all_lessons || [], card = el("section", { class: "fu-card", "aria-label": "الحصص" });
+    var d = STATE.data, s = g.settings, all = d.all_lessons || [], card = el("section", { class: "fu-card fu-compact", "aria-label": "الحصص" });
     var ro = !!g.unclassified;
     // role A
     var a = el("div", { class: "fu-role", id: "fu-role-a" });
     a.appendChild(el("div", { class: "fu-row fu-between" }, [el("h3", {}, ["🎬 الحصة الحالية"]), el("span", { class: "fu-dim" }, ["حضور + مشاهدة"])]));
     if (ro) a.appendChild(s.current_lesson ? el("div", { style: "margin-top:8px" }, [lessonChip(s.current_lesson)]) : el("div", { class: "fu-dim" }, ["اختار جروب من «اعرض بحصص جروب»"]));
-    else a.appendChild(lessonPicker("pick-current", s.current_lesson, function (v) { saveGroup(g, { current_lesson: v }, { reload: true }); }, all));
+    else a.appendChild(lessonPicker("pick-current", s.current_lesson, function (v) { saveGroup(g, { current_lesson: v }, { reload: true }); }, all, { allowEmpty: true, emptyOptionText: "— مفيش حصة حالية —" }));
     var ci = lessonInfo(s.current_lesson);
-    if (ci) a.appendChild(el("div", { class: "fu-chips", style: "margin-top:10px" }, [lockChip("الحصة", ci.lesson_locked), lockChip("الفيديو", ci.video_locked), lockChip("الكويز", ci.quiz_locked)]));
+    if (ci) a.appendChild(el("div", { class: "fu-chips", style: "margin-top:8px" }, [lockChip("الحصة", ci.lesson_locked), lockChip("الفيديو", ci.video_locked), lockChip("الكويز", ci.quiz_locked)]));
     if (V.noTracking) a.appendChild(el("div", { class: "fu-hint", id: "fu-notrack" }, ["لا توجد بيانات مشاهدة لهذه الحصة بعد"]));
     card.appendChild(a);
     // roles B and C: homework lessons and quiz lessons are chosen separately
     function kindBlock(kind) {
       var isHw = kind === "hw", list = (isHw ? hwOf(s) : quizOf(s)).slice(), other = (isHw ? quizOf(s) : hwOf(s)).slice();
       var box = el("div", { class: "fu-role", id: isHw ? "fu-role-hw" : "fu-role-quiz", "data-kind": kind });
-      box.appendChild(el("div", { class: "fu-row fu-between" }, [el("h3", {}, [isHw ? "📝 الواجب" : "❓ الكويز"]), el("span", { class: "fu-dim" }, [isHw ? "الحصة السابقة" : "الحصة السابقة"])]));
+      box.appendChild(el("div", { class: "fu-row fu-between" }, [el("h3", {}, [isHw ? "📝 الواجب" : "❓ الكويز"]), el("span", { class: "fu-dim" }, ["الحصة السابقة"])]));
       function commit(nx) { return isHw ? saveLists(g, nx, other) : saveLists(g, other, nx); }
       list.forEach(function (path, i) {
-        var inf = lessonInfo(path), row = el("div", { style: "margin-top:8px" });
-        if (ro) row.appendChild(lessonChip(path));
-        else row.appendChild(el("div", { class: "fu-row" }, [
-          el("div", { class: "grow", style: "flex:1;min-width:0" }, [lessonPicker("pick-" + kind + "-" + i, path, function (v) { var nx = list.slice(); if (v) nx[i] = v; else nx.splice(i, 1); commit(nx); }, all)]),
-          el("button", { class: "fu-ibtn", type: "button", "aria-label": "حذف الدرس", "data-remove": i, "data-kind": kind, onclick: function () { var nx = list.slice(); nx.splice(i, 1); commit(nx); } }, ["✕"]),
-        ]));
-        if (inf && !isHw) row.appendChild(el("div", { class: "fu-chips", style: "margin-top:6px" }, [lockChip("الكويز" + (list.length > 1 ? " · " + (lessonNo(path) || "") : ""), inf.quiz_locked)]));
-        row.appendChild(reqControls(path, i, ro, kind));
-        box.appendChild(row);
+        if (ro) box.appendChild(el("div", { class: "fu-lessonrow" }, [lessonChip(path), reqControls(path, i, ro, kind)]));
+        else box.appendChild(lessonRow(kind, path, i, all, list, commit));
       });
       if (!ro) {
-        var akey = g.key + ":" + kind;
-        if (STATE.adding[akey] || !list.length) box.appendChild(lessonPicker("pick-" + kind + "-new", "", function (v) { if (!v) return; STATE.adding[akey] = false; commit(list.concat([v])); }, all));
-        if (!STATE.adding[akey] && list.length && list.length < 5) box.appendChild(el("div", { style: "margin-top:10px" }, [el("button", { class: "fu-chip", id: "fu-add-" + kind, type: "button", onclick: function () { STATE.adding[akey] = true; refreshPage(); } }, ["＋ إضافة درس"])]));
+        var akey = g.key + ":" + kind, adding = !!STATE.adding[akey];
+        if (adding || !list.length) box.appendChild(el("div", { class: "fu-lessonrow" }, [lessonPicker("pick-" + kind + "-new", "", function (v) { if (!v) return; STATE.adding[akey] = false; commit(list.concat([v])); }, all, { autoOpen: adding && list.length > 0 })]));
+        if (!adding && list.length && list.length < 5) box.appendChild(el("div", { style: "margin-top:8px" }, [el("button", { class: "fu-chip", id: "fu-add-" + kind, type: "button", onclick: function () { STATE.adding[akey] = true; refreshPage(); } }, ["＋ إضافة درس"])]));
       }
       return box;
     }
     card.appendChild(kindBlock("hw"));
     card.appendChild(kindBlock("quiz"));
+    if (!ro && (hwOf(s).length || quizOf(s).length)) card.appendChild(el("div", { class: "fu-colhint", id: "fu-colhint" }, ["المفتاح = مطلوب · 📅 ميعاد تسليم خاص للواجب · ✕ حذف"]));
     card.appendChild(el("div", { class: "fu-hint" }, ["⚠️ حرّك الاختيارين لقدّام بعد كل حصة، وإلا مواعيد الحصة الجديدة ممكن تظهر متأخرة."]));
     if (STATE.year !== "all") {
       var off = [s.current_lesson].concat(allOf(s)).filter(function (p) { var y = yearOfLesson(p); return p && y && y !== STATE.year; });
@@ -835,7 +899,7 @@
 
   function settingsCard(g) {
     var s = g.settings;
-    var card = el("section", { class: "fu-card", "aria-label": "إعدادات الجروب" });
+    var card = el("section", { class: "fu-card fu-compact", "aria-label": "إعدادات الجروب" });
     var chk = el("input", { type: "checkbox", id: "fu-contacted", role: "switch" }); chk.checked = !!s.parents_contacted;
     chk.addEventListener("change", function () { saveGroup(g, { parents_contacted: chk.checked }, { quiet: true }); });
     card.appendChild(el("label", { class: "fu-switch" }, [el("span", {}, ["تم التواصل مع أولياء الأمور"]), chk, el("span", { class: "trk", "aria-hidden": "true" })]));
@@ -869,10 +933,11 @@
     return el("section", { class: "fu-card", id: "fu-nogroups" }, [
       el("h3", {}, ["مفيش جروبات" + (STATE.year !== "all" ? " لـ " + yearLabel(STATE.year) : "") + " لسه"]),
       el("p", { class: "fu-dim", style: "margin:8px 0 12px" }, ["الطلاب اللي تحت لسه من غير جروب. اعمل جروب جديد أو ضمّهم لجروب موجود، وبعدها تظهر حصصهم ومتابعتهم."]),
-      el("button", { class: "fu-btn primary", id: "fu-assign", type: "button", onclick: openAssign }, ["➕ اعمل جروب وضيف الطلاب"]),
+      el("button", { class: "fu-btn primary", id: "fu-assign", type: "button", style: STATE.role === "assistant" ? "display:none" : "", onclick: openAssign }, ["➕ اعمل جروب وضيف الطلاب"]),
     ]);
   }
   function openAssign() {
+    if (STATE.role === "assistant") return;   // admin_group_add is admin-only by design (S3)
     var d = STATE.data, pool = (d.unclassified || []).filter(yearPass), groups = allGroups();
     openSheet(function (sheet) {
       sheet.appendChild(el("div", { class: "fu-row fu-between" }, [el("h2", {}, ["تعيين طلاب لجروب"]), el("button", { class: "fu-ibtn", id: "fu-close", type: "button", "aria-label": "إغلاق", onclick: closeSheet }, ["✕"])]));
@@ -973,6 +1038,11 @@
       } }, [el("b", {}, [String(c[x[0]])]), el("span", {}, [x[1]])]));
     });
     f.appendChild(t);
+    if (flag("FF_PARENT_LOG") && V.cc.total > 0) {
+      f.appendChild(el("button", { class: "fu-contactline" + (V.cc.pending ? "" : " done"), id: "fu-contactline", type: "button", "aria-pressed": String(STATE.contact === "pending"), onclick: function () { setContact(STATE.contact === "pending" ? "all" : "pending"); } },
+        [el("b", {}, [(V.cc.contacted) + " من " + V.cc.total]), el("span", {}, [" تم التواصل مع ولي الأمر" + (V.cc.pending ? " · اضغط تشوف اللي لسه" : " 🎉")])]));
+    }
+    f.appendChild(el("button", { class: "fu-infolink", id: "fu-info-required", type: "button", onclick: function () { openHelp("required"); } }, ["ℹ️ إزاي الصفحة بتحدد إيه الناقص؟"]));
     return f;
   }
 
@@ -989,11 +1059,26 @@
       chips.appendChild(el("button", { class: "fu-chip", type: "button", "data-filter": x[0], "aria-pressed": String(STATE.filter === x[0]), onclick: function () { STATE.filter = x[0]; STATE.open = null; refreshPage(); } }, [x[1]]));
     });
     f.appendChild(chips);
+    if (flag("FF_PARENT_LOG") && L().contactSummary) {
+      var cc = V.cc, cchips = el("div", { class: "fu-filters fu-cfilters", role: "group", "aria-label": "التواصل مع ولي الأمر" });
+      CONTACT_FILTERS.forEach(function (x) {
+        var n = x[0] === "pending" ? cc.pending : (x[0] === "contacted" ? cc.contacted : null);
+        cchips.appendChild(el("button", { class: "fu-chip", type: "button", "data-cfilter": x[0], "aria-pressed": String(STATE.contact === x[0]), onclick: function () { setContact(x[0]); } }, [x[1] + (n === null ? "" : " · " + n)]));
+      });
+      cchips.appendChild(el("button", { class: "fu-chip", type: "button", "data-sort": "nc", "aria-pressed": String(STATE.sort === "nc"), title: "اللي لسه ما اتكلمش معاهم الأول، وبعدين الأكتر مشاكل", onclick: function () { STATE.sort = STATE.sort === "nc" ? "default" : "nc"; writeHash(); refreshPage(); } }, ["↕ غير المتواصَل أولًا"]));
+      f.appendChild(cchips);
+    }
     return f;
+  }
+  function setContact(v) {
+    STATE.contact = v; STATE.open = null;
+    if (v === "pending") STATE.sort = "nc";      // sort "not contacted first" is the default while that filter is on
+    writeHash(); refreshPage();
   }
   function passFilter(r) {
     var f = STATE.filter;
     if (f !== "all" && !r.tags[f]) return false;
+    if (STATE.contact !== "all" && r.contact.state !== STATE.contact) return false;
     var q = (STATE.q || "").trim().toLowerCase();
     if (!q) return true;
     return r.st.name.toLowerCase().indexOf(q) >= 0 || String(r.st.phone).indexOf(q.replace(/\D/g, "") || "\u0000") >= 0;
@@ -1002,7 +1087,8 @@
     var chips = el("div", { class: "fu-chips chips" });
     (r.sm.microChips || []).forEach(function (c) { chips.appendChild(el("span", { class: "fu-chip t-" + (c.tone || "grey"), "data-chip": c.key }, [c.label])); });
     if (STATE.year === "all") { var yk = yearOfStudent(r.st); if (yk) chips.insertBefore(el("span", { class: "fu-chip fu-year-chip", "data-chip": "year" }, ["S" + yk]), chips.firstChild); }
-    if (flag("FF_PARENT_LOG") && logOf(r.st.key)[0]) chips.appendChild(el("span", { class: "fu-chip green", "data-chip": "notified", title: "آخر تواصل مع ولي الأمر" }, ["📨 " + dmOf(logOf(r.st.key)[0].sent_at)]));
+    if (flag("FF_PARENT_LOG") && logOf(r.st.key)[0]) chips.appendChild(el("span", { class: "fu-chip green", "data-chip": "notified", title: "آخر تواصل مع ولي الأمر" + (r.contact.sum.contacted_month ? "" : " (مش الشهر ده)") }, [(r.contact.state === "contacted" ? "✅ تم التواصل · " : "📨 ") + dmOf(r.contact.sum.last_sent_at || logOf(r.st.key)[0].sent_at)]));
+    if (r.contact.state === "pending") chips.appendChild(el("span", { class: "fu-chip amber", "data-chip": "contact-pending", title: "فيه مشكلة مستحقة ولسه ما اتسجّلش تواصل عنها" }, ["⭕ لم يتم التواصل"]));
     var hasParentChip = (r.sm.microChips || []).some(function (c) { return /parent|phone/i.test(c.key || ""); });
     if (!hasParentChip && r.ck.level === "missing") chips.appendChild(el("span", { class: "fu-chip red", "data-chip": "parent" }, ["⚠️ لا رقم ولي أمر"]));
     else if (!hasParentChip && r.ck.level === "warn") chips.appendChild(el("span", { class: "fu-chip amber", "data-chip": "parent" }, ["⚠️ راجع رقم ولي الأمر"]));
@@ -1015,6 +1101,7 @@
     var b = el("button", { class: cls, type: "button", "data-kind": a.kind, disabled: a.disabled ? "" : null, "aria-disabled": a.disabled ? "true" : null, onclick: function () { if (!a.disabled) openMessage(r, g, a, V); } }, kids);
     return b;
   }
+  function infoBtn() { return el("button", { class: "fu-ibtn fu-info", type: "button", "data-info": "required", "aria-label": "إزاي بنحدد إن ده ناقص؟", title: "إزاي بنحدد إن ده ناقص؟", onclick: function (e) { e.stopPropagation(); openHelp("required"); } }, ["ℹ️"]); }
   function studentBody(r, g, V) {
     var d = STATE.data, s = g.settings, cur = s.current_lesson, st = r.st, facts = d.facts[st.key] || {};
     var body = el("div", { class: "fu-stu-body", id: "fu-body-" + st.key });
@@ -1059,12 +1146,12 @@
       B.appendChild(el("div", { style: "margin-bottom:8px" }, [lessonChip(path)]));
       if (inHw && info.has_assignment !== false) {
         var ok = f.homework && f.homework.submitted;
-        B.appendChild(el("div", { class: "fu-kv" }, [el("span", {}, ["الواجب"]), el("span", { class: "fu-chip " + (ok ? "green" : "red"), "data-hw": ok ? "done" : "missing" }, [ok ? "✓ تم" : "✕ لم يُسلَّم"])]));
+        B.appendChild(el("div", { class: "fu-kv" }, [el("span", {}, ["الواجب"]), el("span", { class: "fu-chip " + (ok ? "green" : "red"), "data-hw": ok ? "done" : "missing" }, [ok ? "✓ تم" : "✕ لم يُسلَّم"]), ok ? null : infoBtn()]));
       }
       if (inQz && info.has_quiz !== false) {
         var q = f.quiz || {};
         if (q.taken) B.appendChild(el("div", { class: "fu-kv" }, [el("span", {}, ["الكويز"]), el("span", { class: "fu-chip " + (ratio(q) >= d.settings.praise_quiz_pct ? "green" : "grey"), "data-quiz": "taken" }, ["❓ " + q.score + " / " + q.total])]));
-        else B.appendChild(el("div", { class: "fu-absent", "data-quiz": "absent", role: "status" }, ["⚠️ غائب عن الكويز – تعويض"]));
+        else B.appendChild(el("div", { class: "fu-absent", "data-quiz": "absent", role: "status" }, ["⚠️ غائب عن الكويز – تعويض ", infoBtn()]));
       }
       body.appendChild(B);
     });
@@ -1091,6 +1178,10 @@
   }
   function renderRows(V) {
     var host = clear($("fu-rows")), shown = V.rows.filter(passFilter);
+    if (STATE.sort === "nc" && L().contactSort) {
+      var byKey = {}; shown.forEach(function (r) { byKey[r.st.key] = r; });
+      shown = L().contactSort(shown.map(function (r) { return { id: r.st.key, state: r.contact.state, severity: r.contact.severity, name: r.st.name }; })).map(function (k) { return byKey[k]; });
+    }
     if ($("fu-count")) $("fu-count").textContent = "الطلاب · " + shown.length + (shown.length !== V.rows.length ? " / " + V.rows.length : "");
     if (!shown.length) { host.appendChild(el("div", { class: "fu-empty" }, [V.rows.length ? "مفيش طلاب بالفلتر ده" : (STATE.year !== "all" ? "مفيش طلاب " + yearLabel(STATE.year) + " في الجروب ده" : "مفيش طلاب في الجروب ده")])); return; }
     shown.forEach(function (r) {
@@ -1208,8 +1299,13 @@
     window.addEventListener("afterprint", cleanup);
     window.print();
   }
+  // a student's monthly report counts as "contacted" when marked sent OR a monthly log entry exists for that month
+  function monthContacted(r, month) {
+    return (r.review || {}).status === "sent" || (L().monthlySent ? L().monthlySent(logOf(pkOf(r.student.phone)), month) : false);
+  }
   function openMonthly(g, month0) {
     var month = month0 || STATE.data.today.slice(0, 7), data = null, loading = true, err = "";
+    var mf = STATE.contact === "pending" || STATE.contact === "contacted" ? STATE.contact : "all", msort = STATE.sort === "nc";   // same filter / sort as the page, adjustable here
     openSheet(function (sheet) {
       var body = el("div", { id: "fu-monthly-body" }); sheet.appendChild(body);
       function fetchIt() {
@@ -1224,7 +1320,8 @@
         body.appendChild(el("label", { style: "display:block;margin-top:10px" }, [el("span", { class: "fu-label" }, ["الشهر"]), sel]));
         if (loading) { body.appendChild(el("div", { class: "fu-skel" })); return; }
         if (err) { body.appendChild(el("div", { class: "fu-err", id: "fu-monthly-error", role: "alert" }, [err])); return; }
-        var revs = data.reviews || [];
+        var revs = data.reviews || [], sentN = revs.filter(function (r) { return monthContacted(r, month); }).length;
+        var logOn = flag("FF_PARENT_LOG"), shownRevs = revs;   // copy-all / print / mark-ready keep using the FULL list; the filter only changes what is listed
         body.appendChild(el("div", { class: "fu-hint" }, [data.closed ? "الشهر خلص — الأرقام نهائية." : "الشهر لسه شغال — الأرقام لحد النهارده (" + dmOf(data.range.to) + ")."]));
         body.appendChild(el("div", { class: "fu-stack", style: "margin:12px 0" }, [
           el("button", { class: "fu-btn", id: "fu-monthly-copy-all", type: "button", onclick: function () {
@@ -1238,7 +1335,21 @@
             } }, ["✓ الكل جاهز"]),
           ]),
         ]));
-        revs.forEach(function (r) {
+        if (logOn) {
+          body.appendChild(el("div", { class: "fu-contactline" + (sentN === revs.length ? " done" : ""), id: "fu-monthly-count" }, [el("b", {}, [sentN + " من " + revs.length]), el("span", {}, [" اتبعتلهم تقرير " + monthLabelOf(month)])]));
+          var mchips = el("div", { class: "fu-filters fu-cfilters", role: "group", "aria-label": "فلتر التواصل" });
+          CONTACT_FILTERS.forEach(function (x) {
+            mchips.appendChild(el("button", { class: "fu-chip", type: "button", "data-mfilter": x[0], "aria-pressed": String(mf === x[0]), onclick: function () { mf = x[0]; if (x[0] === "pending") msort = true; paint(); } }, [x[1]]));
+          });
+          mchips.appendChild(el("button", { class: "fu-chip", type: "button", "data-msort": "nc", "aria-pressed": String(msort), onclick: function () { msort = !msort; paint(); } }, ["↕ غير المتواصَل أولًا"]));
+          body.appendChild(mchips);
+          shownRevs = revs.filter(function (r) { var c = monthContacted(r, month); return mf === "all" || (mf === "contacted" ? c : !c); });
+          if (msort && L().contactSort) {
+            var byK = {}; shownRevs.forEach(function (r) { byK[pkOf(r.student.phone)] = r; });
+            shownRevs = L().contactSort(shownRevs.map(function (r) { var t0 = r.summary.totals || {}; return { id: pkOf(r.student.phone), state: monthContacted(r, month) ? "contacted" : "pending", severity: (t0.quiz_missed || 0) + (t0.homework_missed || 0), name: r.student.name }; })).map(function (k) { return byK[k]; });
+          }
+        }
+        shownRevs.forEach(function (r) {
           var t = r.summary.totals || {}, st = MSTATUS[(r.review || {}).status] || MSTATUS.pending, ck = parentCheck({ phone: r.student.phone, parent_phone: r.student.parent_phone });
           body.appendChild(el("div", { class: "fu-sec fu-mrow", "data-review": pkOf(r.student.phone) }, [
             el("h4", {}, [el("span", {}, [r.student.name]), el("span", { class: "fu-chip " + st[1], "data-status": (r.review || {}).status || "pending" }, [st[0]])]),
@@ -1246,11 +1357,12 @@
               el("span", { class: "fu-chip grey" }, ["📝 " + (t.quiz_avg_pct != null ? Math.round(t.quiz_avg_pct) + "%" : "—")]),
               (t.quiz_missed || t.homework_missed) ? el("span", { class: "fu-chip red" }, ["⚠️ ناقص " + ((t.quiz_missed || 0) + (t.homework_missed || 0))]) : el("span", { class: "fu-chip green" }, ["✓ مفيش ناقص"]),
               ck.level === "missing" ? el("span", { class: "fu-chip red" }, ["لا رقم ولي أمر"]) : null,
+              logOn ? (monthContacted(r, month) ? el("span", { class: "fu-chip green", "data-contact": "sent" }, ["✅ تم التواصل"]) : el("span", { class: "fu-chip amber", "data-contact": "pending" }, ["⭕ لم يتم التواصل"])) : null,
             ]),
             el("div", { style: "margin-top:10px" }, [el("button", { class: "fu-btn wa", type: "button", "data-open-review": pkOf(r.student.phone), onclick: function () { openMonthlyMessage(g, r, month); } }, ["💬 معاينة وإرسال"])]),
           ]));
         });
-        if (!revs.length) body.appendChild(el("div", { class: "fu-empty" }, ["مفيش طلاب في الجروب ده"]));
+        if (!shownRevs.length) body.appendChild(el("div", { class: "fu-empty" }, [revs.length ? "مفيش طلاب بالفلتر ده" : "مفيش طلاب في الجروب ده"]));
       }
       fetchIt();
     }, { full: true, label: "المراجعة الشهرية" });
@@ -1332,7 +1444,27 @@
         } });
     }, { full: true, label: "قوالب الرسائل" });
   }
-  function openHelp() {
+  // "How does the page know what is required?" — mirrors the server rule (Code.gs handleAdminFollowupOverview / _p2fuSummaryFor).
+  function requiredGuide() {
+    var box = el("section", { class: "fu-sec fu-reqguide", id: "fu-help-required" });
+    box.appendChild(el("h3", { style: "margin:0 0 8px" }, ["🧭 إزاي الصفحة بتحدد إيه المطلوب والناقص؟"]));
+    box.appendChild(el("ol", { class: "fu-reqlist" }, [
+      ["الدروس المتوقعة", "لكل جروب الطالب فيه، الصفحة بتاخد قايمة «واجب» وقايمة «كويز» (ولو لسه ما اتفصلوش بتاخد «المراجعة» للاتنين). وأي درس ليه ميعاد مخصص بيتحسب كمان."],
+      ["مطلوب ولا اختياري؟", "مفتاحي «الواجب مطلوب» و«الكويز مطلوب» تحت كل درس. الدرس اللي ملوش إعداد محفوظ يعتبر الاتنين مطلوبين."],
+      ["الميعاد", "لو الدرس ليه ميعاد مخصص بيتحسب هو. غير كده بيتحسب ميعاد واجب الجروب (من يوم وساعة الحصة وعدد أيام التسليم)."],
+      ["اتسلّم ولا لأ؟", "الصفحة بتدوّر في تسليمات الواجب ونتايج الكويز على نفس رقم الطالب + نفس المادة + نفس الدرس (آخر جزء في مسار الدرس). أي تسجيل مطابق = اتسلّم. لو فيه أكتر من واحد بنعتمد آخر نتيجة."],
+      ["الناقص", "ناقص = مطلوب + ما اتسلّمش + الميعاد عدّى. قبل الميعاد بيظهر «لسه بدري» ومش بيتحسب."],
+    ].map(function (x) { return el("li", {}, [el("b", {}, [x[0]]), el("span", {}, [" — " + x[1]])]); })));
+    box.appendChild(el("div", { class: "fu-hint", id: "fu-help-example" }, [
+      el("b", {}, ["مثال: "]),
+      "جروب «Sat 6pm» واجبه Ch 2 · L1، وميعاد التسليم الأحد. سارة سلّمت يوم الخميس فتظهر ✓ تم. عمر ما سلّمش: قبل الأحد يظهر «لسه بدري»، وبعد الأحد يظهر ✕ لم يُسلَّم ويتحسب «واجب ناقص». لو الدرس ده مفتاح «الواجب مطلوب» عليه مقفول، عمر مش هيتحسب عليه أصلًا.",
+    ]));
+    box.appendChild(el("div", { class: "fu-dim", style: "margin-top:8px" }, [
+      "لو طالب بيقول إنه سلّم وبرضه ظاهر ناقص: ده معناه إن مفيش تسجيل مطابق وصل للسيرفر (مثلًا التسليم ما اكتملش، أو الدرس متسجّل بمفتاح مختلف). اطلب منه يفتح صفحة الدرس تاني من نفس الجهاز، وراجع تبويب التسليمات في الشيت.",
+    ]));
+    return box;
+  }
+  function openHelp(focus) {
     var steps = [
       ["اختار السنة", "من الشريط اللي فوق: الكل / سينيور 1 / سينيور 2. الاختيار بيفلتر الجروبات والطلاب وقوائم الدروس في الصفحة كلها، وبيتفكر لحد ما تغيّره."],
       ["اختار الجروب", "من التبويبات تحت العنوان. الرقم جنب الاسم = عدد الطلاب الظاهرين في السنة المختارة."],
@@ -1343,6 +1475,8 @@
     ];
     openSheet(function (sheet) {
       sheet.appendChild(el("h2", {}, ["دليل الاستخدام"]));
+      var rg = requiredGuide();
+      if (focus === "required") { sheet.appendChild(rg); sheet.appendChild(el("h3", { style: "margin:16px 0 8px" }, ["خطوات الاستخدام"])); }
       sheet.appendChild(el("ol", { class: "fu-help fu-guide" }, steps.map(function (x) {
         return el("li", {}, [el("b", {}, [x[0]]), el("span", {}, [" — " + x[1]])]);
       })));
@@ -1354,6 +1488,7 @@
         "رسالة الجروب الأول، ورسالة ولي الأمر بعد الميعاد بس.",
         "بيانات الطلاب وأولياء الأمور تفضل ورا تسجيل دخول الأدمن، ومتتحطش في الريبو.",
       ].map(function (t) { return el("li", {}, [t]); })));
+      if (focus !== "required") sheet.appendChild(rg);
       sheet.appendChild(el("button", { class: "fu-btn", id: "fu-close", type: "button", onclick: closeSheet }, ["تمام"]));
     }, { label: "دليل الاستخدام", full: true });
   }
@@ -1378,6 +1513,7 @@
     if (STATE.year !== "all" && !visibleTabKeys().length) { root.appendChild(el("div", { class: "fu-empty", id: "fu-year-empty" }, ["مفيش طلاب " + yearLabel(STATE.year) + " لسه."])); return; }
     var V = STATE.view = computeView(g);
     if (d.lessons_error) root.appendChild(el("div", { class: "fu-warnbox", id: "fu-lessons-error", role: "alert" }, ["⚠️ تعذّر تحميل قائمة الدروس من GitHub — قد تكون القائمة ناقصة. (" + (typeof d.lessons_error === "string" ? d.lessons_error : "") + ")"]));
+    var fb = flagBanner(); if (fb) root.appendChild(fb);
     var gb = guideBanner(); if (gb) root.appendChild(gb);
     var noGroups = g.unclassified && !visibleGroups().length;
     if (noGroups) root.appendChild(noGroupsCard());
@@ -1390,6 +1526,19 @@
     root.appendChild(listHead(V));
     root.appendChild(el("div", { id: "fu-rows" }));
     renderRows(V);
+  }
+  // A Phase 2 switch is OFF on the server: say which Script Property to set instead of silently hiding the feature.
+  function flagBanner() {
+    var list = L().flagNotices ? L().flagNotices(STATE.data && STATE.data.flags) : [];
+    if (!list.length) return null;
+    var box = el("section", { class: "fu-warnbox fu-flagbanner", id: "fu-flag-banner", role: "alert" });
+    box.appendChild(el("b", {}, ["⚠️ في ميزات متوقفة على السيرفر"]));
+    list.forEach(function (n) {
+      box.appendChild(el("div", { class: "fu-flagline", "data-flag": n.flag }, [n.feature + " متوقفة. ضيف ", el("bdi", { dir: "ltr", class: "fu-code" }, [n.property + " = 1"]), " في Apps Script ← Project Settings ← Script Properties."]));
+    });
+    box.appendChild(el("div", { class: "fu-dim" }, ["مفيش إعادة نشر مطلوبة. بعد ما تضيفها اضغط تحديث. (أو شغّل p3_setup_enable_followup_flags من محرر Apps Script مرة واحدة.)"]));
+    box.appendChild(el("button", { class: "fu-btn", id: "fu-flag-reload", type: "button", onclick: function () { if (!STATE.loading) load(true).then(function () { toast("تم التحديث ✓"); }); } }, ["🔄 تحديث"]));
+    return box;
   }
   function refreshPage() {
     var y = window.scrollY, ae = document.activeElement, id = ae && ae.id, keepQ = id === "fu-q";
@@ -1404,6 +1553,7 @@
       STATE.loading = false; $("fu-refresh").style.opacity = "";
       STATE.data = data; STATE.fetchedAt = Date.now();
       var m = /student=(\d+)/.exec(location.hash);
+      if (!STATE.hashRead) { STATE.hashRead = true; readHashFilters(); }
       // a deep link to a student the year filter hides switches the filter back to "all"
       if (m && STATE.year !== "all" && data.students[m[1]] && yearOfStudent(data.students[m[1]]) !== STATE.year) { STATE.year = "all"; try { localStorage.setItem("fu-year", "all"); } catch (e) {} }
       var keys = visibleTabKeys();
@@ -1429,15 +1579,16 @@
   // ---- boot ------------------------------------------------------------------------------------
   function bindChrome() {
     $("fu-refresh").addEventListener("click", function () { if (!STATE.loading) load(true).then(function () { toast("تم التحديث ✓"); }); });
-    $("fu-help").addEventListener("click", openHelp);
+    $("fu-help").addEventListener("click", function () { openHelp(); });
     $("fu-templates").addEventListener("click", openTemplates);
     window.addEventListener("hashchange", function () {
       var m = /student=(\d+)/.exec(location.hash);
       if (STATE.data && m && STATE.open !== m[1]) { STATE.open = m[1]; refreshPage(); }
     });
   }
-  function start(session) {
+  function start(session, role) {
     STATE.session = session;
+    STATE.role = role || (session && session.role) || "admin";   // "assistant" => hide admin-only controls
     $("fu-refresh").hidden = false; $("fu-templates").hidden = false;
     if (MOCK) $("fu-mock").hidden = false;
     loadTitles().then(function () { load(false); });
@@ -1460,9 +1611,8 @@
           var btn = el("button", { class: "fu-btn primary", type: "button", onclick: function () { window.AuthEngine.clearSession(); location.reload(); } }, ["سجّل خروج وادخل تاني ←"]);
           var r = clear($("fu-root")); r.appendChild(el("div", { class: "fu-err" }, ["تسجيل الدخول المحفوظ ناقصه رمز الجلسة. ادخل تاني (الرقم والباسورد زي ما هم)."])); r.appendChild(btn); return;
         }
-        // Convenience only: the server re-checks is_admin on every call.
-        if (session.is_admin === false) { location.href = "student.html"; return; }
-        start(session);
+        // Convenience only: the server re-checks on every call. Assistants (role) are allowed in.
+        window.StaffGuard.require(["admin","assistant"], session).then(function (role) { if (role) start(session, role); });
       });
     }, function (e) { renderError(e.message); });
   }

@@ -461,6 +461,71 @@
     return out;
   }
 
+  /* ---------------------------------------------------------------- parent contact (Phase 3 / S1)
+   * Everything here is derived from overview.parent_log[phoneKey] = [{kind, ref, sent_at, note}]
+   * (sent_at = "YYYY-MM-DD HH:MM:SS", Cairo). Pure: no DOM, no network.
+   *
+   * Three states per student, issue-relative:
+   *   pending   - has at least one DUE problem (missing homework, absent quiz, ...) with no log entry for it
+   *   contacted - nothing pending AND (all its due problems are logged, or any contact was logged this week)
+   *   none      - nothing pending and nobody contacted: no reason to call, not counted
+   */
+  function ymdOf(v) { var m = /^(\d{4}-\d{2}-\d{2})/.exec(String(v == null ? '' : v)); return m ? m[1] : ''; }
+  function weekRange(today) {          // Saturday..Friday, same rule as the server's _p2fuWeek
+    var back = (weekdayOf(today) + 1) % 7, start = addDays(today, -back);
+    return { start: start, end: addDays(start, 6) };
+  }
+  function contactSummary(log, today, week) {
+    var wk = (week && week.start && week.end) ? week : weekRange(today), month = String(today || '').slice(0, 7);
+    var out = { contacted_week: false, contacted_month: false, count_week: 0, count_month: 0, count: 0, last_sent_at: '', last_kind: '', last_ref: '' };
+    (log || []).forEach(function (n) {
+      var d = ymdOf(n && n.sent_at); if (!d) return;
+      out.count++;
+      if (d >= wk.start && d <= wk.end) out.count_week++;
+      if (d.slice(0, 7) === month) out.count_month++;
+      if (String(n.sent_at) >= out.last_sent_at) { out.last_sent_at = String(n.sent_at); out.last_kind = n.kind || ''; out.last_ref = n.ref || ''; }
+    });
+    out.contacted_week = out.count_week > 0; out.contacted_month = out.count_month > 0;
+    return out;
+  }
+  function isLogged(log, item) {
+    var ref = String(item && item.ref != null ? item.ref : '').toLowerCase(), kind = item && item.kind;
+    return (log || []).some(function (n) { return n.kind === kind && String(n.ref == null ? '' : n.ref).toLowerCase() === ref; });
+  }
+  function unloggedIssues(issues, log) { return (issues || []).filter(function (it) { return !isLogged(log, it); }); }
+  function contactState(issues, log, summary) {
+    var iss = issues || [];
+    if (unloggedIssues(iss, log).length) return 'pending';
+    if (iss.length) return 'contacted';
+    return (summary && summary.contacted_week) ? 'contacted' : 'none';
+  }
+  var CONTACT_RANK = { pending: 0, none: 1, contacted: 2 };
+  // items: [{id, state, severity, name}] -> ids, "not contacted first", then more problems first, then name (stable, no ICU).
+  function contactSort(items) {
+    return (items || []).map(function (x, i) { return { x: x, i: i }; }).sort(function (a, b) {
+      var ra = CONTACT_RANK[a.x.state] == null ? 1 : CONTACT_RANK[a.x.state], rb = CONTACT_RANK[b.x.state] == null ? 1 : CONTACT_RANK[b.x.state];
+      if (ra !== rb) return ra - rb;
+      var sa = a.x.severity || 0, sb = b.x.severity || 0; if (sa !== sb) return sb - sa;
+      var na = String(a.x.name || ''), nb = String(b.x.name || ''); if (na !== nb) return na < nb ? -1 : 1;
+      return a.i - b.i;
+    }).map(function (o) { return o.x.id; });
+  }
+  function contactCounts(states) {
+    var c = { pending: 0, contacted: 0, none: 0, total: 0 };
+    (states || []).forEach(function (s) { if (c[s] !== undefined) c[s]++; });
+    c.total = c.pending + c.contacted;   // "6 of 12 contacted": students who needed (or got) a contact
+    return c;
+  }
+  function monthlySent(log, month) { return (log || []).some(function (n) { return n.kind === 'monthly' && String(n.ref) === String(month); }); }
+  // Which Phase 2 switches are off on the server? -> [{flag, property, feature}]  (overview.flags; undefined = unknown = nothing to say)
+  var FLAG_FEATURES = { FF_PARENT_LOG: 'تسجيل التواصل مع ولي الأمر', FF_MONTHLY: 'المراجعة الشهرية' };
+  function flagNotices(flags) {
+    if (!flags || typeof flags !== 'object') return [];
+    return Object.keys(FLAG_FEATURES).filter(function (k) { return flags[k] === false || flags[k] === 0; })
+      .map(function (k) { return { flag: k, property: k, feature: FLAG_FEATURES[k] }; });
+  }
+
+
   return {
     TZ: TZ, DEFAULT_SETTINGS: DEFAULT_SETTINGS, WEEKDAYS_AR: WEEKDAYS_AR,
     phoneKey: phoneKey, waDigits: waDigits, checkParentPhone: checkParentPhone,
@@ -468,6 +533,8 @@
     deadlineState: deadlineState, deadlineWhen: deadlineWhen,
     studentVerdicts: studentVerdicts, studentSummary: studentSummary, groupSummary: groupSummary,
     mergeSettings: mergeSettings,
-    hwList: hwList, quizList: quizList, allReviewLessons: allReviewLessons
+    hwList: hwList, quizList: quizList, allReviewLessons: allReviewLessons,
+    weekRange: weekRange, contactSummary: contactSummary, isLogged: isLogged, unloggedIssues: unloggedIssues,
+    contactState: contactState, contactSort: contactSort, contactCounts: contactCounts, monthlySent: monthlySent, flagNotices: flagNotices
   };
 }));

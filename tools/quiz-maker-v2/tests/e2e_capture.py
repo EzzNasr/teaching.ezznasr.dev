@@ -174,11 +174,12 @@ def run(browser, tmp):
 
     p.fail_uploads = 3   # postToDrive retries a dropped request twice by itself; 3 drops = a real failure
     pg.click("button:has-text('Submit quiz')")
-    pg.wait_for_selector("text=A photo didn't upload", timeout=20000)
-    check("R-014 failed upload: answers kept, clear message, back on the question", "Take photo" in pg.inner_text("body") and "tap Submit" in pg.inner_text("body"))
-    check("...nothing submitted yet", not p.calls("upload_quiz_result"))
-    pg.click("button:has-text('Submit quiz')")
+    # Phase 3 / S2: answers are posted FIRST and photos best-effort, so a failed photo never loses the submission.
+    pg.wait_for_selector("text=Send photos again", timeout=20000)
+    check("R-014 failed upload: answers already submitted, photos can be re-sent", len(p.calls("upload_quiz_result")) == 1 and "Your answers are saved" in pg.inner_text("body"))
+    pg.click("button:has-text('Send photos again')")
     pg.wait_for_selector("text=Pending grading", timeout=15000)
+    check("re-sent photo went up and the retry button is gone", pg.locator("button:has-text('Send photos again')").count() == 0 and len(p.calls("upload_written_image")) >= 1)
     check("R-016 after submit the page shows the review (score + each question)", pg.locator(".qz-review__item").count() == 3, pg.inner_text("body")[:300])
     txt = pg.inner_text("body")
     check("review: correct one marked, wrong one shows the right answer, written pending, explanations now visible",

@@ -16,7 +16,23 @@
 <link rel="stylesheet" href="/assets/base.css">
 <link rel="stylesheet" href="/assets/forms.css">
 <link rel="stylesheet" href="/assets/dashboard.css">
-<style>:root { --d-w: 1180px; --d-kpis: 6; }</style>
+<style>:root { --d-w: 1180px; --d-kpis: 6; }  /* bulk access (Phase 3 / S4) */
+  .bk-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+  .bk-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 12px 0; }
+  .bk-box { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--surface-soft); min-width: 0; }
+  .bk-box h3 { margin: 0 0 8px; font: 700 12px var(--mono); color: var(--ink); letter-spacing: .03em; }
+  .bk-list { max-height: 340px; overflow: auto; margin-top: 8px; border-top: 1px solid var(--line); }
+  .bk-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 2px 4px; position: sticky; top: 0; background: var(--surface-soft); color: var(--ink); font: 700 12px var(--sans); }
+  .bk-head .ac-btn { padding: 3px 8px; font-size: 10px; }
+  .bk-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; color: var(--ink-dim); font: 11px var(--mono); }
+  .bk-sum { margin: 10px 0 0; color: var(--ink-dim); font: 600 12px/1.5 var(--sans); }
+  .bk-result { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface-soft); font: 12px/1.55 var(--sans); color: var(--ink); }
+  .bk-result ul { margin: 6px 0 0; padding-inline-start: 18px; max-height: 180px; overflow: auto; }
+  .bk-result .bad { color: var(--low); }
+  .bk-stale { opacity: .6; }
+  .bk-tabs { row-gap: 6px; }
+  .dash-section > .ac-preview:empty { display: none; }
+</style>
 <script src="/assets/theme.js" defer></script>
 <style>
   :root { --surface: var(--d-surface); --surface-strong: var(--d-surface); --surface-soft: var(--d-subtle); --ink: var(--d-ink); --ink-dim: var(--d-ink-3);
@@ -1140,6 +1156,7 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
       <a href="master.html">Results</a>
       <a href="access.html" aria-current="page">Video access</a>
       <a href="followup.html" lang="ar">متابعة</a>
+      <a href="team.html">Team</a>
       <a href="/">Back to site</a>
     </nav>
     <span class="d-spacer"></span>
@@ -1682,6 +1699,7 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
       ["lessons", "Lessons", c.lessons_locked],
       ["quizzes", "Quiz gate", c.quizzes_locked],
       ["groups", "Groups", c.groups],
+      ["bulk", "Bulk access", null],
       ["grant", "Give access", null],
     ];
     return el("div", { class: "dash-tabs ac-tabs", role: "group", "aria-label": "Sections" }, list.map(function (t) {
@@ -2743,6 +2761,224 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
     ]);
   }
 
+  // ---- bulk access (Phase 3 / S4) ------------------------------------------------------------------
+  // One checklist for BOTH lesson access and quiz access: lessons x (groups + students), a preview of
+  // exactly what would change, then one request (p3_admin_bulk_grant / p3_admin_bulk_revoke). Selections
+  // live in BULK so ticking never re-renders the page; the existing single flows stay as they were.
+  var BULK = { kind: "lesson", mode: "grant", year: "", q: "", lessons: {}, groups: {}, prev: null, result: null };
+
+  function bulkPanel(d) {
+    var picker = null, term = null, prevBox, applyBtn, previewBtn, sumNode, listNode, groupNode;
+    var isGrant = function () { return BULK.mode === "grant"; };
+    var isQuiz = function () { return BULK.kind === "quiz"; };
+    function selLessons() { return Object.keys(BULK.lessons); }
+    function selGroups() { return Object.keys(BULK.groups); }
+    function selMembers() { return picker ? picker.selected() : []; }
+    function payload(action) {
+      var p = { action: action, kind: BULK.kind, lessons: selLessons(), groups: selGroups(), members: selMembers() };
+      if (action === "p3_admin_bulk_preview") p.mode = BULK.mode;
+      if (action !== "p3_admin_bulk_revoke" && isGrant()) {
+        var t = term.term();
+        if (t) Object.keys(t).forEach(function (k) { p[k] = t[k]; });
+      }
+      return p;
+    }
+    function ready() {
+      return selLessons().length && (selGroups().length || selMembers().length) && (!isGrant() || term.term());
+    }
+    function stale() {
+      BULK.prev = null;
+      applyBtn.disabled = true;
+      prevBox.textContent = "";
+      sumNode.textContent = selLessons().length + " " + (isQuiz() ? "quiz" : "lesson") + (selLessons().length === 1 ? "" : "s") + " × " +
+        plural(selGroups().length, "group") + " + " + plural(selMembers().length, "student") + " selected.";
+      previewBtn.disabled = !ready();
+    }
+
+    // -- lessons checklist (grouped by folder + chapter) --
+    function fillLessons() {
+      listNode.innerHTML = "";
+      var q = BULK.q.toLowerCase();
+      var all = sortLessonsByYear(allLessonsList(d).filter(function (l) {
+        return yearPass(BULK.year, l.lesson) && (!q || (l.lesson + " " + pretty(l.lesson)).toLowerCase().indexOf(q) !== -1);
+      }));
+      if (!all.length) { listNode.appendChild(el("p", { class: "ac-hint" }, ["No lessons match this filter."])); return; }
+      var groups = [], byKey = {};
+      all.forEach(function (l) {
+        var p = lessonParts(l.lesson), k = parentOf(l.lesson) + "|" + p.chapter;
+        if (!byKey[k]) { byKey[k] = { title: pretty(parentOf(l.lesson) || l.lesson).replace(/ · .*$/, "") + (p.chapter ? " · Chapter " + p.chapter : ""), folder: parentOf(l.lesson), items: [] }; groups.push(byKey[k]); }
+        byKey[k].items.push(l.lesson);
+      });
+      var shownFolders = {};
+      groups.forEach(function (g) {
+        var boxes = [];
+        function setAll(on) { boxes.forEach(function (b) { b.checked = on; toggleLesson(b.value, on); }); stale(); }
+        var all1 = el("button", { class: "ac-btn", type: "button" }, ["all"]);
+        var none1 = el("button", { class: "ac-btn", type: "button" }, ["none"]);
+        all1.addEventListener("click", function () { setAll(true); });
+        none1.addEventListener("click", function () { setAll(false); });
+        listNode.appendChild(el("div", { class: "bk-head" }, [g.title + " (" + g.items.length + ")", all1, none1]));
+        // Lesson kind only: a whole-folder wildcard, same scope the single grant accepts.
+        if (!isQuiz() && g.folder && !shownFolders[g.folder]) {
+          shownFolders[g.folder] = 1;
+          var wild = g.folder + "/*", wb = el("input", { type: "checkbox", value: wild });
+          wb.checked = !!BULK.lessons[wild];
+          wb.addEventListener("change", function () { toggleLesson(wild, wb.checked); stale(); });
+          listNode.appendChild(el("label", { class: "ac-pickitem" }, [wb, el("span", {}, ["Everything in this folder", el("small", {}, [wild])])]));
+        }
+        g.items.forEach(function (path) {
+          var b = el("input", { type: "checkbox", value: path });
+          b.checked = !!BULK.lessons[path];
+          b.addEventListener("change", function () { toggleLesson(path, b.checked); stale(); });
+          boxes.push(b);
+          listNode.appendChild(el("label", { class: "ac-pickitem" }, [b, el("span", {}, [pretty(path), el("small", {}, [path])])]));
+        });
+      });
+    }
+    function toggleLesson(path, on) { if (on) BULK.lessons[path] = 1; else delete BULK.lessons[path]; }
+
+    // -- controls --
+    var tabs = el("div", { class: "bk-tabs", role: "group", "aria-label": "What to give" }, [["lesson", "Lesson access"], ["quiz", "Quiz access"]].map(function (t) {
+      var b = el("button", { class: "dash-tab" + (BULK.kind === t[0] ? " is-active" : ""), type: "button", "data-bulk-kind": t[0] }, [t[1]]);
+      b.addEventListener("click", function () { if (BULK.kind === t[0]) return; BULK.kind = t[0]; BULK.lessons = {}; BULK.prev = null; BULK.result = null; render(); });
+      return b;
+    }).concat([["grant", "Give"], ["revoke", "Take away"]].map(function (t) {
+      var b = el("button", { class: "dash-tab" + (BULK.mode === t[0] ? " is-active" : ""), type: "button", "data-bulk-mode": t[0] }, [t[1]]);
+      b.addEventListener("click", function () { if (BULK.mode === t[0]) return; BULK.mode = t[0]; BULK.prev = null; BULK.result = null; render(); });
+      return b;
+    })));
+
+    var yearSel = lessonYearSelect(BULK.year);
+    yearSel.addEventListener("change", function () { BULK.year = yearSel.value; fillLessons(); });
+    var search = el("input", { class: "ac-input", type: "search", placeholder: "Search lessons…", "aria-label": "Search lessons" });
+    search.value = BULK.q;
+    search.addEventListener("input", function () { BULK.q = search.value; fillLessons(); });
+    var selShown = el("button", { class: "ac-btn", type: "button" }, ["Select all shown"]);
+    var clrAll = el("button", { class: "ac-btn", type: "button" }, ["Clear"]);
+    function shownBoxes() { return Array.prototype.slice.call(listNode.querySelectorAll('input[type="checkbox"]')); }
+    selShown.addEventListener("click", function () { shownBoxes().forEach(function (b) { if (b.value.slice(-2) === "/*") return; b.checked = true; toggleLesson(b.value, true); }); stale(); });
+    clrAll.addEventListener("click", function () { BULK.lessons = {}; shownBoxes().forEach(function (b) { b.checked = false; }); stale(); });
+    listNode = el("div", { class: "bk-list" });
+
+    // -- targets: groups + individual students --
+    groupNode = el("div", { class: "bk-list" });
+    var gboxes = [];
+    (d.groups || []).forEach(function (g) {
+      var b = el("input", { type: "checkbox", value: g.group });
+      b.checked = !!BULK.groups[g.group];
+      b.addEventListener("change", function () { if (b.checked) BULK.groups[g.group] = 1; else delete BULK.groups[g.group]; stale(); });
+      gboxes.push(b);
+      groupNode.appendChild(el("label", { class: "ac-pickitem" }, [b, el("span", {}, [g.group, el("small", {}, [plural((g.members || []).length, "member")])])]));
+    });
+    if (!gboxes.length) groupNode.appendChild(el("p", { class: "ac-hint" }, ["No groups yet — create one in the Groups tab, or pick students below."]));
+    var gAll = el("button", { class: "ac-btn", type: "button" }, ["All groups"]);
+    var gNone = el("button", { class: "ac-btn", type: "button" }, ["None"]);
+    gAll.addEventListener("click", function () { gboxes.forEach(function (b) { b.checked = true; BULK.groups[b.value] = 1; }); stale(); });
+    gNone.addEventListener("click", function () { gboxes.forEach(function (b) { b.checked = false; }); BULK.groups = {}; stale(); });
+    picker = studentPicker(rosterOptions(d, []), { placeholder: "Choose individual students…", onChange: function () { stale(); }, empty: "No students on the roster yet." });
+
+    term = termControls("bk", function () { stale(); }, "30");
+    sumNode = el("p", { class: "bk-sum", "aria-live": "polite" });
+    prevBox = el("div", { class: "ac-preview", "aria-live": "polite" });
+    prevBox.textContent = "";
+    previewBtn = el("button", { class: "ac-btn", type: "button", "data-bulk": "preview" }, ["Preview changes"]);
+    applyBtn = el("button", { class: isGrant() ? "ac-btn primary" : "ac-btn danger solid", type: "button", "data-bulk": "apply" }, [isGrant() ? "Apply" : "Revoke"]);
+    applyBtn.disabled = true;
+
+    function fail(err) { setToast(false, (err && err.message) || "That didn't work."); refreshToast(); previewBtn.disabled = !ready(); }
+    previewBtn.addEventListener("click", function () {
+      previewBtn.disabled = true;
+      STATE.toast = null; refreshToast();
+      api(payload("p3_admin_bulk_preview")).then(function (r) {
+        BULK.prev = r;
+        var what = isQuiz() ? "quiz" : "lesson";
+        var line = isGrant()
+          ? plural(r.lessons, what) + " × " + plural(r.students, "student") + " = " + r.total + " grants: " + r.would_create + " new, " + r.would_extend + " extended, " + r.would_skip + " already there (skipped)."
+          : plural(r.lessons, what) + " × " + plural(r.students, "student") + " = " + r.total + " pairs: " + r.would_revoke + " will be taken away, " + r.would_skip + " had none (skipped).";
+        prevBox.textContent = line + (r.failed && r.failed.length ? "  Problems: " + r.failed.map(function (f) { return f.target + " — " + f.error; }).join("; ") : "");
+        applyBtn.disabled = !r.would_apply;
+        previewBtn.disabled = false;
+      }, function (err) { fail(unknownActionHint(err)); });
+    });
+    applyBtn.addEventListener("click", function () {
+      var r = BULK.prev;
+      if (!r) return;
+      var n = r.would_apply;
+      if (!window.confirm((isGrant() ? "Give " : "Take away ") + n + " " + (isQuiz() ? "quiz" : "lesson") + " access " + (n === 1 ? "entry" : "entries") + (isGrant() ? "?" : "? You'll get a list to re-grant them if you change your mind."))) return;
+      applyBtn.disabled = true; previewBtn.disabled = true;
+      var action = isGrant() ? "p3_admin_bulk_grant" : "p3_admin_bulk_revoke";
+      var sent = payload(action);
+      api(sent).then(function (res) {
+        BULK.result = { mode: BULK.mode, kind: BULK.kind, res: res, sent: sent };
+        BULK.prev = null; BULK.lessons = {}; BULK.groups = {};
+        setToast(true, (isGrant() ? "Applied " : "Revoked ") + res.applied + ", skipped " + res.skipped + (res.failed && res.failed.length ? ", " + res.failed.length + " problem(s) — see below." : "."));
+        return load(true);
+      }, function (err) { fail(unknownActionHint(err)); applyBtn.disabled = false; });
+    });
+
+    var note = isQuiz()
+      ? "Quiz access opens a locked quiz for the people you choose (same as the single “quiz access” override). Group members, and anyone added to the group later, get it."
+      : "Lesson access unlocks videos and lessons for the people you choose. Group members, and anyone added to the group later, get it.";
+    var children = [
+      el("h2", {}, ["Bulk access"]),
+      el("p", { class: "dash-section-note" }, [note + " Nothing changes until you press " + (isGrant() ? "Apply" : "Revoke") + " after the preview."]),
+      tabs,
+      el("div", { class: "bk-cols" }, [
+        el("div", { class: "bk-box" }, [el("h3", {}, ["1 · " + (isQuiz() ? "Quizzes" : "Lessons")]),
+          el("div", { class: "ac-row" }, [el("label", {}, ["Year", yearSel]), el("label", {}, ["Search", search])]),
+          el("div", { class: "bk-tools" }, [selShown, clrAll]), listNode]),
+        el("div", { class: "bk-box" }, [el("h3", {}, ["2 · Who"]),
+          el("div", { class: "bk-tools" }, ["Groups", gAll, gNone]), groupNode,
+          el("div", { class: "ac-row" }, [el("label", {}, ["Individual students", picker.node])])]),
+      ]),
+      isGrant() ? term.node : null,
+      sumNode,
+      el("div", { class: "ac-actions" }, [previewBtn, applyBtn]),
+      prevBox,
+      bulkResultNode(),
+    ];
+    var section = el("div", { class: "dash-section" }, children);
+    fillLessons();
+    stale();
+    return section;
+  }
+
+  function unknownActionHint(err) {
+    if (err && /Unknown action/i.test(err.message || "")) return new Error("The server doesn't have the bulk-access code yet — paste Phase3_BulkAccess.gs into Apps Script, add the three router lines and redeploy.");
+    return err;
+  }
+
+  // What just happened, with problems listed and (after a revoke) a way back.
+  function bulkResultNode() {
+    var b = BULK.result;
+    if (!b) return null;
+    var r = b.res, bad = r.failed || [], grantLike = b.mode === "grant";
+    var kids = [el("b", {}, [(grantLike ? "Last grant: " : "Last revoke: ") + r.applied + " applied, " + r.skipped + " skipped" + (bad.length ? ", " + bad.length + " failed" : "") + "."])];
+    if (bad.length) kids.push(el("ul", { class: "bad" }, bad.map(function (f) { return el("li", {}, [f.target + (f.lesson ? " · " + f.lesson : "") + " — " + f.error]); })));
+    if (!grantLike && r.revoked && r.revoked.length) {
+      kids.push(el("p", { style: "margin:8px 0 2px" }, ["Taken away (" + r.revoked.length + "):"]));
+      kids.push(el("ul", {}, r.revoked.slice(0, 200).map(function (x) { return el("li", {}, [x.phone + " · " + pretty(x.lesson) + (x.expires_at ? " (was until " + x.expires_at + ")" : " (had no end date)")]); })));
+      var undo = el("button", { class: "ac-btn", type: "button", "data-bulk": "undo" }, ["Give these back"]);
+      undo.addEventListener("click", function () {
+        undo.disabled = true;
+        // One call per (lesson, old end date) so every pair gets back exactly what it had. Group rules are not restored.
+        var buckets = {};
+        r.revoked.forEach(function (x) { var k = x.lesson + "|" + x.expires_at; (buckets[k] = buckets[k] || { lesson: x.lesson, exp: x.expires_at, phones: [] }).phones.push(x.phone); });
+        var jobs = Object.keys(buckets).map(function (k) { return buckets[k]; });
+        var done = 0, problems = 0;
+        (function next() {
+          if (!jobs.length) { setToast(problems === 0, "Gave back " + done + " " + (done === 1 ? "entry" : "entries") + (problems ? "; " + problems + " call(s) failed" : "") + ". Group rules were not restored."); BULK.result = null; return load(true); }
+          var j = jobs.shift();
+          var p = { action: "p3_admin_bulk_grant", kind: b.kind, lessons: [j.lesson], members: j.phones };
+          if (j.exp) p.expires_at = j.exp; else p.never = true;
+          return api(p).then(function (g) { done += g.applied; next(); }, function () { problems++; next(); });
+        })();
+      });
+      kids.push(el("div", { class: "ac-actions" }, [undo]));
+    }
+    return el("div", { class: "bk-result", "data-bulk": "result" }, kids);
+  }
+
   // ---- page ------------------------------------------------------------------------------------------
 
   function render() {
@@ -2783,6 +3019,7 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
       : STATE.tab === "lessons" ? lessonsPanel(d)
       : STATE.tab === "quizzes" ? quizzesPanel(d)
       : STATE.tab === "groups" ? groupsPanel(d)
+      : STATE.tab === "bulk" ? bulkPanel(d)
       : grantPanel(d);
     root.appendChild(panel);
     window.scrollTo(0, y);

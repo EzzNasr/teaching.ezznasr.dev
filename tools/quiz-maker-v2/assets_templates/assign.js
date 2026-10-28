@@ -80,6 +80,17 @@
     }
   }
 
+  // A record leaves the queue the moment the server confirms it. Whatever is
+  // still queued was never confirmed, and is re-sent by resendPending() below.
+  function dequeueSubmission(clientId) {
+    if (!clientId) return;
+    try {
+      var q = JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
+      var keep = q.filter(function (r) { return !r || r.client_id !== clientId; });
+      if (keep.length !== q.length) localStorage.setItem(QUEUE_KEY, JSON.stringify(keep));
+    } catch (e) { /* storage unavailable - nothing to clean */ }
+  }
+
   function saveLastSubmission(subject, lesson, record) {
     try {
       localStorage.setItem(LAST_SUBMISSION_PREFIX + (subject || "?") + ":" + (lesson || "?"),
@@ -160,6 +171,49 @@
       });
   }
 
+  // Re-sends records that are still in the queue (the server never confirmed
+  // them), for THIS student only, oldest first, at most MAX_RESEND per page
+  // load. Same client_id as the first try, so a copy that did land is dropped
+  // by the server and can never become a second row.
+  var MAX_RESEND = 10;
+  function pendingFor(studentId) {
+    try {
+      return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]").filter(function (r) {
+        return r && r.client_id && r.student_id && String(r.student_id) === String(studentId) &&
+          (r.type === "assignment" || r.type === "quiz");
+      }).slice(0, MAX_RESEND);
+    } catch (e) { return []; }
+  }
+  function resendPending(session, notify) {
+    var list = pendingFor(session.student_id);
+    if (!list.length) return Promise.resolve(0);
+    notify({ state: "sending", count: list.length });
+    var sent = 0, failed = 0;
+    return list.reduce(function (chain, rec) {
+      return chain.then(function () {
+        var action = rec.type === "quiz" ? "upload_quiz_result" : "upload_submission";
+        return postToDrive(Object.assign({}, rec, { action: action })).then(
+          function () { dequeueSubmission(rec.client_id); sent++; },
+          function () { failed++; }
+        );
+      });
+    }, Promise.resolve()).then(function () {
+      notify({ state: failed ? "failed" : "done", sent: sent, failed: failed });
+      return sent;
+    });
+  }
+  // A one-line notice above the page while earlier unsent work is being re-sent.
+  function showResendNotice(root, session) {
+    if (!root.parentNode || !pendingFor(session.student_id).length) return;
+    var box = el("div", { class: "qz-progress", role: "status", dir: "auto" }, []);
+    root.parentNode.insertBefore(box, root);
+    resendPending(session, function (s) {
+      if (s.state === "sending") box.textContent = "\u0641\u064a \u0648\u0627\u062c\u0628 \u0644\u0633\u0647 \u0645\u0627 \u0627\u062a\u0628\u0639\u062a\u0634 \u2014 \u0628\u0646\u0628\u0639\u062a\u0647 \u062f\u0644\u0648\u0642\u062a\u064a\u2026 / Sending your earlier work\u2026";
+      else if (s.state === "done") { box.textContent = "\u062a\u0645 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0648\u0627\u062c\u0628 \u2713 / Earlier work sent \u2713"; setTimeout(function () { if (box.parentNode) box.parentNode.removeChild(box); }, 6000); }
+      else { box.className = "qz-error"; box.textContent = "\u0627\u0644\u0648\u0627\u062c\u0628 \u0644\u0633\u0647 \u0645\u0627 \u0627\u062a\u0628\u0639\u062a\u0634 \u2014 \u0647\u0646\u062d\u0627\u0648\u0644 \u062a\u0627\u0646\u064a \u0644\u0645\u0627 \u062a\u0641\u062a\u062d \u0623\u064a \u062f\u0631\u0633 / Earlier work hasn\u2019t been sent yet. It stays on this device and will retry next time you open a lesson page."; }
+    });
+  }
+
   function loadGradedQuestions() {
     var node = document.querySelector("#assign-questions");
     if (!node) return null;
@@ -208,6 +262,7 @@
     }
 
     window.AuthEngine.mount(rootSelector, function (session) {
+      showResendNotice(root, session);
       if (mode === "graded") startGraded(session);
       else startAssignment(session);
     });
@@ -222,7 +277,7 @@
         return;
       }
 
-      var state = { submitted: false, score: 0, total: 0, answers: [], record: null, syncStatus: null, widgets: {}, photoError: "" };
+      var state = { submitted: false, score: 0, total: 0, answers: [], record: null, syncStatus: null, widgets: {}, photoError: "", photoStatus: null };
       render();
 
       function render() {
@@ -293,7 +348,7 @@
 
         function onSubmit() {
           var incomplete = entries.some(function (e) {
-            if (e.written) return false;                      // photos are optional to attach, never block
+            if (e.written) return false;                      // photos are optional to attach, and never block the submission (sent after it)
             if (e.checks) return !e.checks.some(function (c) { return c.cb.checked; });
             return e.select ? e.select.value === "" : e.rowSelects.some(function (rs) { return rs.value === ""; });
           });
@@ -400,20 +455,34 @@
         sendRecord();
       }
 
-      // Photo answers go up first, under this submission's client_id, so the
-      // teacher's grading queue can pair them with it. Already-sent photos are
-      // skipped, and the server ignores a re-sent one, so retrying is safe.
+      // Photo answers go up AFTER the submission itself, under this submission's
+      // client_id (the grading queue pairs them by that id, so the order does not
+      // matter to the server). A photo that is refused or fails never blocks or
+      // loses the submission: photoStatus becomes "later" and the student can
+      // tap "Send photos again". Already-sent photos are skipped, and the server
+      // ignores a re-sent one, so retrying is safe.
       function uploadPhotos() {
         var written = state.record.answers.filter(function (a) { return a.type === "written" && state.widgets[a.id]; });
+        if (!written.length) { state.photoStatus = null; return Promise.resolve(); }
+        var failedCount = 0;
+        state.photoStatus = "sending"; render();
         return written.reduce(function (chain, a) {
           return chain.then(function () {
             return state.widgets[a.id].upload(function (item, b64) {
               return postToDrive({ action: "upload_written_image", kind: "assignment", student_id: session.student_id, session_token: session.session_token,
                 lesson_path: location.pathname.split("/").filter(Boolean).filter(function (p) { return !/\.html?$/i.test(p); }).join("/"),
                 attempt_id: state.record.client_id, question_id: a.id, image_id: item.id, data_base64: b64, mime_type: "image/jpeg" });
-            }).then(function (r) { if (!r.ok) throw new Error(r.error || "A photo didn't upload."); });
+            }).then(function (r) { if (!r || !r.ok) failedCount++; }, function () { failedCount++; });
           });
-        }, Promise.resolve());
+        }, Promise.resolve()).then(function () {
+          if (failedCount) { state.photoStatus = "later"; }
+          else {
+            state.photoStatus = "ok";
+            Object.keys(state.widgets).forEach(function (k) { state.widgets[k].clear(); });   // delivered: drop the local photo draft
+            state.widgets = {};
+          }
+          render();
+        });
       }
 
       // Posts state.record. Safe to call again (retry button): same
@@ -425,16 +494,14 @@
         // "Busy" replies (a whole class saving at once) are repeated automatically
         // with the same client_id — never a duplicate — while the page says it is
         // still saving.
-        uploadPhotos()
-          .then(function () {
-            return postToDrive(Object.assign({ action: "upload_submission" }, state.record), function () { state.busy = true; render(); });
-          })
+        // The submission goes FIRST. Nothing about photos can stop it.
+        postToDrive(Object.assign({ action: "upload_submission" }, state.record), function () { state.busy = true; render(); })
           .then(function () {
             state.busy = false; state.syncStatus = "ok";
-            Object.keys(state.widgets).forEach(function (k) { state.widgets[k].clear(); });   // delivered: drop the local photo draft
-            state.widgets = {}; render();
-          })
-          .catch(function (err) {
+            dequeueSubmission(state.record.client_id);
+            render();
+            return uploadPhotos();
+          }, function (err) {
             state.busy = false;
             state.syncStatus = (err && err.message === "not-configured") ? "not-configured" : "failed";
             render();
@@ -463,6 +530,14 @@
             "Saved on this device, but couldn't reach the server just now. It'll still be here if you check back \u2014 consider letting your instructor know just in case.",
           ]));
         }
+        if (state.photoStatus === "sending") {
+          children.push(el("div", { class: "qz-progress", dir: "auto" }, ["\u0628\u0646\u0628\u0639\u062a \u0627\u0644\u0635\u0648\u0631\u2026 / Sending your photos\u2026 keep this page open."]));
+        } else if (state.photoStatus === "later") {
+          children.push(el("div", { class: "qz-error", dir: "auto" }, ["\u062a\u0645 \u062d\u0641\u0638 \u0625\u062c\u0627\u0628\u0627\u062a\u0643 \u2713 \u0627\u0644\u0635\u0648\u0631\u0629 \u0647\u062a\u062a\u0628\u0639\u062a \u0628\u0639\u062f\u064a\u0646. / Your answers are saved. The photos didn\u2019t go through yet \u2014 tap \u201cSend photos again\u201d."]));
+          var photoBtn = el("button", { class: "qz-next", type: "button" }, ["Send photos again"]);
+          photoBtn.addEventListener("click", function () { photoBtn.disabled = true; uploadPhotos(); });
+          children.push(photoBtn);
+        }
         if (state.syncStatus === "pending") {
           children.push(el("div", { class: "qz-progress" }, [state.busy ? "Still saving \u2014 lots of submissions are coming in. Please keep this page open\u2026" : "Saving your submission\u2026"]));
         }
@@ -485,6 +560,7 @@
           state.answers = [];
           state.record = null;
           state.syncStatus = null;
+          state.photoStatus = null;
           Object.keys(state.widgets).forEach(function (k) { state.widgets[k].clear(); });
           state.widgets = {};
           render();
@@ -641,7 +717,7 @@
       // button) — the server drops it if the first try already landed.
       function sendPlain(record, onBusy) {
         postToDrive(Object.assign({ action: "upload_submission" }, record), onBusy)
-          .then(function () { submitting = false; renderConfirmation(true, true, true, record); })
+          .then(function () { submitting = false; dequeueSubmission(record.client_id); renderConfirmation(true, true, true, record); })
           .catch(function (err) {
             submitting = false;
             var configured = err.message !== "not-configured";

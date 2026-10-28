@@ -240,3 +240,17 @@ html[data-theme="dark"] .fu-yseg button[aria-checked="true"]{color:#06201f}
   .fu-print-page h1{font-size:22px;margin:0 0 4px} .fu-print-page h2{font-size:18px;margin:0 0 16px}
   .fu-print-body{white-space:normal;unicode-bidi:plaintext}
 }
+
+/* ---- S1: parent contact (Phase 3) ---- */
+.fu-contactline{display:flex;align-items:center;gap:6px;width:100%;min-height:var(--fu-tap);padding:10px 14px;margin:0 0 12px;border-radius:14px;border:0;background:var(--fu-warn-bg);color:var(--fu-warn);font:inherit;font-weight:700;text-align:start;cursor:pointer}
+.fu-contactline.done{background:var(--fu-ok-bg);color:var(--fu-ok)}
+div.fu-contactline{cursor:default}
+.fu-contactline[aria-pressed="true"]{outline:2px solid currentColor}
+.fu-cfilters{padding-top:0}
+.fu-infolink{display:inline-flex;align-items:center;min-height:var(--fu-tap);margin:0 0 10px;padding:0 4px;border:0;background:none;color:var(--fu-neutral);font:inherit;font-size:14px;text-decoration:underline;cursor:pointer}
+.fu-ibtn.fu-info{min-width:var(--fu-tap);height:var(--fu-tap);padding:0 4px;background:none;border:0;font-size:15px;cursor:pointer}
+.fu-flagbanner{display:flex;flex-direction:column;gap:6px;margin:0 0 14px}
+.fu-flagbanner .fu-code{font-family:ui-monospace,Menlo,Consolas,monospace;background:rgba(0,0,0,.08);padding:1px 6px;border-radius:6px}
+.fu-reqguide{margin:0 0 12px}
+.fu-reqlist{margin:0 0 10px;padding-inline-start:20px}
+.fu-reqlist li{margin-bottom:8px;line-height:1.7}

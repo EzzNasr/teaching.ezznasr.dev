@@ -637,6 +637,17 @@ window.PageLang = (function () {
     else if (view.kind === "error") renderError(view.msg);
     else if (view.kind === "relogin") renderNeedsRelogin();
   }
+  // Phase 3: assistants are not admins, so they stay on this page; give them a way into the staff pages.
+  function staffLinks() {
+    var host = document.getElementById("dashboard");
+    if (!host || document.getElementById("staff-links")) return;
+    var d = document.createElement("div");
+    d.id = "staff-links"; d.dir = "rtl"; d.style.cssText = "display:flex;gap:12px;flex-wrap:wrap;margin:12px 0";
+    [["followup.html", "المتابعة"], ["grading.html", "Grading"]].forEach(function (l) {
+      var a = document.createElement("a"); a.href = l[0]; a.textContent = l[1]; a.className = "btn"; d.appendChild(a);
+    });
+    host.parentNode.insertBefore(d, host);
+  }
   window.PageLang.on(redraw);
   window.PageLang.apply();
 
@@ -653,7 +664,7 @@ window.PageLang = (function () {
     }
     view.kind = "loading"; redraw();
     window.AuthEngine.getMyResults(session)
-      .then(function (data) { view = { kind: "dash", session: session, data: data }; redraw(); })
+      .then(function (data) { view = { kind: "dash", session: session, data: data }; redraw(); if (session.role === "assistant") staffLinks(); })
       .catch(function (err) { view = { kind: "error", msg: err && err.message ? err.message : "" }; redraw(); });
   });
 })();

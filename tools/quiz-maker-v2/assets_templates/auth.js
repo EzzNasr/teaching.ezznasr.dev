@@ -8,7 +8,7 @@
    hashes; it never sees the plaintext.
 
    Session — { student_id, student_name, session_token, year,
-   parent_phone, is_admin } — is cached in localStorage under
+   parent_phone, is_admin, role } — is cached in localStorage under
    "teaching_session" so a returning student on the same device/browser
    skips straight past this gate on their next quiz/assignment.
    session_token is what proves a "give me my data" call (dashboards)
@@ -252,7 +252,16 @@
       year: String(data.year || ""),
       parent_phone: canonicalPhone(data.parent_phone || ""),
       is_admin: !!data.is_admin,
+      // Phase 3: "admin" | "assistant" | "student". Assistants keep is_admin false, so pages
+      // must read role, never infer it from is_admin alone. A reply or cached session from
+      // before roles existed has none: admin if is_admin, else student.
+      role: normalizeRole(data.role, data.is_admin),
     };
+  }
+
+  function normalizeRole(role, isAdmin) {
+    if (isAdmin) return "admin";
+    return role === "assistant" || role === "admin" ? role : "student";
   }
 
   function getSession() {
@@ -1538,8 +1547,13 @@
     openSignIn: function () {
       openSignInModal(document.activeElement);
     },
+    // The signed-in session, with its role ("admin" | "assistant" | "student"). Same object
+    // getSession() returns; null when nobody is signed in.
+    get session() { return getSession(); },
+    getRole: function () { var s = getSession(); return s ? s.role : null; },
     // Any admin action from a dashboard page: sends the signed-in session along with it.
-    // Code.gs re-checks is_admin on every call, so this is only plumbing.
+    // Code.gs re-checks the role on every call (admins: everything; assistants: only the
+    // staff allow-list), so this is only plumbing and works the same for assistants.
     adminCall: function (session, payload) {
       var missing = requireSession(session);
       if (missing) return missing;

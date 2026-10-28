@@ -158,6 +158,19 @@ props.FF_CAMERA = '1';
   t('a written question with no photo is "no answer", not pending', e4.pending === false && e4.your_answer === '');
 }
 
+// 6b. Phase 3 / S2: answers are posted first, the photo arrives later -> the review still says "pending grading" ----------
+{
+  let r = submit(SA, { client_id: 'attempt-0500', answers: answers([{ i: 4, v: null }]) });
+  t('late photo: submit with no photo ok', r.ok, JSON.stringify(r));
+  const r0 = review(SA, { client_id: 'attempt-0500' }); t('late photo: before the photo the written answer is "wrong" (nothing to grade)', r0.ok && r0.review.items[4].status === 'wrong', JSON.stringify(r0).slice(0,200));
+  r = up(SA, { attempt_id: 'attempt-0500', image_id: 'image-0500' });
+  t('late photo: upload pairs with the submitted attempt', r.ok === true, JSON.stringify(r));
+  r = review(SA, { client_id: 'attempt-0500' });
+  { const sh = tab('QuizResults'); const last = sh.getLastRow();
+    t('late photo: total drops the written max (same as a submit-with-photo) and the entry is pending', sh.get(last, colOf(sh, 'total')) === 4 && JSON.parse(sh.get(last, colOf(sh, 'questions_json')))[4].pending === true, sh.get(last, colOf(sh, 'total'))); }
+  t('late photo: review now says pending grading', r.ok && r.review.items[4].status === 'pending' && r.review.pending === 1, JSON.stringify(r.review && r.review.items[4]));
+}
+
 // 7. locks and limits -------------------------------------------------------------------------------------------------
 {
   post(Object.assign({ action: 'admin_set_quiz_lock', lesson: L, locked: true }, TOK));

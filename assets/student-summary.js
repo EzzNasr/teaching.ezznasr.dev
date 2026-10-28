@@ -265,12 +265,11 @@
     if (missing.length) { clear($("fu-root")).appendChild(el("div", { class: "fu-err", id: "ss-error", role: "alert" }, ["ملفات ناقصة: " + missing.join("، ")])); return; }
     if (MOCK) { start(null); return; }
     clear($("fu-root")).appendChild(el("span", { class: "fu-dim" }, ["جاري التحقق من تسجيل الدخول…"]));
-    loadScript("/assets/auth.js").then(function () {
+    loadScript("/assets/auth.js").then(function () { return loadScript("/assets/staff-guard.js"); }).then(function () {
       window.AuthEngine.mount("#authgate", function (session) {
         var gate = $("authgate"); if (gate) gate.remove();
         if (!session.session_token) { var r = clear($("fu-root")); r.appendChild(el("div", { class: "fu-err" }, ["تسجيل الدخول المحفوظ ناقصه رمز الجلسة. ادخل تاني."])); r.appendChild(el("button", { class: "fu-btn primary", type: "button", onclick: function () { window.AuthEngine.clearSession(); location.reload(); } }, ["سجّل خروج وادخل تاني ←"])); return; }
-        if (session.is_admin === false) { location.href = "student.html"; return; }   // convenience only: the server re-checks is_admin
-        start(session);
+        window.StaffGuard.require(["admin","assistant"], session).then(function (role) { if (role) start(session, role); });   // convenience only: the server re-checks
       });
     }, function (e) { clear($("fu-root")).appendChild(el("div", { class: "fu-err", id: "ss-error", role: "alert" }, [e.message])); });
   }

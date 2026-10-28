@@ -62,6 +62,7 @@
       <a href="access.html">Video access</a>
       <a href="followup.html" lang="ar">متابعة</a>
       <a href="grading.html" aria-current="page">Grading</a>
+      <a href="team.html" data-admin-only>Team</a>
     </nav>
   </div>
 </header>
@@ -268,12 +269,11 @@
   function loadScript(src) { return new Promise(function (ok, bad) { var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = function () { bad(new Error("Couldn't load " + src)); }; document.head.appendChild(s); }); }
   function boot() {
     if (MOCK) { var g = document.getElementById("authgate"); if (g) g.remove(); start(null); return; }
-    loadScript("/assets/auth.js").then(function () {
+    loadScript("/assets/auth.js").then(function () { return loadScript("/assets/staff-guard.js"); }).then(function () {
       window.AuthEngine.mount("#authgate", function (session) {
         var gate = document.getElementById("authgate"); if (gate) gate.remove();
         if (!session.session_token) { clear(root).appendChild(el("div", { class: "g-state g-err", text: "Your saved sign-in has no session. Sign out and sign in again." })); return; }
-        if (session.is_admin === false) { location.href = "student.html"; return; }   // convenience only; the server re-checks
-        start(session);
+        window.StaffGuard.require(["admin","assistant"], session).then(function (role) { if (role) start(session, role); });   // convenience only; the server re-checks
       });
     }, function (e) { clear(root).appendChild(el("div", { class: "g-state g-err", text: e.message })); });
   }

@@ -574,7 +574,7 @@ def main():
         admin = {"student_id": "01000000000", "session_token": "tok", "is_admin": True}
         c, pg = real_page(admin)
         pg.wait_for_selector(".fu-stu")
-        check("real mode: no mock badge, overview requested via adminCall", not pg.is_visible("#fu-mock") and pg.evaluate("__calls[0].action") == "admin_followup_overview")
+        check("real mode: no mock badge, overview requested via adminCall", not pg.is_visible("#fu-mock") and pg.evaluate("__calls.some(function (c) { return c.action === 'admin_followup_overview'; })"))   # StaffGuard asks p3_session_role first
         pg.click("#stu-1012345001 .fu-stu-head")
         pg.click("#stu-1012345001 [data-att='center']")
         pg.wait_for_function("__calls.some(c => c.action==='admin_followup_set_attendance')")

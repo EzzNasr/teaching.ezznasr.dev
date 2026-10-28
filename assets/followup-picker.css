@@ -1,0 +1,81 @@
+/* ==========================================================================
+   followup-picker.css  (Phase 3 / S2)
+   The compact lesson combobox (assets/lesson-combobox.js) and the one-row-per-lesson layout of the
+   "الحصص" card in dashboard/followup.html. Loads AFTER followup.css and uses its tokens, so dark
+   mode comes for free. RTL-safe (logical properties); phone-first (380px); tap targets >= 44px.
+   ========================================================================== */
+
+/* ---- combobox ------------------------------------------------------------------------------- */
+.fu-cb{position:relative;display:block;min-width:0}
+.fu-cb-btn{display:flex;align-items:center;gap:8px;width:100%;min-height:var(--fu-tap);padding:6px 12px;border-radius:12px;border:1px solid var(--fu-line);background:var(--fu-soft);color:var(--fu-ink);font:inherit;font-size:15px;font-weight:700;text-align:start;cursor:pointer;direction:ltr}
+.fu-cb-btn:hover{border-color:var(--fu-teal)}
+.fu-cb-btn:focus-visible{outline:3px solid var(--fu-teal);outline-offset:2px}
+.fu-cb.is-open .fu-cb-btn{border-color:var(--fu-teal)}
+.fu-cb-label{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fu-cb-btn.is-empty .fu-cb-label{color:var(--fu-dim);font-weight:600;direction:rtl;text-align:start}
+.fu-cb-caret{flex:0 0 auto;color:var(--fu-dim);font-size:14px}
+.fu-cb-flag{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--fu-warn);background:var(--fu-warn-bg);border-radius:999px;padding:0 8px;white-space:nowrap}
+.fu-cb-native{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;pointer-events:none}   /* full-size and invisible: a real, form-able <select> mirror */
+
+.fu-cb-pop{position:absolute;z-index:60;inset-inline:0;top:calc(100% + 6px);display:flex;flex-direction:column;max-height:min(60vh,420px);background:var(--fu-card);border:1px solid var(--fu-line);border-radius:16px;box-shadow:0 14px 36px rgba(0,0,0,.28);overflow:hidden}
+.fu-cb-pop[hidden],.fu-cb-backdrop[hidden]{display:none}
+.fu-cb-head{display:flex;align-items:center;gap:6px;padding:8px;border-bottom:1px solid var(--fu-line);background:var(--fu-card)}
+.fu-cb-q{flex:1 1 auto;min-width:0;min-height:var(--fu-tap);border-radius:12px;border:1px solid var(--fu-line);background:var(--fu-soft);color:var(--fu-ink);padding:6px 12px;font:inherit;font-size:16px}  /* 16px stops iOS zooming the page */
+.fu-cb-q:focus-visible{outline:3px solid var(--fu-teal);outline-offset:1px}
+.fu-cb-x{display:none;flex:0 0 auto;min-width:var(--fu-tap);height:var(--fu-tap);border-radius:12px;border:1px solid var(--fu-line);background:var(--fu-card);color:var(--fu-ink);font-size:18px;cursor:pointer}
+.fu-cb-list{list-style:none;margin:0;padding:4px 0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.fu-cb-grp{position:sticky;top:0;z-index:1;padding:6px 14px;font-size:13px;font-weight:800;color:var(--fu-dim);background:var(--fu-card);border-bottom:1px dashed var(--fu-line)}
+.fu-cb-opt{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;padding:8px 14px;font-size:15px;font-weight:600;cursor:pointer;direction:ltr;text-align:start;overflow-wrap:anywhere}
+.fu-cb-opt.is-active{background:var(--fu-teal-soft)}
+.fu-cb-opt[aria-selected="true"]{font-weight:800;color:var(--fu-teal)}
+.fu-cb-opt[aria-selected="true"]::after{content:"\2713";flex:0 0 auto}
+.fu-cb-opt.is-clear{color:var(--fu-dim);direction:rtl;font-weight:600}
+.fu-cb-empty{padding:16px;text-align:center;color:var(--fu-dim)}
+.fu-cb-count{padding:4px 14px 8px;font-size:12px;color:var(--fu-dim);text-align:end}
+.fu-cb-count:empty{display:none}
+
+/* Phones: the list is a sheet pinned to the TOP of the screen, above the on-screen keyboard.
+   It is position:fixed, so opening it never changes the page height. */
+@media (max-width:640px){
+  .fu-cb-backdrop{position:fixed;inset:0;z-index:59;background:rgba(0,0,0,.35)}
+  .fu-cb-pop{position:fixed;inset-inline:8px;top:8px;max-height:min(72vh,520px)}
+  .fu-cb-x{display:inline-flex;align-items:center;justify-content:center}
+}
+
+/* ---- one compact row per extra homework / quiz lesson ---------------------------------------- */
+.fu-lessonrow{margin-top:8px}
+.fu-lessonrow:first-of-type{margin-top:0}
+.fu-lessonline{display:flex;align-items:center;gap:6px}
+.fu-lessonline .fu-pick{flex:1 1 0;min-width:0;margin-top:0}   /* the picker is a flex child: let it shrink below its text */
+.fu-lessonrow .fu-pick{margin-top:0}
+.fu-lessonline.is-optional .fu-cb-label{opacity:.6;text-decoration:line-through;text-decoration-thickness:1px}
+.fu-lessonline .fu-ibtn{flex:0 0 auto;min-width:var(--fu-tap);height:var(--fu-tap);padding:0 6px;font-size:18px}
+.fu-lessonline .fu-ibtn[aria-pressed="true"],.fu-lessonline .fu-ibtn.has-date{border-color:var(--fu-teal);background:var(--fu-teal-soft)}
+.fu-lessonline .fu-ibtn.has-date::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--fu-teal);margin-inline-start:2px}
+
+/* tiny "required" switch: the track alone, named for assistive tech and by title */
+.fu-miniswitch{position:relative;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:50px;min-height:var(--fu-tap);cursor:pointer}
+.fu-miniswitch input{position:absolute;opacity:0;width:1px;height:1px}
+.fu-miniswitch .trk{width:42px;height:26px;border-radius:999px;background:var(--fu-neutral-bg);position:relative;transition:background .15s}
+.fu-miniswitch .trk::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:inset-inline-start .15s}
+.fu-miniswitch input:checked+.trk{background:var(--fu-wa)}
+.fu-miniswitch input:checked+.trk::after{inset-inline-start:19px}
+.fu-miniswitch input:focus-visible+.trk{outline:3px solid var(--fu-teal);outline-offset:2px}
+
+.fu-lockdot{margin-inline-end:6px}
+.fu-lessonextra{margin-top:6px;padding:8px 10px;border-radius:12px;background:var(--fu-bg);border:1px dashed var(--fu-line)}
+.fu-lessonextra[hidden]{display:none}
+.fu-lessonextra .fu-field{margin-top:4px}
+.fu-colhint{display:flex;align-items:center;gap:6px;margin:6px 0 0;font-size:12px;color:var(--fu-dim)}
+
+/* ---- compact cards ------------------------------------------------------------------------- */
+.fu-card.fu-compact{padding:12px 14px}
+.fu-card.fu-compact .fu-det{margin-top:2px}
+.fu-card.fu-compact .fu-det summary{min-height:var(--fu-tap);display:flex;align-items:center}
+.fu-card.fu-compact .fu-hint{margin-top:10px}
+
+@media (max-width:380px){
+  .fu-cb-btn{padding-inline:10px;font-size:14px}
+  .fu-miniswitch{width:46px}
+}
+@media (prefers-reduced-motion:reduce){.fu-miniswitch .trk,.fu-miniswitch .trk::after{transition:none}}

@@ -797,6 +797,22 @@
     "sent_at": "2026-10-14 18:30:00",
     "note": "ردّت وقالت هتتعوّض"
    }
+  ],
+  "1012345002": [
+   {
+    "kind": "custom",
+    "ref": "custom-sara-1",
+    "sent_at": "2026-10-15 20:00:00",
+    "note": "شكر على المذاكرة"
+   }
+  ],
+  "1112345006": [
+   {
+    "kind": "homework",
+    "ref": "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-3-conditions",
+    "sent_at": "2026-09-20 17:00:00",
+    "note": "تواصل قديم عن درس تاني"
+   }
   ]
  }
 }
