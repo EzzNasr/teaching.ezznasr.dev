@@ -1613,7 +1613,7 @@
         }
         // Convenience only: the server re-checks on every call. Assistants (role) are allowed in.
         window.StaffGuard.require(["admin","assistant"], session).then(function (role) { if (role) start(session, role); });
-      });
+      }, { staff: true });
     }, function (e) { renderError(e.message); });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();

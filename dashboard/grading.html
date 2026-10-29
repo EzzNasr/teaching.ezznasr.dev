@@ -58,8 +58,9 @@
   <div class="titlebar">
     <a href="/" class="mark"><span class="dot"></span> EZZ NASR <span aria-hidden="true">&middot;</span> TEACHING</a>
     <nav>
-      <a href="master.html">Results</a>
-      <a href="access.html">Video access</a>
+      <a href="staff.html" lang="ar">الرئيسية</a>
+      <a href="master.html" data-admin-only>Results</a>
+      <a href="access.html" data-admin-only>Video access</a>
       <a href="followup.html" lang="ar">متابعة</a>
       <a href="grading.html" aria-current="page">Grading</a>
       <a href="team.html" data-admin-only>Team</a>
@@ -261,8 +262,9 @@
   });
 
   // ---------- boot ----------
-  function start(session) {
+  function start(session, role) {
     S.session = session;
+    if (role !== "admin") Array.prototype.forEach.call(document.querySelectorAll("[data-admin-only]"), function (a) { a.style.display = "none"; });
     clear(root).appendChild(el("div", { class: "g-state", text: "Loading…" }));
     loadOptions().then(function () { return load(); }).catch(function (e) { clear(root).appendChild(el("div", { class: "g-state g-err", text: e.message })); });
   }
@@ -274,7 +276,7 @@
         var gate = document.getElementById("authgate"); if (gate) gate.remove();
         if (!session.session_token) { clear(root).appendChild(el("div", { class: "g-state g-err", text: "Your saved sign-in has no session. Sign out and sign in again." })); return; }
         window.StaffGuard.require(["admin","assistant"], session).then(function (role) { if (role) start(session, role); });   // convenience only; the server re-checks
-      });
+      }, { staff: true });
     }, function (e) { clear(root).appendChild(el("div", { class: "g-state g-err", text: e.message })); });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();

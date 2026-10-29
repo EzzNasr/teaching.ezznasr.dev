@@ -30,6 +30,7 @@
   var STAFF = ["admin", "assistant"];
   var ADMIN = ["admin"];
   var PAGES = {
+    "staff": STAFF,
     "followup": STAFF,
     "student-summary": STAFF,
     "grading": STAFF,

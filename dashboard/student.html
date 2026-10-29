@@ -643,7 +643,7 @@ window.PageLang = (function () {
     if (!host || document.getElementById("staff-links")) return;
     var d = document.createElement("div");
     d.id = "staff-links"; d.dir = "rtl"; d.style.cssText = "display:flex;gap:12px;flex-wrap:wrap;margin:12px 0";
-    [["followup.html", "المتابعة"], ["grading.html", "Grading"]].forEach(function (l) {
+    [["staff.html", "← شغل المساعد"]].forEach(function (l) {
       var a = document.createElement("a"); a.href = l[0]; a.textContent = l[1]; a.className = "btn"; d.appendChild(a);
     });
     host.parentNode.insertBefore(d, host);
@@ -662,11 +662,16 @@ window.PageLang = (function () {
       location.href = "master.html";
       return;
     }
+    // Assistants land on their staff home; "?view=student" lets them open their own student page.
+    if (session.role === "assistant" && !/[?&]view=student\b/.test(location.search)) {
+      location.href = "staff.html";
+      return;
+    }
     view.kind = "loading"; redraw();
     window.AuthEngine.getMyResults(session)
       .then(function (data) { view = { kind: "dash", session: session, data: data }; redraw(); if (session.role === "assistant") staffLinks(); })
       .catch(function (err) { view = { kind: "error", msg: err && err.message ? err.message : "" }; redraw(); });
-  });
+  }, { staff: true });
 })();
 </script>
 </body>

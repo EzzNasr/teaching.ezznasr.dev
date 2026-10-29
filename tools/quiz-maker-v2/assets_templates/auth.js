@@ -1045,7 +1045,13 @@
 
   // -- Login/register gate (per-page, opt-in) -----------------------------
 
-  function mount(rootSelector, onReady) {
+  // opts.staff: staff pages (assistant/admin accounts) never ask for a student's year / parent phone.
+  function needsProfile(session, opts) {
+    if (opts && opts.staff && session && (session.role === "assistant" || session.role === "admin" || session.is_admin)) return false;
+    return !session.year || !session.parent_phone;
+  }
+
+  function mount(rootSelector, onReady, opts) {
     var existing = getSession();
     var root = document.querySelector(rootSelector);
     if (!root) return;
@@ -1057,7 +1063,7 @@
     // straight to the completeProfile step below instead of onReady —
     // no password re-entry needed, the existing session_token is already
     // proof enough, it just needs these two fields filled in once.
-    if (existing && existing.year && existing.parent_phone) {
+    if (existing && !needsProfile(existing, opts)) {
       onReady(existing);
       return;
     }
@@ -1092,7 +1098,7 @@
       var session = sessionFromResponse(data);
       saveSession(session);
       mountGlobalWidget();
-      if (!session.year || !session.parent_phone) {
+      if (needsProfile(session, opts)) {
         sessionForProfile = session;
         step = "completeProfile";
         render();

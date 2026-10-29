@@ -270,7 +270,7 @@
         var gate = $("authgate"); if (gate) gate.remove();
         if (!session.session_token) { var r = clear($("fu-root")); r.appendChild(el("div", { class: "fu-err" }, ["تسجيل الدخول المحفوظ ناقصه رمز الجلسة. ادخل تاني."])); r.appendChild(el("button", { class: "fu-btn primary", type: "button", onclick: function () { window.AuthEngine.clearSession(); location.reload(); } }, ["سجّل خروج وادخل تاني ←"])); return; }
         window.StaffGuard.require(["admin","assistant"], session).then(function (role) { if (role) start(session, role); });   // convenience only: the server re-checks
-      });
+      }, { staff: true });
     }, function (e) { clear($("fu-root")).appendChild(el("div", { class: "fu-err", id: "ss-error", role: "alert" }, [e.message])); });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
