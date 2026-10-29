@@ -7,7 +7,7 @@
   if (/^REPLACE_/.test(CFG.API_URL)) window.ATT_FETCH = window.attMockExt || window.attMockFetch;
 
   var $ = function (i) { return document.getElementById(i); };
-  var S = { tok: null, sess: null, key: null, closeMs: 0, offset: 0, win: -1, liveTimer: null, tickTimer: null, syncTimer: null, roomId: "", closed: false, course: "", room: "", wake: null };
+  var S = { tok: null, user: null, role: "teacher", sess: null, key: null, closeMs: 0, offset: 0, win: -1, liveTimer: null, tickTimer: null, syncTimer: null, roomId: "", closed: false, course: "", room: "", wake: null };
 
   function ss(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (e) {} return null; }
   function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
@@ -20,26 +20,42 @@
   // ---------- API ----------
   function A(action, payload) {
     return api.call(action, Object.assign({ token: S.tok }, payload || {})).then(function (r) {
-      // ASSUMPTION: spec does not name the bad-token code; match common wordings.
-      if (!r.ok && r.code !== "NETWORK" && /unauthori|forbidden|bad_token|invalid.?token|auth/i.test(String(r.code) + " " + String(r.error))) { logout("Token rejected. Log in again."); }
+      // Only a rejected/disabled account signs the user out. FORBIDDEN (a teacher calling an admin action) must not.
+      if (!r.ok && (r.code === "UNAUTHORIZED" || r.code === "USER_DISABLED")) { logout(r.code === "USER_DISABLED" ? "This account is disabled." : "Session expired. Sign in again."); }
       return r;
     });
   }
 
   // ---------- login ----------
-  function showLogin(text) { $("panel").hidden = true; $("proj").hidden = true; $("login").hidden = false; msg("loginMsg", text, text ? "err" : ""); }
-  function login() {
-    var t = $("tok").value.trim();
-    if (!t) return msg("loginMsg", "Enter the admin token.", "err");
-    S.tok = t; msg("loginMsg", "Checking…");
-    A("att_requests", {}).then(function (r) {
-      if (!r.ok) { if (S.tok) { S.tok = null; msg("loginMsg", r.code === "NETWORK" ? "No connection." : "Token rejected.", "err"); } return; }
-      ss("att_admin", t); $("tok").value = ""; $("login").hidden = true; $("panel").hidden = false;
-      initPanel();
+  // One box: a teacher password OR the admin token. We ask att_me first (it never counts as a failed login), and only if the
+  // server says the value is not a valid token do we try it as a password (att_login: wrong ones count toward the global lock-out).
+  function showLogin(text) { $("panel").hidden = true; $("proj").hidden = true; $("login").hidden = false; $("loginBtn").disabled = false; msg("loginMsg", text, text ? "err" : ""); }
+  function enter(user, tok) {
+    S.tok = tok; S.user = user; S.role = user.role === "admin" ? "admin" : "teacher";
+    ss("att_admin", tok); $("tok").value = ""; $("loginBtn").disabled = false; msg("loginMsg", "");
+    $("login").hidden = true; $("panel").hidden = false;
+    initPanel();
+  }
+  function login(saved) {
+    var t = saved || $("tok").value.trim();
+    if (!t) return msg("loginMsg", "Enter your password or the admin token.", "err");
+    msg("loginMsg", "Checking\u2026"); $("loginBtn").disabled = true;
+    function fail(text) { S.tok = null; if (saved) ss("att_admin", null); showLogin(text); }
+    api.call("att_me", { token: t }).then(function (r) {
+      if (r.ok) return enter(r.user, t);
+      if (r.code === "NETWORK") return fail("No connection.");
+      if (r.code === "USER_DISABLED") return fail("This account is disabled.");
+      if (saved) return fail("");   // a stale saved token is never sent to att_login as a password
+      return api.call("att_login", { password: t }).then(function (l) {
+        if (l.ok) return enter(l.user, l.token);
+        fail(l.code === "NETWORK" ? "No connection." : l.code === "LOCKED" ? (l.error || "Too many attempts. Wait a few minutes.") : l.code === "USER_DISABLED" ? "This account is disabled." : "Wrong password or token.");
+      });
     });
   }
   function logout(text) {
-    stopSession(); S.tok = null; ss("att_admin", null); showLogin(typeof text === "string" ? text : "");
+    stopSession(); S.tok = null; S.user = null; S.sess = null; H.items = []; H.cursor = null; H.sel = null; ss("att_admin", null);
+    $("secret").hidden = true; $("secretPw").textContent = "";
+    showLogin(typeof text === "string" ? text : "");
   }
 
   // ---------- panel ----------
@@ -66,14 +82,21 @@
     fillList("courses", "att_courses");
     var cs = JSON.parse(ls("att_courses") || "[]");
     if (!$("course").value && cs[0]) $("course").value = cs[0];
+    var adm = S.role === "admin";
+    $("who").textContent = adm ? "Signed in as Admin \u00b7 sees every teacher" : (S.user && S.user.name ? S.user.name : "") + " \u00b7 Teacher \u00b7 sees only your own sessions";
+    $("tabOverview").hidden = !adm; $("tabUsers").hidden = !adm; $("hisUserWrap").hidden = !adm;
     loadRooms(); tab("session");
   }
   function tab(name) {
-    ["session", "requests", "flagged", "roster", "calib"].forEach(function (n) { $("t-" + n).hidden = n !== name; });
+    if ((name === "users" || name === "overview") && S.role !== "admin") name = "session";   // the server refuses these anyway
+    ["session", "requests", "flagged", "roster", "calib", "history", "overview", "users"].forEach(function (n) { $("t-" + n).hidden = n !== name; });
     Array.prototype.forEach.call(document.querySelectorAll("nav [data-tab]"), function (b) { b.classList.toggle("on", b.getAttribute("data-tab") === name); });
     if (name === "requests") loadRequests();
     if (name === "flagged") loadFlagged();
     if (name === "roster") loadRoster();
+    if (name === "history") { showHisList(); fillHisUsers().then(function () { loadHistory(true); }); }
+    if (name === "overview") loadOverview();
+    if (name === "users") loadUsers();
   }
 
   // ---------- session + projector ----------
@@ -323,14 +346,15 @@
   }
 
   // ---------- CSV ----------
-  function exportCSV() {
-    A("att_export", { session_id: S.sess }).then(function (r) {
-      if (!r.ok) return msg("csvMsg", "Export failed: " + (r.code || "error"), "err");
+  function exportCSV(sid, msgId) {
+    sid = typeof sid === "string" ? sid : S.sess; msgId = msgId || "csvMsg";
+    A("att_export", { session_id: sid }).then(function (r) {
+      if (!r.ok) return msg(msgId, "Export failed: " + (r.code || "error"), "err");
       var blob = new Blob(["\ufeff" + r.csv], { type: "text/csv;charset=utf-8" });
       var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-      a.download = "attendance_" + (S.sess || "session") + ".csv"; document.body.appendChild(a); a.click(); a.remove();
+      a.download = "attendance_" + (sid || "session") + ".csv"; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
-      msg("csvMsg", "CSV exported.", "ok");
+      msg(msgId, "CSV exported.", "ok");
     });
   }
 
@@ -364,15 +388,213 @@
     }
   }
 
+  // ---------- history: past sessions, per-session check-ins, accept / reject ----------
+  var H = { items: [], cursor: null, sel: null, rows: [], users: null };
+  var fWhen = new Intl.DateTimeFormat("en-GB", { timeZone: CFG.TZ, day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+  function when(iso) { var d = new Date(iso); return isNaN(d) ? "" : fWhen.format(d); }
+  var WARN = { GEO_UNAVAILABLE: 1, GEO_SKIPPED: 1, GEO_WEAK: 1, GEO_UPGRADED: 1 };
+  function tagFor(code) { return mk("span", code, "tag " + (WARN[code] ? "warn" : "bad")); }
+  function geoTags(g) { var td = mk("td"); Object.keys(g || {}).forEach(function (k) { if (g[k]) td.appendChild(mk("span", k.replace("GEO_", "") + " " + g[k], "tag " + (WARN[k] ? "warn" : "bad"))); }); return td; }
+  function showHisList() { $("hisList").hidden = false; $("hisDetail").hidden = true; H.sel = null; }
+  function fillHisUsers() {
+    if (S.role !== "admin" || H.users) return Promise.resolve();
+    return A("att_users", {}).then(function (r) {
+      if (!r.ok) return;
+      H.users = r.users; var sel = $("hisUser"), keep = sel.value;
+      var a = mk("option", "Admin (legacy sessions)"); a.value = "ADMIN"; sel.appendChild(a);
+      r.users.forEach(function (u) { var o = mk("option", u.name + (u.status === "active" ? "" : " (disabled)")); o.value = u.user_id; sel.appendChild(o); });
+      sel.value = keep;
+    });
+  }
+  function loadHistory(reset) {
+    if (reset) { H.items = []; H.cursor = null; }
+    msg("hisMsg", "Loading…");
+    var p = { limit: 30 };
+    if (H.cursor) p.cursor = H.cursor;
+    if ($("hisCourse").value.trim()) p.course = $("hisCourse").value.trim();
+    if ($("hisFrom").value) p.from = $("hisFrom").value;
+    if ($("hisTo").value) p.to = $("hisTo").value;
+    if (S.role === "admin" && $("hisUser").value) p.user_id = $("hisUser").value;
+    A("att_sessions", p).then(function (r) {
+      if (!r.ok) return msg("hisMsg", "Could not load: " + (r.error || r.code || "error"), "err");
+      H.items = H.items.concat(r.sessions || []); H.cursor = r.next_cursor || null;
+      $("hisMore").hidden = !H.cursor;
+      msg("hisMsg", H.items.length ? H.items.length + " session" + (H.items.length === 1 ? "" : "s") + (H.cursor ? " shown (more available)" : "") : "No sessions match.");
+      renderHistory();
+    });
+  }
+  function renderHistory() {
+    var box = $("hisTable"); clear(box);
+    if (!H.items.length) return;
+    var adm = S.role === "admin", t = mk("table", null, "his"), h = mk("tr");
+    ["When", "Course", "Room"].concat(adm ? ["Teacher"] : []).concat(["Present", "Flagged", "To review", "Location problems", ""]).forEach(function (x) { h.appendChild(mk("th", x)); });
+    t.appendChild(h);
+    H.items.forEach(function (x) {
+      var tr = mk("tr");
+      tr.appendChild(mk("td", when(x.start_utc))); tr.appendChild(mk("td", x.course || "")); tr.appendChild(mk("td", x.room_name || ""));
+      if (adm) tr.appendChild(mk("td", x.owner_name || x.owner_user_id || ""));
+      tr.appendChild(mk("td", String(x.present | 0), "n")); tr.appendChild(mk("td", String(x.flagged | 0), "n")); tr.appendChild(mk("td", String(x.unreviewed | 0), "n"));
+      tr.appendChild(geoTags(x.geo));
+      var td = mk("td"), b = mk("button", "Open"); b.onclick = function () { openDetail(x.session_id); }; td.appendChild(b); tr.appendChild(td);
+      t.appendChild(tr);
+    });
+    box.appendChild(t);
+  }
+  function openDetail(id) {
+    $("hisList").hidden = true; $("hisDetail").hidden = false; H.sel = id; H.rows = [];
+    $("detTitle").textContent = "Loading…"; $("detSummary").textContent = ""; clear($("detTable")); msg("detMsg", "");
+    A("att_session_detail", { session_id: id }).then(function (r) {
+      if (!r.ok) { msg("detMsg", "Could not load: " + (r.error || r.code || "error"), "err"); $("detTitle").textContent = "Session"; return; }
+      var s = r.session, t = r.summary || {};
+      H.rows = r.checkins || [];
+      $("detTitle").textContent = (s.course || "") + " · " + (s.room_name || "") + " · " + when(s.start_utc) + (S.role === "admin" ? " · " + (s.owner_name || s.owner_user_id || "") : "");
+      $("detSummary").textContent = "Present " + (t.present | 0) + " · Flagged " + (t.flagged | 0) + " · Still to review " + (t.unreviewed | 0);
+      renderDetail();
+    });
+  }
+  function renderDetail() {
+    var box = $("detTable"); clear(box);
+    var only = $("detFlagOnly").checked, list = H.rows.filter(function (r) { return !only || r.flags; });
+    if (!list.length) return msg("detMsg", H.rows.length ? "No flagged check-ins." : "No check-ins in this session.");
+    msg("detMsg", list.length + " check-in" + (list.length === 1 ? "" : "s"));
+    var t = mk("table", null, "his"), h = mk("tr");
+    ["Time", "Student", "Flags", "Distance", "Accuracy", "Location", "Review", "Decision"].forEach(function (x) { h.appendChild(mk("th", x)); });
+    t.appendChild(h);
+    list.forEach(function (r) {
+      var tr = mk("tr", null, r.review_status === "rejected" ? "rej" : "");
+      tr.appendChild(mk("td", when(r.server_utc)));
+      var s = mk("td"); s.appendChild(mk("b", r.name || "(no name)")); s.appendChild(mk("div", String(r.student_id), "msg")); tr.appendChild(s);
+      var f = mk("td"); String(r.flags || "").split(/[\s,;|]+/).filter(Boolean).forEach(function (c) { f.appendChild(tagFor(c)); }); tr.appendChild(f);
+      tr.appendChild(mk("td", r.dist_m == null ? "" : Math.round(r.dist_m) + " m", "n")); tr.appendChild(mk("td", r.acc == null ? "" : Math.round(r.acc) + " m", "n"));
+      tr.appendChild(mk("td", r.geo_reason || ""));
+      var rv = mk("td");
+      if (r.review_status) { rv.appendChild(mk("span", r.review_status, "tag " + (r.review_status === "accepted" ? "good" : "bad"))); if (r.review_note) rv.appendChild(mk("div", r.review_note, "msg")); if (r.reviewed_by_name || r.reviewed_at) rv.appendChild(mk("div", (r.reviewed_by_name || "") + (r.reviewed_at ? " · " + when(r.reviewed_at) : ""), "msg")); }
+      else rv.appendChild(mk("span", r.flags ? "to review" : "", "msg"));
+      tr.appendChild(rv);
+      var d = mk("td", null, "dec"), note = mk("input", null, "note"); note.setAttribute("placeholder", "note (optional)"); note.value = r.review_note || "";
+      var ok = mk("button", "Accept", "ok"), no = mk("button", "Reject", "bad");
+      ok.onclick = function () { review(r, "accepted", note, [ok, no]); }; no.onclick = function () { review(r, "rejected", note, [ok, no]); };
+      d.appendChild(note); d.appendChild(ok); d.appendChild(no); tr.appendChild(d);
+      t.appendChild(tr);
+    });
+    box.appendChild(t);
+  }
+  function review(r, decision, noteEl, btns) {
+    btns.forEach(function (b) { b.disabled = true; });
+    A("att_review", { checkin_id: r.checkin_id, decision: decision, note: noteEl.value }).then(function (x) {
+      if (!x.ok) { btns.forEach(function (b) { b.disabled = false; }); return msg("detMsg", "Could not save: " + (x.error || x.code || "error"), "err"); }
+      r.review_status = x.review_status; r.review_note = x.review_note; r.reviewed_by = x.reviewed_by; r.reviewed_by_name = x.reviewed_by_name; r.reviewed_at = x.reviewed_at;
+      renderDetail(); msg("detMsg", "Saved: " + r.student_id + " " + decision + ".", "ok");
+    });
+  }
+
+  // ---------- admin: all sessions overview ----------
+  function geoLine(g) { return Object.keys(g || {}).filter(function (k) { return g[k]; }).map(function (k) { return k.replace("GEO_", "") + " " + g[k]; }).join(" · "); }
+  function loadOverview() {
+    msg("ovMsg", "Loading…");
+    var p = {}; if ($("ovFrom").value) p.from = $("ovFrom").value; if ($("ovTo").value) p.to = $("ovTo").value;
+    A("att_overview", p).then(function (r) {
+      if (!r.ok) return msg("ovMsg", "Could not load: " + (r.error || r.code || "error"), "err");
+      msg("ovMsg", "");
+      var tot = r.totals || {}, box = $("ovTotals"); clear(box);
+      [["Sessions", tot.sessions], ["Present", tot.present], ["Flagged", tot.flagged], ["To review", tot.unreviewed]].forEach(function (x) {
+        var c = mk("div", null, "stat"); c.appendChild(mk("b", String(x[1] | 0))); c.appendChild(mk("span", x[0])); box.appendChild(c);
+      });
+      var gl = geoLine(tot.geo); if (gl) box.appendChild(mk("div", "Location problems: " + gl, "msg"));
+      ovTable($("ovUsers"), r.by_user || [], "Teacher", function (b) { return b.name + (b.status === "active" ? "" : " (disabled)"); }, function (b) { openHistory({ user: b.user_id }); });
+      ovTable($("ovDays"), r.by_day || [], "Day (UTC)", function (b) { return b.day; }, function (b) { openHistory({ from: b.day, to: b.day }); });
+    });
+  }
+  function ovTable(box, rows, first, label, open) {
+    clear(box);
+    if (!rows.length) return box.appendChild(mk("div", "Nothing in this range.", "msg"));
+    var t = mk("table", null, "his"), h = mk("tr");
+    [first, "Sessions", "Present", "Flagged", "To review", "Location problems", ""].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
+    rows.forEach(function (b) {
+      var tr = mk("tr"); tr.appendChild(mk("td", label(b)));
+      [b.sessions, b.present, b.flagged, b.unreviewed].forEach(function (n) { tr.appendChild(mk("td", String(n | 0), "n")); });
+      tr.appendChild(geoTags(b.geo));
+      var td = mk("td"), btn = mk("button", "Sessions"); btn.onclick = function () { open(b); }; td.appendChild(btn); tr.appendChild(td); t.appendChild(tr);
+    });
+    box.appendChild(t);
+  }
+  function openHistory(f) {
+    $("hisUser").value = f.user || ""; $("hisFrom").value = f.from || ""; $("hisTo").value = f.to || ""; $("hisCourse").value = "";
+    tab("history");
+  }
+
+  // ---------- admin: teacher accounts ----------
+  function loadUsers() {
+    msg("userMsg", "Loading…");
+    A("att_users", {}).then(function (r) {
+      if (!r.ok) return msg("userMsg", "Could not load: " + (r.error || r.code || "error"), "err");
+      msg("userMsg", r.users.length ? "" : "No teacher accounts yet. Create the first one above.");
+      H.users = null;   // history's teacher filter is rebuilt next time
+      var box = $("userList"); clear(box);
+      if (!r.users.length) return;
+      var t = mk("table", null, "his"), h = mk("tr");
+      ["Name", "Status", "Created", "Last login", ""].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
+      r.users.forEach(function (u) {
+        var on = u.status === "active", tr = mk("tr");
+        tr.appendChild(mk("td", u.name)); tr.appendChild(mk("td", on ? "active" : "disabled", on ? "" : "pill-off"));
+        tr.appendChild(mk("td", when(u.created_at))); tr.appendChild(mk("td", u.last_login ? when(u.last_login) : "never"));
+        var td = mk("td"), ren = mk("button", "Rename"), tog = mk("button", on ? "Disable" : "Enable", on ? "bad" : "ok"), rst = mk("button", "Reset password");
+        ren.onclick = function () { var n = prompt("New name for " + u.name, u.name); if (n && n.trim() && n.trim() !== u.name) userCall("att_user_update", { user_id: u.user_id, name: n.trim() }); };
+        tog.onclick = function () { if (!on || confirm("Disable " + u.name + "? They are signed out within a minute.")) userCall("att_user_update", { user_id: u.user_id, status: on ? "disabled" : "active" }); };
+        rst.onclick = function () { if (confirm("Reset the password of " + u.name + "? Their current password and sessions stop working.")) userCall("att_user_reset", { user_id: u.user_id }, "Password reset"); };
+        [ren, tog, rst].forEach(function (b) { td.appendChild(b); }); tr.appendChild(td); t.appendChild(tr);
+      });
+      box.appendChild(t);
+    });
+  }
+  function userCall(action, payload, what) {
+    A(action, payload).then(function (r) {
+      if (!r.ok) return msg("userMsg", "Failed: " + (r.error || r.code || "error"), "err");
+      if (r.password) showSecret(r.user.name, r.password, what || "Account created");
+      else msg("userMsg", "Saved.", "ok");
+      loadUsers();
+    });
+  }
+  function showSecret(name, pw, what) {
+    $("secretWho").textContent = what + " — " + name; $("secretPw").textContent = pw; $("secret").hidden = false;
+    msg("userMsg", "");
+  }
+  function createUser() {
+    var n = $("userName").value.trim();
+    if (n.length < 2) return msg("userMsg", "Enter the teacher's name.", "err");
+    $("userCreate").disabled = true;
+    A("att_user_create", { name: n }).then(function (r) {
+      $("userCreate").disabled = false;
+      if (!r.ok) return msg("userMsg", "Failed: " + (r.error || r.code || "error"), "err");
+      $("userName").value = ""; showSecret(r.user.name, r.password, "Account created"); loadUsers();
+    });
+  }
+  function copySecret() {
+    var pw = $("secretPw").textContent;
+    function done(ok) { msg("userMsg", ok ? "Password copied." : "Could not copy: select it and copy by hand.", ok ? "ok" : "err"); }
+    try { navigator.clipboard.writeText(pw).then(function () { done(true); }, function () { done(false); }); } catch (e) { done(false); }
+  }
+
   // ---------- boot ----------
   function boot() {
-    $("loginBtn").onclick = login;
+    $("loginBtn").onclick = function () { login(); };
     $("tok").addEventListener("keydown", function (e) { if (e.key === "Enter") login(); });
+    $("hisGo").onclick = function () { showHisList(); loadHistory(true); };
+    $("hisReset").onclick = function () { $("hisCourse").value = ""; $("hisFrom").value = ""; $("hisTo").value = ""; $("hisUser").value = ""; showHisList(); loadHistory(true); };
+    $("hisMore").onclick = function () { loadHistory(false); };
+    $("hisBack").onclick = function () { showHisList(); };
+    $("detCsv").onclick = function () { if (H.sel) exportCSV(H.sel, "detMsg"); };
+    $("detFlagOnly").addEventListener("change", renderDetail);
+    $("ovGo").onclick = loadOverview;
+    $("userCreate").onclick = createUser;
+    $("userName").addEventListener("keydown", function (e) { if (e.key === "Enter") createUser(); });
+    $("secretCopy").onclick = copySecret;
+    $("secretDone").onclick = function () { $("secret").hidden = true; $("secretPw").textContent = ""; };
     $("logout").onclick = function () { logout(""); };
     $("startBtn").onclick = startSession;
     $("resumeBtn").onclick = function () { if (S.sess) showProjector(); };
     $("closeBtn").onclick = closeSession;
-    $("csvBtn").onclick = exportCSV;
+    $("csvBtn").onclick = function () { exportCSV(); };
     $("calBtn").onclick = calibrate;
     $("flagRefresh").onclick = loadFlagged;
     $("rosRefresh").onclick = loadRoster;
@@ -388,7 +610,7 @@
     document.addEventListener("visibilitychange", function () { if (!document.hidden && !$("proj").hidden) wake(); });
     if (DEBUG) T.selfTest().then(function (ok) { console.assert(ok, "TOKEN VECTOR MISMATCH (spec section 2)"); if (ok) console.log("token vector OK"); });
     var saved = ss("att_admin");
-    if (saved) { $("tok").value = saved; login(); } else showLogin("");
+    if (saved) login(saved); else showLogin("");
   }
   boot();
 })();

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Attendance Admin · Alexandria University, Faculty of Engineering</title>
+<title>Attendance Dashboard · Alexandria University, Faculty of Engineering</title>
 <link rel="stylesheet" href="admin.css">
 </head>
 <body>
@@ -17,21 +17,25 @@
     <div class="sys">Attendance System</div>
   </header>
   <section id="login" class="card" hidden>
-    <h2>Admin login</h2>
-    <label for="tok">Admin token</label>
-    <input id="tok" type="password" autocomplete="off">
+    <h2>Sign in</h2>
+    <label for="tok">Your password (or the admin token)</label>
+    <input id="tok" type="password" autocomplete="current-password" autocapitalize="characters" spellcheck="false">
     <div class="row" style="margin-top:12px"><button id="loginBtn" class="pri">Log in</button></div>
     <div id="loginMsg" class="msg" role="status"></div>
   </section>
 
   <div id="panel" hidden>
     <nav>
-      <h1>Admin Dashboard</h1>
+      <h1>Dashboard</h1>
+      <div id="who" class="who"></div>
       <button data-tab="session" class="on">Session</button>
       <button data-tab="requests">Requests<span id="pendBadge" class="badge" hidden>0</span></button>
       <button data-tab="flagged">Flagged</button>
       <button data-tab="roster">Roster</button>
       <button data-tab="calib">Calibrate room</button>
+      <button data-tab="history">History</button>
+      <button id="tabOverview" data-tab="overview" hidden>All sessions</button>
+      <button id="tabUsers" data-tab="users" hidden>Users</button>
       <button id="logout">Log out</button>
     </nav>
 
@@ -84,6 +88,63 @@
         <label for="calRoom">Room</label><input id="calRoom" list="roomNames" autocomplete="off"><datalist id="roomNames"></datalist>
         <div class="row" style="margin-top:12px"><button id="calBtn" class="pri">Calibrate</button></div>
         <div id="calMsg" class="msg" role="status"></div>
+      </div>
+    </section>
+
+    <section id="t-history" hidden>
+      <div id="hisList" class="card">
+        <h2>Session history</h2>
+        <div class="row">
+          <div><label for="hisCourse">Course</label><input id="hisCourse" list="courses" autocomplete="off" placeholder="All courses"></div>
+          <div><label for="hisFrom">From (UTC day)</label><input id="hisFrom" type="date"></div>
+          <div><label for="hisTo">To (UTC day)</label><input id="hisTo" type="date"></div>
+          <div id="hisUserWrap" hidden><label for="hisUser">Teacher</label><select id="hisUser"><option value="">All teachers</option></select></div>
+        </div>
+        <div class="row" style="margin-top:12px"><button id="hisGo" class="pri">Show</button><button id="hisReset">Clear filters</button></div>
+        <div id="hisMsg" class="msg" role="status"></div>
+        <div id="hisTable" class="scroll"></div>
+        <div class="row" style="margin-top:12px"><button id="hisMore" hidden>Load more</button></div>
+      </div>
+      <div id="hisDetail" class="card" hidden>
+        <div class="row" style="margin-bottom:8px"><button id="hisBack">&larr; Back to sessions</button><button id="detCsv" class="pri">Export CSV</button></div>
+        <h2 id="detTitle">Session</h2>
+        <div id="detSummary" class="msg"></div>
+        <label class="chk"><input id="detFlagOnly" type="checkbox"> Flagged check-ins only</label>
+        <div id="detMsg" class="msg" role="status"></div>
+        <div id="detTable" class="scroll"></div>
+      </div>
+    </section>
+
+    <section id="t-overview" hidden>
+      <div class="card">
+        <h2>All sessions, all teachers</h2>
+        <div class="row">
+          <div><label for="ovFrom">From (UTC day)</label><input id="ovFrom" type="date"></div>
+          <div><label for="ovTo">To (UTC day)</label><input id="ovTo" type="date"></div>
+          <div><button id="ovGo" class="pri">Show</button></div>
+        </div>
+        <div id="ovMsg" class="msg" role="status"></div>
+        <div id="ovTotals" class="stats"></div>
+        <h3>By teacher</h3><div id="ovUsers" class="scroll"></div>
+        <h3>By day</h3><div id="ovDays" class="scroll"></div>
+      </div>
+    </section>
+
+    <section id="t-users" hidden>
+      <div class="card">
+        <h2>Teacher accounts</h2>
+        <div class="row">
+          <div><label for="userName">New teacher name</label><input id="userName" autocomplete="off" maxlength="60"></div>
+          <div><button id="userCreate" class="pri">Create account</button></div>
+        </div>
+        <div id="userMsg" class="msg" role="status"></div>
+        <div id="secret" class="secret" hidden>
+          <div id="secretWho"></div>
+          <code id="secretPw"></code>
+          <div class="msg">Shown once. It cannot be looked up later (only reset). Give it to the teacher now.</div>
+          <div class="row"><button id="secretCopy" class="pri">Copy password</button><button id="secretDone">I saved it, hide</button></div>
+        </div>
+        <div id="userList" class="scroll"></div>
       </div>
     </section>
   </div>

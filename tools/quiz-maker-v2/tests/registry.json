@@ -693,6 +693,36 @@
       "owner": "S5"
     },
     {
+      "id": "R-A05",
+      "title": "Attendance student page: location gate before sign-in, failure reasons, blocking overlay, retry/watchdog, no auto check-in",
+      "cmd": [
+        "node",
+        "../../tests/attendance/student_page.test.js"
+      ],
+      "status": "active",
+      "owner": "S1-att"
+    },
+    {
+      "id": "R-A06",
+      "title": "Attendance multi-user backend: accounts, login/lockout, owner scoping, geo reasons, upgrade rule, overview, review",
+      "cmd": [
+        "node",
+        "../../tests/attendance/multiuser.test.js"
+      ],
+      "status": "active",
+      "owner": "S2-att"
+    },
+    {
+      "id": "R-A07",
+      "title": "Attendance dashboard (admin.js against the real backend): password-or-token login, teacher isolation in History, review, admin Users + All sessions",
+      "cmd": [
+        "node",
+        "../../tests/attendance/dashboard.test.js"
+      ],
+      "status": "active",
+      "owner": "S3-att"
+    },
+    {
       "id": "R-P3-F1",
       "title": "S1 follow-up core: contacted state, week/month boundaries, filter sort order, flag notices, Phase3_Flags.gs against the real router",
       "status": "active",
@@ -733,7 +763,7 @@
         "node",
         "tests/test_p3_bulk_access.js",
         "apps_script/Code.gs",
-        "apps_script/Phase3_BulkAccess.gs"
+        "apps_script/chunks/Phase3_BulkAccess.gs"
       ]
     },
     {
