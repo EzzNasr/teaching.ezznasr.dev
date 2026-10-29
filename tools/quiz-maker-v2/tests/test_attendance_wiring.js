@@ -22,8 +22,8 @@ vm.runInContext(`
   var __log = [];
   function _tgAdminIds(){ return ["PAY"]; }
   function _tgCall(m, b){ __log.push(["pay", m, b]); }
-  function att_tgAdminIds_(){ return ["111"]; }
-  function att_tgCall_(m, b){ __log.push(["att", m, b]); }
+  function attt_adminIds_(){ return ["111"]; }
+  function attt_call_(m, b){ __log.push(["att", m, b]); }
   function att_decideFromTelegram_(id, ok){ __log.push(["decide", id, ok]); return "VERDICT-" + id; }
   function handleAdminDecidePayment(p){ __log.push(["payment", p.payment_id, p.decision]); }
 `, env.ctx);

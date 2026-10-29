@@ -5,6 +5,7 @@ const signed = buf => Array.from(buf).map(b => (b > 127 ? b - 256 : b));
 const unsigned = arr => Buffer.from(arr.map(b => (b + 256) % 256));
 function build() {
   const sheets = {}, props = { ADMIN_TOKEN: "adm-secret", ATT_TG_BOT_TOKEN: "NEWBOT:token", ATT_TG_ADMIN_IDS: "111" }, cache = {};
+  let cacheShift = 0;   // gas.advance(ms) moves the CACHE clock forward (TTL expiry: login lock, 60 s user cache) without waiting
   // Telegram capture: gas.sent = messages (chat/text/markup/token), gas.tgCalls = every API call, gas.triggers = one-shot triggers created
   const sent = [], tgCalls = [], triggers = [];
   class Sheet {
@@ -40,7 +41,10 @@ function build() {
       formatDate: (d, tz, f) => new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d),
     },
     PropertiesService: { getScriptProperties: () => ({ getProperty: k => (k in props ? props[k] : null), setProperty: (k, v) => { props[k] = String(v); } }) },
-    CacheService: { getScriptCache: () => ({ get: k => (k in cache ? cache[k] : null), put: (k, v) => { cache[k] = v; }, remove: k => { delete cache[k]; } }) },
+    CacheService: { getScriptCache: () => ({
+      get: k => { const e = cache[k]; if (!e) return null; if (e.exp && e.exp <= Date.now() + cacheShift) { delete cache[k]; return null; } return e.v; },
+      put: (k, v, ttl) => { cache[k] = { v, exp: ttl ? Date.now() + cacheShift + ttl * 1000 : 0 }; },
+      remove: k => { delete cache[k]; } }) },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
     SpreadsheetApp: { openById: () => ss, getActiveSpreadsheet: () => ss },
     UrlFetchApp: {
@@ -58,7 +62,8 @@ function build() {
     },
   };
   vm.createContext(ctx);
-  (process.env.ATT_ALL ? ["AttendanceAll.gs"] : ["AttSetup.gs", "Attendance.gs", "AttFlags.gs", "AttTelegram.gs"]).forEach(f => vm.runInContext(fs.readFileSync(GS_DIR + "/" + f, "utf8"), ctx, { filename: f }));
-  return { ctx, sheets, props, sent, tgCalls, triggers, run: code => vm.runInContext(code, ctx) };
+  // The DEPLOYED backend: AttendanceAll.gs (attendance, flags, Telegram, setup, accounts/login), loaded after Code.gs' own functions in the real project. apps_script/chunks/Att* are older copies and are NOT loaded.
+  ["AttendanceAll.gs"].forEach(f => vm.runInContext(fs.readFileSync(GS_DIR + "/" + f, "utf8"), ctx, { filename: f }));
+  return { ctx, sheets, props, sent, tgCalls, triggers, advance: ms => { cacheShift += ms; }, run: code => vm.runInContext(code, ctx) };
 }
 module.exports = { build };

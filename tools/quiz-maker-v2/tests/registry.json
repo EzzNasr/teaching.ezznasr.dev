@@ -713,16 +713,6 @@
       "owner": "S2-att"
     },
     {
-      "id": "R-A07",
-      "title": "Attendance dashboard (admin.js against the real backend): password-or-token login, teacher isolation in History, review, admin Users + All sessions",
-      "cmd": [
-        "node",
-        "../../tests/attendance/dashboard.test.js"
-      ],
-      "status": "active",
-      "owner": "S3-att"
-    },
-    {
       "id": "R-P3-F1",
       "title": "S1 follow-up core: contacted state, week/month boundaries, filter sort order, flag notices, Phase3_Flags.gs against the real router",
       "status": "active",

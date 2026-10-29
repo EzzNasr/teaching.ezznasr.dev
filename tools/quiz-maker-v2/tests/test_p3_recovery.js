@@ -16,7 +16,8 @@ const read = f => fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n');
   // ======================= backend =======================
   const f = makeEnv();
   const ctx = f.env.ctx;
-  vm.runInContext(read(path.join(QM, 'apps_script', 'Phase3_Recovery.gs')), ctx, { filename: 'Phase3_Recovery.gs' });
+  const REC = [path.join(QM, 'apps_script', 'Phase3_Recovery.gs'), path.join(QM, 'apps_script', 'chunks', 'Phase3_Recovery.gs')].find(f => fs.existsSync(f));
+  vm.runInContext(read(REC), ctx, { filename: 'Phase3_Recovery.gs' });
   f.env.setNow('2026-10-27T12:00:00Z');
   const LA = G2 + 'chapter-2-lesson-1-cryptography', LB = G2 + 'chapter-2-lesson-2-network-security';
   const slugA = LA.split('/').pop();
@@ -142,12 +143,12 @@ const read = f => fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n');
         Promise, JSON, Object, Error, location: { pathname: '/programming/x/lesson/assignment.html' },
         session: { student_id: '01000000002', session_token: 'tok' },
         state: { record: { client_id: 'cid-abcdefgh', answers: [{ id: 'q1', type: 'written' }, { id: 'q2', type: 'written' }] }, widgets: {}, syncStatus: null, busy: false, photoStatus: null },
-        render() {}, dequeueSubmission: id => dequeued.push(id),
+        render() {}, beginGuard: () => { const n = { set: () => n, busy: () => n, success: () => n, fail: () => n, close: () => n }; return n; }, dequeueSubmission: id => dequeued.push(id),
         postToDrive: (p) => { calls.push(p.action); if (p.action === 'upload_submission') return scenario.submissionFails ? Promise.reject(new Error('Couldn\'t reach the server.')) : Promise.resolve({ ok: true });
           return scenario.photosRefused ? Promise.reject(new Error('Feature disabled: FF_CAMERA')) : Promise.resolve({ ok: true }); },
       };
       let cleared = 0;
-      const widget = { upload: (send) => send({ id: 'img-00000001' }, 'b64').then(() => ({ ok: true }), (e) => ({ ok: false, error: e.message })), clear: () => { cleared++; } };
+      const widget = { pending: () => 1, upload: (send) => send({ id: 'img-00000001' }, 'b64').then(() => ({ ok: true }), (e) => ({ ok: false, error: e.message })), clear: () => { cleared++; } };
       sb.state.widgets = { q1: widget, q2: widget };
       vm.createContext(sb);
       vm.runInContext(code + '\nthis.sendRecord = sendRecord;', sb);

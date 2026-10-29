@@ -90,7 +90,7 @@ def run(browser):
 
 def main():
     proc = subprocess.Popen(["node", os.path.join(HERE, "e2e_p3_bulk_backend.js"), os.path.join(APPS, "Code.gs"),
-                             os.path.join(APPS, "Phase3_BulkAccess.gs"), str(E.PORT)], stdout=subprocess.PIPE, text=True)
+                             os.path.join(APPS, "chunks", "Phase3_BulkAccess.gs"), str(E.PORT)], stdout=subprocess.PIPE, text=True)
     proc.stdout.readline()
     try:
         with sync_playwright() as p:

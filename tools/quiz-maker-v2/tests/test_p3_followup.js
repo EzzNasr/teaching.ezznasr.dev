@@ -110,7 +110,9 @@ t('notices: each one has an Arabic feature name', L.flagNotices({ FF_PARENT_LOG:
 
 /* ---------------------------------------------------------- Phase3_Flags.gs against the real Code.gs */
 {
-  const CODE = path.join(dir, 'Code.gs'), P3 = path.join(dir, 'Phase3_Flags.gs');
+  const CODE = path.join(dir, 'Code.gs');
+  // Phase3_Flags.gs may sit next to Code.gs or in chunks/ (repo layout)
+  const P3 = [path.join(dir, 'Phase3_Flags.gs'), path.join(dir, 'chunks', 'Phase3_Flags.gs')].find(f => fs.existsSync(f));
   const names = ['FF_PARENT_LOG', 'FF_MONTHLY', 'FF_DEFERRED_ANSWERS', 'FF_CAMERA', 'FF_GRADING'];
   const logs = [];
   let env = load([CODE, P3], { log: (...a) => logs.push(a.join(' ')) });
