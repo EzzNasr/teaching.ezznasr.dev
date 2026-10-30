@@ -1,4 +1,0 @@
-SAFE: only tests, scripts, CI and the Quiz Maker button. No Code.gs, no page you edited. Unzip over your repo root.
-Then:  bash scripts/test_all.sh --strict
-Expected: R-025 FAILS until you also apply package B (access.html lost its alias code in commit 8bbd0ec). Everything else green.
-If something else fails, paste the output.
