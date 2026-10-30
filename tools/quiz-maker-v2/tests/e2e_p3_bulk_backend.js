@@ -4,7 +4,7 @@
 const http = require('http'), fs = require('fs'), vm = require('vm');
 const { load } = require('./harness');
 const env = load(process.argv[2]);
-vm.runInContext(fs.readFileSync(process.argv[3], 'utf8'), env.ctx, { filename: 'Phase3_BulkAccess.gs' });
+if (fs.existsSync(process.argv[3])) vm.runInContext(fs.readFileSync(process.argv[3], 'utf8'), env.ctx, { filename: 'Phase3_BulkAccess.gs' });   // else: merged into Code.gs
 const port = +process.argv[4] || 8765;
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Content-Type': 'text/plain' };
 const P3 = { p3_admin_bulk_preview: 1, p3_admin_bulk_grant: 1, p3_admin_bulk_revoke: 1 };

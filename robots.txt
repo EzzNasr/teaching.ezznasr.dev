@@ -2,5 +2,6 @@
 User-agent: *
 Allow: /
 Disallow: /dashboard/
+Disallow: /attend/
 
 Sitemap: https://teaching.ezznasr.dev/sitemap.xml

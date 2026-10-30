@@ -17,7 +17,7 @@ const read = f => fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n');
   const f = makeEnv();
   const ctx = f.env.ctx;
   const REC = [path.join(QM, 'apps_script', 'Phase3_Recovery.gs'), path.join(QM, 'apps_script', 'chunks', 'Phase3_Recovery.gs')].find(f => fs.existsSync(f));
-  vm.runInContext(read(REC), ctx, { filename: 'Phase3_Recovery.gs' });
+  if (REC) vm.runInContext(read(REC), ctx, { filename: 'Phase3_Recovery.gs' });   // merged into Code.gs in the deployed layout: nothing to load
   f.env.setNow('2026-10-27T12:00:00Z');
   const LA = G2 + 'chapter-2-lesson-1-cryptography', LB = G2 + 'chapter-2-lesson-2-network-security';
   const slugA = LA.split('/').pop();

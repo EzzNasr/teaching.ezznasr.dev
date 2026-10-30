@@ -12,7 +12,7 @@ const addDays = (ymd, n) => { const [y, m, d] = ymd.split('-').map(Number); retu
 const L = ['programming/other/functions', 'programming/other/loops', 'english/grammar'];
 const env = load(codePath);
 // Phase3_*.gs files are not auto-loaded by the shared harness: run ours into the same context (shared scope, like Apps Script).
-require('vm').runInContext(fs.readFileSync(p3Path, 'utf8'), env.ctx, { filename: path.basename(p3Path) });
+if (p3Path && fs.existsSync(p3Path)) require('vm').runInContext(fs.readFileSync(p3Path, 'utf8'), env.ctx, { filename: path.basename(p3Path) });   // else: already merged into Code.gs
 const { post, getSS, ctx, lockState } = env;
 const tab = n => getSS('STU').getSheetByName(n);
 const rowsOf = n => { const sh = tab(n); if (!sh) return []; const hd = []; for (let c = 1; c <= 10; c++) hd.push(sh.get(1, c)); const o = []; for (let r = 2; r <= sh.getLastRow(); r++) { const row = {}; hd.forEach((h, i) => { if (h) row[h] = sh.get(r, i + 1); }); o.push(row); } return o; };

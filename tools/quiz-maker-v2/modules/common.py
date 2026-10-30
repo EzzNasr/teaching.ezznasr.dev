@@ -1042,66 +1042,121 @@ def _parse_grid_cards(cards_block):
     ]
 
 
+# --- chapter sections, order and numbers -----------------------------------
+# A grid index whose lessons carry chapter numbers (slug "chapter-2-lesson-3-...") is laid out BY CHAPTER, whatever order the
+# lessons were created or pushed in: lessons without a chapter (an introductory session) first, then chapter 1, 2, 3 ...,
+# each chapter's lessons by lesson number (ties by slug). The visible number is the position in that final order, and each
+# chapter gets a heading row. A page with no chapter lessons at all (programming/other) keeps the old append-only behaviour.
+_CHAPTER_SLUG_RE = re.compile(r'^chapter-(\d+)-lesson-(\d+)(?:-|$)')
+_CHAPTER_TITLE_RE = re.compile(r'chap\w*\s*(\d+)', re.I)
+_LESSON_TITLE_RE = re.compile(r'lesson\s*(\d+)', re.I)
+_AR_ORDINALS = {1: "الأول", 2: "الثاني", 3: "الثالث", 4: "الرابع", 5: "الخامس", 6: "السادس", 7: "السابع", 8: "الثامن", 9: "التاسع", 10: "العاشر"}
+
+
+def lesson_position(slug, title=""):
+    """(chapter, lesson) numbers of a lesson from its slug (title as a fallback); (None, None) when it has no chapter."""
+    m = _CHAPTER_SLUG_RE.match(slug or "")
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    c = _CHAPTER_TITLE_RE.search(title or "")
+    if c:
+        l = _LESSON_TITLE_RE.search(title or "")
+        return int(c.group(1)), (int(l.group(1)) if l else 0)
+    return None, None
+
+
+def _chapter_heading(chapter):
+    if chapter is None:
+        return ('<div class="chapter-head" role="heading" aria-level="3" id="intro">'
+                '<span>\u0645\u0642\u062f\u0645\u0629</span><i>Introduction</i></div>')
+    ar = "\u0627\u0644\u0641\u0635\u0644 " + _AR_ORDINALS.get(chapter, str(chapter))
+    return ('<div class="chapter-head" role="heading" aria-level="3" id="chapter-{n}">'
+            '<span>{ar}</span><i>Chapter {n}</i></div>').format(n=chapter, ar=ar)
+
+
+def layout_grid_cards(cards):
+    """cards: dicts with slug/number/title/desc/open_label. Returns the inner HTML of <div class="lessons"> (cards sorted by chapter
+    and lesson, renumbered, with a heading row per chapter). With no chaptered lesson the cards are left in the given order."""
+    pos = [lesson_position(c["slug"], c["title"]) for c in cards]
+    chaptered = any(p[0] is not None for p in pos)
+    items = list(zip(cards, pos))
+    if chaptered:
+        num = lambda c: int(c["number"]) if str(c["number"]).isdigit() else 0
+        intro = sorted([cp for cp in items if cp[1][0] is None], key=lambda cp: (num(cp[0]), cp[0]["slug"]))   # keep their current order
+        chap = sorted([cp for cp in items if cp[1][0] is not None], key=lambda cp: (cp[1][0], cp[1][1] or 0, cp[0]["slug"]))
+        items = intro + chap
+        width = max([len(str(c["number"])) for c in cards] + [len(str(len(cards)))])
+    out, last = [], object()
+    for n, (c, (chap, _les)) in enumerate(items, 1):
+        if chaptered and chap != last:
+            out.append(_chapter_heading(chap)); last = chap
+        num = str(n).zfill(width) if chaptered else str(c["number"])
+        out.append('<a class="lesson" href="./{slug}/"><span class="number">{num}</span>'
+                   '<h3>{title}</h3><p>{desc}</p><span class="open">{open_label}</span></a>'.format(
+                       slug=c["slug"], num=num, title=c["title"], desc=c["desc"], open_label=c["open_label"]))
+    return "\n".join(out) + "\n"
+
+
+def _write_grid_index(content, m, cards):
+    return content[:m.start()] + m.group(1) + "\n" + layout_grid_cards(cards) + m.group(3) + content[m.end():]
+
+
 def upsert_grid_lesson_card(index_path, lesson_slug, lesson_title, lesson_desc):
-    """Insert or update a lesson's card in a grid-style group index.html.
-    The number auto-increments from the highest existing card (kept as-is
-    if the lesson already has a card, so regenerating doesn't reshuffle
-    everyone else's numbering). Raises ValueError if the file isn't
-    grid-style / the container can't be found."""
+    """Insert or update a lesson's card in a grid-style group index.html, then lay the whole list out again (chapter sections,
+    order, numbers; see layout_grid_cards). Raises ValueError if the file isn't grid-style / the container can't be found."""
     with open(index_path, "r", encoding="utf-8") as f:
         content = f.read()
-
     m = _GRID_CONTAINER_RE.search(content)
     if not m:
         raise ValueError('No <div class="lessons">...</div></div></section> block found in ' + index_path)
-
-    open_tag, cards_block, close_tag = m.group(1), m.group(2), m.group(3)
-    cards = _parse_grid_cards(cards_block)
-
+    cards = _parse_grid_cards(m.group(2))
     open_label = cards[0]["open_label"] if cards else "Open lesson"
     existing = next((c for c in cards if c["slug"] == lesson_slug), None)
     if existing:
-        number = existing["number"]
-        cards = [c for c in cards if c["slug"] != lesson_slug]
+        existing["title"], existing["desc"] = lesson_title, lesson_desc
     else:
-        width = len(cards[-1]["number"]) if cards else 2
+        width = max((len(c["number"]) for c in cards), default=2)
         next_n = max((int(c["number"]) for c in cards), default=0) + 1
-        number = str(next_n).zfill(width)
-
-    new_card = ('<a class="lesson" href="./{slug}/"><span class="number">{num}</span>'
-                '<h3>{title}</h3><p>{desc}</p><span class="open">{open_label}</span></a>').format(
-                    slug=lesson_slug, num=number, title=lesson_title, desc=lesson_desc, open_label=open_label)
-
-    rebuilt_cards = "\n".join(c["raw"] for c in cards) + ("\n" if cards else "") + new_card + "\n"
-    new_content = content[:m.start()] + open_tag + "\n" + rebuilt_cards + close_tag + content[m.end():]
-
+        cards.append({"slug": lesson_slug, "number": str(next_n).zfill(width), "title": lesson_title, "desc": lesson_desc, "open_label": open_label})
     with open(index_path, "w", encoding="utf-8") as f:
-        f.write(new_content)
+        f.write(_write_grid_index(content, m, cards))
+
+
+def normalize_grid_index(index_path):
+    """Re-lay-out an existing grid index (sections, order, numbers) without adding anything. True if the file changed."""
+    with open(index_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    m = _GRID_CONTAINER_RE.search(content)
+    if not m:
+        return False
+    cards = _parse_grid_cards(m.group(2))
+    if not cards:
+        return False
+    new = _write_grid_index(content, m, cards)
+    if new == content:
+        return False
+    with open(index_path, "w", encoding="utf-8") as f:
+        f.write(new)
+    return True
 
 
 def remove_grid_lesson_card(index_path, lesson_slug):
-    """Remove a lesson's card from a grid-style group index.html. Returns
-    the removed card's raw markup (stashed for trash recovery), or None
-    if no matching card was found."""
+    """Remove a lesson's card from a grid-style group index.html (the rest is laid out again, so numbers stay consecutive).
+    Returns the removed card's raw markup (stashed for trash recovery), or None if no matching card was found."""
     if not os.path.exists(index_path):
         return None
     with open(index_path, "r", encoding="utf-8") as f:
         content = f.read()
-
     m = _GRID_CONTAINER_RE.search(content)
     if not m:
         return None
-
-    open_tag, cards_block, close_tag = m.group(1), m.group(2), m.group(3)
-    cards = _parse_grid_cards(cards_block)
+    cards = _parse_grid_cards(m.group(2))
     removed = next((c for c in cards if c["slug"] == lesson_slug), None)
     if not removed:
         return None
     remaining = [c for c in cards if c["slug"] != lesson_slug]
-    rebuilt = "\n".join(c["raw"] for c in remaining) + ("\n" if remaining else "")
-    new_content = content[:m.start()] + open_tag + "\n" + rebuilt + close_tag + content[m.end():]
     with open(index_path, "w", encoding="utf-8") as f:
-        f.write(new_content)
+        f.write(_write_grid_index(content, m, remaining))
     return removed["raw"]
 
 

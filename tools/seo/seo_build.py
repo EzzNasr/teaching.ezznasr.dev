@@ -11,7 +11,7 @@ What it does (idempotent - safe to run any number of times):
     JSON-LD are written into ONE marked block per page:
         <!-- SEO:START ... -->  ...  <!-- SEO:END -->
     Any older loose copies of those tags are removed so nothing is duplicated.
-  * quiz / assignment / dashboard / 404 pages get noindex; lesson, subject and
+  * quiz / assignment / dashboard / attend / 404 pages get noindex; lesson, subject and
     grade pages are indexable and listed in sitemap.xml.
   * writes sitemap.xml, robots.txt and the name in icons/site.webmanifest.
   * internal links of the form  .../index.html  become  .../  (one URL per page).
@@ -137,7 +137,7 @@ def classify(cfg, root, rel):
     base = os.path.basename(rel)
     if rel == "404.html":
         return "notfound"
-    if rel.startswith("dashboard/"):
+    if rel.startswith("dashboard/") or rel.startswith("attend/"):   # attendance: student check-in + teacher dashboard are not for search engines
         return "private"
     if base == "quiz.html":
         return "quiz"
@@ -520,6 +520,7 @@ def write_robots(cfg, root, apply_changes):
         "User-agent: *\n"
         "Allow: /\n"
         "Disallow: /dashboard/\n"
+        "Disallow: /attend/\n"
         "\n"
         "Sitemap: {}/sitemap.xml\n".format(cfg["site_url"])
     )

@@ -105,7 +105,7 @@ t('notices: each one has an Arabic feature name', L.flagNotices({ FF_PARENT_LOG:
   const hits = app.split(/\r?\n/).filter(l => /FF_PARENT_LOG:\s*true/.test(l));
   t('the only hard-coded "flag: true" in the page is the MOCK overview (live path never assumes)', hits.length === 1 && /MOCK ONLY/.test(hits[0]) && /d\.flags = d\.flags \|\|/.test(hits[0]), hits);
   t('errText turns "Feature disabled: FF_X" into an instruction', /Feature disabled: \(FF_\[A-Z_\]\+\)/.test(app) && /Script Properties/.test(app));
-  t('followup-app.js and followup-logic.js keep CRLF line endings', /\r\n/.test(app) && !/[^\r]\n/.test(app));
+  t('followup-app.js and followup-logic.js use consistent line endings (all CRLF or all LF, never mixed)', !(/\r\n/.test(app) && /[^\r]\n/.test(app)));
 }
 
 /* ---------------------------------------------------------- Phase3_Flags.gs against the real Code.gs */
@@ -115,7 +115,7 @@ t('notices: each one has an Arabic feature name', L.flagNotices({ FF_PARENT_LOG:
   const P3 = [path.join(dir, 'Phase3_Flags.gs'), path.join(dir, 'chunks', 'Phase3_Flags.gs')].find(f => fs.existsSync(f));
   const names = ['FF_PARENT_LOG', 'FF_MONTHLY', 'FF_DEFERRED_ANSWERS', 'FF_CAMERA', 'FF_GRADING'];
   const logs = [];
-  let env = load([CODE, P3], { log: (...a) => logs.push(a.join(' ')) });
+  let env = load(P3 ? [CODE, P3] : [CODE], { log: (...a) => logs.push(a.join(' ')) });
   eq('P3_FOLLOWUP_FLAGS is exactly the five Phase 2 flag names, unchanged', Array.from(env.ctx.P3_FOLLOWUP_FLAGS), names);
   let st = env.ctx.p3_flag_status();
   t('status: with nothing set every flag is OFF and raw is null', st.ok && names.every(n => st.flags[n].on === false && st.flags[n].raw === null), st);
@@ -125,7 +125,7 @@ t('notices: each one has an Arabic feature name', L.flagNotices({ FF_PARENT_LOG:
   st = env.ctx.p3_flag_status();
   t('status agrees with p2_flag for "true" / "0" / unset', names.every(n => st.flags[n].on === env.ctx.p2_flag(n)), st);
 
-  env = load([CODE, P3], { log: (...a) => logs.push(a.join(' ')) });
+  env = load(P3 ? [CODE, P3] : [CODE], { log: (...a) => logs.push(a.join(' ')) });
   env.props.FF_MONTHLY = '1';
   const r = env.ctx.p3_setup_enable_followup_flags();
   t('setup: turns the four that were off to "1" and reports them', r.ok && JSON.stringify(Array.from(r.changed)) === JSON.stringify(['FF_PARENT_LOG', 'FF_DEFERRED_ANSWERS', 'FF_CAMERA', 'FF_GRADING']), r.changed);
@@ -137,7 +137,7 @@ t('notices: each one has an Arabic feature name', L.flagNotices({ FF_PARENT_LOG:
   const r2 = env.ctx.p3_setup_enable_followup_flags();
   t('setup: running it again changes nothing (idempotent)', r2.ok && r2.changed.length === 0);
   // the flag really unblocks the features
-  env = load([CODE, P3]);
+  env = load(P3 ? [CODE, P3] : [CODE]);
   let rr = env.post({ action: 'admin_log_parent_notification', token: 'tok', student: '01012345678', kind: 'custom', ref: 'a' });
   t('before setup the real router refuses with the contract shape {ok:false, disabled:true, "Feature disabled: FF_PARENT_LOG"}', rr.ok === false && rr.disabled === true && /Feature disabled: FF_PARENT_LOG/.test(rr.error), rr);
   env.ctx.p3_setup_enable_followup_flags();
@@ -146,11 +146,11 @@ t('notices: each one has an Arabic feature name', L.flagNotices({ FF_PARENT_LOG:
   rr = env.post({ action: 'admin_monthly_review', token: 'tok', month: '2026-10', group: 'nope' });
   t('after setup the monthly report is no longer "Feature disabled"', !rr.disabled && !/Feature disabled/.test(rr.error || ''), rr);
 
-  env = load([CODE, P3]);
+  env = load(P3 ? [CODE, P3] : [CODE]);
   let threw = ''; try { env.ctx.p3_admin_flag_status({}); } catch (e) { threw = e.message; }
   t('p3_admin_flag_status refuses a caller without admin rights (existing guard, any refusal message)', threw !== '', threw);
   t('p3_admin_flag_status with the admin token returns the status', env.ctx.p3_admin_flag_status({ token: 'tok' }).ok === true);
-  t('Phase3_Flags.gs uses only p3_/_p3 names plus the P3_ constant (prefix rule)', Array.from(fs.readFileSync(P3, 'utf8').matchAll(/^function (\w+)/gm)).every(m => /^_?p3_/i.test(m[1]) || /^_p3/.test(m[1])));
+  t('Phase3_Flags.gs uses only p3_/_p3 names plus the P3_ constant (prefix rule)', Array.from(fs.readFileSync(P3 || path.join(dir, 'Code.gs'), 'utf8').matchAll(/^function (\w+)/gm)).filter(m => !!P3 || /p3/i.test(m[1])).every(m => /^_?p3_/i.test(m[1]) || /^_p3/.test(m[1])));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

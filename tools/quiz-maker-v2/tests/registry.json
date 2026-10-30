@@ -713,6 +713,27 @@
       "owner": "S2-att"
     },
     {
+      "id": "R-A07",
+      "title": "Attendance dashboard (admin.js against the real backend): password-or-token login, teacher isolation in History, review, admin Users + All sessions",
+      "cmd": [
+        "node",
+        "../../tests/attendance/dashboard.test.js"
+      ],
+      "status": "active",
+      "owner": "S3-att"
+    },
+    {
+      "id": "R-A08",
+      "title": "Attendance multi-user in real Chromium: 2 teachers at once, geolocation granted/blocked/far, escape hatch, upgrade, offline retry, both dashboards",
+      "cmd": [
+        "python",
+        "../../tests/attendance/e2e_multiuser.py"
+      ],
+      "status": "active",
+      "needs": "playwright",
+      "owner": "S4-att"
+    },
+    {
       "id": "R-P3-F1",
       "title": "S1 follow-up core: contacted state, week/month boundaries, filter sort order, flag notices, Phase3_Flags.gs against the real router",
       "status": "active",
@@ -807,6 +828,16 @@
         "python",
         "tests/e2e_upload_guard.py"
       ]
+    },
+    {
+      "id": "R-G01",
+      "title": "Grade 1 / 2 lesson lists: sectioned by chapter, ordered by chapter then lesson, numbered consecutively (also after add/remove)",
+      "cmd": [
+        "python",
+        "tests/test_grid_layout.py"
+      ],
+      "status": "active",
+      "owner": "lesson-order"
     }
   ]
 }

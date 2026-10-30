@@ -94,7 +94,15 @@
     if (name === "requests") loadRequests();
     if (name === "flagged") loadFlagged();
     if (name === "roster") loadRoster();
-    if (name === "history") { showHisList(); fillHisUsers().then(function () { loadHistory(true); }); }
+    if (name === "history") {
+      showHisList();
+      // the teacher <select> must have its options BEFORE a drill-down value is set (a browser resets an unknown value to "")
+      fillHisUsers().then(function () {
+        var f = H.pending; H.pending = null;
+        if (f) { $("hisUser").value = f.user || ""; $("hisFrom").value = f.from || ""; $("hisTo").value = f.to || ""; $("hisCourse").value = ""; }
+        loadHistory(true);
+      });
+    }
     if (name === "overview") loadOverview();
     if (name === "users") loadUsers();
   }
@@ -519,8 +527,7 @@
     box.appendChild(t);
   }
   function openHistory(f) {
-    $("hisUser").value = f.user || ""; $("hisFrom").value = f.from || ""; $("hisTo").value = f.to || ""; $("hisCourse").value = "";
-    tab("history");
+    H.pending = f; tab("history");
   }
 
   // ---------- admin: teacher accounts ----------
