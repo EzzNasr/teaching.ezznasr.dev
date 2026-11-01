@@ -748,6 +748,9 @@
         });
         box.appendChild(badge("lock"));
         if (data.session_replaced) {
+          // The saved sign-in is dead (account opened on another device): drop it so nothing else on
+          // the page (photo uploads, the corner widget after reload) keeps using the old token.
+          try { if (window.AuthEngine && window.AuthEngine.clearSession) window.AuthEngine.clearSession(); } catch (e) { /* nothing to clear */ }
           box.appendChild(el("p", { class: "vp-title" }, ["You've been signed out"]));
           box.appendChild(el("p", { class: "vp-text" }, ["Your account was signed in on another device, or its password was reset. Only one device can be signed in at a time, so sign in again to keep watching here."]));
         } else {
