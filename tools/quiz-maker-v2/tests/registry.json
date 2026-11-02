@@ -1253,6 +1253,199 @@
         "node",
         "tests/test_p4_s7_fakedom.js"
       ]
+    },
+    {
+      "id": "R-FU2-S1-1",
+      "title": "follow-up v2 page (no browser): 12-hour formatter, no Cairo / no <input type=time>, script order, fixture 3.4/3.5 fields, stub shape, scenario phases vs the real engine",
+      "status": "active",
+      "owner": "S1",
+      "cmd": [
+        "node",
+        "tests/test_followup_v2_ui.js"
+      ],
+      "note": "the engine checks run only once assets/followup-events.js (S3) is merged; before that they print a NOTE"
+    },
+    {
+      "id": "R-FU2-S1-2",
+      "title": "follow-up v2 page on a 390px phone (?mock=1): Today tab, hero per golden phase, dots, deep links, reminder sent, advance card, walk-through + fallback, requirement off, 12-hour pickers, notification settings, degraded layout",
+      "status": "active",
+      "owner": "S1",
+      "cmd": [
+        "python",
+        "tests/e2e_followup_v2.py"
+      ],
+      "needs": "playwright",
+      "note": "runs every scenario against the stub, and again against S3's engine when it exists"
+    },
+    {
+      "id": "R-FU2-NOTIFY",
+      "title": "Follow-up v2 notifications: hourly tick, dedup, quiet hours, snooze/enabled, Telegram callbacks, mark-done, settings, overview hook, \"Alex\" never \"Cairo\"",
+      "status": "active",
+      "owner": "fu2-S2",
+      "cmd": [
+        "node",
+        "tests/test_fu2_notify.js",
+        "apps_script"
+      ]
+    },
+    {
+      "id": "R-FU2-S3-1",
+      "title": "follow-up v2 event engine: eventsFor / dueNow, golden examples, DST weeks",
+      "status": "active",
+      "owner": "S3",
+      "cmd": [
+        "node",
+        "tests/test_followup_events.js"
+      ],
+      "note": "pure, no DOM; also run under TZ=America/Los_Angeles"
+    },
+    {
+      "id": "R-FU2-S3-2",
+      "title": "follow-up v2 parity: browser module vs generated FollowupLogic.gs (incl. 6 DST fixtures) + build --check",
+      "status": "active",
+      "owner": "S3",
+      "cmd": [
+        "node",
+        "tests/test_followup_parity.js"
+      ]
+    },
+    {
+      "id": "R-FU2-S3-3",
+      "title": "parent-message walk-through: flow core (pure)",
+      "status": "active",
+      "owner": "S3",
+      "cmd": [
+        "node",
+        "tests/test_followup_walk.js"
+      ]
+    },
+    {
+      "id": "R-FU2-S3-4",
+      "title": "parent-message walk-through on a 390px phone (own harness page)",
+      "status": "active",
+      "owner": "S3",
+      "cmd": [
+        "python",
+        "tests/e2e_followup_walk.py"
+      ],
+      "needs": "playwright"
+    },
+    {
+      "id": "R-FU2-S3-5",
+      "title": "FollowupLogic.gs is current with its two sources",
+      "status": "active",
+      "owner": "S3",
+      "cmd": [
+        "python",
+        "../../scripts/build_server_logic.py",
+        "--check"
+      ]
+    },
+    {
+      "id": "R-REQ1",
+      "title": "Requirements: pure rules (defaults = today, precedence, validation, custom keys)",
+      "status": "active",
+      "owner": "S4",
+      "cmd": [
+        "node",
+        "tests/test_req_logic.js"
+      ]
+    },
+    {
+      "id": "R-REQ2",
+      "title": "Requirements: server copy (Requirements.gs) and client copy (requirements-logic.js) agree",
+      "status": "active",
+      "owner": "S4",
+      "cmd": [
+        "node",
+        "tests/test_req_parity.js"
+      ]
+    },
+    {
+      "id": "R-REQ3",
+      "title": "Requirements: five actions, audit, assistant access, hook, checks, history (real Code.gs)",
+      "status": "active",
+      "owner": "S4",
+      "cmd": [
+        "node",
+        "tests/test_req_server.js"
+      ]
+    },
+    {
+      "id": "R-REQ4",
+      "title": "Requirements page at 390px in mock mode: toggle, override, copy, manual check, preview, history",
+      "status": "active",
+      "needs": "playwright",
+      "owner": "S4",
+      "cmd": [
+        "python",
+        "tests/e2e_requirements.py"
+      ]
+    },
+    {
+      "id": "R-FU2-CORE",
+      "title": "Follow-up v2 core: routing admin_fu2_*/admin_req_*, allow-list (assistants), overview hooks, internal overview, Telegram fu: callbacks, group duplicates",
+      "status": "active",
+      "owner": "fu2-S5",
+      "cmd": [
+        "node",
+        "tests/test_fu2_core.js",
+        "apps_script"
+      ]
+    },
+    {
+      "id": "R-FU2-ONEGROUP",
+      "title": "One group per student: in_other_group, move:true, all-or-nothing bulk, audit, atomic under the lock",
+      "status": "active",
+      "owner": "fu2-S5",
+      "cmd": [
+        "node",
+        "tests/test_one_group.js",
+        "apps_script"
+      ]
+    },
+    {
+      "id": "R-FU2-MONTHLY",
+      "title": "Monthly report requirements section + sent/closed snapshot",
+      "status": "active",
+      "owner": "fu2-S5",
+      "cmd": [
+        "node",
+        "tests/test_monthly_requirements.js",
+        "apps_script"
+      ]
+    },
+    {
+      "id": "R-FU2-E2E-GROUP",
+      "title": "access.html: confirm before moving, current group in picker, two-groups banner (real Code.gs + FollowupRouter.gs, Chromium)",
+      "status": "active",
+      "needs": "playwright",
+      "owner": "fu2-S5",
+      "cmd": [
+        "python",
+        "tests/e2e_one_group.py"
+      ]
+    },
+    {
+      "id": "R-FU2-E2E-SUMMARY",
+      "title": "student-summary.html: Requirements card in the summary and the monthly report (mock, 390px)",
+      "status": "active",
+      "needs": "playwright",
+      "owner": "fu2-S5",
+      "cmd": [
+        "python",
+        "tests/e2e_student_summary_requirements.py"
+      ]
+    },
+    {
+      "id": "R-FU2-P4-1",
+      "title": "follow-up v2 x Phase 4 integration: who may call admin_fu2_*/admin_req_*, one group per student per teacher, what a teacher's overview / monthly review carries",
+      "status": "active",
+      "owner": "integration",
+      "cmd": [
+        "node",
+        "tests/test_fu2_p4_integration.js"
+      ]
     }
   ]
 }

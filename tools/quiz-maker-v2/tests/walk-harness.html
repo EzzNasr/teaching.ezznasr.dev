@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FollowupWalk harness</title>
+<link rel="stylesheet" href="../../../assets/followup-walk.css">
+<style>body{margin:0;font-family:system-ui;padding:16px}</style></head>
+<body>
+<button id="open" type="button">open</button>
+<script src="../../../assets/followup-logic.js"></script>
+<script src="../../../assets/followup-templates.js"></script>
+<script src="../../../assets/followup-walk.js"></script>
+<script>
+window.LOG = { done: [], closed: 0, opened: 0 };
+window.ROWS = [
+  { key: '1012345001', name: 'أحمد علي', parent_phone: '01198765401', issues: [{ kind: 'homework', lesson: 'programming/x/chapter-2-lesson-1-x', label: 'واجب ناقص' }], message: 'رسالة أحمد' },
+  { key: '1012345002', name: 'منى حسن', parent_phone: '', issues: [{ kind: 'quiz', label: 'اختبار غائب' }], message: 'رسالة منى' },
+  { key: '1012345003', name: 'يوسف سعيد', parent_phone: '01098765403', issues: [{ kind: 'watch', label: 'فيديو' }], message: 'رسالة يوسف' }
+];
+window.openWalk = function (rows) {
+  window.LOG.opened++;
+  window.WALK = window.FollowupWalk.open({
+    group: { group: 'Sat 18:00' }, rows: rows || window.ROWS, templates: {}, kind: 'parents_hw',
+    onDone: function (r) { window.LOG.done.push(r); },
+    onClose: function () { window.LOG.closed++; }
+  });
+};
+document.getElementById('open').addEventListener('click', function () { window.openWalk(); });
+</script></body></html>

@@ -1,0 +1,9 @@
+{
+  "entries": [
+    { "id": "R-FU2-CORE", "title": "Follow-up v2 core: routing admin_fu2_*/admin_req_*, allow-list (assistants), overview hooks, internal overview, Telegram fu: callbacks, group duplicates", "status": "active", "owner": "fu2-S5", "cmd": ["node", "tests/test_fu2_core.js", "apps_script"] },
+    { "id": "R-FU2-ONEGROUP", "title": "One group per student: in_other_group, move:true, all-or-nothing bulk, audit, atomic under the lock", "status": "active", "owner": "fu2-S5", "cmd": ["node", "tests/test_one_group.js", "apps_script"] },
+    { "id": "R-FU2-MONTHLY", "title": "Monthly report requirements section + sent/closed snapshot", "status": "active", "owner": "fu2-S5", "cmd": ["node", "tests/test_monthly_requirements.js", "apps_script"] },
+    { "id": "R-FU2-E2E-GROUP", "title": "access.html: confirm before moving, current group in picker, two-groups banner (real Code.gs + FollowupRouter.gs, Chromium)", "status": "active", "needs": "playwright", "owner": "fu2-S5", "cmd": ["python", "tests/e2e_one_group.py"] },
+    { "id": "R-FU2-E2E-SUMMARY", "title": "student-summary.html: Requirements card in the summary and the monthly report (mock, 390px)", "status": "active", "needs": "playwright", "owner": "fu2-S5", "cmd": ["python", "tests/e2e_student_summary_requirements.py"] }
+  ]
+}

@@ -19,7 +19,7 @@ from tkinter import ttk, messagebox, filedialog
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from modules import common, drive_bridge, test_runner, teacher_mode
+from modules import common, drive_bridge, test_runner
 from modules.quiz_tab import QuizTab
 from modules.assignment_tab import AssignmentTab
 from modules.attachment_tab import AttachmentTab
@@ -57,10 +57,8 @@ class DriveConfigDialog(tk.Toplevel):
 
     def _test(self):
         try:
-            info = drive_bridge.test_connection(self.url_var.get().strip(), self.token_var.get().strip())
-            who = teacher_mode.badge_text(teacher_mode.identity_from_ping(info))
-            messagebox.showinfo("Connected", "The Drive bridge responded successfully."
-                                + ("\n\n" + who if who else ""), parent=self)
+            drive_bridge.test_connection(self.url_var.get().strip(), self.token_var.get().strip())
+            messagebox.showinfo("Connected", "The Drive bridge responded successfully.", parent=self)
         except drive_bridge.DriveBridgeError as e:
             messagebox.showerror("Connection failed", str(e), parent=self)
 
@@ -100,11 +98,6 @@ class App(tk.Tk):
         self.content = scroll.inner
 
         self.config_data = common.load_config()
-
-        # Teacher mode (Phase 4): a teacher token limits the subjects every tab offers. Must run BEFORE the tabs
-        # are built (they read common.SUBJECTS once). Never raises; an unreachable server just means no filtering.
-        self.teacher_identity, self.teacher_badge, self.teacher_problem = teacher_mode.startup(
-            self.config_data, common.SUBJECTS, common.get_drive_config)
 
         self._build_top_bar()
         self._build_notebook()
@@ -165,9 +158,6 @@ class App(tk.Tk):
                  fg="gray30", font=("TkDefaultFont", 8), justify="left").pack(anchor="w", padx=8, pady=(0, 6))
 
         self._update_drive_status()
-        self.teacher_badge_var = tk.StringVar(value=self.teacher_badge or self.teacher_problem)
-        tk.Label(drive_frame, textvariable=self.teacher_badge_var, anchor="w", fg="#0a6a3a",
-                 font=("TkDefaultFont", 9, "bold")).pack(anchor="w", padx=8, pady=(0, 4))
 
         self.status_var = tk.StringVar(value="Ready.")
         status_bar = tk.Label(self.content, textvariable=self.status_var, anchor="w", fg="gray30",
@@ -220,11 +210,6 @@ class App(tk.Tk):
             common.save_drive_config(self.config_data, url, token)
             self._update_drive_status()
             self.status_var.set("Drive bridge settings saved.")
-            ident, badge, problem = teacher_mode.startup(self.config_data, common.SUBJECTS, common.get_drive_config)
-            self.teacher_badge_var.set(badge or problem)
-            if badge:
-                messagebox.showinfo("Restart needed", "If you changed the token, restart the app so the subject "
-                                    "lists on every tab match it.")
 
     def _sync_assets(self):
         site_root = self.site_root_var.get().strip()

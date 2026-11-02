@@ -93,6 +93,7 @@
     root.appendChild(el("div", { class: "sh-cards" }, [follow, grade]));
 
     var foot = el("div", { class: "sh-foot" });
+    foot.appendChild(el("a", { href: "requirements.html", text: "المطلوبات" }));
     if (role === "admin") foot.appendChild(el("a", { href: "master.html", text: "لوحة المدرّس" }));
     foot.appendChild(el("a", { href: "student.html?view=student", text: "صفحتي كطالب" }));
     foot.appendChild(el("button", { type: "button", id: "sh-out", text: "تسجيل خروج" }));

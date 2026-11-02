@@ -49,6 +49,14 @@
 
   // ---- api (real: AuthEngine.adminCall; mock: fixtures, in memory) ---------------------------------
   function fx(name) { return fetch("_fixtures/" + name, { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("fixture " + name + " " + r.status); return r.json(); }); }
+  function mockRequirements() {
+    return { items: [
+      { key: "homework", label_ar: "الواجب", label_en: "Homework", kind: "auto", met: 7, expected: 9, pct: 77.8, weight: 1 },
+      { key: "quiz", label_ar: "الكويز", label_en: "Quiz", kind: "auto", met: 9, expected: 9, pct: 100, weight: 1 },
+      { key: "watch", label_ar: "المشاهدة", label_en: "Video watching", kind: "auto", met: 4, expected: 9, pct: 44.4, weight: 1 },
+      { key: "custom_behaviour", label_ar: "السلوك", label_en: "Behaviour", kind: "manual", met: true, expected: 1, pct: 100, weight: 1, note: "ممتاز" },
+    ], compliance_pct: 80.6, source: "group" };
+  }
   function mockApi(p) {
     var load = MKS.overview ? Promise.resolve() : Promise.all([fx("followup-overview.json"), fx("student-summary.json")]).then(function (a) { MKS.overview = a[0]; MKS.sum = a[1]; MKS.log = clone(a[0].parent_log || {}); });
     return load.then(function () {
@@ -57,6 +65,7 @@
       if (p.action === "admin_student_summary") {
         var st = d.students[pkOf(p.student)]; if (!st) return { ok: false, error: "Student not found." };
         var o = clone(MKS.sum); o.student = { phone: st.phone, name: st.name, year: st.year, parent_phone: st.parent_phone };
+        if (!o.requirements) o.requirements = mockRequirements();
         o.groups = d.groups.filter(function (g) { return g.members.some(function (m) { return pkOf(m.phone) === pkOf(st.phone); }); }).map(function (g) { return { group: g.group, key: g.key }; });
         o.range = { from: p.from, to: p.to };
         o.notifications = (MKS.log[pkOf(st.phone)] || []).map(function (n) { return { student: st.phone, kind: n.kind, ref: n.ref, sent_at: n.sent_at, by: "mock", note: n.note || "" }; });
@@ -74,6 +83,7 @@
         if (p.op === "mark") { MKS.month[mk] = { status: p.status, sent_at: p.status === "sent" ? d.today + " 12:00:00" : "", note: p.note || "" }; return { ok: true, review: Object.assign({ student: p.student, month: p.month }, MKS.month[mk]) }; }
         var s2 = clone(MKS.sum), st2 = d.students[pkOf(p.student)];
         s2.student = { phone: st2.phone, name: st2.name, year: st2.year, parent_phone: st2.parent_phone }; s2.groups = [];
+        if (!s2.requirements) s2.requirements = mockRequirements();
         s2.range = { from: p.month + "-01", to: monthEnd(p.month) };
         return { ok: true, month: p.month, range: s2.range, closed: true, reviews: [{ student: s2.student, summary: s2, review: MKS.month[mk] || { status: "pending", sent_at: "", note: "" } }] };
       }
@@ -92,6 +102,39 @@
   function card(title, kids, id) { return el("section", { class: "fu-card", id: id || null }, [el("h3", { style: "margin-bottom:8px" }, [title])].concat(kids)); }
   function kpi(label, value, tone, id) { return el("div", { class: "fu-kpi" + (tone ? " " + tone : ""), id: id || null }, [el("b", {}, [String(value)]), el("span", {}, [label])]); }
   function pct(n) { return n === null || n === undefined ? "—" : Math.round(n) + "%"; }
+
+  // FU2: the requirements section (summary.requirements). req = {items, compliance_pct, source}; opts.id sets the card id;
+  // opts.snapshot / opts.unavailable describe a month that was already sent or closed.
+  var REQ_SRC = { group: "إعدادات الجروب", global: "الإعدادات العامة", "default": "الإعدادات الافتراضية" };
+  function reqBar(p) {
+    var w = p === null || p === undefined ? 0 : Math.max(0, Math.min(100, p));
+    var tone = p === null || p === undefined ? "#9aa0a6" : p >= 80 ? "#2e9d5b" : p >= 50 ? "#d99a1e" : "#d4503a";
+    return el("div", { class: "ss-req-bar", style: "height:6px;border-radius:3px;background:rgba(127,127,127,.25);overflow:hidden;margin-top:4px", "aria-hidden": "true" }, [el("div", { style: "height:100%;width:" + w + "%;background:" + tone })]);
+  }
+  function reqCard(req, opts) {
+    opts = opts || {};
+    var id = opts.id || "ss-requirements";
+    if (opts.unavailable) return card("✅ المتطلبات", [el("div", { class: "fu-dim", id: id + "-unavailable" }, ["الشهر ده اتبعت قبل ما المتطلبات تتسجّل، فمفيش نسخة محفوظة منها."])], id);
+    if (!req || !Array.isArray(req.items)) return null;
+    var kids = [];
+    var head = el("div", { class: "fu-chips" }, [chip("الالتزام " + pct(req.compliance_pct), req.compliance_pct === null || req.compliance_pct === undefined ? "grey" : req.compliance_pct >= 80 ? "green" : "amber", { id: id + "-compliance" })]);
+    if (req.source) head.appendChild(chip(REQ_SRC[req.source] || req.source, "grey", { id: id + "-source" }));
+    kids.push(head);
+    if (opts.snapshot) kids.push(el("div", { class: "fu-dim", id: id + "-snapshot", style: "margin-top:6px" }, ["📌 الأرقام دي زي ما كانت وقت إرسال التقرير (محفوظة ومش بتتغيّر)."]));
+    if (!req.items.length) kids.push(el("div", { class: "fu-dim", style: "margin-top:6px" }, ["مفيش متطلبات مفعّلة للتقرير"]));
+    req.items.forEach(function (it) {
+      var label = it.label_ar || it.label_en || it.key, right;
+      if (it.kind === "manual") {
+        right = [it.met === true ? chip("✓ تمّ", "green") : it.met === false ? chip("✗ لم يتم", "amber") : chip("لم يُسجَّل", "grey")];
+      } else {
+        right = [chip(it.met + " / " + it.expected, it.expected ? (it.pct >= 80 ? "green" : "amber") : "grey"), chip(pct(it.pct), "grey")];
+      }
+      var r = el("div", { class: "ss-req-item", "data-req": it.key, style: "margin-top:8px" }, [row(label, right), it.expected || it.kind === "manual" ? reqBar(it.pct) : null]);
+      if (it.kind === "manual" && (it.note || it.by)) r.appendChild(el("div", { class: "fu-dim", dir: "auto", style: "margin-top:2px" }, [(it.note || "") + (it.by ? (it.note ? " · " : "") + "سجّلها: " + it.by : "")]));
+      kids.push(r);
+    });
+    return card("✅ المتطلبات", kids, id);
+  }
 
   function renderPicker() {
     var root = clear($("fu-root")), r = ST.roster, inGroup = {};
@@ -168,6 +211,9 @@
       var o = lessons[k];
       return row(lessonName(k), [o.att ? chip(o.att.mode === "center" ? "🏫 سنتر" : "💻 أونلاين", o.att.mode === "center" ? "green" : "grey") : null, o.watch ? chip("▶ " + pct(o.watch.pct), o.watch.pct >= 80 ? "green" : "amber") : null, o.access ? chip(o.access.can_watch ? "🔓 الفيديو مفتوح" : "🔒 الفيديو مقفول", o.access.can_watch ? "green" : "red", { "data-access": o.access.can_watch ? "open" : "locked" }) : null]);
     }) : [el("div", { class: "fu-dim" }, ["لا توجد بيانات"])], "ss-attendance"));
+    // requirements (FU2)
+    var rq = reqCard(s.requirements, { id: "ss-requirements" });
+    if (rq) root.appendChild(rq);
     // written answers
     var w = s.written || {};
     root.appendChild(card("📷 الإجابات الكتابية", [
@@ -225,6 +271,8 @@
     clear(host);
     host.appendChild(el("div", { class: "fu-row fu-between", style: "margin:10px 0" }, [chip("الحالة: " + ({ pending: "معلّق", ready: "جاهز", sent: "اتبعت", closed: "مقفول" }[status] || status), status === "sent" ? "green" : "amber", { id: "ss-month-status" })]));
     if (ck.level === "missing") host.appendChild(el("div", { class: "fu-warnbox", role: "alert" }, ["⚠️ لا يوجد رقم ولي أمر — تقدر تنسخ الرسالة بس."]));
+    var mrq = reqCard(rev.summary && rev.summary.requirements, { id: "ss-month-requirements", snapshot: !!(rev.summary && rev.summary.requirements_snapshot), unavailable: !!(rev.summary && rev.summary.requirements_unavailable) });   // FU2
+    if (mrq) host.appendChild(mrq);
     host.appendChild(bubble); host.appendChild(ta);
     host.appendChild(el("div", { class: "fu-stack", style: "margin-top:12px" }, [link, el("div", { class: "fu-btns two" }, [
       el("button", { class: "fu-btn", id: "ss-copy", type: "button", onclick: function () { var p; try { p = T().copyText(ta.value); } catch (e) {} Promise.resolve(p).then(function () { toast("تم النسخ ✓"); }, function () { toast("تعذّر النسخ", true); }); } }, ["📋 نسخ"]),

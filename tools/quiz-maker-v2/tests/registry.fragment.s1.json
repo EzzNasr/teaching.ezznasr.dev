@@ -1,0 +1,19 @@
+[
+  {
+    "id": "R-FU2-S1-1",
+    "title": "follow-up v2 page (no browser): 12-hour formatter, no Cairo / no <input type=time>, script order, fixture 3.4/3.5 fields, stub shape, scenario phases vs the real engine",
+    "status": "active",
+    "owner": "S1",
+    "cmd": ["node", "tests/test_followup_v2_ui.js"],
+    "note": "the engine checks run only once assets/followup-events.js (S3) is merged; before that they print a NOTE"
+  },
+  {
+    "id": "R-FU2-S1-2",
+    "title": "follow-up v2 page on a 390px phone (?mock=1): Today tab, hero per golden phase, dots, deep links, reminder sent, advance card, walk-through + fallback, requirement off, 12-hour pickers, notification settings, degraded layout",
+    "status": "active",
+    "owner": "S1",
+    "cmd": ["python", "tests/e2e_followup_v2.py"],
+    "needs": "playwright",
+    "note": "runs every scenario against the stub, and again against S3's engine when it exists"
+  }
+]

@@ -1,0 +1,60 @@
+/* followup-walk.css — styles for assets/followup-walk.js (Follow-up v2, session S3).
+   Uses the follow-up page's colour tokens (--fu-*) when they exist, with its own fallbacks so the
+   walk-through also looks right on a bare test page. Phone-first, RTL, 44px+ tap targets. */
+.fw-overlay{
+  --w-bg:var(--fu-card,#fff); --w-bg2:var(--fu-bg,#f3efe7); --w-soft:var(--fu-soft,#ece7dc); --w-line:var(--fu-line,#e0d9cb);
+  --w-ink:var(--fu-ink,#16302e); --w-dim:var(--fu-dim,#66736f); --w-teal:var(--fu-teal,#0f6b66);
+  --w-wa:var(--fu-wa,#15803d); --w-wa-deep:var(--fu-wa-deep,#116a32); --w-bubble:var(--fu-bubble,#e2f5d3);
+  --w-warn:var(--fu-warn,#8a5a00); --w-warn-bg:var(--fu-warn-bg,#fdecc8); --w-bad:var(--fu-bad,#b3261e); --w-bad-bg:var(--fu-bad-bg,#fbe0dd);
+  --w-ok:var(--fu-ok,#1d7a4a); --w-ok-bg:var(--fu-ok-bg,#dff3e6); --w-neutral:var(--fu-neutral,#4d5b57); --w-neutral-bg:var(--fu-neutral-bg,#e8e4da);
+  position:fixed;inset:0;z-index:1000;display:flex;justify-content:center;background:var(--w-bg2);color:var(--w-ink);
+  font:500 17px/1.6 'Cairo',system-ui,sans-serif;-webkit-text-size-adjust:100%;
+}
+html[data-theme="dark"] .fw-overlay{--w-wa:var(--fu-wa,#2bbd62);--w-bubble:var(--fu-bubble,#14402a)}
+.fw-overlay *{box-sizing:border-box}
+.fw-overlay [hidden]{display:none!important}
+.fw-panel{display:flex;flex-direction:column;width:100%;max-width:720px;height:100%;height:100dvh;background:var(--w-bg);animation:fw-in .18s ease-out}
+@keyframes fw-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+.fw-top{display:flex;align-items:center;gap:10px;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));border-bottom:1px solid var(--w-line)}
+.fw-x{flex:0 0 auto;min-width:48px;height:48px;border-radius:14px;border:1px solid var(--w-line);background:var(--w-bg);color:inherit;font-size:20px;cursor:pointer}
+.fw-head{flex:1;min-width:0}
+.fw-title{font-weight:800;font-size:17px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fw-sub{font-size:14px;color:var(--w-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fw-count{flex:0 0 auto;min-width:64px;text-align:center;font-weight:800;font-size:16px;background:var(--w-soft);border-radius:999px;padding:4px 12px}
+.fw-bar{height:5px;background:var(--w-soft)}
+.fw-bar i{display:block;height:100%;background:var(--w-teal);transition:width .2s}
+
+.fw-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch}
+.fw-name{margin:0 0 8px;font-size:24px;font-weight:800;line-height:1.35;overflow-wrap:anywhere}
+.fw-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.fw-chip{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:2px 12px;border-radius:999px;font-size:15px;font-weight:700;background:var(--w-warn-bg);color:var(--w-warn)}
+.fw-chip small{font-weight:600;opacity:.85;font-size:13px}
+.fw-phone{margin:2px 0 8px;font-size:15px}
+.fw-num{direction:ltr;unicode-bidi:isolate;font:700 16px/1.4 ui-monospace,Menlo,Consolas,monospace}
+.fw-dim{color:var(--w-dim);font-size:14px}
+.fw-warn{border-radius:14px;padding:10px 14px;background:var(--w-bad-bg);color:var(--w-bad);font-weight:700;margin:8px 0}
+.fw-bubble{background:var(--w-bubble);border-radius:16px;padding:14px;margin:10px 0;line-height:1.75;overflow-wrap:anywhere;color:var(--w-ink);unicode-bidi:plaintext;white-space:normal}
+.fw-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.fw-edit{display:block;width:100%;min-height:140px;border:1px solid var(--w-line);border-radius:14px;padding:10px 12px;background:var(--w-bg);color:inherit;font:inherit;line-height:1.7;resize:vertical}
+.fw-empty{padding:40px 8px;text-align:center;color:var(--w-dim);font-size:18px}
+.fw-summary{padding:24px 6px;text-align:center}
+.fw-summary p{margin:8px 0}
+.fw-big{font-size:26px;font-weight:800;line-height:1.4}
+
+.fw-actions{flex:0 0 auto;display:flex;flex-direction:column;gap:10px;padding:10px 16px;padding-bottom:max(14px,env(safe-area-inset-bottom));border-top:1px solid var(--w-line);background:var(--w-bg)}
+.fw-status{min-height:22px;font-size:14px;color:var(--w-ok);font-weight:700;text-align:center}
+.fw-status:empty{min-height:0}
+.fw-row3{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:8px}
+.fw-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:6px 14px;border-radius:14px;border:1px solid var(--w-line);background:var(--w-bg);color:inherit;font:inherit;font-weight:700;text-decoration:none;cursor:pointer;text-align:center}
+.fw-btn.small{min-height:44px;font-size:15px;padding:4px 14px}
+.fw-btn.primary{background:var(--w-teal);border-color:var(--w-teal);color:#fff}
+html[data-theme="dark"] .fw-btn.primary{color:#06201f}
+.fw-btn.wa{min-height:56px;font-size:19px;background:var(--w-wa);border-color:var(--w-wa);color:#fff}
+html[data-theme="dark"] .fw-btn.wa{color:#04210f}
+.fw-btn.quiet{background:transparent;border-color:transparent;color:var(--w-dim);text-decoration:underline}
+.fw-btn:active:not([disabled]):not([aria-disabled="true"]){transform:scale(.97)}
+.fw-btn[disabled],.fw-btn[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
+.fw-overlay :focus-visible{outline:3px solid var(--w-teal);outline-offset:2px}
+@media (max-width:360px){.fw-row3{grid-template-columns:1fr 1fr}.fw-row3 .primary{grid-column:1 / -1}}
+@media (prefers-reduced-motion:reduce){.fw-panel{animation:none}.fw-bar i{transition:none}}

@@ -177,6 +177,7 @@ def real(name):
 def new_page(browser, base, width=390, height=844, dark=False, mutate=None, fixture_status=None, block=(), url_extra="?mock=1"):
     ctx = browser.new_context(viewport={"width": width, "height": height}, color_scheme="dark" if dark else "light",
                               is_mobile=width < 600, has_touch=width < 600, locale="ar-EG", timezone_id="Africa/Cairo")
+    ctx.add_init_script("try{if(!sessionStorage.getItem('fu-tab'))sessionStorage.setItem('fu-tab','sat 6pm')}catch(e){}")   # S1: skip the v2 Today tab
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -246,8 +247,8 @@ def main():
         check("noindex meta present", page.locator('meta[name="robots"]').get_attribute("content") == "noindex, nofollow")
         check("mock badge visible", page.is_visible("#fu-mock"))
         tabs = page.locator(".fu-tab")
-        check("tabs: 3 groups + unclassified", tabs.count() == 4, tabs.count())
-        check("first tab selected", tabs.first.get_attribute("aria-selected") == "true")
+        check("tabs: 3 groups + unclassified (+ Today when v2 is loaded)", tabs.count() == (5 if real("followup-events.js") else 4), tabs.count())
+        check("first group tab selected", page.locator(".fu-tab[data-tab]:not([data-tab='__today'])").first.get_attribute("aria-selected") == "true")
         check("no horizontal scroll (390, group page)", no_hscroll(page))
         check("tap targets >= 48px (group page)", not small_targets(page), small_targets(page))
         check("rtl + arabic", page.evaluate("document.documentElement.dir") == "rtl" and page.evaluate("document.documentElement.lang") == "ar")
@@ -400,7 +401,7 @@ def main():
         # group settings
         page.click("#fu-edit-time")
         page.select_option("#fu-wd", "2")
-        page.fill("#fu-time", "16:30")
+        page.select_option("#fu-time-h", "4"); page.select_option("#fu-time-m", "30"); page.select_option("#fu-time-ap", "pm")   # S1: 12-hour picker
         page.click("#fu-save-time")
         page.wait_for_function("document.querySelector('#fu-when').textContent.includes('الثلاثاء')")
         check("weekday/time editor saves and updates the card", "4:30" in page.inner_text("#fu-when"), page.inner_text("#fu-when"))
@@ -466,13 +467,13 @@ def main():
         page.click("#fu-close")
 
         # global year filter (the fixture's students are all Senior 1)
-        page.click(".fu-tab[data-tab]:not([data-tab='__none'])")
+        page.click(".fu-tab[data-tab]:not([data-tab='__none']):not([data-tab='__today'])")
         check("year bar: All / Senior 1 / Senior 2 with counts", page.locator("#fu-year button").count() == 3 and "12" in page.inner_text("#fu-year button[data-year='all']"))
         n_all = page.locator(".fu-tab").count()
         opts = page.eval_on_selector("#pick-current", "s => [...s.querySelectorAll('option')].map(o => o.text).join('|')")
         check("lesson picker shows names, not slugs", "Ch 2 · L2 — Functions" in opts and "chapter-2-lesson-2-functions" not in opts, opts)
         page.click("#fu-year button[data-year='2']")
-        check("Senior 2 with no Senior 2 students: empty state, no group tabs", page.locator("#fu-year-empty").count() == 1 and page.locator(".fu-tab[data-tab]:not([data-tab='__none'])").count() == 0)
+        check("Senior 2 with no Senior 2 students: empty state, no group tabs", page.locator("#fu-year-empty").count() == 1 and page.locator(".fu-tab[data-tab]:not([data-tab='__none']):not([data-tab='__today'])").count() == 0)
         page.click("#fu-year button[data-year='1']")
         check("Senior 1 keeps every group and their students", page.locator(".fu-tab").count() == n_all and page.locator(".fu-stu").count() > 0)
         sel = page.eval_on_selector("#pick-current", "s => [...s.querySelectorAll('optgroup')].map(g => g.label).join('|')")
@@ -558,6 +559,7 @@ def main():
         # ---------------- real mode with a stub AuthEngine (payload shapes) ----------------
         def real_page(session, deny=False):
             c = browser.new_context(viewport={"width": 390, "height": 844}, locale="ar-EG")
+            c.add_init_script("try{if(!sessionStorage.getItem('fu-tab'))sessionStorage.setItem('fu-tab','sat 6pm')}catch(e){}")   # S1: skip the v2 Today tab
             pg = c.new_page()
             pg.route(re.compile(r"https://fonts\.(googleapis|gstatic)\.com/.*"), lambda r: r.abort())
             if not real("followup-logic.js"):

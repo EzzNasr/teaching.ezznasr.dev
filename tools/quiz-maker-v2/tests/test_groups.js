@@ -27,6 +27,9 @@ const cr = r => ({ student_id: r.student_id, session_token: r.session_token });
 const ADMIN = cr(adm), SA = cr(A), SB = cr(B);
 const TOK = { token: 'tok' };
 
+// Follow-up v2 made "one group per student" the rule for admin_group_add. Data written before that rule can still hold a student
+// in two groups, and the grant/revoke code must keep coping with it, so those cases are set up by writing the row directly.
+const legacyAdd = (group, phone) => { const sh = tab('Groups'); const r = sh.getLastRow() + 1; sh.set(r, colOf(sh, 'group'), group); sh.set(r, colOf(sh, 'phone'), phone); sh.set(r, colOf(sh, 'name'), ''); sh.set(r, colOf(sh, 'added_at'), '2026-01-01 00:00:00'); };
 const add = (group, phone, creds = TOK) => post(Object.assign({ action: 'admin_group_add', group, phone }, creds));
 const remove = (group, phone, creds = TOK) => post(Object.assign({ action: 'admin_group_remove', group, phone }, creds));
 const list = (creds = TOK) => post(Object.assign({ action: 'admin_list_groups' }, creds));
@@ -99,9 +102,9 @@ setVideo(L1, 'AAAAAAAAAAA'); setVideo(L2, 'BBBBBBBBBBB');
   t('bulk-revoking a group that has no members at all is refused, not a silent no-op', !r.ok && /no members/.test(r.error), JSON.stringify(r));
   t('a student cannot bulk-revoke either', !groupRevoke({ group: 'Grade 2', scope: L1 }, SA).ok);
   t('no credentials cannot bulk-revoke', !groupRevoke({ group: 'Grade 2', scope: L1 }, {}).ok);
-  add('Staff', '01000000002');
+  legacyAdd('Staff', '01000000002');
   groupGrant({ group: 'Staff', scope: L2, days: 10 });
-  add('Grade 2', '01000000002');   // Sara is now in BOTH groups again
+  legacyAdd('Grade 2', '01000000002');   // Sara is now in BOTH groups again (legacy data: admin_group_add no longer allows it)
   groupGrant({ group: 'Grade 2', scope: L2, days: 10 });
   const saraL2Rows = (() => { const sh = tab('Entitlements'); let n = 0; for (let rr = 2; rr <= sh.getLastRow(); rr++) if (String(sh.get(rr, colOf(sh, 'phone'))).endsWith('1000000002') && sh.get(rr, colOf(sh, 'scope')) === L2) n++; return n; })();
   t('access is per (student, scope), not per group: granting the same scope from two groups merges into one entitlement', saraL2Rows === 1, saraL2Rows);
@@ -113,7 +116,7 @@ setVideo(L1, 'AAAAAAAAAAA'); setVideo(L2, 'BBBBBBBBBBB');
 {
   const q = post(Object.assign({ action: 'request_access', lesson: L1, reference: 'ref' }, SB));
   post(Object.assign({ action: 'admin_decide_payment', payment_id: q.payment_id, decision: 'approve', days: 20 }, TOK));
-  add('Paid Batch', '01000000003');
+  legacyAdd('Paid Batch', '01000000003');
   const r = groupRevoke({ group: 'Paid Batch', scope: L1 });
   t('a bulk revoke also marks an individual payment behind it as revoked', r.ok && r.payments_revoked.indexOf(q.payment_id) !== -1, JSON.stringify(r));
   const ov = post(Object.assign({ action: 'admin_access_overview' }, TOK));
@@ -143,10 +146,10 @@ setVideo(L1, 'AAAAAAAAAAA'); setVideo(L2, 'BBBBBBBBBBB');
   t('bulk add: a student cannot', !addMany('Class Z', ['01000000002'], SA).ok);
   t('bulk add: empty list is refused', !addMany('Class Z', []).ok);
   t('bulk add: a bad phone refuses the whole batch and writes nothing', !addMany('Class Z', ['01000000002', '123']).ok && !list().groups.some(g => g.group === 'Class Z'));
-  let r = addMany('Class Z', ['01000000002', '01000000003', '01000000002']);
+  let r = addMany('Class Z', ['01000000002', '01000000003', '01000000002'], Object.assign({ move: true }, TOK));
   t('bulk add: adds both once (duplicate in the request ignored)', r.ok && r.count === 2 && r.added.length === 2 && r.already.length === 0 && r.group === 'Class Z', JSON.stringify(r));
   t('...names come from the roster', r.added.some(x => x.name === 'Sara') && r.added.some(x => x.name === 'Omar'));
-  r = addMany('class   z', ['01000000002', '01000000001']);
+  r = addMany('class   z', ['01000000002', '01000000001'], Object.assign({ move: true }, TOK));   // the Teacher is in Staff: move:true takes them out
   t('bulk add: re-adding skips existing members, adds the new one, keeps the first spelling', r.ok && r.count === 1 && r.already.length === 1 && r.group === 'Class Z', JSON.stringify(r));
   t('...group now has 3 members in one group', list().groups.find(g => g.group === 'Class Z').members.length === 3);
 

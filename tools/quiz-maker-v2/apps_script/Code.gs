@@ -429,9 +429,11 @@ function handleTelegramUpdate(e, update) {
     if (!cq || !cq.from || !cq.data) return _json({ ok: true });
 
     // ap:/rj: = payment approve/reject (payments bot); ad:/dd: = attendance device approve/deny (attendance bot, AttTelegram.gs).
-    var m = /^(ap|rj|ad|dd):(\S+)$/.exec(String(cq.data));
+    // FU2: fu: = follow-up notification buttons (snooze / done), handled by fu2_notify_telegramCallback_ (FollowupNotify.gs).
+    var m = /^(ap|rj|ad|dd|fu):(\S+)$/.exec(String(cq.data));
     if (!m) return _json({ ok: true });
     var isAtt = m[1] === "ad" || m[1] === "dd";
+    var isFu = m[1] === "fu";   // FU2:
     var adminIds = isAtt ? attt_adminIds_() : _tgAdminIds();
     var call = isAtt ? attt_call_ : _tgCall;
     if (adminIds.indexOf(String(cq.from.id)) === -1) return _json({ ok: true });
@@ -449,7 +451,9 @@ function handleTelegramUpdate(e, update) {
     var chatId = cq.message && cq.message.chat ? cq.message.chat.id : cq.from.id;
     try {
       var verdict;
-      if (isAtt) {
+      if (isFu) {   // FU2: returns the verdict line itself, never throws
+        verdict = typeof fu2_notify_telegramCallback_ === "function" ? fu2_notify_telegramCallback_(cq) : "Not available.";
+      } else if (isAtt) {
         verdict = att_decideFromTelegram_(m[2], approve);   // returns the verdict line itself, never throws
       } else {
         handleAdminDecidePayment({
@@ -1460,6 +1464,8 @@ function doPost(e) {
         return _json(p3_admin_flag_status(payload));
 
       default:
+        // FU2: follow-up v2 actions (admin_fu2_* / admin_req_*) -> FollowupRouter.gs (merges FollowupNotify.gs, Requirements.gs and its own).
+        if (/^admin_(fu2|req)_/.test(String(payload.action || "")) && typeof fu2_dispatch_ === "function") return _json(fu2_dispatch_(payload));
         // Attendance system (Attendance.gs): every action is prefixed att_ and answers its own {ok, code} shape.
         if (String(payload.action || "").indexOf("att_") === 0) return _json(att_dispatch_(payload));
         return _json({ ok: false, error: "Unknown action: " + payload.action });
@@ -4342,6 +4348,12 @@ function handleAdminGroupAdd(payload) {
       var spelling = _groupSpellings(sheet)[key] || group;
       var members = _groupMembers(sheet, key);
       var who = _nameLookup();
+      // FU2: one group per student. Nothing is written until the whole request is allowed (all or nothing, under this lock).
+      var move = _fu2Move(payload);
+      var conflicts = _fu2Conflicts(sheet, wanted, key, who, move);
+      var foreign = _fu2ScopedRefusal(conflicts); if (foreign) return foreign;   // FU2 x P4: a teacher never moves a student out of a group that is not theirs
+      if (conflicts.length && !move) return _fu2InOtherGroup(conflicts);
+      var moved = conflicts.length ? _fu2MoveOut(ss, sheet, conflicts, spelling, payload) : [];
       var added = [], already = [];
       wanted.forEach(function (phone) {
         var w = who(phone);
@@ -4353,7 +4365,9 @@ function handleAdminGroupAdd(payload) {
         added.push({ phone: phone, name: w.name, known_student: w.known });
       });
       var inherited = added.length ? _applyGroupGrantsTo(ss, key, spelling, added.map(function (a) { return a.phone; })) : [];
-      return { ok: true, group: spelling, added: added, already: already, count: added.length, inherited: inherited };
+      var res = { ok: true, group: spelling, added: added, already: already, count: added.length, inherited: inherited };
+      if (moved.length) res.moved = moved;   // FU2
+      return res;
     });
   }
 
@@ -4368,10 +4382,122 @@ function handleAdminGroupAdd(payload) {
     var existing = _groupMembers(sheet, key).filter(function (m) { return _phonesMatch(m.phone, phone); });
     var stu = _findStudentRow(_students(), phone);
     var name = stu ? String(stu.display_name == null ? "" : stu.display_name) : "";
-    if (existing.length) return { ok: true, group: spelling, phone: phone, name: name, known_student: !!stu, already: true };
+    // FU2: one group per student (see _fu2Conflicts). A student already in THIS group is just "already"; with move:true
+    // any second membership they happen to have is cleaned up too.
+    var move1 = _fu2Move(payload), who1 = function () { return { known: !!stu, name: name }; };
+    var conflicts1 = _fu2Conflicts(sheet, [phone], key, who1, move1);
+    var foreign1 = _fu2ScopedRefusal(conflicts1); if (foreign1) return foreign1;   // FU2 x P4 (see _fu2ScopedRefusal)
+    if (existing.length && !move1) return { ok: true, group: spelling, phone: phone, name: name, known_student: !!stu, already: true };
+    if (conflicts1.length && !move1) return _fu2InOtherGroup(conflicts1);
+    var moved1 = conflicts1.length ? _fu2MoveOut(ss, sheet, conflicts1, spelling, payload) : [];
+    if (existing.length) return { ok: true, group: spelling, phone: phone, name: name, known_student: !!stu, already: true, moved: moved1 };
     _appendByHeader(sheet, { group: spelling, phone: phone, name: name, added_at: _fmt(new Date(), TZ, true) });
     var inheritedOne = _applyGroupGrantsTo(ss, key, spelling, [phone]);
-    return { ok: true, group: spelling, phone: phone, name: name, known_student: !!stu, already: false, inherited: inheritedOne };
+    var res1 = { ok: true, group: spelling, phone: phone, name: name, known_student: !!stu, already: false, inherited: inheritedOne };
+    if (moved1.length) res1.moved = moved1;   // FU2
+    return res1;
+  });
+}
+
+// ---- FU2: one group per student -------------------------------------------------------------------
+// A student belongs to at most one group. admin_group_add keeps its request shape; the optional field move:true means
+// "if they are in a different group, take them out of it first". Without it the answer is
+// {ok:false, code:"in_other_group", from, conflicts:[{phone,name,from}], error} and NOTHING is changed (a bulk request is
+// all or nothing). Everything runs inside the caller's _withLock, so two concurrent requests cannot both pass the check.
+function _fu2Move(payload) { return payload.move === true || String(payload.move).toLowerCase() === "true"; }
+
+// Students in `phones` (not already in group `key`, unless move) who sit in some other group.
+// -> [{phone, name, from, from_groups:[spelling], rows:[sheet rows], keys:[group key]}]
+// FU2 x P4 (integration): with several teachers the rule is ONE GROUP PER STUDENT PER TEACHER. A student taking
+// Programming with the owner and Math with a teacher is in two groups on purpose; only groups with the SAME owner as the
+// target group conflict (and only those are ever moved out of). Owner of a group = its GroupOwners row (Phase 4), "" for
+// the owner's own groups. The target of a scoped caller (teacher / teacher-appointed assistant) is theirs: P4's gate only
+// lets them add to their own group or to a free name that becomes theirs right after this handler.
+function _fu2GroupOwners_() {
+  var m = {};
+  try {
+    var sh = _ss().getSheetByName("GroupOwners");
+    if (sh && sh.getLastRow() >= 2) _sheetValuesAsObjects(sh).forEach(function (r) {
+      var k = _groupKey(r.group);
+      if (k && !m.hasOwnProperty(k)) m[k] = typeof p4_idKey_ === "function" ? p4_idKey_(r.owner_id) : String(r.owner_id || "");
+    });
+  } catch (e) { /* no Phase 4 sheet: everything belongs to the owner */ }
+  return m;
+}
+function _fu2TargetOwner_(key, owners) {
+  var ctx = (typeof P4_GATE_RAN_ !== "undefined" && P4_GATE_RAN_ && typeof P4_CTX_ !== "undefined") ? P4_CTX_ : null;
+  if (ctx && typeof p4_isScoped_ === "function" && p4_isScoped_(ctx) && typeof p4_principalKey_ === "function") return p4_principalKey_(ctx);
+  return owners.hasOwnProperty(key) ? owners[key] : "";
+}
+function _fu2Conflicts(sheet, phones, key, who, includeAlreadyIn) {
+  var all = _groupMembers(sheet, "", null), spellings = _groupSpellings(sheet), out = [];
+  var owners = _fu2GroupOwners_(), target = _fu2TargetOwner_(key, owners);
+  var sameOwner = function (g) { var k = _groupKey(g); return (owners.hasOwnProperty(k) ? owners[k] : "") === target; };
+  phones.forEach(function (phone) {
+    var mine = all.filter(function (m) { return _phonesMatch(m.phone, phone) && (_groupKey(m.group) === key || sameOwner(m.group)); });
+    var others = mine.filter(function (m) { return _groupKey(m.group) !== key; });
+    if (!others.length) return;
+    if (!includeAlreadyIn && mine.some(function (m) { return _groupKey(m.group) === key; })) return;   // already in the target group: nothing to move
+    var keys = [], names = [];
+    others.forEach(function (m) { var k = _groupKey(m.group); if (keys.indexOf(k) < 0) { keys.push(k); names.push(spellings[k] || m.group); } });
+    out.push({ phone: phone, name: who(phone).name, from: names[0], from_groups: names, rows: others.map(function (m) { return m.row; }), keys: keys });
+  });
+  return out;
+}
+
+// FU2 x P4 (integration): P4's gate only checks the TARGET group for a teacher / teacher-appointed assistant. A move takes
+// the student OUT of their current group, so for those callers every group the student is in must be theirs too; otherwise
+// nothing changes and the answer names neither the student nor the other group (it may belong to the owner or another
+// teacher). The owner and the owner's own assistants are unaffected. null = allowed.
+function _fu2ScopedRefusal(conflicts) {
+  if (!conflicts || !conflicts.length) return null;
+  var ctx = (typeof P4_GATE_RAN_ !== "undefined" && P4_GATE_RAN_ && typeof P4_CTX_ !== "undefined") ? P4_CTX_ : null;
+  if (!ctx || typeof p4_isScoped_ !== "function" || !p4_isScoped_(ctx) || typeof p4_ownsGroup !== "function") return null;
+  var bad = conflicts.filter(function (c) { return (c.from_groups || [c.from]).some(function (g) { return !p4_ownsGroup(ctx, g); }); });
+  if (!bad.length) return null;
+  return { ok: false, code: "in_other_group", foreign: true,
+    error: "in_other_group: " + (bad.length === 1 ? "this student is" : bad.length + " of these students are") + " already in a group you do not manage. Ask the owner to move them." };
+}
+
+function _fu2InOtherGroup(conflicts) {
+  var first = conflicts[0], label = first.name || first.phone;
+  var msg = conflicts.length === 1
+    ? "in_other_group: " + label + " is already in \u201c" + first.from + "\u201d. A student can be in one group only; move them instead."
+    : "in_other_group: " + conflicts.length + " of these students are already in another group (for example " + label + " in \u201c" + first.from + "\u201d). A student can be in one group only; move them instead.";
+  return { ok: false, code: "in_other_group", from: first.from, conflicts: conflicts.map(function (c) { return { phone: c.phone, name: c.name, from: c.from }; }), error: msg };
+}
+
+// Deletes the old membership rows (bottom first), audits each move, and forgets a group's remembered grants when it ends up empty,
+// exactly like admin_group_remove does. Returns [{phone, name, from}].
+function _fu2MoveOut(ss, sheet, conflicts, toSpelling, payload) {
+  var rows = [], touched = {};
+  conflicts.forEach(function (c) { c.rows.forEach(function (r) { rows.push(r); }); c.keys.forEach(function (k) { touched[k] = true; }); });
+  rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
+  Object.keys(touched).forEach(function (k) {
+    if (!_groupMembers(sheet, k).length) _forgetGroupGrants(ss, k, "", "");
+  });
+  var who = payload.student_id && !payload.token ? payload.student_id : "token";
+  return conflicts.map(function (c) {
+    try { p2_audit(who, "group_move", c.phone, { groups: c.from_groups }, { group: toSpelling }); } catch (e) { /* audit never blocks */ }
+    return { phone: c.phone, name: c.name, from: c.from };
+  });
+}
+
+// Students currently in 2+ groups. Never changes data. -> [{phone, name, groups:[spelling]}]
+function _fu2Duplicates() {
+  var sheet = _ss().getSheetByName("Groups");
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  var spellings = _groupSpellings(sheet), who = _nameLookup(), by = {}, order = [], owners = _fu2GroupOwners_();
+  _groupMembers(sheet, "", null).forEach(function (m) {
+    var gk0 = _groupKey(m.group), ow = owners.hasOwnProperty(gk0) ? owners[gk0] : "";
+    var pk = _phoneKey(m.phone); if (!pk) return;
+    pk = pk + "|" + ow;   // FU2 x P4: one group per student PER TEACHER (see _fu2GroupOwners_)
+    if (!by[pk]) { by[pk] = { phone: m.phone, keys: [], groups: [] }; order.push(pk); }
+    var gk = _groupKey(m.group);
+    if (by[pk].keys.indexOf(gk) < 0) { by[pk].keys.push(gk); by[pk].groups.push(spellings[gk] || m.group); }
+  });
+  return order.filter(function (pk) { return by[pk].groups.length > 1; }).map(function (pk) {
+    return { phone: by[pk].phone, name: who(by[pk].phone).name, groups: by[pk].groups };
   });
 }
 
@@ -6022,6 +6148,7 @@ function p2_get_written_image(payload) { return handleGetWrittenImage(payload ||
 var P2_FU_REQ_HEADERS = ["lesson", "quiz_required", "homework_required", "due_override", "updated_at"];
 var P2_FU_NOTIF_HEADERS = ["student", "kind", "ref", "sent_at", "by", "note"];
 var P2_FU_MONTHLY_HEADERS = ["student", "month", "status", "sent_at", "note"];
+var FU2_REQ_SNAPSHOT_COL_ = "requirements_json";   // FU2: MonthlyReviews column added with _ensureColumns (same name as FU2_REQ_SNAPSHOT_COL in FollowupRouter.gs)
 var P2_FU_AUDIT_HEADERS = ["who", "when", "action", "before", "after"];
 var P2_FU_KINDS = { quiz: 1, homework: 1, monthly: 1, custom: 1 };
 var P2_FU_MONTH_STATUS = { pending: 1, ready: 1, sent: 1, closed: 1 };
@@ -6418,8 +6545,12 @@ function _p2fuSummaryFor(X, key, from, to) {
     written_pending: w.pending, written_graded: w.graded
   };
   var gOut = X.groups.filter(function (g) { return g.members.indexOf(key) >= 0; }).map(function (g) { return { group: g.group, key: g.key }; });
-  return { student: { phone: st.phone, name: st.name, year: st.year, parent_phone: st.parent_phone }, groups: gOut, range: { from: from, to: to },
+  var res = { student: { phone: st.phone, name: st.name, year: st.year, parent_phone: st.parent_phone }, groups: gOut, range: { from: from, to: to },
            totals: totals, quizzes: quizzes, homework: homework, expected: exp, attendance: att, watch: watchList, video_access: access, written: w, notifications: notifs };
+  // FU2: summary.requirements (FollowupRouter.gs). A failure here must never break the summary itself.
+  try { if (typeof fu2_core_requirements_ === "function") res.requirements = fu2_core_requirements_(X, key, res, from.slice(0, 7)); }
+  catch (e) { console.error("FU2 requirements failed: " + e); }
+  return res;
 }
 
 function p2_admin_student_summary(payload) {
@@ -6460,6 +6591,12 @@ function p2_admin_monthly_review(payload) {
     var s = _p2fuSummaryFor(X, k, r.from, to);
     var row = X.monthly.filter(function (m) { return _phoneKey(m.student) === k && String(m.month).trim() === r.month; })[0];
     var rev = { status: row ? String(row.status || "pending") : "pending", sent_at: row ? String(row.sent_at || "") : "", note: row ? String(row.note || "") : "" };
+    // FU2: a month marked sent or closed shows the requirements as they were THEN (saved when it was marked); it is never recomputed.
+    if (rev.status === "sent" || rev.status === "closed") {
+      var snap = typeof fu2_core_snapshotParse_ === "function" ? fu2_core_snapshotParse_(row[FU2_REQ_SNAPSHOT_COL_]) : null;
+      if (snap) { s.requirements = snap; s.requirements_snapshot = true; }
+      else if (typeof fu2_core_requirements_ === "function") { s.requirements = null; s.requirements_unavailable = true; }   // marked before snapshots existed
+    }
     return { student: s.student, summary: s, review: rev };
   });
   return { ok: true, month: r.month, range: { from: r.from, to: to }, closed: to < r.to ? false : true, reviews: out };
@@ -6470,11 +6607,30 @@ function _p2fuMonthlyMark(payload, r) {
   var status = String(payload.status == null ? "" : payload.status).trim().toLowerCase();
   if (!P2_FU_MONTH_STATUS.hasOwnProperty(status)) throw new Error('status must be "pending", "ready", "sent" or "closed".');
   var note = String(payload.note == null ? "" : payload.note).slice(0, 500), key = _phoneKey(digits);
+  // FU2: when a month becomes sent/closed, save the requirements as they are now (outside the lock: loading the data is slow).
+  // Already sent/closed with a snapshot: keep it. Back to pending/ready: clear it, the month is open again.
+  var snapJson = null;   // null = leave the cell alone, "" = clear, text = write
+  if (typeof fu2_core_requirements_ === "function") {
+    if (status === "sent" || status === "closed") {
+      var prev = null;
+      _p2fuRows(_ss().getSheetByName("MonthlyReviews")).forEach(function (m) { if (!prev && _phoneKey(m.student) === key && String(m.month).trim() === r.month) prev = m; });
+      var prevDone = prev && (String(prev.status) === "sent" || String(prev.status) === "closed");
+      if (!(prevDone && fu2_core_snapshotParse_(prev[FU2_REQ_SNAPSHOT_COL_]))) {
+        try {
+          var today0 = _p2fuToday(), to0 = r.to > today0 ? today0 : r.to;
+          var sum0 = _p2fuSummaryFor(_p2fuLoad(_ss(), _dataSs()), key, r.from, to0);
+          if (sum0.requirements) snapJson = JSON.stringify(sum0.requirements);
+        } catch (e) { console.error("FU2 snapshot failed: " + e); }
+      }
+    } else snapJson = "";
+  }
   return _withLock(function () {
     var ss = _ss();
     var sh = _followupSheet(ss, "MonthlyReviews", P2_FU_MONTHLY_HEADERS);
     _ensureColumns(sh, P2_FU_MONTHLY_HEADERS);
+    if (snapJson !== null) _ensureColumns(sh, [FU2_REQ_SNAPSHOT_COL_]);   // FU2: additive column
     var c = _needCols(sh, "MonthlyReviews", P2_FU_MONTHLY_HEADERS);
+    var snapCol = snapJson !== null ? _headerIndex(sh)[FU2_REQ_SNAPSHOT_COL_] : 0;
     var hit = null;
     _p2fuRows(sh).forEach(function (m) { if (!hit && _phoneKey(m.student) === key && String(m.month).trim() === r.month) hit = m; });
     var now = _p2fuNow(), sent = status === "sent" ? now : (hit ? String(hit.sent_at || "") : "");
@@ -6482,8 +6638,11 @@ function _p2fuMonthlyMark(payload, r) {
       sh.getRange(hit._row, c.status).setValue(status);
       sh.getRange(hit._row, c.sent_at).setNumberFormat("@").setValue(sent);
       if (payload.note !== undefined) sh.getRange(hit._row, c.note).setNumberFormat("@").setValue(note);
+      if (snapCol) sh.getRange(hit._row, snapCol).setNumberFormat("@").setValue(snapJson);
     } else {
-      _appendByHeader(sh, { student: _canonicalPhone(digits) || digits, month: r.month, status: status, sent_at: sent, note: note });
+      var rec = { student: _canonicalPhone(digits) || digits, month: r.month, status: status, sent_at: sent, note: note };
+      if (snapCol && snapJson) rec[FU2_REQ_SNAPSHOT_COL_] = snapJson;
+      _appendByHeader(sh, rec);
     }
     if (status === "sent" && _p2fuFlag("FF_PARENT_LOG")) {
       p2_admin_log_parent_notification({ token: payload.token, student_id: payload.student_id, session_token: payload.session_token,
@@ -6516,7 +6675,18 @@ function p2_admin_followup_overview(payload) {
       (o.parent_log[k] = o.parent_log[k] || []).push({ kind: n.kind, ref: n.ref, sent_at: n.sent_at, note: n.note });
     });
   }
+  // FU2: optional hooks from FollowupNotify.gs (done, notify, tz_label) then Requirements.gs (requirements). Each one is isolated:
+  // a missing function changes nothing, a throwing one is logged and skipped.
+  ["fu2_notify_overviewHook_", "req_overviewHook_"].forEach(function (name) { _fu2Hook(name, o); });
   return o;
+}
+// FU2: calls a global function by name if it exists; never throws.
+function _fu2Hook(name, arg) {
+  try {
+    var g = typeof globalThis !== "undefined" ? globalThis : this;
+    if (g && typeof g[name] === "function") return g[name](arg);
+  } catch (e) { console.error("FU2 hook " + name + " failed: " + e); }
+  return undefined;
 }
 
 // ---- admin_followup_set_attendance with the weekly center rule -------------------------------
@@ -6650,7 +6820,16 @@ var P3_STAFF_ALLOW = [
   "admin_grading_queue",
   "admin_grade_written",
   "admin_get_written_models",
-  "get_written_image"
+  "get_written_image",
+  // FU2: follow-up v2. NOT listed on purpose (admin only): admin_fu2_notify_test, admin_fu2_group_duplicates.
+  "admin_fu2_mark_done",
+  "admin_fu2_notify_settings_get",
+  "admin_fu2_notify_settings_save",
+  "admin_req_get",
+  "admin_req_save_global",
+  "admin_req_save_group",
+  "admin_req_check",
+  "admin_req_history"
 ];
 
 var P3_ROLE_ASSISTANT = "assistant";
@@ -7668,6 +7847,9 @@ var P4_ACTIONS = (function () {
   // Follow-up
   add("admin_followup_set_attendance", { rule: "SP", needs: ["SP", "GP"], St: ["items[].phone"], G: ["group"], opt: ["GP"], ses: true });
   add("admin_followup_save_group", { rule: "GP", needs: ["GP"], G: ["group"], ses: true });
+  // FU2 (integration): "reminder sent" / "advance done" on the follow-up page, same scope as saving that group. The other
+  // admin_fu2_* and admin_req_* actions are deliberately NOT listed: they stay owner + owner-assistant only (deny by default).
+  add("admin_fu2_mark_done", { rule: "GP", needs: ["GP"], G: ["group"], ses: true });
   add("admin_followup_save_templates", { rule: "ALLOW", needs: [], ses: true });
   add("admin_student_summary", { rule: "SP", needs: ["SP"], St: ["student"], ses: true, filter: "p4f_admin_student_summary" });
   add("admin_monthly_review", { rule: "SP", needs: ["SP", "GP"], St: ["student"], G: ["group"], opt: ["SP", "GP"], any: true, ses: true, filter: "p4f_admin_monthly_review" });
@@ -8372,7 +8554,7 @@ function p4f_admin_list_groups(resp, ctx, payload) {
 
 function p4f_admin_followup_overview(resp, ctx, payload) {
   if (!p4_scoped_(ctx) || !resp || resp.ok === false) return resp;
-  p4_allowKeys_(resp, ["ok", "today", "now", "settings", "groups", "unclassified", "students", "lessons", "all_lessons", "lessons_error", "slug_collisions", "join_mismatches", "facts", "templates", "flags", "week", "requirements", "parent_log"], "followup_overview");
+  p4_allowKeys_(resp, ["ok", "today", "now", "settings", "groups", "unclassified", "students", "lessons", "all_lessons", "lessons_error", "slug_collisions", "join_mismatches", "facts", "templates", "flags", "week", "requirements", "parent_log", "tz_label", "unclassified_requirements"], "followup_overview");   // FU2: tz_label = "Alex"; unclassified_requirements = global policy, no student data
   resp.groups = p4_filterRows_(resp.groups, ctx, { group: ["group"] }, "followup.groups");
   resp.unclassified = p4_filterRows_(resp.unclassified, ctx, { student: ["phone"] }, "followup.unclassified");
   resp.students = p4_filterMap_(resp.students, function (k, v) { return p4_ownsStudent(ctx, v && v.phone ? v.phone : k); });
@@ -8395,6 +8577,10 @@ function p4f_admin_followup_overview(resp, ctx, payload) {
 // Shared by the summary and the monthly review. Filters every list to the caller's subjects and recomputes the totals.
 function p4_summaryFilter_(s, ctx) {
   if (!s || typeof s !== "object") return s;
+  // FU2 x P4 (integration): summary.requirements (FollowupRouter.gs) counts lessons of EVERY subject and cannot be recomputed
+  // from the filtered lists here, so a scoped caller gets none (fail closed, like p4f_admin_student_summary's key list).
+  if (s.requirements !== undefined) { delete s.requirements; s.requirements_unavailable = true; }
+  delete s.requirements_snapshot;
   var lk = ["path", "subject", "lesson"];
   var okL = function (names) { return function (r) { return p4_rowOk_(ctx, r, names); }; };
   var arr = function (x) { return Array.isArray(x) ? x : []; };

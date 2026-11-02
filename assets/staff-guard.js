@@ -26,9 +26,13 @@
 
   var ALL_STAFF = ["admin", "teacher", "assistant", "sassistant"];
   var WORK = ["admin", "teacher", "sassistant"];          // legacy owner-assistants are NOT let into these (unchanged)
+  // Follow-up v2 requirements page: the owner and the owner's own assistants only. The server refuses every admin_req_*
+  // action for teachers and teacher-appointed assistants (p4_gate: not in P4_ACTIONS), so expand() must not widen this list.
+  var OWNER_TEAM = ["admin", "assistant"]; OWNER_TEAM.noExpand = true;
   var PAGES = {
     "staff": ALL_STAFF,
     "followup": ALL_STAFF,
+    "requirements": OWNER_TEAM,
     "student-summary": ALL_STAFF,
     "grading": ALL_STAFF,
     "master": WORK,
@@ -57,6 +61,7 @@
 
   // "assistant" in a list means every kind of assistant, and teachers share the staff pages.
   function expand(list) {
+    if (list && list.noExpand) return list.slice();   // OWNER_TEAM: exactly these roles
     var out = (list || []).slice();
     if (out.indexOf("assistant") !== -1) {
       ["sassistant", "teacher"].forEach(function (r) { if (out.indexOf(r) === -1) out.push(r); });

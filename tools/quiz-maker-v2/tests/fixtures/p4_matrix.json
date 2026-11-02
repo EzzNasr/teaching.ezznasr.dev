@@ -511,6 +511,21 @@
       }
     },
     {
+      "action": "admin_fu2_mark_done",
+      "rule": "TEAM",
+      "needs": [
+        "G"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "group": "group"
+      },
+      "note": "integration (follow-up v2): same scope as admin_followup_save_group; routed by FollowupRouter.gs"
+    },
+    {
       "action": "admin_followup_save_templates",
       "rule": "TEAM",
       "needs": [],

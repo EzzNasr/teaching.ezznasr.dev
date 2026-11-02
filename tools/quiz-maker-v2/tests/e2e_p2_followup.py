@@ -116,6 +116,7 @@ window.AuthEngine = {
 
 def real_page(browser, base, path, mutate=None, session=None):
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, locale="ar-EG", timezone_id="Africa/Cairo")
+    ctx.add_init_script("try{if(!sessionStorage.getItem('fu-tab'))sessionStorage.setItem('fu-tab','sat 6pm')}catch(e){}")   # S1: skip the v2 Today tab
     pg = ctx.new_page()
     errors = []
     pg.on("pageerror", lambda e: errors.append(str(e)))

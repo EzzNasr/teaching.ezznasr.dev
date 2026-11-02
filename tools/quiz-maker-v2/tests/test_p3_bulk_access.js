@@ -30,7 +30,10 @@ let isAdminCol = 0; for (let c = 1; c <= 12; c++) if (stu.get(1, c) === 'is_admi
 stu.set(2, isAdminCol, true);
 const addG = (group, phones) => post({ action: 'admin_group_add', group, phones, ...TOK });
 t('setup: group A has 3 members', addG('GroupA', [P[0], P[1], P[2]]).ok);
-t('setup: group B has 1 member (overlaps A)', addG('GroupB', [P[2]]).ok);
+// admin_group_add no longer lets one student sit in two groups (follow-up v2); the overlap this test needs is legacy data, so write the row directly.
+{ const sh = tab('Groups'); const r = sh.getLastRow() + 1; const hd = {}; for (let c = 1; c <= 8; c++) if (sh.get(1, c)) hd[sh.get(1, c)] = c;
+  sh.set(r, hd.group, 'GroupB'); sh.set(r, hd.phone, P[2]); sh.set(r, hd.name, ''); sh.set(r, hd.added_at, '2026-01-01 00:00:00'); }
+t('setup: group B has 1 member (overlaps A)', rowsOf('Groups').filter(x => x.group === 'GroupB').length === 1);
 t('setup: empty-ish group exists', addG('GroupC', [P[3]]).ok);
 
 const ent = () => rowsOf('Entitlements'), qa = () => rowsOf('QuizAccess');

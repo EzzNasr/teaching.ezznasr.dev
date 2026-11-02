@@ -293,8 +293,10 @@ function link() {
   // group creation
   const a = build(), cc = a.env.ctx;
   const state = cc.p4_groupState(T(), 'Brand New');
-  const resp = a.post({ action: 'admin_group_add', token: 'tok', group: 'Brand New', phone: a.ids.sara });
-  const out = cc.p4f_admin_group_add(J(resp), T(), { group: 'Brand New', phone: a.ids.sara });
+  // integration (follow-up v2 S5): the owner token adds here, and Sara is already in one of the owner's groups, so the
+  // one-group-per-student rule refuses her. A phone that is in no group keeps this check about group creation only.
+  const resp = a.post({ action: 'admin_group_add', token: 'tok', group: 'Brand New', phone: '01055500077' });
+  const out = cc.p4f_admin_group_add(J(resp), T(), { group: 'Brand New', phone: '01055500077' });
   const rows = a.rows('GroupOwners');
   t('group creation: a free name is created for the teacher', state === 'free' && out.ok === true && rows.some(r => r.group === 'Brand New' && String(r.owner_id).slice(-10) === TPH.slice(-10)), JSON.stringify(rows));
   t('group creation: he owns it afterwards, another teacher does not', cc.p4_ownsGroup(T(), 'Brand New') && cc.p4_groupState(T2(), 'Brand New') === 'foreign');

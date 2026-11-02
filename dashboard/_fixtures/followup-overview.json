@@ -45,7 +45,59 @@
      "phone": "01012345005",
      "name": "Hana Sami"
     }
-   ]
+   ],
+   "done": [],
+   "notify": {
+    "enabled": true,
+    "hour": 16,
+    "snooze_until": ""
+   },
+   "requirements": {
+    "watch": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": true,
+     "rule": {
+      "pct": 80
+     },
+     "weight": 1,
+     "source": "default"
+    },
+    "homework": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": true,
+     "rule": {},
+     "weight": 1,
+     "source": "default"
+    },
+    "quiz": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": true,
+     "rule": {
+      "min_pct": 0
+     },
+     "weight": 1,
+     "source": "default"
+    },
+    "attendance": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": false,
+     "rule": {},
+     "weight": 1,
+     "source": "default"
+    },
+    "written_answers": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": false,
+     "rule": {},
+     "weight": 1,
+     "source": "default"
+    }
+   }
   },
   {
    "group": "Tue 4pm",
@@ -79,7 +131,59 @@
      "phone": "01112345009",
      "name": "Laila Fawzy"
     }
-   ]
+   ],
+   "done": [],
+   "notify": {
+    "enabled": true,
+    "hour": 16,
+    "snooze_until": ""
+   },
+   "requirements": {
+    "watch": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": true,
+     "rule": {
+      "pct": 80
+     },
+     "weight": 1,
+     "source": "default"
+    },
+    "homework": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": true,
+     "rule": {},
+     "weight": 1,
+     "source": "default"
+    },
+    "quiz": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": true,
+     "rule": {
+      "min_pct": 0
+     },
+     "weight": 1,
+     "source": "default"
+    },
+    "attendance": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": false,
+     "rule": {},
+     "weight": 1,
+     "source": "default"
+    },
+    "written_answers": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": false,
+     "rule": {},
+     "weight": 1,
+     "source": "default"
+    }
+   }
   },
   {
    "group": "Sun 8pm",
@@ -110,7 +214,59 @@
      "phone": "01212345011",
      "name": "Dina Essam"
     }
-   ]
+   ],
+   "done": [],
+   "notify": {
+    "enabled": true,
+    "hour": 16,
+    "snooze_until": ""
+   },
+   "requirements": {
+    "watch": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": true,
+     "rule": {
+      "pct": 80
+     },
+     "weight": 1,
+     "source": "default"
+    },
+    "homework": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": true,
+     "rule": {},
+     "weight": 1,
+     "source": "default"
+    },
+    "quiz": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": true,
+     "rule": {
+      "min_pct": 0
+     },
+     "weight": 1,
+     "source": "default"
+    },
+    "attendance": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": false,
+     "rule": {},
+     "weight": 1,
+     "source": "default"
+    },
+    "written_answers": {
+     "enabled": true,
+     "in_monthly_report": true,
+     "parent_message": false,
+     "rule": {},
+     "weight": 1,
+     "source": "default"
+    }
+   }
   }
  ],
  "unclassified": [
@@ -814,5 +970,1259 @@
     "note": "تواصل قديم عن درس تاني"
    }
   ]
+ },
+ "tz_label": "Alex",
+ "unclassified_requirements": {
+  "watch": {
+   "enabled": true,
+   "in_monthly_report": true,
+   "parent_message": true,
+   "rule": {
+    "pct": 80
+   },
+   "weight": 1,
+   "source": "default"
+  },
+  "homework": {
+   "enabled": true,
+   "in_monthly_report": true,
+   "parent_message": true,
+   "rule": {},
+   "weight": 1,
+   "source": "default"
+  },
+  "quiz": {
+   "enabled": true,
+   "in_monthly_report": true,
+   "parent_message": true,
+   "rule": {
+    "min_pct": 0
+   },
+   "weight": 1,
+   "source": "default"
+  },
+  "attendance": {
+   "enabled": true,
+   "in_monthly_report": true,
+   "parent_message": false,
+   "rule": {},
+   "weight": 1,
+   "source": "default"
+  },
+  "written_answers": {
+   "enabled": true,
+   "in_monthly_report": true,
+   "parent_message": false,
+   "rule": {},
+   "weight": 1,
+   "source": "default"
+  }
+ },
+ "_v2_scenarios": {
+  "_note": "MOCK ONLY (Follow-up v2, S1). ?mock=1&scenario=<name> deep-merges one of these over the fixture. _stub_events is read only by assets/__stubs__/followup-events.stub.js.",
+  "golden1": {
+   "now": "2026-11-06T16:30:00+02:00",
+   "today": "2026-11-06",
+   "facts": {
+    "1012345001": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": false,
+       "at": null
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345002": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345003": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": false,
+       "at": null
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345004": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345005": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": false,
+       "at": null
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    }
+   },
+   "groups": {
+    "sat 6pm": {
+     "done": [
+      "advance|2026-10-31"
+     ]
+    }
+   },
+   "_stub_events": {
+    "sat 6pm": {
+     "group_key": "sat 6pm",
+     "tz_label": "Alex",
+     "phase": "remind_hw",
+     "next_event_at_iso": "2026-11-07T16:00:00+02:00",
+     "prev_session": {
+      "date": "2026-10-31",
+      "at_iso": "2026-10-31T18:00:00+02:00"
+     },
+     "next_session": {
+      "date": "2026-11-07",
+      "at_iso": "2026-11-07T18:00:00+02:00"
+     },
+     "events": [
+      {
+       "key": "attendance",
+       "state": "done",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-10-31T19:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-10-31"
+      },
+      {
+       "key": "parents_watch",
+       "state": "done",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-11-05T16:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "parents_hw",
+       "state": "upcoming",
+       "count": 3,
+       "student_keys": [
+        "1012345001",
+        "1012345003",
+        "1012345005"
+       ],
+       "blocked_count": 0,
+       "lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables",
+       "fire_at_iso": "2026-11-07T16:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "remind_watch",
+       "state": "expired",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions",
+       "fire_at_iso": "2026-11-04T16:00:00+02:00",
+       "expires_at_iso": "2026-11-04T23:59:59+02:00",
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "remind_hw",
+       "state": "due",
+       "count": 3,
+       "student_keys": [
+        "1012345001",
+        "1012345003",
+        "1012345005"
+       ],
+       "blocked_count": 0,
+       "lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables",
+       "fire_at_iso": "2026-11-06T16:00:00+02:00",
+       "expires_at_iso": "2026-11-06T23:59:59+02:00",
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "advance_lessons",
+       "state": "done",
+       "count": 1,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-10-31T21:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-10-31"
+      }
+     ]
+    },
+    "tue 4pm": {
+     "group_key": "tue 4pm",
+     "tz_label": "Alex",
+     "phase": "all_clear",
+     "next_event_at_iso": "2026-11-12T16:00:00+02:00",
+     "prev_session": null,
+     "next_session": null,
+     "events": [
+      {
+       "key": "remind_hw",
+       "state": "upcoming",
+       "count": 2,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-11-12T16:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      }
+     ]
+    },
+    "sun 8pm": {
+     "group_key": "sun 8pm",
+     "tz_label": "Alex",
+     "phase": "parents_watch",
+     "next_event_at_iso": null,
+     "prev_session": {
+      "date": "2026-11-07",
+      "at_iso": "2026-11-07T18:00:00+02:00"
+     },
+     "next_session": {
+      "date": "2026-11-14",
+      "at_iso": "2026-11-14T18:00:00+02:00"
+     },
+     "events": [
+      {
+       "key": "parents_watch",
+       "state": "due",
+       "count": 2,
+       "student_keys": [
+        "1212345010",
+        "1212345011"
+       ],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-11-06T16:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      }
+     ]
+    }
+   }
+  },
+  "golden2": {
+   "now": "2026-11-07T20:30:00+02:00",
+   "today": "2026-11-07",
+   "facts": {
+    "1012345001": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": null,
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345002": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": null,
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345003": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": null,
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345004": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": null,
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345005": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": null,
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    }
+   },
+   "groups": {
+    "sat 6pm": {
+     "done": [
+      "hw|2026-11-07"
+     ]
+    }
+   },
+   "_stub_events": {
+    "sat 6pm": {
+     "group_key": "sat 6pm",
+     "tz_label": "Alex",
+     "phase": "attendance",
+     "next_event_at_iso": "2026-11-07T21:00:00+02:00",
+     "prev_session": {
+      "date": "2026-11-07",
+      "at_iso": "2026-11-07T18:00:00+02:00"
+     },
+     "next_session": {
+      "date": "2026-11-14",
+      "at_iso": "2026-11-14T18:00:00+02:00"
+     },
+     "events": [
+      {
+       "key": "attendance",
+       "state": "due",
+       "count": 5,
+       "student_keys": [
+        "1012345001",
+        "1012345002",
+        "1012345003",
+        "1012345004",
+        "1012345005"
+       ],
+       "blocked_count": 0,
+       "lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions",
+       "fire_at_iso": "2026-11-07T19:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "parents_hw",
+       "state": "expired",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 5,
+       "lesson": null,
+       "fire_at_iso": "2026-11-07T16:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "advance_lessons",
+       "state": "upcoming",
+       "count": 1,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-11-07T21:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      }
+     ]
+    }
+   }
+  },
+  "advance": {
+   "now": "2026-11-07T21:30:00+02:00",
+   "today": "2026-11-07",
+   "facts": {
+    "1012345001": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345002": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345003": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345004": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345005": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    }
+   },
+   "groups": {
+    "sat 6pm": {
+     "done": [
+      "hw|2026-11-07"
+     ]
+    }
+   },
+   "_stub_events": {
+    "sat 6pm": {
+     "group_key": "sat 6pm",
+     "tz_label": "Alex",
+     "phase": "advance_lessons",
+     "next_event_at_iso": null,
+     "prev_session": {
+      "date": "2026-11-07",
+      "at_iso": "2026-11-07T18:00:00+02:00"
+     },
+     "next_session": {
+      "date": "2026-11-14",
+      "at_iso": "2026-11-14T18:00:00+02:00"
+     },
+     "events": [
+      {
+       "key": "attendance",
+       "state": "done",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-11-07T19:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "advance_lessons",
+       "state": "due",
+       "count": 1,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-11-07T21:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      }
+     ]
+    }
+   }
+  },
+  "parents": {
+   "now": "2026-11-07T16:30:00+02:00",
+   "today": "2026-11-07",
+   "facts": {
+    "1012345001": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": false,
+       "at": null
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345002": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345003": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": false,
+       "at": null
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345004": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345005": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": false,
+       "at": null
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    }
+   },
+   "groups": {
+    "sat 6pm": {
+     "done": [
+      "advance|2026-10-31",
+      "hw|2026-11-07"
+     ]
+    }
+   },
+   "_stub_events": {
+    "sat 6pm": {
+     "group_key": "sat 6pm",
+     "tz_label": "Alex",
+     "phase": "parents_hw",
+     "next_event_at_iso": "2026-11-07T19:00:00+02:00",
+     "prev_session": {
+      "date": "2026-10-31",
+      "at_iso": "2026-10-31T18:00:00+02:00"
+     },
+     "next_session": {
+      "date": "2026-11-07",
+      "at_iso": "2026-11-07T18:00:00+02:00"
+     },
+     "events": [
+      {
+       "key": "attendance",
+       "state": "done",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-10-31T19:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-10-31"
+      },
+      {
+       "key": "parents_watch",
+       "state": "done",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-11-05T16:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "parents_hw",
+       "state": "due",
+       "count": 3,
+       "student_keys": [
+        "1012345001",
+        "1012345003",
+        "1012345005"
+       ],
+       "blocked_count": 0,
+       "lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables",
+       "fire_at_iso": "2026-11-07T16:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "remind_watch",
+       "state": "expired",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions",
+       "fire_at_iso": "2026-11-04T16:00:00+02:00",
+       "expires_at_iso": "2026-11-04T23:59:59+02:00",
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "remind_hw",
+       "state": "done",
+       "count": 0,
+       "student_keys": [
+        "1012345001",
+        "1012345003",
+        "1012345005"
+       ],
+       "blocked_count": 0,
+       "lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables",
+       "fire_at_iso": "2026-11-06T16:00:00+02:00",
+       "expires_at_iso": "2026-11-06T23:59:59+02:00",
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "advance_lessons",
+       "state": "done",
+       "count": 1,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-10-31T21:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-10-31"
+      }
+     ]
+    }
+   }
+  },
+  "reqoff": {
+   "now": "2026-11-06T16:30:00+02:00",
+   "today": "2026-11-06",
+   "facts": {
+    "1012345001": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": false,
+       "at": null
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345002": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345003": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": false,
+       "at": null
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345004": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345005": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": false,
+       "at": null
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    }
+   },
+   "groups": {
+    "sat 6pm": {
+     "done": [
+      "advance|2026-10-31"
+     ],
+     "requirements": {
+      "homework": {
+       "enabled": false,
+       "source": "group"
+      },
+      "watch": {
+       "rule": {
+        "pct": 60
+       },
+       "source": "group"
+      }
+     }
+    }
+   },
+   "_stub_events": {
+    "sat 6pm": {
+     "group_key": "sat 6pm",
+     "tz_label": "Alex",
+     "phase": "all_clear",
+     "next_event_at_iso": "2026-11-07T16:00:00+02:00",
+     "prev_session": {
+      "date": "2026-10-31",
+      "at_iso": "2026-10-31T18:00:00+02:00"
+     },
+     "next_session": {
+      "date": "2026-11-07",
+      "at_iso": "2026-11-07T18:00:00+02:00"
+     },
+     "events": [
+      {
+       "key": "attendance",
+       "state": "done",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-10-31T19:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-10-31"
+      },
+      {
+       "key": "parents_watch",
+       "state": "done",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-11-05T16:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "remind_watch",
+       "state": "expired",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions",
+       "fire_at_iso": "2026-11-04T16:00:00+02:00",
+       "expires_at_iso": "2026-11-04T23:59:59+02:00",
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "advance_lessons",
+       "state": "done",
+       "count": 1,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-10-31T21:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-10-31"
+      }
+     ]
+    }
+   }
+  },
+  "setup": {
+   "now": "2026-11-06T16:30:00+02:00",
+   "today": "2026-11-06",
+   "facts": {
+    "1012345001": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": false,
+       "at": null
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345002": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345003": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": false,
+       "at": null
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345004": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": true,
+       "at": "2026-11-05"
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    },
+    "1012345005": {
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions": {
+      "attendance": "online",
+      "watch_pct": 95,
+      "can_watch": true
+     },
+     "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables": {
+      "homework": {
+       "submitted": false,
+       "at": null
+      },
+      "quiz": {
+       "taken": true,
+       "score": 8,
+       "total": 10,
+       "at": "2026-11-02",
+       "attempts": 1
+      }
+     }
+    }
+   },
+   "groups": {
+    "sat 6pm": {
+     "done": [
+      "advance|2026-10-31"
+     ]
+    },
+    "tue 4pm": {
+     "settings": {
+      "weekday": null,
+      "time": ""
+     }
+    }
+   },
+   "_stub_events": {
+    "tue 4pm": {
+     "group_key": "tue 4pm",
+     "tz_label": "Alex",
+     "phase": "setup_missing",
+     "next_event_at_iso": null,
+     "prev_session": null,
+     "next_session": null,
+     "events": [
+      {
+       "key": "setup_missing",
+       "state": "due",
+       "count": 1,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-11-01T16:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": ""
+      }
+     ]
+    },
+    "sat 6pm": {
+     "group_key": "sat 6pm",
+     "tz_label": "Alex",
+     "phase": "remind_hw",
+     "next_event_at_iso": "2026-11-07T16:00:00+02:00",
+     "prev_session": {
+      "date": "2026-10-31",
+      "at_iso": "2026-10-31T18:00:00+02:00"
+     },
+     "next_session": {
+      "date": "2026-11-07",
+      "at_iso": "2026-11-07T18:00:00+02:00"
+     },
+     "events": [
+      {
+       "key": "attendance",
+       "state": "done",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-10-31T19:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-10-31"
+      },
+      {
+       "key": "parents_watch",
+       "state": "done",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-11-05T16:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "parents_hw",
+       "state": "upcoming",
+       "count": 3,
+       "student_keys": [
+        "1012345001",
+        "1012345003",
+        "1012345005"
+       ],
+       "blocked_count": 0,
+       "lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables",
+       "fire_at_iso": "2026-11-07T16:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "remind_watch",
+       "state": "expired",
+       "count": 0,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-2-functions",
+       "fire_at_iso": "2026-11-04T16:00:00+02:00",
+       "expires_at_iso": "2026-11-04T23:59:59+02:00",
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "remind_hw",
+       "state": "due",
+       "count": 3,
+       "student_keys": [
+        "1012345001",
+        "1012345003",
+        "1012345005"
+       ],
+       "blocked_count": 0,
+       "lesson": "programming/baccalaureate/grade-1-secondary/chapter-2-lesson-1-variables",
+       "fire_at_iso": "2026-11-06T16:00:00+02:00",
+       "expires_at_iso": "2026-11-06T23:59:59+02:00",
+       "session_date": "2026-11-07"
+      },
+      {
+       "key": "advance_lessons",
+       "state": "done",
+       "count": 1,
+       "student_keys": [],
+       "blocked_count": 0,
+       "lesson": null,
+       "fire_at_iso": "2026-10-31T21:00:00+02:00",
+       "expires_at_iso": null,
+       "session_date": "2026-10-31"
+      }
+     ]
+    }
+   }
+  }
  }
 }

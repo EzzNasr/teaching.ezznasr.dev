@@ -254,3 +254,45 @@ div.fu-contactline{cursor:default}
 .fu-reqguide{margin:0 0 12px}
 .fu-reqlist{margin:0 0 10px;padding-inline-start:20px}
 .fu-reqlist li{margin-bottom:8px;line-height:1.7}
+
+/* ---- Follow-up v2 (S1): next step, Today inbox, dots, 12-hour pickers ---- */
+.fu-tab{display:inline-flex;align-items:center;gap:6px}
+.fu-dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;display:inline-block}
+.fu-dot.red{background:var(--fu-bad)} .fu-dot.amber{background:#d99a12}
+html[data-theme="dark"] .fu-dot.amber{background:var(--fu-warn)}
+.fu-tab[aria-selected="true"] .fu-dot{box-shadow:0 0 0 2px #fff}
+.fu-badge{min-width:26px;height:26px;border-radius:999px;background:var(--fu-bad);color:#fff;font-size:14px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+.fu-hero{border:2px solid var(--fu-teal);padding:18px}
+.fu-hero.clear{border-color:var(--fu-line)}
+.fu-eyebrow{color:var(--fu-teal);font-weight:800;font-size:14px;margin-bottom:2px}
+.fu-hero-title{margin:0;font-size:24px;font-weight:800;line-height:1.35}
+.fu-hero-sub{color:var(--fu-dim);font-size:15px;margin:4px 0 0;line-height:1.6}
+.fu-hero-box{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--fu-soft);border-radius:14px;padding:10px 14px;margin-top:12px}
+.fu-hero-box .fu-lname{background:var(--fu-card)}
+.fu-move-pair{display:flex;align-items:center;gap:8px;flex-wrap:wrap;direction:rtl}
+.fu-arrow{color:var(--fu-teal);font-weight:800;font-size:20px}
+.fu-hero-btns{margin-top:14px}
+.fu-hero-next{color:var(--fu-dim);font-size:14px;margin-top:12px;line-height:1.6}
+.fu-also{background:var(--fu-soft);border-radius:var(--fu-r);padding:12px 16px;margin:0 0 14px}
+.fu-also-h{font-weight:800;color:var(--fu-dim);font-size:15px;margin-bottom:4px}
+.fu-also-row{display:flex;align-items:center;width:100%;min-height:var(--fu-tap);border:0;background:none;padding:4px 0;text-align:start;font:inherit;font-size:16px;color:var(--fu-ink);cursor:pointer;border-top:1px solid var(--fu-line)}
+.fu-also-row:first-of-type{border-top:0}
+.fu-also-row:not(.due){color:var(--fu-dim)}
+.fu-also-row.due{font-weight:700}
+.fu-also-row.static{cursor:default}
+.fu-today-h{font-size:17px;font-weight:800;color:var(--fu-dim);margin:6px 2px 12px}
+.fu-today-h.dim{margin-top:22px}
+.fu-inrow{display:flex;align-items:center;gap:12px;padding:12px 14px}
+.fu-inrow.clear{width:100%;text-align:start;cursor:pointer;background:color-mix(in srgb,var(--fu-card) 70%,var(--fu-bg));font:inherit;color:inherit}
+.fu-inrow-main{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;border:0;background:none;padding:0;text-align:start;font:inherit;color:inherit;cursor:pointer;min-height:var(--fu-tap)}
+.fu-inrow-g{font-size:14px;font-weight:800;color:var(--fu-dim)}
+.fu-inrow-t{font-size:19px;font-weight:800;line-height:1.35}
+.fu-inrow-s{font-size:14px;color:var(--fu-dim);line-height:1.5}
+.fu-inrow-go{width:auto;min-width:84px;flex:0 0 auto}
+.fu-focus{margin:0 0 8px;white-space:normal;max-width:100%;text-align:start;line-height:1.4;padding:6px 14px}
+.fu-tp-row{display:flex;align-items:center;gap:6px}
+.fu-tp-row select{flex:1;min-width:0;direction:ltr;text-align:center;font:700 16px 'Cairo',system-ui,sans-serif}
+.fu-tp-sep{font-weight:800}
+.fu-hoursel{direction:rtl;text-align:start;font:700 17px 'Cairo',system-ui,sans-serif}
+.fu-notify-hour{align-items:center;margin:2px 0 6px}
+.fu-btn[aria-pressed="true"]{background:var(--fu-teal-soft);border-width:2px}

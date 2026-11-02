@@ -19,7 +19,12 @@ t('fixture keys are well formed', fx.actions.every(a => ['PUB', 'O', 'T', 'TEAM'
 t('callers and contexts are the 7 x 3 grid of the brief', fx.callers.length === 7 && fx.contexts.join() === 'math,programming,none');
 
 // every existing router action in the table exists; every p4_ action is one p4_wire.py wires
-const missing = fx.actions.filter(a => !a.action.startsWith('p4_') && !routerCases.includes(a.action)).map(a => a.action);
+// integration (follow-up v2): admin_fu2_* / admin_req_* are routed by doPost's default branch to fu2_dispatch_
+// (FollowupRouter.gs), which merges the route maps of FollowupNotify.gs / Requirements.gs. Such a row counts as a router
+// case when its name is a key of one of those route maps.
+const FU2_SRC = ['FollowupNotify.gs', 'Requirements.gs', 'FollowupRouter.gs'].map(n => { try { return fs.readFileSync(path.join(__dirname, '..', 'apps_script', n), 'utf8').replace(/\r\n/g, '\n'); } catch (e) { return ''; } }).join('\n');
+const fu2Routed = a => /^admin_(fu2|req)_/.test(a) && /\^admin_\(fu2\|req\)_/.test(dp) && new RegExp('["\']?' + a + '["\']?\\s*:').test(FU2_SRC);
+const missing = fx.actions.filter(a => !a.action.startsWith('p4_') && !routerCases.includes(a.action) && !fu2Routed(a.action)).map(a => a.action);
 t('every non-p4 action in the table is a real router case', missing.length === 0, missing.join(', '));
 const p4rows = fx.actions.filter(a => a.action.startsWith('p4_')).map(a => a.action);
 t('the p4_ rows are exactly the cases p4_wire.py adds (plus none missing)', p4rows.every(a => wired.has(a)) && [...wired].filter(a => !p4rows.includes(a)).length === 0, p4rows.filter(a => !wired.has(a)).concat([...wired].filter(a => !p4rows.includes(a))).join(', '));
@@ -48,7 +53,12 @@ const handlerBody = action => {
 };
 const has = (body, f) => new RegExp('\\b(?:payload|p)\\.' + f + '\\b|\\["' + f + '"\\]').test(body);
 fx.actions.filter(a => !a.action.startsWith('p4_') && Object.keys(a.fields).length).forEach(a => {
-  const body = handlerBody(a.action);
+  let body = handlerBody(a.action);
+  if (!body && fu2Routed(a.action)) {   // integration: the handler named in the route map (e.g. admin_fu2_mark_done: fu2_notify_markDone_)
+    const m = new RegExp('["\']?' + a.action + '["\']?\\s*:\\s*(?:[A-Za-z_0-9]+\\()?([A-Za-z_0-9]+)').exec(FU2_SRC);
+    const fm = m && new RegExp('^function ' + m[1] + '\\(', 'm').exec(FU2_SRC);
+    body = fm ? FU2_SRC.slice(fm.index, fm.index + (/^}[ \t]*$/m.exec(FU2_SRC.slice(fm.index)) || { index: 2000 }).index + 1) : null;
+  }
   if (!body) return t('handler found for ' + a.action, false, 'no handler body');
   const bad = [];
   Object.entries(a.fields).forEach(([k, v]) => {

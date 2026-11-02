@@ -1156,6 +1156,7 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
       <a href="master.html">Results</a>
       <a href="access.html" aria-current="page">Video access</a>
       <a href="followup.html" lang="ar">متابعة</a>
+      <a href="requirements.html" lang="ar">المطلوبات</a>
       <a href="team.html">Team</a>
       <a href="/">Back to site</a>
     </nav>
@@ -2471,7 +2472,88 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
     var skip = {};
     (exceptPhones || []).forEach(function (p) { skip[keyOf(p)] = 1; });
     return (d.roster || []).filter(function (r) { return !skip[keyOf(r.phone)]; })
-      .map(function (r) { return { phone: r.phone, name: r.name, sub: r.year, year: r.year || "" }; });
+      .map(function (r) {
+        var inGroup = groupNameOf(d, r.phone);   // FU2: a student can be in one group only, so show where they are
+        return { phone: r.phone, name: r.name, sub: [r.year, inGroup ? "in \u201c" + inGroup + "\u201d" : ""].filter(Boolean).join("  \u00b7  "), year: r.year || "" };
+      });
+  }
+  // ---- FU2: one group per student -------------------------------------------------------------
+  function groupKeyOf(name) { return String(name == null ? "" : name).trim().replace(/\s+/g, " ").toLowerCase(); }
+  // The group a student is in right now ("" = none). If legacy data has them in several, the first.
+  function groupNameOf(d, phone, exceptGroup) {
+    var k = keyOf(phone), skip = groupKeyOf(exceptGroup), found = "";
+    (d.groups || []).some(function (g) {
+      if (skip && groupKeyOf(g.group) === skip) return false;
+      if ((g.members || []).some(function (m) { return keyOf(m.phone) === k; })) { found = g.group; return true; }
+      return false;
+    });
+    return found;
+  }
+  // Students in `phones` who are in a group OTHER than `group`: [{phone, name, from}]
+  function otherGroupConflicts(d, group, phones) {
+    var seen = {}, out = [];
+    phones.forEach(function (p) {
+      var k = keyOf(p); if (seen[k]) return; seen[k] = 1;
+      var inThis = (d.groups || []).some(function (g) { return groupKeyOf(g.group) === groupKeyOf(group) && (g.members || []).some(function (m) { return keyOf(m.phone) === k; }); });
+      var from = groupNameOf(d, p, group);
+      if (!from || inThis) return;
+      var r = (d.roster || []).filter(function (x) { return keyOf(x.phone) === k; })[0];
+      out.push({ phone: p, name: r ? r.name : "", from: from });
+    });
+    return out;
+  }
+  function moveQuestion(conf, group) {
+    if (conf.length === 1) return (conf[0].name || conf[0].phone) + " is in \u201c" + conf[0].from + "\u201d. A student can be in one group only.\n\nMove them to \u201c" + group + "\u201d?";
+    return conf.length + " of these students are already in another group (" + conf.slice(0, 3).map(function (c) { return (c.name || c.phone) + " in \u201c" + c.from + "\u201d"; }).join(", ") + (conf.length > 3 ? ", \u2026" : "") + "). A student can be in one group only.\n\nMove them to \u201c" + group + "\u201d?";
+  }
+  function movedText(res) {
+    return res && res.moved && res.moved.length ? " Moved from another group: " + res.moved.map(function (m) { return (m.name || m.phone) + " (from \u201c" + m.from + "\u201d)"; }).join(", ") + "." : "";
+  }
+  // admin_group_add with the one-group rule: ask before moving someone (from what this page already knows), and if the
+  // server still says in_other_group (the data changed since the page loaded) ask then and retry with move:true.
+  function runAdd(d, payload, okText, btn) {
+    var conf = payload.move ? [] : otherGroupConflicts(d, payload.group, payload.phones);
+    if (conf.length) {
+      if (!window.confirm(moveQuestion(conf, payload.group))) { if (btn) btn.disabled = false; return Promise.resolve(); }
+      payload = Object.assign({}, payload, { move: true });
+    }
+    STATE.toast = null;
+    refreshToast();
+    return api(payload).then(
+      function (res) { setToast(true, okText(res) + movedText(res)); STATE.open = null; STATE.dups = undefined; return load(true); },
+      function (err) {
+        var m = (err && err.message) || "";
+        if (/^in_other_group:/.test(m) && !payload.move) {
+          if (window.confirm(m.replace(/^in_other_group:\s*/, "") + "\n\nMove them?")) return runAdd(d, Object.assign({}, payload, { move: true }), okText, btn);
+        } else {
+          setToast(false, m || "That didn't work.");
+          refreshToast();
+        }
+        if (btn) btn.disabled = false;
+      }
+    );
+  }
+  // Admin only (the server refuses an assistant): students currently in two groups. Quiet on any error.
+  function loadDuplicates() {
+    return api({ action: "admin_fu2_group_duplicates" }).then(
+      function (r) { STATE.dups = r.duplicates || []; refreshDuplicates(); },
+      function () { STATE.dups = null; refreshDuplicates(); }
+    );
+  }
+  function duplicatesBanner() {
+    if (!STATE.dups || !STATE.dups.length) return null;
+    return el("div", { class: "ac-note", "data-dup-banner": "", role: "status" }, [
+      el("b", {}, [plural(STATE.dups.length, "student") + " in two groups. "]),
+      "A student should be in one group only. Open the group you want to keep and add them there with \u201cmove\u201d: " +
+      STATE.dups.slice(0, 5).map(function (x) { return (x.name || x.phone) + " (" + x.groups.join(", ") + ")"; }).join("; ") + (STATE.dups.length > 5 ? "; \u2026" : "") + ".",
+    ]);
+  }
+  function refreshDuplicates() {
+    var host = document.querySelector("[data-dup-host]");
+    if (!host) return;
+    host.textContent = "";
+    var b = duplicatesBanner();
+    if (b) host.appendChild(b);
   }
   function keyOf(phone) { return String(phone || "").replace(/\D/g, "").slice(-10); }
   // One remembered group grant -> words. g: { kind: "access"|"quiz", target, expires_at ("" = never) }
@@ -2532,7 +2614,7 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
       if (phoneIn.value.trim()) phones.push(phoneIn.value.trim());
       if (!phones.length) return;
       addBtn.disabled = true;
-      run({ action: "admin_group_add", group: g.group, phones: phones },
+      runAdd(d, { action: "admin_group_add", group: g.group, phones: phones },
         function (r) { return "Added " + plural(r.count, "student") + " to \u201c" + g.group + "\u201d" + (r.already.length ? " (" + r.already.length + " already in it)" : "") + "." + inheritedText(r.count ? r.inherited : null); }, addBtn);
     });
 
@@ -2588,7 +2670,7 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
       if (phone.value.trim()) phones.push(phone.value.trim());
       if (!name.value.trim() || !phones.length) return;
       go.disabled = true;
-      run({ action: "admin_group_add", group: name.value.trim(), phones: phones },
+      runAdd(d, { action: "admin_group_add", group: name.value.trim(), phones: phones },
         function (r) { return "Created \u201c" + r.group + "\u201d with " + plural(r.count, "student") + "." + inheritedText(r.count ? r.inherited : null); }, go);
     });
     return el("div", { class: "dash-section" }, [
@@ -2640,7 +2722,9 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
     if (!d.groups.length) section.appendChild(el("div", { class: "dash-empty" }, ["No groups yet \u2014 create one below."]));
     else if (!shown.length) section.appendChild(el("div", { class: "dash-empty" }, ["No group has members from this year."]));
     shown.forEach(function (g) { section.appendChild(groupCard(d, g)); });
-    return el("div", {}, [yearBar(counts), section, groupCreateForm(d)]);
+    var dupHost = el("div", { "data-dup-host": "" });
+    if (STATE.dups === undefined) loadDuplicates(); else { var db = duplicatesBanner(); if (db) dupHost.appendChild(db); }   // FU2: asked once per page load
+    return el("div", {}, [yearBar(counts), dupHost, section, groupCreateForm(d)]);
   }
 
   // ---- LESSONS ------------------------------------------------------------------------------------------

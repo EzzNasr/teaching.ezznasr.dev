@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="/assets/followup.css">
 <link rel="stylesheet" href="/assets/followup-picker.css">
 <link rel="stylesheet" href="/assets/followup-templates.css">
+<link rel="stylesheet" href="/assets/followup-walk.css">
 <script src="/assets/theme.js" defer></script>
 </head>
 <body class="fu">
@@ -50,6 +51,9 @@
 <script src="/assets/lesson-combobox.js"></script>
 <script src="/assets/staff-guard.js"></script>
 <script src="/assets/draft-store.js"></script>
+<!-- Follow-up v2 (S3): optional. If either file is missing the page keeps the old layout (no Today tab / hero). -->
+<script src="/assets/followup-events.js" onerror="window.FollowupEvents=null"></script>
+<script src="/assets/followup-walk.js" onerror="window.FollowupWalk=null"></script>
 <script src="/assets/followup-app.js"></script>
 </body>
 </html>

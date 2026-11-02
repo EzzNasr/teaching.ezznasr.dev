@@ -1,0 +1,8 @@
+{
+  "entries": [
+    { "id": "R-REQ1", "title": "Requirements: pure rules (defaults = today, precedence, validation, custom keys)", "status": "active", "owner": "S4", "cmd": ["node", "tests/test_req_logic.js"] },
+    { "id": "R-REQ2", "title": "Requirements: server copy (Requirements.gs) and client copy (requirements-logic.js) agree", "status": "active", "owner": "S4", "cmd": ["node", "tests/test_req_parity.js"] },
+    { "id": "R-REQ3", "title": "Requirements: five actions, audit, assistant access, hook, checks, history (real Code.gs)", "status": "active", "owner": "S4", "cmd": ["node", "tests/test_req_server.js"] },
+    { "id": "R-REQ4", "title": "Requirements page at 390px in mock mode: toggle, override, copy, manual check, preview, history", "status": "active", "needs": "playwright", "owner": "S4", "cmd": ["python", "tests/e2e_requirements.py"] }
+  ]
+}

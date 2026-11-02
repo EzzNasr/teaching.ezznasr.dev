@@ -31,6 +31,8 @@ async function runPage(file, o) {
   o = o || {};
   const html = read('dashboard/' + file);
   const dom = makeDom({ path: '/dashboard/' + file, search: o.search || '' });
+  // integration (follow-up v2): a fresh visit opens the Today tab; o.tab remembers a group tab like a reload would
+  if (o.tab) dom.window.sessionStorage.setItem('fu-tab', o.tab);
   dom.loadHtml(html);
   const calls = [];
   const session = { student_id: '01000000009', phone: '01000000009', session_token: 'tok', role: o.who === 'owner' ? 'admin' : 'student', is_admin: o.who === 'owner' };
@@ -269,7 +271,7 @@ async function followup() {
     if (p.action === 'admin_followup_set_attendance') return { ok: true, results: [] };
     if (p.action === 'admin_followup_save_group') return { ok: true, settings: p.settings || {} };
   };
-  const r = await runPage('followup.html', { who: 'teacher', answer });
+  const r = await runPage('followup.html', { who: 'teacher', answer, tab: 'sat 6pm' });
   const { doc, calls, win, dom } = r;
   t('follow-up (teacher): runs and loads the overview', !r.err && sentOf(calls, 'admin_followup_overview').length >= 1, r.err && r.err.message);
   const before = sentOf(calls, 'admin_followup_overview').length;
@@ -284,7 +286,7 @@ async function followup() {
   t('follow-up: Save sends the attendance edit once and clears the draft', sentOf(calls, 'admin_followup_set_attendance').length >= 1 && win.Draft.count() === 0);
   t('follow-up: no reload', dom.calls.reloads === 0);
   // discard re-reads the server
-  const r2 = await runPage('followup.html', { who: 'teacher', answer });
+  const r2 = await runPage('followup.html', { who: 'teacher', answer, tab: 'sat 6pm' });
   const b2 = btn(r2.doc, 'الكل سنتر'); if (b2) { b2.click(); await settle(8); }
   const dlg2 = btn(r2.doc, 'تأكيد') || btn(r2.doc, 'نعم'); if (dlg2 && r2.win.Draft.count() === 0) { dlg2.click(); await settle(8); }
   const n0 = sentOf(r2.calls, 'admin_followup_overview').length;

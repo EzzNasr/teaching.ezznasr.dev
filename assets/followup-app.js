@@ -21,6 +21,8 @@
 
   var DAYS_AR = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
   var NONE_TAB = "__none";
+  var TODAY_TAB = "__today";   // Follow-up v2 (S1): the "what to do now" inbox, only when window.FollowupEvents is loaded
+  var TZ_LABEL = "Alex";       // every time zone a person reads says this (owner decision); overview.tz_label wins when present
   var NEG_SESSION = { session_unwatched: 1, session_locked: 1, session_unfinished: 1 };
 
   var STATE = {
@@ -35,6 +37,8 @@
     lessonQ: {},             // lesson-picker search text, by picker id
     sheetClose: null, view: null,
     year: "all",             // global Senior filter: "all" | "1" | "2"  (persisted in localStorage)
+    step: null,              // v2: event key shown in the hero card instead of the group's phase (deep link / "also waiting" tap)
+    focus: null,             // v2: {keys:{pk:1}, label} narrows the student list to one event's students (walk-through fallback)
   };
   var TITLES = {};           // lesson path -> real lesson name (assets/lesson-titles.json, built by tools/seo/seo_build.py)
   var YEARS = [{ k: "1", label: "سينيور 1" }, { k: "2", label: "سينيور 2" }];
@@ -111,7 +115,7 @@
     try { localStorage.setItem("fu-year", k); } catch (e) {}
     if (STATE.data) {
       var tabs = visibleTabKeys();
-      if (tabs.length && tabs.indexOf(STATE.tab) < 0) STATE.tab = tabs[0];   // nothing visible: keep the tab so switching back restores it
+      if (tabs.length && tabs.indexOf(STATE.tab) < 0 && STATE.tab !== TODAY_TAB) STATE.tab = tabs[0];   // nothing visible: keep the tab so switching back restores it
       if (STATE.borrow && visibleGroups().every(function (g) { return g.key !== STATE.borrow; })) STATE.borrow = (visibleGroups()[0] || {}).key || null;
       writeHash(); renderYearBar(); renderTabs(); renderPage(); window.scrollTo(0, 0);
       checkYearLessons();
@@ -130,6 +134,35 @@
     var m = /^(\d{2}):(\d{2})$/.exec(t || ""); if (!m) return "";
     var h = +m[1], ap = h >= 12 ? "م" : "ص";
     return ((h % 12) || 12) + ":" + m[2] + " " + ap;
+  }
+  // Contract 3.12: display is 12-hour, storage stays "HH:MM". lang "ar" -> ص/م, else AM/PM. "" for bad input.
+  function fmtTime12(t, lang) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(t == null ? "" : t).trim()); if (!m) return "";
+    var H = +m[1]; if (H > 23 || +m[2] > 59) return "";
+    var ar = lang === "ar";
+    return ((H % 12) || 12) + ":" + m[2] + " " + (H >= 12 ? (ar ? "م" : "PM") : (ar ? "ص" : "AM"));
+  }
+  function tzLabel() { return (STATE.data && STATE.data.tz_label) || TZ_LABEL; }
+  // ISO instant -> {ymd, hhmm} on the Alex wall clock
+  function wallOf(iso) {
+    var d = iso instanceof Date ? iso : new Date(iso); if (isNaN(d)) return null;
+    var c = cairo(d), ymd = L().cairoToday ? L().cairoToday(d) : d.toISOString().slice(0, 10);
+    return { ymd: ymd, hhmm: String(c.h).padStart(2, "0") + ":" + String(c.m).padStart(2, "0"), date: d };
+  }
+  function weekdayOfYmd(ymd) { var p = String(ymd).split("-").map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay(); }
+  // "النهارده" / "بكرة" / "امبارح" / "الخميس"  (day word only, for short lines)
+  function dayWord(ymd) {
+    if (!ymd) return "";
+    var today = L().cairoToday ? L().cairoToday(nowD()) : "", add = function (n) { var p = today.split("-").map(Number), t = new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)); return t.toISOString().slice(0, 10); };
+    if (today && ymd === today) return "النهارده";
+    if (today && ymd === add(1)) return "بكرة";
+    if (today && ymd === add(-1)) return "امبارح";
+    return DAYS_AR[weekdayOfYmd(ymd)];
+  }
+  // "الخميس 4:00 م Alex"
+  function whenText(iso, withTz) {
+    var w = wallOf(iso); if (!w) return "";
+    return dayWord(w.ymd) + " " + fmtTime12(w.hhmm, "ar") + (withTz === false ? "" : " " + tzLabel());
   }
   function dmOf(v) { var m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(v || "")); return m ? (+m[3]) + "/" + (+m[2]) : ""; }
   function weekOfYmd(ymd) {
@@ -182,9 +215,27 @@
     if (!d) return "";
     try { return L().deadlineWhen(nowD(), d) || ""; } catch (e) { return ""; }
   }
+  // ---- v2 requirements (contract 3.4): groups[].requirements / unclassified_requirements. Missing = today's rules. ----
+  function reqOf(g) {
+    var d = STATE.data || {};
+    if (g && g.requirements) return g.requirements;
+    if (g && g.unclassified) return (g.borrowed && g.borrowed.requirements) || d.unclassified_requirements || {};
+    return {};
+  }
+  function reqOn(g, key) { var r = reqOf(g)[key]; return !(r && r.enabled === false); }
+  function watchPct(g) {
+    var r = reqOf(g).watch, p = r && r.rule ? Number(r.rule.pct) : NaN;
+    return (p >= 1 && p <= 100) ? p : ((STATE.data && STATE.data.settings && STATE.data.settings.watch_done_pct) || 80);
+  }
+  // the overview the logic library sees for this group: same object unless the group has its own watch threshold
+  function ovFor(g) {
+    var d = STATE.data, p = watchPct(g);
+    if (!d || !d.settings || d.settings.watch_done_pct === p) return d;
+    return Object.assign({}, d, { settings: Object.assign({}, d.settings, { watch_done_pct: p }) });
+  }
   function summaryFor(st, g) {
     var s = null;
-    try { s = L().studentSummary(st, g, STATE.data); } catch (e) { console.error("studentSummary failed", e); }
+    try { s = L().studentSummary(st, g, ovFor(g)); } catch (e) { console.error("studentSummary failed", e); }
     return s || { verdicts: {}, issues: [], praises: [], needsAttendance: false, microChips: [], primaryAction: null };
   }
   function parentCheck(st) {
@@ -225,9 +276,35 @@
   function mockLoad() {
     var p = MK.data ? Promise.resolve() : fetch("_fixtures/followup-overview.json", { cache: "no-store" }).then(function (r) {
       if (!r.ok) throw new Error("fixture " + r.status); return r.json();
-    }).then(function (j) { MK.data = j; MK.log = clone(j.parent_log || {}); })
+    }).then(function (j) { MK.data = applyScenario(j); MK.log = clone(MK.data.parent_log || {}); })
       .then(function () { return fetch("_fixtures/student-summary.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { MK.sum = j; }, function () {}); });
     return p;
+  }
+  // MOCK ONLY (v2). ?mock=1&scenario=<name> deep-merges fixture._v2_scenarios[name] over the fixture
+  // (now, today, facts, groups by key, ...). ?mock=1&now=<iso> overrides the clock. The live page never reads these.
+  function qsParam(n) { var m = new RegExp("[?&]" + n + "=([^&#]*)").exec(location.search); return m ? decodeURIComponent(m[1]) : ""; }
+  function deepMerge(a, b) {
+    if (!b || typeof b !== "object" || Array.isArray(b)) return b;
+    var o = (a && typeof a === "object" && !Array.isArray(a)) ? a : {};
+    Object.keys(b).forEach(function (k) { o[k] = deepMerge(o[k], b[k]); });
+    return o;
+  }
+  function applyScenario(j) {
+    var name = qsParam("scenario"), sc = name && j._v2_scenarios && j._v2_scenarios[name];
+    if (sc) {
+      sc = clone(sc);
+      var groups = sc.groups; delete sc.groups;
+      deepMerge(j, sc);
+      Object.keys(groups || {}).forEach(function (k) {
+        var g = j.groups.filter(function (x) { return x.key === k; })[0];
+        if (g) deepMerge(g, groups[k]);
+      });
+      j._scenario = name;
+    }
+    var now = qsParam("now");
+    if (now && !isNaN(Date.parse(now))) { j.now = now; if (L().cairoToday) j.today = L().cairoToday(new Date(now)); }
+    delete j._v2_scenarios;
+    return j;
   }
   function mockOverview() {
     var d = clone(MK.data), used = {};
@@ -266,6 +343,7 @@
     return o;
   }
   function mockApi(payload) {
+    try { (window.__fuMockCalls = window.__fuMockCalls || []).push(clone(payload)); } catch (e) {}   // MOCK ONLY: lets tests read the payloads
     return mockLoad().then(function () {
       var a = payload.action, d = MK.data;
       if (a === "admin_followup_overview") return mockOverview();
@@ -333,6 +411,29 @@
       if (a === "admin_student_summary") {
         var sk = pkOf(payload.student), st2 = d.students[sk]; if (!st2) return { ok: false, error: "Student not found." };
         return mockSummary(st2, 0, payload.from || d.today.slice(0, 8) + "01", payload.to || d.today);
+      }
+      // ---- v2 (S2's actions, faked in memory) ----
+      if (a === "admin_fu2_mark_done") {
+        var gd = d.groups.filter(function (x) { return x.key === payload.group || x.group === payload.group; })[0];
+        if (!gd) return { ok: false, error: "Missing group." };
+        if (["watch", "hw", "advance"].indexOf(payload.kind) < 0) return { ok: false, error: "Unknown kind." };
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.session_date || "")) return { ok: false, error: "Invalid session date." };
+        gd.done = gd.done || []; var tok = payload.kind + "|" + payload.session_date;
+        if (gd.done.indexOf(tok) < 0) gd.done.push(tok);
+        return { ok: true, done: clone(gd.done) };
+      }
+      if (a === "admin_fu2_notify_settings_get") {
+        var gs0 = {}; d.groups.forEach(function (x) { gs0[x.key] = clone(x.notify || { enabled: true, hour: 16, snooze_until: "" }); });
+        return { ok: true, groups: gs0 };
+      }
+      if (a === "admin_fu2_notify_settings_save") {
+        var gn = d.groups.filter(function (x) { return x.key === payload.group || x.group === payload.group; })[0];
+        if (!gn) return { ok: false, error: "Missing group." };
+        var cur2 = gn.notify = gn.notify || { enabled: true, hour: 16, snooze_until: "" };
+        if ("hour" in payload) { var hh = Number(payload.hour); if (isNaN(hh) || hh < 0 || hh > 23 || hh !== Math.floor(hh)) return { ok: false, error: "Hour must be 0 to 23." }; cur2.hour = hh; }
+        if ("enabled" in payload) cur2.enabled = !!payload.enabled;
+        if ("snooze_until" in payload) { var su = String(payload.snooze_until || ""); if (su && !/^\d{4}-\d{2}-\d{2}$/.test(su)) return { ok: false, error: "Snooze must be a date (yyyy-MM-dd) or empty." }; cur2.snooze_until = su; }
+        return { ok: true, settings: clone(cur2) };
       }
       if (a === "admin_followup_save_templates") {
         d.templates = d.templates || {};
@@ -563,28 +664,28 @@
     var neg = [], pos = [];
     var multi = reviews.length > 1;
     var cf = facts[cur] || {};
-    var blocked = !!summary.needsAttendance;
+    var blocked = !!summary.needsAttendance && reqOn(g, "attendance");
     var watchOver = dl.watch ? dlState(dl.watch) === "overdue" : true;
     var hwOver = dl.hw ? dlState(dl.hw) === "overdue" : true;
 
-    var sv = v.session;
+    var sv = reqOn(g, "watch") ? v.session : null;   // v2: a disabled requirement gives no verdict and no button
     if (sv && cur) {
       var ss = sv.state;
       if (NEG_SESSION[ss]) {
         neg.push({ kind: ss === "session_unfinished" ? "session_unfinished" : "session_unwatched", lesson: cur, verdict: sv, label: "▶ المشاهدة", due: watchOver, session: true, blocked: blocked, chip: ss });
-      } else if (ss === "session_done" || (ss === "optional" && (cf.watch_pct || 0) >= d.settings.watch_done_pct)) {
+      } else if (ss === "session_done" || (ss === "optional" && (cf.watch_pct || 0) >= watchPct(g))) {
         pos.push({ kind: "session_done", lesson: cur, verdict: sv, label: "✅ أنهى المشاهدة", due: true, session: true, blocked: blocked });
       }
     }
     if (blocked && sv && cur && !neg.some(function (a) { return a.session; })) {
       neg.push({ kind: "session_unwatched", lesson: cur, verdict: sv, label: "▶ المشاهدة", due: false, session: true, blocked: true, stub: true });
     }
-    (v.homework || []).forEach(function (h) {
+    (reqOn(g, "homework") ? (v.homework || []) : []).forEach(function (h) {
       var tag = multi ? " · " + (lessonNo(h.lesson) || pretty(h.lesson)) : "";
       if (h.state === "homework_missing") neg.push({ kind: "homework_missing", lesson: h.lesson, verdict: h, label: "📝 الواجب" + tag, due: h.due !== undefined ? !!h.due : hwOver });
       else if (h.state === "homework_done") pos.push({ kind: "homework_done", lesson: h.lesson, verdict: h, label: "🌟 شكر على الواجب" + tag, due: true });
     });
-    (v.quiz || []).forEach(function (q) {
+    (reqOn(g, "quiz") ? (v.quiz || []) : []).forEach(function (q) {
       var tag = multi ? " · " + (lessonNo(q.lesson) || pretty(q.lesson)) : "";
       if (q.state === "quiz_absent") neg.push({ kind: "quiz_absent", lesson: q.lesson, verdict: q, label: "❓ الكويز (غائب)" + tag, due: q.due !== undefined ? !!q.due : true, warn: true });
       else if (q.state === "quiz_taken") {
@@ -607,23 +708,25 @@
   }
 
   // ---- group view (computed once per render) ---------------------------------------------------
+  // one student row of a group view (also used by the v2 walk-through for students the year filter hides)
+  function makeRow(g, m, dl) {
+    var st = studentOf(m), sm = summaryFor(st, g), ck = parentCheck(st);
+    var ac = buildActions(st, g, sm, dl, ck);
+    var v = sm.verdicts || {};
+    var tags = {
+      unmarked: !!sm.needsAttendance && reqOn(g, "attendance"),
+      noparent: ck.level !== "ok",
+      late: ac.hasDue,
+      unwatched: reqOn(g, "watch") && !!(v.session && NEG_SESSION[v.session.state]),
+      hwmissing: reqOn(g, "homework") && (v.homework || []).some(function (h) { return h.state === "homework_missing"; }),
+      quizabsent: reqOn(g, "quiz") && (v.quiz || []).some(function (q) { return q.state === "quiz_absent"; }),
+      notnotified: flag("FF_PARENT_LOG") && ac.dueNeg.some(function (a) { return logItems(a).some(function (it) { return !loggedFor(st.key, it); }); }),
+    };
+    return { st: st, sm: sm, ck: ck, ac: ac, tags: tags, contact: contactOf(st, ac) };
+  }
   function computeView(g) {
     var dl = deadlinesFor(g);
-    var rows = visibleMembers(g).map(function (m) {
-      var st = studentOf(m), sm = summaryFor(st, g), ck = parentCheck(st);
-      var ac = buildActions(st, g, sm, dl, ck);
-      var v = sm.verdicts || {};
-      var tags = {
-        unmarked: !!sm.needsAttendance,
-        noparent: ck.level !== "ok",
-        late: ac.hasDue,
-        unwatched: !!(v.session && NEG_SESSION[v.session.state]),
-        hwmissing: (v.homework || []).some(function (h) { return h.state === "homework_missing"; }),
-        quizabsent: (v.quiz || []).some(function (q) { return q.state === "quiz_absent"; }),
-        notnotified: flag("FF_PARENT_LOG") && ac.dueNeg.some(function (a) { return logItems(a).some(function (it) { return !loggedFor(st.key, it); }); }),
-      };
-      return { st: st, sm: sm, ck: ck, ac: ac, tags: tags, contact: contactOf(st, ac) };
-    });
+    var rows = visibleMembers(g).map(function (m) { return makeRow(g, m, dl); });
     var counts = { unmarked: 0, unwatched: 0, hwmissing: 0, quizabsent: 0, noparent: 0, late: 0 };
     rows.forEach(function (r) { Object.keys(counts).forEach(function (k) { if (r.tags[k]) counts[k]++; }); });
     var cur = g.settings.current_lesson, anyTrack = false;
@@ -682,8 +785,9 @@
         if (res.settings) real.settings = res.settings;
         if (opts.reload) NEED_RELOAD = true;
         refreshPage(); if (!opts.quiet) toast("تم الحفظ ✓");
+        if (opts.onSaved) { try { opts.onSaved(res); } catch (e) { console.error(e); } }   // v2: e.g. the advance card marks its step done only now
       },
-      onFailed: function (res) { real.settings = before; refreshPage(); toast(errText(new Error((res && res.error) || "")), { err: true }); } });
+      onFailed: function (res) { real.settings = before; refreshPage(); toast(errText(new Error((res && res.error) || "")), { err: true }); if (opts.onFailed) { try { opts.onFailed(res); } catch (e) { console.error(e); } } } });
     return Promise.resolve();
   }
 
@@ -726,20 +830,37 @@
     var nav = clear($("fu-tabs")), d = STATE.data;
     if (!d) { nav.hidden = true; return; }
     nav.hidden = false;
-    function tab(key, label, n) {
-      var b = el("button", { class: "fu-tab", type: "button", role: "tab", "aria-selected": String(STATE.tab === key), "data-tab": key, onclick: function () { selectTab(key); } }, [label, el("small", {}, ["· " + n])]);
+    function tab(key, label, n, dot) {
+      var kids = [label, el("small", {}, ["· " + n])];
+      if (dot) kids.push(el("span", { class: "fu-dot " + dot.tone, "data-dot": dot.tone, "aria-label": dot.label, title: dot.label }));
+      var b = el("button", { class: "fu-tab", type: "button", role: "tab", "aria-selected": String(STATE.tab === key), "data-tab": key, onclick: function () { selectTab(key); } }, kids);
       nav.appendChild(b);
     }
-    visibleGroups().forEach(function (g) { tab(g.key, g.group, visibleMembers(g).length); });
+    if (todayOn()) {   // v2: the Today inbox comes first, with a badge = groups that need something now
+      var tc = todayCount();
+      nav.appendChild(el("button", { class: "fu-tab fu-tab-today", type: "button", role: "tab", "aria-selected": String(STATE.tab === TODAY_TAB), "data-tab": TODAY_TAB, onclick: function () { selectTab(TODAY_TAB); } },
+        [tc ? el("span", { class: "fu-badge", "data-badge": String(tc), "aria-label": tc + " جروب محتاج حاجة" }, [String(tc)]) : null, "📋 اليوم"]));
+    }
+    visibleGroups().forEach(function (g) {
+      var due = v2On() ? dueList(eventsOf(g)) : [], dot = null;
+      if (due.length) {
+        var red = due.some(function (e) { return EV[e.key].tone === "red"; });
+        dot = { tone: red ? "red" : "amber", label: due.length + (due.length === 1 ? " خطوة مستنية" : " خطوات مستنية") };
+      }
+      tab(g.key, g.group, visibleMembers(g).length, dot);
+    });
     if (visibleTabKeys().indexOf(NONE_TAB) >= 0) tab(NONE_TAB, "طلاب غير مصنفين", (d.unclassified || []).filter(yearPass).length);
   }
-  function selectTab(key) {
+  function selectTab(key, keepStep) {
     STATE.tab = key; STATE.open = null; STATE.filter = "all"; STATE.q = ""; STATE.lessonQ = {}; STATE.contact = "all"; STATE.sort = "default";
+    STATE.focus = null; if (!keepStep) STATE.step = null;
     try { sessionStorage.setItem("fu-tab", key); } catch (e) {}
     writeHash(); renderTabs(); renderPage(); window.scrollTo(0, 0);
+    var t = document.querySelector(".fu-tab[aria-selected='true']"); if (t && t.scrollIntoView) try { t.scrollIntoView({ block: "nearest", inline: "nearest" }); } catch (e) {}
   }
   function writeHash() {
     var parts = [];
+    if (STATE.tab === TODAY_TAB) parts.push("today");
     if (STATE.open) parts.push("student=" + STATE.open);
     if (STATE.contact !== "all") parts.push("cf=" + STATE.contact);
     if (STATE.sort === "nc") parts.push("sort=nc");
@@ -753,7 +874,7 @@
   }
   function updatedLine() {
     var n = $("fu-updated");
-    n.textContent = STATE.data ? "آخر تحديث " + hhmm(new Date(STATE.fetchedAt)) + (MOCK ? " · تجربة" : "") : "";
+    n.textContent = STATE.data ? "آخر تحديث " + fmtTime12(hhmm(new Date(STATE.fetchedAt)), "ar") + (MOCK ? " · تجربة" : "") : "";
   }
 
   // ---- rendering: group page -------------------------------------------------------------------
@@ -813,11 +934,11 @@
     if (STATE.editTime[g.key] && !g.unclassified) {
       var wd = el("select", { class: "fu-field", id: "fu-wd", "aria-label": "اليوم", style: "direction:rtl;font:inherit" }, DAYS_AR.map(function (n, i) { return el("option", { value: i }, [n]); }));
       wd.value = (s.weekday === null || s.weekday === undefined) ? "6" : String(s.weekday);
-      var tm = el("input", { class: "fu-field", id: "fu-time", type: "time", value: s.time || "18:00", "aria-label": "الساعة", style: "direction:ltr" });
+      var tm = timePicker12("fu-time", s.time || "18:00", 5);   // v2: 12-hour picker, same on every phone (no <input type=time>)
       card.appendChild(el("div", { class: "fu-role" }, [
-        el("div", { class: "fu-row" }, [el("div", { style: "flex:1" }, [wd]), el("div", { style: "flex:1" }, [tm])]),
+        el("div", { class: "fu-row", style: "align-items:flex-end" }, [el("div", { style: "flex:1;min-width:120px" }, [el("span", { class: "fu-label" }, ["اليوم"]), wd]), el("div", { style: "flex:2;min-width:200px" }, [el("span", { class: "fu-label" }, ["الساعة (" + tzLabel() + ")"]), tm.node])]),
         el("div", { style: "margin-top:10px" }, [el("button", { class: "fu-btn primary", id: "fu-save-time", type: "button", onclick: function () {
-          STATE.editTime[g.key] = false; saveGroup(g, { weekday: +wd.value, time: tm.value }, { reload: false });
+          STATE.editTime[g.key] = false; saveGroup(g, { weekday: +wd.value, time: tm.value() }, { reload: false });
         } }, ["حفظ الميعاد"])]),
       ]));
     }
@@ -961,6 +1082,15 @@
     ]);
     if (s.note || s.watch_deadline_override || s.hw_deadline_override) det.open = true;
     card.appendChild(det);
+    // v2: per-group Telegram notifications (S2's settings actions). Owner + owner's assistants only: the server refuses
+    // admin_fu2_notify_settings_* for teachers and teacher-appointed assistants (not in P4_ACTIONS), and messages go to the owner's chat.
+    var notifyRole = STATE.role !== "teacher" && STATE.role !== "sassistant";
+    if (notifyRole && (v2On() || g.notify)) {
+      var nf = g.notify || { enabled: true, hour: 16, snooze_until: "" }, sz = nf.snooze_until && STATE.data.today && nf.snooze_until > STATE.data.today;
+      var hourTxt = fmtTime12(String(+nf.hour || 16).padStart(2, "0") + ":00", "ar") + " " + tzLabel();
+      card.appendChild(el("button", { class: "fu-btn", id: "fu-notify-open", type: "button", style: "margin-top:10px", onclick: function () { openNotify(g); } },
+        ["🔔 الإشعارات · " + (nf.enabled === false ? "متوقفة" : (sz ? "موقوفة مؤقتًا" : hourTxt))]));
+    }
     return card;
   }
 
@@ -1092,6 +1222,7 @@
   function listHead(V) {
     var f = document.createDocumentFragment();
     f.appendChild(el("div", { class: "fu-listhead" }, [el("h2", { id: "fu-count" }, ["الطلاب · " + V.rows.length])]));
+    if (STATE.focus) f.appendChild(el("button", { class: "fu-chip amber fu-focus", id: "fu-focus", type: "button", onclick: function () { STATE.focus = null; refreshPage(); } }, ["🎯 " + STATE.focus.label + " · ✕ اعرض الكل"]));
     var inp = el("input", { type: "search", id: "fu-q", placeholder: "🔍 ابحث بالاسم…", value: STATE.q, "aria-label": "بحث بالاسم أو الرقم", autocomplete: "off" });
     inp.addEventListener("input", function () { STATE.q = inp.value; renderRows(V); });
     f.appendChild(el("div", { class: "fu-search" }, [inp]));
@@ -1118,15 +1249,19 @@
   }
   function passFilter(r) {
     var f = STATE.filter;
+    if (STATE.focus && !STATE.focus.keys[r.st.key]) return false;
     if (f !== "all" && !r.tags[f]) return false;
     if (STATE.contact !== "all" && r.contact.state !== STATE.contact) return false;
     var q = (STATE.q || "").trim().toLowerCase();
     if (!q) return true;
     return r.st.name.toLowerCase().indexOf(q) >= 0 || String(r.st.phone).indexOf(q.replace(/\D/g, "") || "\u0000") >= 0;
   }
-  function microChips(r) {
+  function microChips(r, g) {
     var chips = el("div", { class: "fu-chips chips" });
-    (r.sm.microChips || []).forEach(function (c) { chips.appendChild(el("span", { class: "fu-chip t-" + (c.tone || "grey"), "data-chip": c.key }, [c.label])); });
+    (r.sm.microChips || []).forEach(function (c) {
+      if (g && (c.key === "watch" || c.key === "homework" || c.key === "quiz" || c.key === "attendance") && !reqOn(g, c.key)) return;   // v2: disabled requirement
+      chips.appendChild(el("span", { class: "fu-chip t-" + (c.tone || "grey"), "data-chip": c.key }, [c.label]));
+    });
     if (STATE.year === "all") { var yk = yearOfStudent(r.st); if (yk) chips.insertBefore(el("span", { class: "fu-chip fu-year-chip", "data-chip": "year" }, ["S" + yk]), chips.firstChild); }
     if (flag("FF_PARENT_LOG") && logOf(r.st.key)[0]) chips.appendChild(el("span", { class: "fu-chip green", "data-chip": "notified", title: "آخر تواصل مع ولي الأمر" + (r.contact.sum.contacted_month ? "" : " (مش الشهر ده)") }, [(r.contact.state === "contacted" ? "✅ تم التواصل · " : "📨 ") + dmOf(r.contact.sum.last_sent_at || logOf(r.st.key)[0].sent_at)]));
     if (r.contact.state === "pending") chips.appendChild(el("span", { class: "fu-chip amber", "data-chip": "contact-pending", title: "فيه مشكلة مستحقة ولسه ما اتسجّلش تواصل عنها" }, ["⭕ لم يتم التواصل"]));
@@ -1159,21 +1294,24 @@
         } }, [x[1]]));
       });
       A.appendChild(seg);
-      if (!f.attendance) A.appendChild(el("div", { class: "fu-hint", style: "background:var(--fu-warn-bg);color:var(--fu-warn)" }, ["⚠️ الحضور غير محدد"]));
+      var wpct = watchPct(g), watchOn = reqOn(g, "watch");
+      if (!f.attendance) { if (reqOn(g, "attendance")) A.appendChild(el("div", { class: "fu-hint", style: "background:var(--fu-warn-bg);color:var(--fu-warn)" }, ["⚠️ الحضور غير محدد"])); }
+      else if (!watchOn) { /* v2: watching is not a requirement for this group */ }
       else {
-        var wd = f.attendance === "center" ? null : ((f.watch_pct || 0) >= d.settings.watch_done_pct);
+        var wd = f.attendance === "center" ? null : ((f.watch_pct || 0) >= wpct);
         A.appendChild(el("div", { class: "fu-chips", style: "margin-top:10px", "data-att-state": f.attendance === "center" ? "center" : (wd ? "watched" : "must") }, [
           f.attendance === "center" ? el("span", { class: "fu-chip green" }, ["🏫 حضر في السنتر"]) : (wd ? el("span", { class: "fu-chip green" }, ["✅ شاهد أونلاين"]) : el("span", { class: "fu-chip amber" }, ["💻 لازم يشاهد أونلاين"]))]));
       }
       if (f.attendance === "center") A.appendChild(el("div", { class: "fu-chips", style: "margin-top:10px" }, [el("span", { class: "fu-chip green" }, ["🔓 الفيديو والكويز مفتوحين مجانًا"])]));
       var watch = el("div", { style: "margin-top:12px", "data-watch": "" });
       var pct = f.watch_pct;
-      if (f.attendance === "center") watch.appendChild(el("div", { class: "fu-dim" }, ["المشاهدة اختيارية" + (pct !== null && pct !== undefined ? " — اتشاف منها " + pct + "%" : "")]));
+      if (!watchOn) watch.appendChild(el("div", { class: "fu-dim", "data-req-off": "watch" }, ["المشاهدة مش مطلوبة للجروب ده"]));
+      else if (f.attendance === "center") watch.appendChild(el("div", { class: "fu-dim" }, ["المشاهدة اختيارية" + (pct !== null && pct !== undefined ? " — اتشاف منها " + pct + "%" : "")]));
       else if (f.can_watch === false) watch.appendChild(el("div", { class: "fu-chips" }, [el("span", { class: "fu-chip red" }, ["🔒 الفيديو مقفول"])]));
       else if (pct === null || pct === undefined) watch.appendChild(el("div", { class: "fu-dim" }, ["لا توجد بيانات"]));
       else {
-        watch.appendChild(el("div", { class: "fu-row fu-between" }, [el("span", { class: "fu-label" }, ["مشاهدة الحصة: " + pct + "%"]), el("span", { class: "fu-dim" }, ["المطلوب " + d.settings.watch_done_pct + "%"])]));
-        watch.appendChild(el("div", { class: "fu-bar", role: "progressbar", "aria-valuenow": pct, "aria-valuemin": 0, "aria-valuemax": 100 }, [el("i", { style: "width:" + Math.min(100, pct) + "%" }), el("u", { style: "inset-inline-start:" + d.settings.watch_done_pct + "%" })]));
+        watch.appendChild(el("div", { class: "fu-row fu-between" }, [el("span", { class: "fu-label" }, ["مشاهدة الحصة: " + pct + "%"]), el("span", { class: "fu-dim" }, ["المطلوب " + wpct + "%"])]));
+        watch.appendChild(el("div", { class: "fu-bar", role: "progressbar", "aria-valuenow": pct, "aria-valuemin": 0, "aria-valuemax": 100 }, [el("i", { style: "width:" + Math.min(100, pct) + "%" }), el("u", { style: "inset-inline-start:" + wpct + "%" })]));
       }
       A.appendChild(watch);
       if (info.has_video === false) A.appendChild(el("div", { class: "fu-dim" }, ["الحصة دي ملهاش فيديو"]));
@@ -1181,7 +1319,8 @@
     }
     // section B (one sub-block per review lesson)
     allOf(s).forEach(function (path) {
-      var inHw = hwOf(s).indexOf(path) >= 0, inQz = quizOf(s).indexOf(path) >= 0;
+      var inHw = hwOf(s).indexOf(path) >= 0 && reqOn(g, "homework"), inQz = quizOf(s).indexOf(path) >= 0 && reqOn(g, "quiz");
+      if (!inHw && !inQz) return;   // v2: both requirements of this lesson are switched off for the group
       var f = facts[path] || {}, info = lessonInfo(path) || {}, B = el("div", { class: "fu-sec", "data-sec": "review" });
       B.appendChild(el("h4", {}, [el("span", {}, [inHw && inQz ? "📝 واجب وكويز" : (inHw ? "📝 الواجب" : "❓ الكويز")]), lessonNo(path) ? el("span", { class: "fu-dim" }, [lessonNo(path)]) : null]));
       B.appendChild(el("div", { style: "margin-bottom:8px" }, [lessonChip(path)]));
@@ -1229,7 +1368,7 @@
       var st = r.st, open = STATE.open === st.key;
       var head = el("button", { class: "fu-stu-head", type: "button", "aria-expanded": String(open), "aria-controls": "fu-body-" + st.key, onclick: function () { toggleStudent(st.key); } }, [
         el("span", { class: "fu-av", "aria-hidden": "true" }, [(st.name || "?").trim().charAt(0).toUpperCase()]),
-        el("span", { class: "fu-stu-main" }, [el("div", { class: "fu-stu-name" }, [st.name]), microChips(r)]),
+        el("span", { class: "fu-stu-main" }, [el("div", { class: "fu-stu-name" }, [st.name]), microChips(r, V.g)]),
         el("span", { class: "fu-chev", "aria-hidden": "true" }, [open ? "⌃" : "⌄"]),
       ]);
       var card = el("div", { class: "fu-stu" + (open ? " open" : ""), id: "stu-" + st.key, "data-pk": st.key }, [head]);
@@ -1443,16 +1582,33 @@
     }, { label: "التقرير الشهري" });
   }
 
-  function openReminder(g, V) {
-    var res, err = null, rv = hwOf(g.settings);
+  // v2 (remind_watch): the watch part of the group reminder. Built from the same placeholders as template 4; when the
+  // owner's own group_reminder already uses {watch_list}, that template is used instead.
+  var WATCH_REMINDER = ["السلام عليكم 👋", "", "📣 *تذكير مهم*", "", "من فضلكم نشاهد الحصة على المنصة 🎬", "", "{watch_list}", "", "{parents_contacted_line}", "",
+    "⏰ *{deadline_when} آخر معاد* للمشاهدة بإذن الله، وبعدها هيتم التواصل مع أولياء الأمور 🙏"].join("\n");
+  function watchReminderText(g, V) {
+    var t = T(), own = (STATE.data.templates || {}).group_reminder;
+    var tpl = own && own.indexOf("{watch_list}") >= 0 ? own : WATCH_REMINDER;
+    var dls = Object.assign({}, V.dl.raw || {}); dls.hw = (V.dl.raw || {}).watch;   // {deadline_when} = the watch deadline here
+    if (t.setLessonTitles) t.setLessonTitles(TITLES);
+    var c = t.buildContext({ student: {}, group: g, lesson: g.settings.current_lesson, kind: "group_reminder", facts: null, deadlines: dls, now: nowD(), lessons: STATE.data.lessons });
+    var r = t.render(tpl, c);
+    return { text: (r && r.text) || "", missing: (r && r.missing) || [] };
+  }
+  function openReminder(g, V, opts) {
+    opts = opts || {};
+    var res, err = null, rv = hwOf(g.settings), watch = !!opts.watch;
     try {
-      var ctx = { student: {}, group: g, lesson: rv[0] || g.settings.current_lesson, verdicts: null, facts: null, deadlines: V.dl.raw, now: nowD(), lessons: STATE.data && STATE.data.lessons };
-      res = composeMsg(null, "group_reminder", ctx);
+      if (watch && T().buildContext && T().render) res = watchReminderText(g, V);
+      else {
+        var ctx = { student: {}, group: g, lesson: rv[0] || g.settings.current_lesson, verdicts: null, facts: null, deadlines: V.dl.raw, now: nowD(), lessons: STATE.data && STATE.data.lessons };
+        res = composeMsg(null, "group_reminder", ctx);
+      }
     } catch (e) { console.error(e); err = e; res = { text: "", missing: [] }; }
-    var st = dlState(V.dl.hw), stTxt = { upcoming: "قبل الميعاد", today: "النهارده", overdue: "انتهى", none: "بدون ميعاد" }[st];
-    var names = missingNames(V);
+    var st = dlState(watch ? V.dl.watch : V.dl.hw), stTxt = { upcoming: "قبل الميعاد", today: "النهارده", overdue: "انتهى", none: "بدون ميعاد" }[st];
+    var names = watch ? V.rows.filter(function (r) { return r.tags.unwatched; }).map(function (r) { return r.st.name; }) : missingNames(V);
     openSheet(function (sheet) {
-      sheet.appendChild(el("div", { class: "fu-row fu-between" }, [el("h2", {}, ["تذكير الجروب · " + g.group]), el("span", { class: "fu-chip " + (st === "overdue" ? "red" : st === "today" ? "amber" : "green"), id: "fu-reminder-state" }, [stTxt])]));
+      sheet.appendChild(el("div", { class: "fu-row fu-between" }, [el("h2", {}, [(watch ? "تذكير المشاهدة · " : "تذكير الجروب · ") + g.group]), el("span", { class: "fu-chip " + (st === "overdue" ? "red" : st === "today" ? "amber" : "green"), id: "fu-reminder-state" }, [stTxt])]));
       if (err) sheet.appendChild(el("div", { class: "fu-warnbox", role: "alert" }, ["تعذّر تجهيز الرسالة: " + err.message]));
       if (res.missing.length) sheet.appendChild(el("div", { class: "fu-warnbox" }, ["متغيرات غير معروفة في القالب: " + res.missing.join(" ")]));
       var bubble = el("div", { class: "fu-bubble", id: "fu-preview", dir: "auto" });
@@ -1461,7 +1617,8 @@
       sheet.appendChild(el("div", { class: "fu-dim", style: "margin-bottom:12px" }, ["الجروبات مفيهاش رابط مباشر — اضغط «نسخ» والصق الرسالة في جروب واتساب."]));
       sheet.appendChild(el("div", { class: "fu-stack" }, [
         el("button", { class: "fu-btn primary", id: "fu-copy", type: "button", onclick: function () { copy(res.text); } }, ["📋 نسخ الرسالة"]),
-        el("button", { class: "fu-btn", id: "fu-copy-names2", type: "button", onclick: function () { if (names.length) copy(names.join("\n")); else toast("كله سلّم الواجب 🎉"); } }, ["📋 نسخ أسماء اللي لسه ما سلّموش (" + names.length + ")"]),
+        el("button", { class: "fu-btn", id: "fu-copy-names2", type: "button", onclick: function () { if (names.length) copy(names.join("\n")); else toast(watch ? "كله شاف الحصة 🎉" : "كله سلّم الواجب 🎉"); } }, [(watch ? "📋 نسخ أسماء اللي لسه ما شافوش (" : "📋 نسخ أسماء اللي لسه ما سلّموش (") + names.length + ")"]),
+        opts.ev && DONE_KIND[opts.ev.key] ? el("button", { class: "fu-btn", id: "fu-reminder-sent", type: "button", onclick: function () { closeSheet(); markDone(g, opts.ev); } }, ["✔ تم إرسال التذكير"]) : null,
         el("button", { class: "fu-btn", id: "fu-close", type: "button", onclick: closeSheet }, ["إغلاق"]),
       ]));
     }, { label: "تذكير الجروب" });
@@ -1530,13 +1687,470 @@
       sheet.appendChild(el("ol", { class: "fu-help" }, [
         "الإرسال يدوي بس — مفيش بوتات ولا أتمتة غير رسمية لواتساب (خطر حظر الحساب).",
         "ما تبعتش عشرات الرسائل في دقايق — وزّعها.",
-        "تجنّب الإرسال متأخر بالليل (بعد 10 مساءً بتوقيت القاهرة).",
+        "تجنّب الإرسال متأخر بالليل (بعد " + fmtTime12("22:00", "ar") + " بتوقيت " + tzLabel() + ").",
         "رسالة الجروب الأول، ورسالة ولي الأمر بعد الميعاد بس.",
         "بيانات الطلاب وأولياء الأمور تفضل ورا تسجيل دخول الأدمن، ومتتحطش في الريبو.",
       ].map(function (t) { return el("li", {}, [t]); })));
       if (focus !== "required") sheet.appendChild(rg);
       sheet.appendChild(el("button", { class: "fu-btn", id: "fu-close", type: "button", onclick: closeSheet }, ["تمام"]));
     }, { label: "دليل الاستخدام", full: true });
+  }
+
+  // ===========================================================================================
+  // Follow-up v2 (S1): "what is the next step?"
+  //   Renders what FollowupEvents.eventsFor(...) returns (contract 3.2). It never decides what is due itself.
+  //   Without window.FollowupEvents the page keeps the old layout (no Today tab, no hero, no dots).
+  // ===========================================================================================
+  function v2On() { return !!(window.FollowupEvents && typeof window.FollowupEvents.eventsFor === "function"); }
+  function todayOn() { return v2On() && allGroups().length > 0; }   // no groups at all -> the old "no groups yet" empty state
+  var EV_ORDER = ["attendance", "parents_watch", "parents_hw", "remind_watch", "remind_hw", "advance_lessons", "setup_missing"];
+  var EV = {
+    attendance: { icon: "🙋", short: "سجّل الحضور", tone: "red" },
+    parents_watch: { icon: "👨‍👩‍👧", short: "كلّم أولياء الأمور (المشاهدة)", tone: "red" },
+    parents_hw: { icon: "👨‍👩‍👧", short: "كلّم أولياء الأمور (الواجب والكويز)", tone: "red" },
+    remind_watch: { icon: "📣", short: "فكّر الجروب بمشاهدة الحصة", tone: "amber" },
+    remind_hw: { icon: "📝", short: "ذكّر الجروب بالواجب", tone: "amber" },
+    advance_lessons: { icon: "📚", short: "انقل الدرس التالي", tone: "amber" },
+    setup_missing: { icon: "⚙️", short: "كمّل إعداد الجروب", tone: "amber" },
+  };
+  var DONE_KIND = { remind_watch: "watch", remind_hw: "hw", advance_lessons: "advance" };
+  function nStu(n) { return n === 1 ? "طالب واحد" : (n === 2 ? "طالبين" : n + (n >= 3 && n <= 10 ? " طلاب" : " طالب")); }
+  function nParents(n) { return n === 1 ? "ولي أمر واحد" : n + " أولياء أمور"; }
+
+  function eventsOf(g) {
+    if (!v2On() || !g || g.unclassified) return null;
+    try { return window.FollowupEvents.eventsFor(STATE.data, g.key, nowD().toISOString()) || null; }
+    catch (e) { console.error("FollowupEvents.eventsFor failed", e); return null; }
+  }
+  function dueList(R) { return ((R && R.events) || []).filter(function (e) { return e.state === "due"; }).sort(function (a, b) { return EV_ORDER.indexOf(a.key) - EV_ORDER.indexOf(b.key); }); }
+  // the event the hero shows: the deep-linked / tapped step when it exists, else the top due event, else null (all clear)
+  function heroEvent(g, R) {
+    var ev = (R && R.events) || [];
+    if (STATE.step && STATE.stepGroup === g.key) { var s = ev.filter(function (e) { return e.key === STATE.step; })[0]; if (s) return s; }
+    return dueList(R)[0] || null;
+  }
+  function evTitle(e) {
+    var n = e.count || 0;
+    switch (e.key) {
+      case "attendance": return "سجّل الحضور";
+      case "parents_watch": return "كلّم " + nParents(n);
+      case "parents_hw": return "كلّم " + nParents(n);
+      case "remind_watch": return "فكّر الجروب بمشاهدة الحصة";
+      case "remind_hw": return "ذكّر الجروب بالواجب";
+      case "advance_lessons": return "الحصة خلصت 🎉 ننقل للدرس التالي؟";
+      case "setup_missing": return "كمّل إعداد الجروب";
+    }
+    return e.key;
+  }
+  function evSub(g, R, e) {
+    var n = e.count || 0, s = g.settings || {}, parts = [];
+    if (e.state === "upcoming") return "لسه بدري · تبدأ " + whenText(e.fire_at_iso);
+    if (e.state === "done") return "✓ اتعملت";
+    if (e.state === "expired") return "الوقت بتاعها عدّى";
+    switch (e.key) {
+      case "attendance":
+        parts.push(nStu(n) + " لسه مش متحدد");
+        if (R.prev_session && R.prev_session.at_iso) parts.push("الحصة خلصت " + fmtTime12((wallOf(R.prev_session.at_iso) || {}).hhmm, "ar"));
+        break;
+      case "parents_watch": parts.push("لم يشاهدوا الحصة", "الميعاد عدّى"); break;
+      case "parents_hw": parts.push("واجب ناقص أو غياب كويز", "الميعاد عدّى"); break;
+      case "remind_watch": parts.push(nStu(n) + " لسه ما شافوش الحصة"); if (e.expires_at_iso) parts.push("الميعاد " + whenText(e.expires_at_iso, false)); break;
+      case "remind_hw": parts.push(nStu(n) + " لم يسلّموا"); if (e.expires_at_iso) parts.push("الميعاد " + whenText(e.expires_at_iso, false)); break;
+      case "advance_lessons":
+        if (R.prev_session && R.prev_session.at_iso) {
+          var w = wallOf(R.prev_session.at_iso), hrs = Math.max(0, Math.round((nowD() - w.date) / 3600000));
+          parts.push(DAYS_AR[weekdayOfYmd(w.ymd)] + " " + fmtTime12(w.hhmm, "ar"), hrs < 1 ? "خلصت دلوقتي" : (hrs < 24 ? "انتهت من " + (hrs === 1 ? "ساعة" : hrs === 2 ? "ساعتين" : hrs + (hrs <= 10 ? " ساعات" : " ساعة")) : "انتهت من " + (function (dd) { return dd === 1 ? "يوم" : dd === 2 ? "يومين" : dd + " أيام"; }(Math.round(hrs / 24)))));
+        }
+        break;
+      case "setup_missing":
+        parts.push(s.weekday === null || s.weekday === undefined || !s.time ? "الجروب ملوش ميعاد حصة" : "مفيش حصة حالية مختارة"); break;
+    }
+    var line = parts.join(" · ");
+    if (e.blocked_count) line += " · " + nStu(e.blocked_count) + " مستنيين تحديد الحضور";
+    return line;
+  }
+  function nextLine(R) {
+    if (!R || !R.next_event_at_iso) return "";
+    var nx = (R.events || []).filter(function (e) { return e.state === "upcoming" && e.fire_at_iso === R.next_event_at_iso; })[0];
+    return (nx ? EV[nx.key].short + " " : "") + whenText(R.next_event_at_iso);
+  }
+
+  // ---- hero card -----------------------------------------------------------------------------
+  function heroCard(g, V, R) {
+    var e = heroEvent(g, R), key = e ? e.key : "all_clear";
+    var card = el("section", { class: "fu-card fu-hero" + (e ? "" : " clear"), id: "fu-hero", "data-phase": key, "data-state": e ? e.state : "clear", "aria-label": "الخطوة الجاية" });
+    card.appendChild(el("div", { class: "fu-eyebrow" }, ["الخطوة الجاية"]));
+    if (!e) {
+      card.appendChild(el("h2", { class: "fu-hero-title", id: "fu-hero-title" }, ["✅ كله تمام"]));
+      var nl = nextLine(R);
+      card.appendChild(el("div", { class: "fu-hero-sub", id: "fu-hero-sub" }, [nl ? "الجاي: " + nl : "مفيش حاجة مطلوبة دلوقتي"]));
+      return card;
+    }
+    if (key === "advance_lessons" && e.state !== "done") return advanceCard(g, V, R, e, card);
+    card.appendChild(el("h2", { class: "fu-hero-title", id: "fu-hero-title" }, [evTitle(e) + " " + EV[key].icon]));
+    card.appendChild(el("div", { class: "fu-hero-sub", id: "fu-hero-sub" }, [evSub(g, R, e)]));
+    if ((key === "remind_hw" || key === "remind_watch") && e.lesson) card.appendChild(el("div", { class: "fu-hero-box" }, [el("span", { class: "fu-dim" }, ["الدرس"]), lessonChip(e.lesson)]));
+    var btns = el("div", { class: "fu-stack fu-hero-btns" });
+    var live = e.state === "due";
+    function primary(label, cls, fn) { btns.appendChild(el("button", { class: "fu-btn " + cls, id: "fu-hero-go", type: "button", "data-step": key, disabled: live ? null : "", onclick: fn }, [label])); }
+    if (key === "attendance") primary("🙋 افتح الحضور", "primary", function () { goAttendance(g); });
+    else if (key === "parents_watch" || key === "parents_hw") primary("💬 ابدأ (" + (e.count || 0) + ")", "wa", function () { openWalk(g, STATE.view, e); });
+    else if (key === "remind_watch" || key === "remind_hw") {
+      primary("💬 افتح رسالة الجروب", "wa", function () { openReminder(g, STATE.view, { watch: key === "remind_watch", ev: e }); });
+      btns.appendChild(el("button", { class: "fu-btn", id: "fu-hero-sent", type: "button", disabled: live ? null : "", onclick: function () { markDone(g, e); } }, ["✔ تم إرسال التذكير"]));
+    } else if (key === "setup_missing") primary("⚙️ " + (evSub(g, R, e).indexOf("ميعاد") >= 0 ? "حدد ميعاد الحصة" : "اختار الحصة الحالية"), "primary", function () { goSetup(g); });
+    if (btns.childNodes.length) card.appendChild(btns);
+    var nl2 = nextLine(R);
+    if (nl2) card.appendChild(el("div", { class: "fu-hero-next", id: "fu-hero-next" }, ["⏭ بعده: " + nl2]));
+    if (STATE.step && STATE.stepGroup === g.key && dueList(R)[0] && dueList(R)[0].key !== key) {
+      card.appendChild(el("button", { class: "fu-infolink", id: "fu-hero-back", type: "button", onclick: function () { STATE.step = null; refreshPage(); } }, ["↩ ارجع للخطوة الأهم"]));
+    }
+    return card;
+  }
+  // "also waiting": the other due events (priority order), then the next upcoming ones, muted
+  function alsoCard(g, R) {
+    var hero = heroEvent(g, R), due = dueList(R).filter(function (e) { return !hero || e.key !== hero.key; });
+    var up = ((R && R.events) || []).filter(function (e) { return e.state === "upcoming" && e.count !== 0 && (!hero || e.key !== hero.key); })
+      .sort(function (a, b) { return String(a.fire_at_iso).localeCompare(String(b.fire_at_iso)); }).slice(0, 2);
+    if (!due.length && !up.length) return null;
+    var box = el("section", { class: "fu-also", id: "fu-also", "aria-label": "كمان مستني" }, [el("div", { class: "fu-also-h" }, ["كمان مستني"])]);
+    due.concat(up).forEach(function (e) {
+      var tail = e.state === "due" ? (e.count ? " (" + e.count + ")" : "") : " — " + whenText(e.fire_at_iso);
+      box.appendChild(el("button", { class: "fu-also-row" + (e.state === "due" ? " due" : ""), type: "button", "data-also": e.key, "data-state": e.state, onclick: function () {
+        STATE.step = e.key; STATE.stepGroup = g.key; refreshPage(); var h = $("fu-hero"); if (h && h.scrollIntoView) h.scrollIntoView({ block: "start", behavior: "smooth" });
+      } }, [EV[e.key].icon + " " + EV[e.key].short + tail]));
+    });
+    return box;
+  }
+
+  // ---- hero actions --------------------------------------------------------------------------
+  function goAttendance(g) {
+    STATE.focus = null; STATE.filter = "unmarked"; STATE.q = "";
+    var first = (STATE.view && STATE.view.rows || []).filter(function (r) { return r.tags.unmarked; })[0];
+    STATE.open = first ? first.st.key : null; writeHash(); refreshPage();
+    var n = first ? $("stu-" + first.st.key) : $("fu-rows");
+    if (n && n.scrollIntoView) n.scrollIntoView({ block: "start", behavior: "smooth" });
+    if (!first) toast("كل الحضور متسجّل ✓");
+  }
+  function goSetup(g) {
+    var s = g.settings || {};
+    if (s.weekday === null || s.weekday === undefined || !s.time) {
+      STATE.editTime[g.key] = true; refreshPage();
+      var n = $("fu-wd"); if (n) { n.scrollIntoView({ block: "center", behavior: "smooth" }); n.focus({ preventScroll: true }); }
+    } else {
+      var a = $("fu-role-a"); if (a) { a.scrollIntoView({ block: "center", behavior: "smooth" }); var b = a.querySelector("button,select"); if (b) b.focus({ preventScroll: true }); }
+    }
+  }
+  function markDone(g, e) {
+    var kind = DONE_KIND[e.key]; if (!kind) return Promise.resolve(false);
+    return api({ action: "admin_fu2_mark_done", group: g.key, kind: kind, session_date: e.session_date }).then(function (res) {
+      g.done = res.done || (g.done || []).concat([kind + "|" + e.session_date]);
+      if (STATE.step === e.key) STATE.step = null;
+      refreshPage(); renderTabs();
+      toast(kind === "advance" ? "اتنقل الجروب للدرس التالي ✓" : "اتسجّل إن التذكير اتبعت ✓");
+      return true;
+    }, function (err) { toast(errText(err), { err: true }); return false; });
+  }
+
+  // ---- pending "done" marks for staged edits (P4 Save model) ---------------------------------
+  // {group key: ["advance|<date>", ...]} kept in sessionStorage, because restored drafts lose their callbacks.
+  var PENDING_KEY = "fu2-pending-done";
+  function pendingAll() { try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || "{}") || {}; } catch (e) { return {}; } }
+  function pendingPut(o) { try { if (Object.keys(o).length) sessionStorage.setItem(PENDING_KEY, JSON.stringify(o)); else sessionStorage.removeItem(PENDING_KEY); } catch (e) {} }
+  function addPendingDone(g, tok) {
+    var o = pendingAll(); o[g.key] = (o[g.key] || []).filter(function (t) { return t !== tok; }).concat([tok]); pendingPut(o);
+    g.done = (g.done || []).concat((g.done || []).indexOf(tok) < 0 ? [tok] : []);
+  }
+  function dropPendingDone(gk) {
+    var o = pendingAll(), toks = o[gk] || []; delete o[gk]; pendingPut(o);
+    var g = groupByKey(gk); if (g) g.done = (g.done || []).filter(function (t) { return toks.indexOf(t) < 0; });
+  }
+  function groupStaged(g) { return !!(window.Draft && window.Draft.has && window.Draft.has("group:" + g.group)); }
+  function applyPendingDone() {
+    var o = pendingAll();
+    Object.keys(o).forEach(function (gk) { var g = groupByKey(gk); if (g) o[gk].forEach(function (t) { if ((g.done || []).indexOf(t) < 0) g.done = (g.done || []).concat([t]); }); });
+  }
+  // after a Save: send the marks whose group change is no longer staged (it was saved); after a discard: drop them
+  function flushPendingDone(discarded) {
+    var o = pendingAll();
+    Object.keys(o).forEach(function (gk) {
+      var g = groupByKey(gk); if (!g) { dropPendingDone(gk); return; }
+      if (groupStaged(g)) return;
+      if (discarded) { dropPendingDone(gk); return; }
+      var toks = o[gk]; dropPendingDone(gk);
+      toks.forEach(function (t) {
+        var kind = t.split("|")[0], date = t.split("|")[1], key = { watch: "remind_watch", hw: "remind_hw", advance: "advance_lessons" }[kind];
+        if (key) markDone(g, { key: key, session_date: date });
+      });
+    });
+  }
+
+  // ---- advance lessons (P6) ------------------------------------------------------------------
+  function lessonNum(p, re) { var m = re.exec(lessonSlug(p)); return m ? +m[1] : 999; }
+  // the lesson after `cur` in track order (same folder, then chapter / lesson number), or "" at the end of the track
+  function nextLessonOf(cur) {
+    if (!cur) return "";
+    var dir = cur.slice(0, cur.lastIndexOf("/") + 1), seen = {};
+    var list = (STATE.data.all_lessons || []).map(function (l) { return l.path; }).filter(function (p) {
+      if (!p || seen[p] || p.slice(0, p.lastIndexOf("/") + 1) !== dir) return false; seen[p] = 1; return true;
+    });
+    if (list.indexOf(cur) < 0) list.push(cur);
+    list.sort(function (a, b) { return lessonNum(a, /chapter-(\d+)/i) - lessonNum(b, /chapter-(\d+)/i) || lessonNum(a, /lesson-(\d+)/i) - lessonNum(b, /lesson-(\d+)/i) || a.localeCompare(b); });
+    return list[list.indexOf(cur) + 1] || "";
+  }
+  function moveRow(label, from, to, id) {
+    return el("div", { class: "fu-hero-box fu-move", id: id }, [
+      el("span", { class: "fu-dim" }, [label]),
+      el("span", { class: "fu-move-pair" }, (from.length ? from.map(function (p) { return lessonChip(p); }) : [el("span", { class: "fu-dim" }, ["—"])])
+        .concat([el("span", { class: "fu-arrow", "aria-label": "يتغير إلى" }, ["←"]), to ? lessonChip(to) : el("span", { class: "fu-dim" }, ["—"])])),
+    ]);
+  }
+  function advanceCard(g, V, R, e, card) {
+    var s = g.settings || {}, cur = s.current_lesson || "", next = nextLessonOf(cur), oldHw = hwOf(s), oldQz = quizOf(s);
+    var oldReview = []; oldHw.concat(oldQz).forEach(function (p) { if (oldReview.indexOf(p) < 0) oldReview.push(p); });
+    card.appendChild(el("h2", { class: "fu-hero-title", id: "fu-hero-title" }, [evTitle(e)]));
+    card.appendChild(el("div", { class: "fu-hero-sub", id: "fu-hero-sub" }, [evSub(g, R, e)]));
+    card.appendChild(moveRow("الحصة الحالية", cur ? [cur] : [], next, "fu-adv-current"));
+    card.appendChild(moveRow("واجب + كويز", oldReview, cur, "fu-adv-review"));
+    if (!next) card.appendChild(el("div", { class: "fu-hint", id: "fu-adv-nonext" }, ["مفيش درس بعده في ترتيب المسار — اختار الدرس بنفسك من «تعديل»."]));
+    var live = e.state === "due";
+    var confirm = el("button", { class: "fu-btn primary", id: "fu-adv-confirm", type: "button", disabled: (!next || !live) ? "" : null, onclick: function () {
+      confirm.disabled = true;
+      // P4 Save model: the lesson change is STAGED (sent by the Save bar). The step is shown done right away and is
+      // marked done on the server only once the group change is really saved (or dropped if it is discarded).
+      addPendingDone(g, "advance|" + e.session_date);
+      saveGroup(g, { current_lesson: next, review_lessons: [cur], hw_lessons: [cur], quiz_lessons: [cur] }, { quiet: true,
+        onSaved: function () { flushPendingDone(); },
+        onFailed: function () { dropPendingDone(g.key); refreshPage(); renderTabs(); } });
+      if (STATE.step === e.key) STATE.step = null;
+      refreshPage(); renderTabs();
+      toast("جاهز للحفظ: الدرس التالي لجروب " + g.group + " — اضغط «حفظ»");
+    } }, ["✔ تأكيد"]);
+    var edit = el("button", { class: "fu-btn", id: "fu-adv-edit", type: "button", onclick: function () {
+      var a = $("fu-role-a"); if (a) { a.scrollIntoView({ block: "start", behavior: "smooth" }); var b = a.querySelector("button,select"); if (b) b.focus({ preventScroll: true }); }
+    } }, ["✏️ تعديل"]);
+    card.appendChild(el("div", { class: "fu-btns two fu-hero-btns" }, [confirm, edit]));
+    var dl = null; try { dl = L().groupDeadlines(s, nowD(), STATE.data.settings); } catch (x) { dl = null; }
+    function dlTxt(d) { return d && d.date ? DAYS_AR[weekdayOfYmd(d.date)] + " " + fmtTime12("23:59", "ar") : "—"; }
+    if (dl && (dl.watch || dl.hw)) card.appendChild(el("div", { class: "fu-hero-next", id: "fu-adv-deadlines" }, ["الميعاد الجديد للمشاهدة: " + dlTxt(dl.watch) + " · للواجب: " + dlTxt(dl.hw)]));
+    // what is already done for the session that just ended
+    var rows = V.rows, marked = rows.filter(function (r) { return !r.tags.unmarked; }).length;
+    var hwDone = rows.filter(function (r) { return !r.tags.hwmissing; }).length;
+    var doneBox = el("div", { class: "fu-also fu-done-box", id: "fu-adv-done" }, [el("div", { class: "fu-also-h" }, ["تم"])]);
+    if (reqOn(g, "attendance") && rows.length) doneBox.appendChild(el("div", { class: "fu-also-row static" }, [(marked === rows.length ? "✅" : "⏳") + " الحضور اتسجّل (" + marked + " من " + rows.length + ")"]));
+    if (reqOn(g, "homework") && oldHw.length && rows.length) doneBox.appendChild(el("div", { class: "fu-also-row static" }, [(hwDone === rows.length ? "✅" : "⏳") + " واجب " + (lessonNo(oldHw[0]) || lessonTitle(oldHw[0])) + ": " + hwDone + " من " + rows.length]));
+    var frag = document.createDocumentFragment(); frag.appendChild(card);
+    if (doneBox.childNodes.length > 1) frag.appendChild(doneBox);
+    return frag;
+  }
+
+  // ---- parent-message walk-through (S3's FollowupWalk; falls back to the single-message flow) ----
+  function walkAction(r, kind, cur) {
+    var pool = r.ac.neg.filter(function (a) { return !a.blocked && !a.stub && (kind === "parents_watch" ? a.session : !a.session); });
+    if (flag("FF_PARENT_LOG")) pool = pool.filter(function (a) { return logItems(a).some(function (it) { return !loggedFor(r.st.key, it); }); });
+    if (pool.length >= 2) return { kind: "combined", lesson: cur, label: "💬 رسالة مجمّعة لولي الأمر (" + pool.length + ")", due: true, issues: pool };
+    return pool[0] || null;
+  }
+  function composeFor(r, g, a, V) {
+    var ctx = { student: r.st, group: g, lesson: a.lesson, facts: (STATE.data.facts[r.st.key] || {})[a.lesson] || null, deadlines: V.dl.raw, now: nowD(), lessons: STATE.data.lessons };
+    var sm = Object.assign({}, r.sm, { dueIssues: (a.issues || []).map(function (i) { return { kind: i.kind, lesson: i.lesson }; }) });
+    try { return composeMsg(sm, a.kind, ctx).text; } catch (e) { console.error(e); return ""; }
+  }
+  function logSent(st, a) {
+    if (!flag("FF_PARENT_LOG")) return Promise.resolve();
+    var d = STATE.data; d.parent_log = d.parent_log || {};
+    return logItems(a).reduce(function (p, it) {
+      return p.then(function () {
+        if (loggedFor(st.key, it)) return;
+        return api({ action: "admin_log_parent_notification", student: st.phone, kind: it.kind, ref: it.ref, note: "" }).then(function (res) {
+          var arr = d.parent_log[st.key] = (d.parent_log[st.key] || []).filter(function (n) { return !(n.kind === it.kind && String(n.ref).toLowerCase() === String(it.ref).toLowerCase()); });
+          arr.unshift({ kind: it.kind, ref: String(it.ref).toLowerCase(), sent_at: (res.notification || {}).sent_at || (d.today + " 00:00:00"), note: "" });
+        });
+      });
+    }, Promise.resolve());
+  }
+  function openWalk(g, V, e) {
+    var cur = g.settings.current_lesson, keys = e.student_keys || [], byKey = {};
+    (g.members || []).forEach(function (m) { byKey[pkOf(m.phone)] = m; });
+    var built = [];
+    keys.forEach(function (pk) {
+      var m = byKey[pk]; if (!m) return;
+      var r = makeRow(g, m, V.dl), a = walkAction(r, e.key, cur); if (!a) return;
+      built.push({ r: r, a: a });
+    });
+    if (!built.length) { toast("مفيش رسائل مستنية دلوقتي ✓"); return; }
+    if (!window.FollowupWalk || typeof window.FollowupWalk.open !== "function") {   // fallback: the list of those students + the first message
+      var only = {}; built.forEach(function (b) { only[b.r.st.key] = 1; });
+      STATE.focus = { keys: only, label: EV[e.key].short }; STATE.filter = "all"; STATE.open = built[0].r.st.key; writeHash(); refreshPage();
+      openMessage(built[0].r, g, built[0].a, V);
+      return;
+    }
+    var byPk = {}; built.forEach(function (b) { byPk[b.r.st.key] = b; });
+    window.FollowupWalk.open({
+      group: g, kind: e.key, templates: STATE.data.templates || {},
+      rows: built.map(function (b) {
+        return { key: b.r.st.key, name: b.r.st.name, parent_phone: b.r.st.parent_phone || "",
+          issues: (b.a.issues || [b.a]).map(function (i) { return { kind: i.kind, lesson: i.lesson, label: String(i.label || "").replace(/^[^\s]+\s/, "") }; }),
+          message: composeFor(b.r, g, b.a, V) };
+      }),
+      onDone: function (res) {
+        var sent = (res && res.sent) || [];
+        sent.reduce(function (p, pk) { var b = byPk[pk]; return b ? p.then(function () { return logSent(b.r.st, b.a); }) : p; }, Promise.resolve()).then(function () {
+          refreshPage(); renderTabs();
+          if (sent.length) toast(flag("FF_PARENT_LOG") ? "اتسجّل التواصل مع " + nParents(sent.length) + " ✓" : "تمام ✓");
+        }, function (err) { refreshPage(); toast(errText(err), { err: true }); });
+      },
+      onClose: function () {},
+    });
+  }
+
+  // ---- Today tab ("what to do now", across groups) -------------------------------------------
+  function todayItems() {
+    return visibleGroups().map(function (g) {
+      var R = eventsOf(g), top = dueList(R)[0] || null;
+      return { g: g, R: R, top: top, due: dueList(R) };
+    });
+  }
+  function todayCount() { return todayItems().filter(function (x) { return x.top; }).length; }
+  function goStep(g, key) { STATE.step = key || null; STATE.stepGroup = g.key; selectTab(g.key, true); }
+  function renderToday(root) {
+    var items = todayItems(), busy = items.filter(function (x) { return x.top; }), idle = items.filter(function (x) { return !x.top; });
+    busy.sort(function (a, b) {
+      return EV_ORDER.indexOf(a.top.key) - EV_ORDER.indexOf(b.top.key) || String(a.top.fire_at_iso).localeCompare(String(b.top.fire_at_iso)) || a.g.group.localeCompare(b.g.group);
+    });
+    root.appendChild(el("h2", { class: "fu-today-h", id: "fu-today-h" }, [busy.length ? "اللي محتاج تعمله دلوقتي" : "مفيش حاجة مطلوبة دلوقتي 🎉"]));
+    var list = el("div", { id: "fu-today" });
+    busy.forEach(function (x) {
+      var e = x.top, start = e.key === "parents_watch" || e.key === "parents_hw";
+      var more = x.due.length > 1 ? " · +" + (x.due.length - 1) + " كمان" : "";
+      list.appendChild(el("div", { class: "fu-card fu-inrow", "data-group": x.g.key, "data-step": e.key }, [
+        el("button", { class: "fu-inrow-main", type: "button", onclick: function () { goStep(x.g, e.key); } }, [
+          el("span", { class: "fu-inrow-g", dir: "auto" }, [x.g.group]),
+          el("span", { class: "fu-inrow-t" }, [evTitle(e)]),
+          el("span", { class: "fu-inrow-s" }, [evSub(x.g, x.R, e) + more]),
+        ]),
+        el("button", { class: "fu-btn " + (start ? "wa" : "primary") + " fu-inrow-go", type: "button", "data-go": e.key, onclick: function () { todayGo(x.g, e); } }, [start ? "ابدأ" : "افتح"]),
+      ]));
+    });
+    root.appendChild(list);
+    if (idle.length) {
+      root.appendChild(el("h2", { class: "fu-today-h dim" }, ["مفيش حاجة مطلوبة"]));
+      var il = el("div", { id: "fu-today-clear" });
+      idle.forEach(function (x) {
+        var nl = nextLine(x.R);
+        il.appendChild(el("button", { class: "fu-card fu-inrow clear", type: "button", "data-group": x.g.key, onclick: function () { goStep(x.g, null); } }, [
+          el("span", { class: "fu-inrow-main static" }, [
+            el("span", { class: "fu-inrow-g", dir: "auto" }, [x.g.group]),
+            el("span", { class: "fu-inrow-t" }, ["✅ كله تمام"]),
+            el("span", { class: "fu-inrow-s" }, [nl ? "الجاي: " + nl : (x.R ? "مفيش مواعيد جاية" : "")]),
+          ]),
+        ]));
+      });
+      root.appendChild(il);
+    }
+  }
+  // the row's button = the hero's primary action, after switching to that group
+  function todayGo(g, e) {
+    goStep(g, e.key);
+    var V = STATE.view;
+    if (e.key === "parents_watch" || e.key === "parents_hw") openWalk(g, V, e);
+    else if (e.key === "attendance") goAttendance(g);
+    else if (e.key === "remind_watch" || e.key === "remind_hw") openReminder(g, V, { watch: e.key === "remind_watch", ev: e });
+    else if (e.key === "setup_missing") goSetup(g);
+  }
+
+  // ---- 12-hour pickers (contract 3.12) -------------------------------------------------------
+  function timePicker12(id, hhmm, step) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || "") || [0, "18", "00"], H = +m[1], M = +m[2];
+    var h = el("select", { class: "fu-field fu-tp", id: id + "-h", "aria-label": "الساعة" }), mi = el("select", { class: "fu-field fu-tp", id: id + "-m", "aria-label": "الدقيقة" }), ap = el("select", { class: "fu-field fu-tp", id: id + "-ap", "aria-label": "صباحًا أو مساءً" });
+    for (var i = 1; i <= 12; i++) h.appendChild(el("option", { value: String(i) }, [String(i)]));
+    var mins = []; for (var j = 0; j < 60; j += (step || 5)) mins.push(j); if (mins.indexOf(M) < 0) { mins.push(M); mins.sort(function (a, b) { return a - b; }); }
+    mins.forEach(function (x) { var s = String(x).padStart(2, "0"); mi.appendChild(el("option", { value: s }, [s])); });
+    ap.appendChild(el("option", { value: "am" }, ["ص"])); ap.appendChild(el("option", { value: "pm" }, ["م"]));
+    h.value = String((H % 12) || 12); mi.value = String(M).padStart(2, "0"); ap.value = H >= 12 ? "pm" : "am";
+    var node = el("div", { class: "fu-tp-row", id: id, role: "group", "aria-label": "الساعة", dir: "ltr" }, [h, el("span", { class: "fu-tp-sep", "aria-hidden": "true" }, [":"]), mi, ap]);
+    return { node: node, value: function () { var hh = (+h.value % 12) + (ap.value === "pm" ? 12 : 0); return String(hh).padStart(2, "0") + ":" + mi.value; } };
+  }
+  function hourSelect(id, hour) {   // reminder hour: 8:00 AM .. 10:00 PM, hourly
+    var s = el("select", { class: "fu-field fu-hoursel", id: id, "aria-label": "وقت التذكير" });
+    for (var hh = 8; hh <= 22; hh++) s.appendChild(el("option", { value: String(hh) }, [fmtTime12(String(hh).padStart(2, "0") + ":00", "ar")]));
+    var hv = Number(hour); if (!(hv >= 8 && hv <= 22)) { s.insertBefore(el("option", { value: String(hv) }, [fmtTime12(String(hv).padStart(2, "0") + ":00", "ar")]), s.firstChild); }
+    s.value = String(isFinite(hv) ? hv : 16);
+    return s;
+  }
+
+  // ---- notification settings (S2's actions; screen 6) ----------------------------------------
+  function addDaysYmd(ymd, n) { var p = ymd.split("-").map(Number), t = new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)); return t.toISOString().slice(0, 10); }
+  function openNotify(g) {
+    var draft = Object.assign({ enabled: true, hour: 16, snooze_until: "" }, g.notify || {}), state = { loading: true, err: "" };
+    openSheet(function (sheet) {
+      var body = el("div", { id: "fu-notify-body" }); sheet.appendChild(body);
+      function paint() {
+        clear(body);
+        body.appendChild(el("div", { class: "fu-row fu-between" }, [el("h2", {}, ["إعدادات الجروب · ", el("bdi", {}, [g.group])]), el("button", { class: "fu-ibtn", id: "fu-close", type: "button", "aria-label": "إغلاق", onclick: closeSheet }, ["✕"])]));
+        if (state.loading) { body.appendChild(el("div", { class: "fu-skel" })); return; }
+        if (state.err) body.appendChild(el("div", { class: "fu-warnbox", id: "fu-notify-error", role: "alert" }, [state.err]));
+        var chk = el("input", { type: "checkbox", id: "fu-notify-enabled", role: "switch" }); chk.checked = draft.enabled !== false;
+        chk.addEventListener("change", function () { draft.enabled = chk.checked; paint(); });
+        var hs = hourSelect("fu-notify-hour", draft.hour); hs.addEventListener("change", function () { draft.hour = +hs.value; paint(); });
+        body.appendChild(el("section", { class: "fu-card fu-compact", style: "margin-top:12px" }, [
+          el("label", { class: "fu-switch" }, [el("span", {}, ["🔔 الإشعارات"]), chk, el("span", { class: "trk", "aria-hidden": "true" })]),
+          el("div", { class: "fu-dim" }, ["تيليجرام ليك وللمساعدين"]),
+          el("div", { class: "fu-role" }, [el("span", { class: "fu-label" }, ["وقت التذكير"]),
+            el("div", { class: "fu-row fu-notify-hour" }, [el("div", { style: "flex:1" }, [hs]), el("span", { class: "fu-chip grey", id: "fu-notify-tz" }, [tzLabel()])]),
+            el("div", { class: "fu-dim" }, ["الاختيارات: " + fmtTime12("08:00", "ar") + " … " + fmtTime12("22:00", "ar") + " (كل ساعة)"])]),
+        ]));
+        var today = STATE.data.today, R = eventsOf(g), ns = R && R.next_session, snoozed = draft.snooze_until && draft.snooze_until > today;
+        var sn = el("section", { class: "fu-card fu-compact" }, [el("h3", {}, ["⏸ إيقاف مؤقت"]), el("div", { class: "fu-dim", style: "margin:4px 0 10px" }, ["مش هيجيلك إشعار لحد التاريخ ده"])]);
+        var d1 = addDaysYmd(today, 1), dS = ns ? addDaysYmd(ns.date, 1) : "";
+        sn.appendChild(el("div", { class: "fu-btns two" }, [
+          el("button", { class: "fu-btn", id: "fu-snooze-day", type: "button", "aria-pressed": String(draft.snooze_until === d1), onclick: function () { draft.snooze_until = d1; paint(); } }, ["يوم واحد"]),
+          el("button", { class: "fu-btn", id: "fu-snooze-session", type: "button", disabled: dS ? null : "", "aria-pressed": String(!!dS && draft.snooze_until === dS), onclick: function () { draft.snooze_until = dS; paint(); } }, ["لحد بعد الحصة"]),
+        ]));
+        if (snoozed) sn.appendChild(el("button", { class: "fu-btn", id: "fu-snooze-clear", type: "button", style: "margin-top:10px", onclick: function () { draft.snooze_until = ""; paint(); } }, ["▶ إلغاء الإيقاف"]));
+        var status;
+        if (draft.enabled === false) status = "حاليًا: متوقفة";
+        else if (snoozed) status = "حاليًا: موقوفة لحد " + dayWord(draft.snooze_until) + " " + dmOf(draft.snooze_until);
+        else { var nl = nextLine(R); status = "حاليًا: شغّالة" + (nl ? " · " + nl : ""); }
+        sn.appendChild(el("div", { class: "fu-dim", id: "fu-notify-status", style: "margin-top:10px" }, [status]));
+        body.appendChild(sn);
+        var save = el("button", { class: "fu-btn primary", id: "fu-notify-save", type: "button", onclick: function () {
+          save.disabled = true;
+          api({ action: "admin_fu2_notify_settings_save", group: g.key, enabled: draft.enabled !== false, hour: +draft.hour, snooze_until: draft.snooze_until || "" }).then(function (res) {
+            g.notify = Object.assign({}, draft, res.settings || {}); closeSheet(); refreshPage(); renderTabs(); toast("تم حفظ الإشعارات ✓");
+          }, function (err) { save.disabled = false; toast(errText(err), { err: true }); });
+        } }, ["حفظ"]);
+        body.appendChild(save);
+      }
+      paint();
+      api({ action: "admin_fu2_notify_settings_get" }).then(function (res) {
+        var cur = res.groups && res.groups[g.key];
+        if (cur) { draft = Object.assign({ enabled: true, hour: 16, snooze_until: "" }, cur); g.notify = Object.assign({}, cur); }
+        state.loading = false; paint();
+      }, function (err) {
+        state.loading = false;
+        state.err = /Unknown action/i.test((err && err.message) || "") ? "الإشعارات لسه مش متفعلة على السيرفر (محتاجة نشر Follow-up v2)." : errText(err);
+        paint();
+      });
+    }, { label: "إعدادات الإشعارات" });
+  }
+
+  // ---- deep links (contract 3.10): #g=<group_key>&step=<event key> | #today ----
+  function readHashStep() {
+    var h = location.hash || "", g = /[#&]g=([^&]*)/.exec(h), s = /[#&]step=([^&]*)/.exec(h);
+    if (/^#today\b/.test(h) || /[#&]today\b/.test(h)) return { today: true };
+    if (!g) return null;
+    var key = ""; try { key = decodeURIComponent(g[1].replace(/\+/g, " ")).toLowerCase(); } catch (e) { key = g[1].toLowerCase(); }
+    var step = s ? decodeURIComponent(s[1]) : "";
+    return { group: key, step: EV[step] ? step : null };
+  }
+  function applyHashStep(hs) {
+    if (!hs || !STATE.data) return false;
+    if (hs.today) { if (todayOn()) { STATE.tab = TODAY_TAB; STATE.step = null; } return todayOn(); }
+    var g = groupByKey(hs.group); if (!g) return false;
+    if (STATE.year !== "all" && !visibleMembers(g).length) { STATE.year = "all"; try { localStorage.setItem("fu-year", "all"); } catch (e) {} }
+    STATE.tab = g.key; STATE.step = hs.step; STATE.stepGroup = g.key; STATE.open = null; STATE.filter = "all"; STATE.focus = null;
+    return true;
   }
 
   // ---- render orchestration --------------------------------------------------------------------
@@ -1554,6 +2168,14 @@
     var d = STATE.data, root = clear($("fu-root"));
     if (!d) return;
     updatedLine();
+    if (STATE.tab === TODAY_TAB) {
+      if (!todayOn()) { STATE.tab = visibleTabKeys()[0] || NONE_TAB; }
+      else {
+        if (STATE.year !== "all" && !visibleTabKeys().length) { root.appendChild(el("div", { class: "fu-empty", id: "fu-year-empty" }, ["مفيش طلاب " + yearLabel(STATE.year) + " لسه."])); return; }
+        var fb0 = flagBanner(); if (fb0) root.appendChild(fb0);
+        renderToday(root); return;
+      }
+    }
     var g = currentGroup();
     if (!g) { root.appendChild(el("div", { class: "fu-empty" }, ["مفيش جروبات لسه. أضف جروبات من لوحة Groups الأول."])); return; }
     if (STATE.year !== "all" && !visibleTabKeys().length) { root.appendChild(el("div", { class: "fu-empty", id: "fu-year-empty" }, ["مفيش طلاب " + yearLabel(STATE.year) + " لسه."])); return; }
@@ -1564,6 +2186,8 @@
     var noGroups = g.unclassified && !visibleGroups().length;
     if (noGroups) root.appendChild(noGroupsCard());
     else if (g.unclassified) root.appendChild(borrowCard());
+    var R = eventsOf(g);   // v2: null when FollowupEvents is missing or for the unclassified tab -> old layout
+    if (R) { root.appendChild(heroCard(g, V, R)); var ac0 = alsoCard(g, R); if (ac0) root.appendChild(ac0); }
     if (!noGroups && (!g.unclassified || (g.settings && g.settings.weekday !== null && g.settings.weekday !== undefined))) root.appendChild(nextSessionCard(g, V));
     if (!noGroups) root.appendChild(rolesCard(g, V));
     if (!g.unclassified) root.appendChild(settingsCard(g));
@@ -1599,15 +2223,19 @@
       STATE.loading = false; $("fu-refresh").style.opacity = "";
       STATE.data = data; STATE.fetchedAt = Date.now();
       reapplyStaged();
-      var m = /student=(\d+)/.exec(location.hash);
-      if (!STATE.hashRead) { STATE.hashRead = true; readHashFilters(); }
+      applyPendingDone();   // v2: an advance staged but not saved yet stays "done" on screen
+      var m = /student=(\d+)/.exec(location.hash), stepLink = false;
+      if (!STATE.hashRead) { STATE.hashRead = true; readHashFilters(); if (!m) stepLink = applyHashStep(readHashStep()); }
       // a deep link to a student the year filter hides switches the filter back to "all"
       if (m && STATE.year !== "all" && data.students[m[1]] && yearOfStudent(data.students[m[1]]) !== STATE.year) { STATE.year = "all"; try { localStorage.setItem("fu-year", "all"); } catch (e) {} }
       var keys = visibleTabKeys();
+      if (todayOn()) keys = [TODAY_TAB].concat(keys);
       if (!STATE.tab || keys.indexOf(STATE.tab) < 0) {
+        // v2: a fresh visit opens the Today inbox; a tab remembered in this browser session wins (reloads stay put)
         var t0 = null; try { t0 = sessionStorage.getItem("fu-tab"); } catch (e) {}
         STATE.tab = (t0 && keys.indexOf(t0) >= 0) ? t0 : (keys[0] || NONE_TAB);
       }
+      if (stepLink && STATE.tab !== TODAY_TAB) { try { sessionStorage.setItem("fu-tab", STATE.tab); } catch (e) {} writeHash(); }
       if (!STATE.borrow || visibleGroups().every(function (g) { return g.key !== STATE.borrow; })) STATE.borrow = (visibleGroups()[0] || {}).key || null;
       if (m && !STATE.open && !quiet) {
         STATE.open = m[1];
@@ -1630,7 +2258,10 @@
     $("fu-templates").addEventListener("click", openTemplates);
     window.addEventListener("hashchange", function () {
       var m = /student=(\d+)/.exec(location.hash);
-      if (STATE.data && m && STATE.open !== m[1]) { STATE.open = m[1]; refreshPage(); }
+      if (STATE.data && m && STATE.open !== m[1]) { STATE.open = m[1]; refreshPage(); return; }
+      // v2: a Telegram "Open" link tapped while the page is already open (#g=…&step=… / #today)
+      var hs = !m && STATE.data ? readHashStep() : null;
+      if (hs && applyHashStep(hs)) { try { sessionStorage.setItem("fu-tab", STATE.tab); } catch (e) {} writeHash(); renderYearBar(); renderTabs(); renderPage(); window.scrollTo(0, 0); }
     });
   }
   function start(session, role) {
@@ -1642,7 +2273,8 @@
         afterSave: function () { if (NEED_RELOAD && !window.Draft.pauseRefresh()) { NEED_RELOAD = false; load(true).then(function () { toast("تم التحديث ✓"); }); } } });
       window.Draft.onChange(function (n, why) {
         if (!STATE.data) return;
-        if (why === "discard" || why === "discardAll") load(true);                 // an unsent edit must not stay on screen: re-read the server
+        if (why === "save") flushPendingDone(false);                              // v2: restored drafts have no callbacks
+        if (why === "discard" || why === "discardAll") { flushPendingDone(true); load(true); }                 // an unsent edit must not stay on screen: re-read the server
         else if (why === "restore") { reapplyStaged(); refreshPage(); }
       });
     }
