@@ -81,7 +81,7 @@
     });
   }
   function api(p) {
-    var run = MOCK ? mockApi(p) : (window.AuthEngine && window.AuthEngine.adminCall ? window.AuthEngine.adminCall(ST.session, p) : Promise.reject(new Error("الصفحة محتاجة أحدث assets/auth.js — شغّل Sync site assets في Quiz Maker.")));
+    var run = (MOCK && p.action === "p4_teacher_update_student") ? Promise.resolve({ ok: true, student: Object.assign({ name: "", phone: p.student, parent_phone: "" }, p.changes) }) : MOCK ? mockApi(p) : (window.AuthEngine && window.AuthEngine.adminCall ? window.AuthEngine.adminCall(ST.session, p) : Promise.reject(new Error("الصفحة محتاجة أحدث assets/auth.js — شغّل Sync site assets في Quiz Maker.")));
     return run.then(function (res) { if (res && res.ok === false) throw new Error(res.error || "حصل خطأ"); return res; });
   }
 
@@ -173,6 +173,8 @@
     root.appendChild(card("📷 الإجابات الكتابية", [
       el("div", { class: "fu-chips" }, [chip("⏳ معلّق " + (w.pending || 0), w.pending ? "amber" : "grey", { id: "ss-w-pending" }), chip("✓ اتصحّح " + (w.graded || 0), "green"), (w.max ? chip("الدرجة " + w.awarded + " / " + w.max, "grey") : null)]),
     ].concat((w.items || []).map(function (i) { return row(lessonName(i.lesson) + " · " + i.question, [i.graded ? chip(i.awarded + " / " + i.max, "green") : chip("معلّق", "amber")]); })), "ss-written"));
+    // teacher only: edit this student's name and phones (staged; see assets/draft-store.js)
+    if (isTeacher()) root.appendChild(editCard(s));
     // parent notifications
     root.appendChild(parentCard());
     // monthly review
@@ -233,6 +235,51 @@
   }
 
   // ---- load ------------------------------------------------------------------------------------------
+  // ---- teacher: edit this student's name / phones (contract 6c, 6d) ------------------------------
+  // Staged like every field edit and sent by the Save bar. The server decides (the student must be his; a phone
+  // that is already registered is refused with a generic message). Assistants never see this card.
+  function isTeacher() { return !!(window.StaffGuard && window.StaffGuard.STATE && window.StaffGuard.STATE.role === "teacher" && window.Draft); }
+  function applyEdit(st, ns) {
+    if (!ns) return;
+    var oldK = pkOf(st.phone);
+    ["name", "phone", "parent_phone"].forEach(function (f) { if (ns[f] !== undefined) st[f] = ns[f]; });
+    var entry = ST.roster && ST.roster.students[oldK];
+    if (entry) {
+      ["name", "phone", "parent_phone"].forEach(function (f) { if (ns[f] !== undefined) entry[f] = ns[f]; });
+      var nk = pkOf(st.phone);
+      if (nk !== oldK) {
+        delete ST.roster.students[oldK]; ST.roster.students[nk] = entry;
+        if (ST.key === oldK) ST.key = nk;
+        try { history.replaceState(null, "", location.pathname + "?student=" + encodeURIComponent(nk)); } catch (e) { /* the address bar is cosmetic */ }
+      }
+    }
+    renderSummary();
+  }
+  function editCard(s) {
+    var st = s.student || {}, id = "stu:" + pkOf(st.phone), staged = window.Draft.get(id), cur = staged ? staged.payload.changes : {};
+    var val = function (f) { return cur[f] !== undefined ? cur[f] : (st[f] || ""); };
+    var fields = [["name", "الاسم", "ss-edit-name"], ["phone", "رقم الطالب", "ss-edit-phone"], ["parent_phone", "رقم ولي الأمر", "ss-edit-parent"]];
+    var inputs = {};
+    var rows = fields.map(function (f) {
+      var inp = el("input", { class: "fu-field", id: f[2], value: val(f[0]), dir: f[0] === "name" ? "auto" : "ltr", "aria-label": f[1] });
+      inputs[f[0]] = inp;
+      return el("label", { style: "display:block;margin-top:8px" }, [el("span", { class: "fu-label" }, [f[1]]), inp]);
+    });
+    var msg = el("div", { class: "fu-dim", id: "ss-edit-msg", role: "status" }, [staged ? "جاهز للحفظ — اضغط Save تحت." : ""]);
+    var btn = el("button", { class: "fu-btn", id: "ss-edit-stage", type: "button" }, ["جهّز التعديل"]);
+    btn.addEventListener("click", function () {
+      var changes = {};
+      fields.forEach(function (f) { var v = inputs[f[0]].value.trim(); if (v !== String(st[f[0]] || "")) changes[f[0]] = v; });
+      if (!Object.keys(changes).length) { window.Draft.discard(id); msg.textContent = "مفيش تعديل."; return; }
+      window.Draft.stage({ id: id, label: "Edit student · " + (changes.name || st.name || st.phone), action: "p4_teacher_update_student",
+        payload: { student: st.phone, changes: changes },
+        onSaved: function (res) { applyEdit(st, res.student); toast("تم حفظ بيانات الطالب ✓"); },
+        onFailed: function (res) { var m = $("ss-edit-msg"); if (m) { m.className = "fu-err"; m.textContent = (res && res.error) || "Could not apply that change."; } } });
+      msg.className = "fu-dim"; msg.textContent = "جاهز للحفظ — اضغط Save تحت.";
+    });
+    return card("✏️ بيانات الطالب", rows.concat([el("div", { style: "margin-top:10px" }, [btn]), msg]), "ss-edit");
+  }
+
   function loadSummary(quiet) {
     if (!quiet) { ST.loading = true; clear($("fu-root")).appendChild(el("div", { class: "fu-skel" })); }
     return api({ action: "admin_student_summary", student: ST.roster.students[ST.key].phone, from: ST.from, to: ST.to }).then(function (r) {
@@ -245,6 +292,11 @@
   }
   function start(session) {
     ST.session = session; if (MOCK) $("fu-mock").hidden = false;
+    if (window.Draft) {
+      window.Draft.init({ page: "student-summary", user: (session && (session.student_id || session.phone)) || "mock",
+        send: function (a, p) { return api(Object.assign({ action: a }, p)); } });
+      window.Draft.onChange(function (n, why) { if (ST.data && (why === "discard" || why === "discardAll")) renderSummary(); });   // an unsent edit must not stay on screen
+    }
     clear($("fu-root")).appendChild(el("div", { class: "fu-skel" }));
     api({ action: "admin_followup_overview" }).then(function (o) {
       ST.roster = { students: o.students || {}, groups: o.groups || [] }; ST.today = o.today || "";
@@ -269,7 +321,7 @@
       window.AuthEngine.mount("#authgate", function (session) {
         var gate = $("authgate"); if (gate) gate.remove();
         if (!session.session_token) { var r = clear($("fu-root")); r.appendChild(el("div", { class: "fu-err" }, ["تسجيل الدخول المحفوظ ناقصه رمز الجلسة. ادخل تاني."])); r.appendChild(el("button", { class: "fu-btn primary", type: "button", onclick: function () { window.AuthEngine.clearSession(); location.reload(); } }, ["سجّل خروج وادخل تاني ←"])); return; }
-        window.StaffGuard.require(["admin","assistant"], session).then(function (role) { if (role) start(session, role); });   // convenience only: the server re-checks
+        window.StaffGuard.require(null, session).then(function (role) { if (role) start(session, role); });   // convenience only: the server re-checks
       }, { staff: true });
     }, function (e) { clear($("fu-root")).appendChild(el("div", { class: "fu-err", id: "ss-error", role: "alert" }, [e.message])); });
   }

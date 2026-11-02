@@ -1,0 +1,36 @@
+{
+  "entries": [
+    {
+      "id": "R-P4-S1-01",
+      "title": "P4-S1 hardening: delete_attachment parent check, upload session check, P4_LEGACY_UPLOADS, client sends session",
+      "status": "active",
+      "owner": "p4-s1",
+      "cmd": [
+        "node",
+        "tests/test_p4_s1_hardening.js"
+      ],
+      "note": "Before assembly this builds a patched temp copy of Code.gs from patches/S1-hardening.diff (needs the `patch` tool); after assembly it tests the repo Code.gs directly"
+    },
+    {
+      "id": "R-P4-S1-02",
+      "title": "P4-S1 math-render.js + on-demand loader in jsdom with real KaTeX: only \\( \\) and \\[ \\], lazy load, missing KaTeX harmless, Arabic order. NEEDS jsdom (npm i --no-save jsdom); without it the test SKIPs and the runner shows \"0 pass\"",
+      "status": "active",
+      "owner": "p4-s1",
+      "cmd": [
+        "node",
+        "tests/test_p4_s1_math.js"
+      ],
+      "needs": "jsdom"
+    },
+    {
+      "id": "R-P4-S1-03",
+      "title": "P4-S1 bulk parser: * inside math is not a marker, trailing * is, \\* is literal, backslashes survive to the page JSON",
+      "status": "active",
+      "owner": "p4-s1",
+      "cmd": [
+        "python",
+        "tests/test_p4_s1_parser.py"
+      ]
+    }
+  ]
+}

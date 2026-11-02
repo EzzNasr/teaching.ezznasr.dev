@@ -66,6 +66,7 @@
   <div class="wrap">
     <div id="authgate"></div>
     <div id="t-root" class="t-root" lang="ar" dir="rtl" aria-live="polite"></div>
+    <div id="t-owner" class="t-root" lang="en" dir="ltr" aria-live="polite"></div>
   </div>
 </main>
 
@@ -147,9 +148,100 @@
           if (ex) MOCK_STAFF.splice(MOCK_STAFF.indexOf(ex), 1);
           return res({ ok: true, phone: ph, name: ex ? ex.name : "", role: "student", changed: !!ex });
         }
+        if (p.action === "p4_admin_list_teachers") return res({ ok: true, teachers: [{ phone: "01000000009", name: "Mona (math)", scope: "math", telegram: true, assistants: [{ phone: "01000000010", name: "Omar" }] }], tokens: [{ name: "mona-laptop", scope: "math", created: "2026-10-30" }] });
+        if (p.action === "p4_admin_set_teacher") return res({ ok: true, phone: p.phone, role: p.scope ? "teacher" : "student", scope: p.scope || "" });
+        if (p.action === "p4_admin_tg_unlink") return res({ ok: true });
+        if (p.action === "p4_admin_list_edit_log") return res({ ok: true, rows: [{ ts: "2026-10-30 10:00:00", actor_kind: "teacher", actor_id: "01000000009", student_old: "01000000002", student_new: "01000000002", field: "name", old_value: "Sara", new_value: "Sara M." }] });
         rej(new Error("mock: unknown action"));
       }, 30);
     });
+  }
+
+  // ---------- teachers (owner only, Phase 4) ----------
+  // Every button here is a DECISION: it asks first and then updates its own row only (nothing on this page is staged).
+  var ownerRoot = document.getElementById("t-owner");
+  var SUBJECTS = ["math", "english", "programming"];
+  function note(node, text, kind) { node.textContent = text || ""; node.className = "t-msg" + (kind ? " " + kind : ""); }
+  function teacherRow(t) {
+    var tg = el("span", { class: "t-badge" + (t.telegram ? " assistant" : ""), text: t.telegram ? "Telegram linked" : "Telegram not linked" });
+    var row = el("li", { class: "t-row" }, [
+      el("span", { class: "t-name", text: t.name || t.phone }), el("span", { class: "t-phone", text: t.phone }),
+      el("span", { class: "t-badge", text: t.scope || "-" }), tg,
+      el("span", { class: "t-hint", style: "margin:0", text: "Assistants: " + ((t.assistants || []).map(function (a) { return a.name || a.phone; }).join(", ") || "none") })
+    ]);
+    if (t.telegram) {
+      var unlink = el("button", { class: "t-btn", type: "button", text: "Unlink Telegram" });
+      unlink.addEventListener("click", function () {
+        if (!window.confirm("Unlink " + (t.name || t.phone) + "'s Telegram? They stop receiving payment requests there.")) return;
+        unlink.disabled = true;
+        api({ action: "p4_admin_tg_unlink", phone: t.phone }).then(function () { tg.textContent = "Telegram not linked"; tg.className = "t-badge"; if (unlink.parentNode) unlink.parentNode.removeChild(unlink); },
+          function (e) { unlink.disabled = false; note(teachersMsg, e.message, "err"); });
+      });
+      row.appendChild(unlink);
+    }
+    var rm = el("button", { class: "t-btn danger", type: "button", text: "Remove teacher" });
+    rm.addEventListener("click", function () {
+      if (!window.confirm("Remove " + (t.name || t.phone) + " as a teacher? Their assistants are removed too.")) return;
+      rm.disabled = true;
+      api({ action: "p4_admin_set_teacher", phone: t.phone, scope: "" }).then(function () { if (row.parentNode) row.parentNode.removeChild(row); note(teachersMsg, (t.name || t.phone) + " is no longer a teacher.", "ok"); },
+        function (e) { rm.disabled = false; note(teachersMsg, e.message, "err"); });
+    });
+    row.appendChild(rm);
+    return row;
+  }
+  var teachersMsg = el("div", { class: "t-msg", role: "status" });
+  var teachersList = el("ul", { class: "t-list" });
+  var tokensList = el("ul", { class: "t-list" });
+  function loadTeachers() {
+    return api({ action: "p4_admin_list_teachers" }).then(function (r) {
+      clear(teachersList); clear(tokensList);
+      (r.teachers || []).forEach(function (t) { teachersList.appendChild(teacherRow(t)); });
+      if (!(r.teachers || []).length) teachersList.appendChild(el("li", { class: "t-empty", text: "No teachers yet." }));
+      (r.tokens || []).forEach(function (k) { tokensList.appendChild(el("li", { class: "t-row" }, [el("span", { class: "t-name", text: k.name }), el("span", { class: "t-badge", text: k.scope || "-" }), el("span", { class: "t-phone", text: k.created || "" })])); });
+    }, function (e) { note(teachersMsg, e.message, "err"); });
+  }
+  function teachersCard() {
+    var phone = el("input", { type: "tel", inputMode: "numeric", placeholder: "01XXXXXXXXX", autocomplete: "off", "aria-label": "Teacher phone" });
+    var boxes = SUBJECTS.map(function (s) { var c = el("input", { type: "checkbox", value: s, "aria-label": s }); return [s, c]; });
+    var go = el("button", { class: "t-btn primary", type: "button", text: "Make teacher" });
+    go.addEventListener("click", function () {
+      var scope = boxes.filter(function (b) { return b[1].checked; }).map(function (b) { return b[0]; }).join(",");
+      if (!phone.value.trim() || !scope) { note(teachersMsg, "Enter the phone and tick at least one subject.", "err"); return; }
+      go.disabled = true;
+      api({ action: "p4_admin_set_teacher", phone: phone.value.trim(), scope: scope }).then(function () { go.disabled = false; phone.value = ""; note(teachersMsg, "Saved.", "ok"); return loadTeachers(); },
+        function (e) { go.disabled = false; note(teachersMsg, e.message, "err"); });
+    });
+    return el("section", { class: "t-card" }, [
+      el("h2", { text: "Teachers" }),
+      el("p", { class: "t-hint", text: "A teacher signs in with their own student account and sees only their subjects and their own students. The person must already have a student account." }),
+      el("div", { class: "t-add" }, [phone].concat(boxes.map(function (b) { return el("label", {}, [b[1], " " + b[0]]); })).concat([go])),
+      teachersMsg, teachersList,
+      el("h3", { text: "Quiz Maker tokens (names only)" }), tokensList
+    ]);
+  }
+  function editLogCard() {
+    var out = el("div", { class: "t-msg", role: "status" }), table = el("table", { class: "t-table" });
+    var btn = el("button", { class: "t-btn", type: "button", text: "Show the latest 200 edits" });
+    btn.addEventListener("click", function () {
+      btn.disabled = true; note(out, "Loading\u2026");
+      api({ action: "p4_admin_list_edit_log", limit: 200 }).then(function (r) {
+        btn.disabled = false; note(out, ""); clear(table);
+        table.appendChild(el("tr", {}, ["When", "By", "Student", "Field", "From", "To"].map(function (h) { return el("th", { text: h }); })));
+        (r.rows || []).forEach(function (x) {
+          table.appendChild(el("tr", {}, [x.ts, x.actor_kind + " " + x.actor_id, x.student_old === x.student_new ? x.student_old : x.student_old + " \u2192 " + x.student_new, x.field, x.old_value, x.new_value].map(function (v) { return el("td", { text: String(v == null ? "" : v) }); })));
+        });
+        if (!(r.rows || []).length) note(out, "No edits yet.");
+      }, function (e) { btn.disabled = false; note(out, e.message, "err"); });
+    });
+    return el("section", { class: "t-card" }, [el("h2", { text: "Student edit log" }), el("p", { class: "t-hint", text: "Read only: every change a teacher made to a student's name or phone numbers." }), btn, out, el("div", { style: "overflow-x:auto" }, [table])]);
+  }
+  function startOwner() {
+    if (!ownerRoot) return;
+    clear(ownerRoot);
+    ownerRoot.appendChild(el("p", {}, [el("a", { href: "teacher-stats.html", text: "Teacher stats \u2192" })]));
+    ownerRoot.appendChild(teachersCard());
+    ownerRoot.appendChild(editLogCard());
+    loadTeachers();
   }
 
   // ---------- view ----------
@@ -235,6 +327,7 @@
     S.session = session;
     clear(root).appendChild(el("div", { class: "t-state", text: "جاري التحميل…" }));
     reload();
+    startOwner();
   }
   function loadScript(src) { return new Promise(function (ok, bad) { var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = function () { bad(new Error("Couldn't load " + src)); }; document.head.appendChild(s); }); }
   function boot() {
@@ -244,7 +337,7 @@
         var gate = document.getElementById("authgate"); if (gate) gate.remove();
         if (!session.session_token) { clear(root).appendChild(el("div", { class: "t-state err", text: "تسجيل الدخول المحفوظ ناقصه رمز الجلسة. اخرج وادخل تاني." })); return; }
         // Convenience only: the server re-checks the role on every call. Admin-only page.
-        window.StaffGuard.require(["admin"], session).then(function (role) { if (role) start(session); });
+        window.StaffGuard.require(null, session).then(function (role) { if (role) start(session); });
       });
     }, function (e) { clear(root).appendChild(el("div", { class: "t-state err", text: e.message })); });
   }

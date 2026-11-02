@@ -1,0 +1,12 @@
+{
+  "entries": [
+    {
+      "id": "R-P4-S2-01",
+      "title": "P4 authorization core: ctx, action table, gate, hooks, lesson filters",
+      "status": "active",
+      "needs": [],
+      "owner": "p4-s2",
+      "cmd": ["node", "tests/test_p4_s2_scope.js"]
+    }
+  ]
+}

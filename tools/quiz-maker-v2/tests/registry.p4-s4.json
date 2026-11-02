@@ -1,0 +1,81 @@
+{
+  "entries": [
+    {
+      "id": "R-P4-S4-01",
+      "title": "p4_wire.py: merge, hooks H1-H5, idempotence, CRLF, broken anchors fail loudly",
+      "status": "active",
+      "needs": "node",
+      "owner": "p4-s4",
+      "cmd": [
+        "node",
+        "tests/test_p4_s4_wire.js"
+      ]
+    },
+    {
+      "id": "R-P4-S4-02",
+      "title": "merge_registry_fragments.py: eight fragments, duplicates, activate, check",
+      "status": "active",
+      "needs": "node",
+      "owner": "p4-s4",
+      "cmd": [
+        "node",
+        "tests/test_p4_s4_registry.js"
+      ]
+    },
+    {
+      "id": "R-P4-S4-03",
+      "title": "p4_matrix.json fixture matches the real router (every admin action classified, field names exist)",
+      "status": "active",
+      "needs": "node",
+      "owner": "p4-s4",
+      "cmd": [
+        "node",
+        "tests/test_p4_s4_matrix_fixture.js"
+      ]
+    },
+    {
+      "id": "R-P4-S4-04",
+      "title": "authorization matrix: every action x 7 callers x lesson context x ownership (needs merged Phase 4)",
+      "status": "pending",
+      "needs": "node",
+      "owner": "p4-s4",
+      "cmd": [
+        "node",
+        "tests/test_p4_s4_matrix.js"
+      ]
+    },
+    {
+      "id": "R-P4-S4-05",
+      "title": "acceptance run of plan section 9 steps 1-12, 15 on the assembled backend (needs merged Phase 4)",
+      "status": "pending",
+      "needs": "node",
+      "owner": "p4-s4",
+      "cmd": [
+        "node",
+        "tests/test_p4_s4_acceptance.js"
+      ]
+    },
+    {
+      "id": "R-P4-S4-06",
+      "title": "S4 test support world builds (actors, groups, payments, SHA-256 and UrlFetch stubs)",
+      "status": "active",
+      "needs": "node",
+      "owner": "p4-s4",
+      "cmd": [
+        "node",
+        "tests/test_p4_s4_support.js"
+      ]
+    },
+    {
+      "id": "R-P4-S4-07",
+      "title": "desktop teacher mode: subject filter, guards, startup against a local ping server",
+      "status": "active",
+      "needs": "python",
+      "owner": "p4-s4",
+      "cmd": [
+        "python",
+        "tests/test_p4_s4_teacher_mode.py"
+      ]
+    }
+  ]
+}

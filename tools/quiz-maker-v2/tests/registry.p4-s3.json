@@ -1,0 +1,115 @@
+{
+  "entries": [
+    {
+      "id": "R-P4-S3-01",
+      "title": "contract surface: every function named in the contract exists; self test",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "surface"
+      ]
+    },
+    {
+      "id": "R-P4-S3-02",
+      "title": "student linkage: each of the four rules alone, none, multi-subject union, assistant shares principal cache",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "linkage"
+      ]
+    },
+    {
+      "id": "R-P4-S3-03",
+      "title": "group ownership and group state (own / free / foreign)",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "groups"
+      ]
+    },
+    {
+      "id": "R-P4-S3-04",
+      "title": "response filters: get_all, access overview, payments, groups, follow-up overview, summary, monthly, notifications, grading queue",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "filters"
+      ]
+    },
+    {
+      "id": "R-P4-S3-05",
+      "title": "filters drop unknown top-level keys for scoped callers (shape drift fails closed)",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "drift"
+      ]
+    },
+    {
+      "id": "R-P4-S3-06",
+      "title": "add-by-phone: registered boolean only, 30 per hour bucket, group creation owner row",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "link"
+      ]
+    },
+    {
+      "id": "R-P4-S3-07",
+      "title": "payment scope: own stored scope decides, crafted scope override refused",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "payments"
+      ]
+    },
+    {
+      "id": "R-P4-S3-08",
+      "title": "p4_admin_set_group_owner: owner only, target must be a teacher, reset",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "owner"
+      ]
+    },
+    {
+      "id": "R-P4-S3-09",
+      "title": "shared student and scoped assistant end to end",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "shared"
+      ]
+    },
+    {
+      "id": "R-P4-S3-10",
+      "title": "per-owner follow-up templates (needs patches/S3-templates.diff applied; prints SKIP otherwise)",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "templates"
+      ],
+      "note": "runs for real only after patches/S3-templates.diff is applied to Code.gs"
+    }
+  ]
+}

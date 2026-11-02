@@ -1,4 +1,5 @@
 {
+  "_note": "A teacher puts HIS OWN token in drive_admin_token (not the owner token). The app then shows only his subjects.",
   "site_root": "",
   "drive_web_app_url": "",
   "drive_admin_token": ""

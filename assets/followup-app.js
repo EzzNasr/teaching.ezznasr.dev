@@ -360,6 +360,39 @@
     return m;
   }
 
+  // ---- Save model (Phase 4 / S7) ---------------------------------------------------------------
+  // Field edits (attendance marks, group settings, lesson requirements, templates, group assignments) are STAGED and
+  // sent by the Save bar from assets/draft-store.js. Parent-contact marks and monthly marks stay immediate.
+  var NEED_RELOAD = false;      // set when a saved edit changed what the overview would list (group settings, new members)
+  function isAsst() { return STATE.role === "assistant" || STATE.role === "sassistant"; }
+  function stageOp(op) { return window.Draft.stage(op); }
+  // Re-draw staged edits on top of freshly loaded data, so a refresh never overwrites a staged field.
+  function reapplyStaged() {
+    if (!window.Draft || !STATE.data) return;
+    window.Draft.ops().forEach(function (op) {
+      var p = op.payload || {}, d = STATE.data;
+      if (op.action === "admin_followup_set_attendance") {
+        d.facts = d.facts || {};
+        (p.items || []).forEach(function (it) {
+          var k = pkOf(it.phone); d.facts[k] = d.facts[k] || {};
+          var f = d.facts[k][p.lesson] = d.facts[k][p.lesson] || { can_watch: true, attendance: null, watch_pct: null, quiz: { taken: false }, quiz_open: true, homework: { submitted: false } };
+          f.attendance = it.mode || null;
+          if (it.mode === "center") { f.can_watch = true; f.quiz_open = true; }
+        });
+      } else if (op.action === "admin_followup_save_group") {
+        var g = allGroups().filter(function (x) { return x.group === p.group; })[0];
+        if (g && !g.unclassified) { var s = Object.assign({}, p); delete s.group; g.settings = Object.assign({}, g.settings, s); }
+      } else if (op.action === "admin_set_requirement") {
+        d.lessons = d.lessons || {};
+        var meta = d.lessons[p.lesson] = d.lessons[p.lesson] || { path: p.lesson };
+        Object.keys(p).forEach(function (k) { if (k !== "lesson") meta[k] = p[k]; });
+      } else if (op.action === "admin_followup_save_templates") {
+        d.templates = d.templates || {};
+        Object.keys(p.templates || {}).forEach(function (k) { var v = p.templates[k]; if (v) d.templates[k] = v; else delete d.templates[k]; });
+      }
+    });
+  }
+
   // ---- toast / dialog / sheet ------------------------------------------------------------------
   var toastTimer = null;
   function toast(text, opt) {
@@ -612,26 +645,30 @@
       if (it.mode === "center") { f.can_watch = true; f.quiz_open = true; }
     });
     refreshPage();
-    var payload = { action: "admin_followup_set_attendance", lesson: lesson, items: items, grant: true };
+    var payload = { lesson: lesson, items: items, grant: true };
     if (opts.week_confirm) { payload.week_confirm = opts.week_confirm; payload.bulk = true; }
-    return api(payload).then(function (res) {
-      (res.results || []).forEach(function (r) {
-        var f = (facts[pkOf(r.phone)] || {})[lesson]; if (f) { f.can_watch = r.can_watch; f.quiz_open = r.quiz_open; }
-      });
+    var id = "att:" + lesson + ":" + items.map(function (it) { return pkOf(it.phone); }).sort().join(",");
+    var one = items.length === 1;
+    var who = one ? ((STATE.data.students[pkOf(items[0].phone)] || {}).name || "") : items.length + " طالب";
+    function rollback() {
+      items.forEach(function (it) { var k = pkOf(it.phone), f = (facts[k] || {})[lesson]; if (f && prev[k]) { f.attendance = prev[k].att; f.can_watch = prev[k].can; f.quiz_open = prev[k].qo; } });
       refreshPage();
-      if (!opts.silent) {
-        var one = items.length === 1;
-        var name = one ? (STATE.data.students[pkOf(items[0].phone)] || {}).name || "" : items.length + " طالب";
-        var modeTxt = items[0].mode === "center" ? "سنتر" : (items[0].mode === "online" ? "أونلاين" : "غير محدد");
-        var wk = STATE.data.week, exp = (items.some(function (it) { return it.mode === "center"; }) && (res.expires_at || (wk && wk.end))) ? " — ينتهي يوم الجمعة " + dmOf(res.expires_at || wk.end) : "";
-        toast("تم تسجيل " + name + ": " + modeTxt + exp, { undo: function () {
-          setAttendance(g, items.map(function (it) { var k = pkOf(it.phone); return { phone: it.phone, mode: prev[k].att || "" }; }), { silent: true, week_confirm: wk && wk.start });
-        } });
-      }
-    }, function (err) {
-      items.forEach(function (it) { var k = pkOf(it.phone), f = facts[k][lesson]; f.attendance = prev[k].att; f.can_watch = prev[k].can; f.quiz_open = prev[k].qo; });
-      refreshPage(); toast(errText(err), { err: true });
-    });
+    }
+    stageOp({ id: id, label: "Attendance · " + who + " · " + (items[0].mode || "none"), action: "admin_followup_set_attendance", payload: payload,
+      onSaved: function (res) {
+        (res.results || []).forEach(function (r) { var f = (facts[pkOf(r.phone)] || {})[lesson]; if (f) { f.can_watch = r.can_watch; f.quiz_open = r.quiz_open; } });
+        refreshPage();
+      },
+      onFailed: function (res) { rollback(); toast(errText(new Error((res && res.error) || "")), { err: true }); } });
+    if (!opts.silent) {
+      var modeTxt = items[0].mode === "center" ? "سنتر" : (items[0].mode === "online" ? "أونلاين" : "غير محدد");
+      toast("جاهز للحفظ: " + who + ": " + modeTxt, { undo: function () {
+        if (window.Draft.has(id)) { window.Draft.discard(id); rollback(); return; }
+        var wk = STATE.data.week;
+        setAttendance(g, items.map(function (it) { var k = pkOf(it.phone); return { phone: it.phone, mode: (prev[k] && prev[k].att) || "" }; }), { silent: true, week_confirm: wk && wk.start });
+      } });
+    }
+    return Promise.resolve();
   }
   function saveGroup(g, patch, opts) {
     opts = opts || {};
@@ -639,12 +676,15 @@
     if (!real) return Promise.resolve();
     var before = clone(real.settings), s = Object.assign({}, real.settings, patch);
     real.settings = s; refreshPage();
-    var payload = Object.assign({ action: "admin_followup_save_group", group: real.group }, s);
-    return api(payload).then(function (res) {
-      if (res.settings) real.settings = res.settings;
-      if (opts.reload) return load(true).then(function () { if (!opts.quiet) toast("تم الحفظ ✓"); });
-      refreshPage(); if (!opts.quiet) toast("تم الحفظ ✓");
-    }, function (err) { real.settings = before; refreshPage(); toast(errText(err), { err: true }); });
+    var payload = Object.assign({ group: real.group }, s);
+    stageOp({ id: "group:" + real.group, label: "Group settings · " + real.group, action: "admin_followup_save_group", payload: payload,
+      onSaved: function (res) {
+        if (res.settings) real.settings = res.settings;
+        if (opts.reload) NEED_RELOAD = true;
+        refreshPage(); if (!opts.quiet) toast("تم الحفظ ✓");
+      },
+      onFailed: function (res) { real.settings = before; refreshPage(); toast(errText(new Error((res && res.error) || "")), { err: true }); } });
+    return Promise.resolve();
   }
 
   // ---- rendering: global year bar ---------------------------------------------------------------
@@ -794,9 +834,12 @@
     var meta = d.lessons[path], before = {};
     Object.keys(patch).forEach(function (k) { before[k] = meta[k]; meta[k] = patch[k]; });
     refreshPage();
-    return api(Object.assign({ action: "admin_set_requirement", lesson: path }, patch)).then(function () {
-      return load(true).then(function () { toast("تم الحفظ ✓"); });
-    }, function (err) { Object.keys(before).forEach(function (k) { meta[k] = before[k]; }); refreshPage(); toast(errText(err), { err: true }); });
+    var rid = "req:" + path, prevOp = window.Draft.get(rid);
+    stageOp({ id: rid, label: "Lesson requirements · " + path.split("/").pop(), action: "admin_set_requirement",
+      payload: Object.assign({}, prevOp ? prevOp.payload : {}, patch, { lesson: path }),
+      onSaved: function () { /* the page already shows it; nothing to redraw */ },
+      onFailed: function (res) { Object.keys(before).forEach(function (k) { meta[k] = before[k]; }); refreshPage(); toast(errText(new Error((res && res.error) || "")), { err: true }); } });
+    return Promise.resolve();
   }
   function reqSwitch(id, label, on, onchange) {
     var chk = el("input", { type: "checkbox", id: id, role: "switch" }); chk.checked = on;
@@ -933,11 +976,11 @@
     return el("section", { class: "fu-card", id: "fu-nogroups" }, [
       el("h3", {}, ["مفيش جروبات" + (STATE.year !== "all" ? " لـ " + yearLabel(STATE.year) : "") + " لسه"]),
       el("p", { class: "fu-dim", style: "margin:8px 0 12px" }, ["الطلاب اللي تحت لسه من غير جروب. اعمل جروب جديد أو ضمّهم لجروب موجود، وبعدها تظهر حصصهم ومتابعتهم."]),
-      el("button", { class: "fu-btn primary", id: "fu-assign", type: "button", style: STATE.role === "assistant" ? "display:none" : "", onclick: openAssign }, ["➕ اعمل جروب وضيف الطلاب"]),
+      el("button", { class: "fu-btn primary", id: "fu-assign", type: "button", style: isAsst() ? "display:none" : "", onclick: openAssign }, ["➕ اعمل جروب وضيف الطلاب"]),
     ]);
   }
   function openAssign() {
-    if (STATE.role === "assistant") return;   // admin_group_add is admin-only by design (S3)
+    if (isAsst()) return;   // assistants cannot create groups (contract A16)
     var d = STATE.data, pool = (d.unclassified || []).filter(yearPass), groups = allGroups();
     openSheet(function (sheet) {
       sheet.appendChild(el("div", { class: "fu-row fu-between" }, [el("h2", {}, ["تعيين طلاب لجروب"]), el("button", { class: "fu-ibtn", id: "fu-close", type: "button", "aria-label": "إغلاق", onclick: closeSheet }, ["✕"])]));
@@ -961,15 +1004,13 @@
         var gname = sel.value === "__new" ? nm.value.trim() : (groupByKey(sel.value) || {}).group;
         if (!gname) { toast("اكتب اسم الجروب", { err: true }); return; }
         if (!phones.length) { toast("اختار طالب واحد على الأقل", { err: true }); return; }
-        go.disabled = true;
-        var ok = 0, bad = [];
-        phones.reduce(function (p, ph) { return p.then(function () { return api({ action: "admin_group_add", group: gname, phone: ph }).then(function () { ok++; }, function (e) { bad.push(errText(e)); }); }); }, Promise.resolve())
-          .then(function () { closeSheet(); return load(true); })
-          .then(function () {
-            var g2 = allGroups().filter(function (x) { return x.group.toLowerCase() === gname.toLowerCase(); })[0];
-            if (g2) selectTab(g2.key);
-            toast(bad.length ? "اتعيّن " + ok + " وفشل " + bad.length + ": " + bad[0] : "اتعيّن " + ok + " طالب لجروب " + gname + " ✓", { err: !!bad.length });
-          });
+        phones.forEach(function (ph) {
+          var who = (STATE.data.students[pkOf(ph)] || {}).name || ph;
+          stageOp({ id: "gadd:" + gname.toLowerCase() + ":" + pkOf(ph), label: "Add " + who + " to " + gname, action: "admin_group_add", payload: { group: gname, phone: ph },
+            onSaved: function () { NEED_RELOAD = true; } });
+        });
+        closeSheet();
+        toast("جاهز للحفظ: تعيين " + phones.length + " طالب لجروب " + gname + " — اضغط Save تحت");
       } }, ["تعيين"]);
       sheet.appendChild(go);
     }, { label: "تعيين طلاب لجروب" });
@@ -1438,9 +1479,14 @@
       if (!T().mountEditor) { host.appendChild(el("div", { class: "fu-err" }, ["محرر القوالب غير متاح (followup-templates.js)."])); return; }
       T().mountEditor(host, { templates: clone(STATE.data.templates || {}), defaults: T().DEFAULTS, sample: sample,
         onSave: function (changes) {
-          return api({ action: "admin_followup_save_templates", templates: changes }).then(function (res) {
-            STATE.data.templates = res.templates || {}; toast("تم حفظ القوالب ✓"); return res;
-          }, function (err) { toast(errText(err), { err: true }); throw err; });
+          var prevT = window.Draft.get("tpl");
+          var merged = Object.assign({}, prevT ? prevT.payload.templates : {}, changes);
+          STATE.data.templates = STATE.data.templates || {};
+          Object.keys(changes).forEach(function (k) { var v = changes[k]; if (v) STATE.data.templates[k] = v; else delete STATE.data.templates[k]; });
+          stageOp({ id: "tpl", label: "Message templates", action: "admin_followup_save_templates", payload: { templates: merged },
+            onSaved: function (res) { STATE.data.templates = res.templates || {}; toast("تم حفظ القوالب ✓"); },
+            onFailed: function (res) { toast(errText(new Error((res && res.error) || "")), { err: true }); } });
+          return Promise.resolve({ ok: true, staged: true, templates: clone(STATE.data.templates) });
         } });
     }, { full: true, label: "قوالب الرسائل" });
   }
@@ -1552,6 +1598,7 @@
     return api({ action: "admin_followup_overview" }).then(function (data) {
       STATE.loading = false; $("fu-refresh").style.opacity = "";
       STATE.data = data; STATE.fetchedAt = Date.now();
+      reapplyStaged();
       var m = /student=(\d+)/.exec(location.hash);
       if (!STATE.hashRead) { STATE.hashRead = true; readHashFilters(); }
       // a deep link to a student the year filter hides switches the filter back to "all"
@@ -1588,8 +1635,18 @@
   }
   function start(session, role) {
     STATE.session = session;
-    STATE.role = role || (session && session.role) || "admin";   // "assistant" => hide admin-only controls
-    $("fu-refresh").hidden = false; $("fu-templates").hidden = false;
+    STATE.role = role || (session && session.role) || "admin";   // "assistant" / "sassistant" => hide the owner-and-teacher-only controls
+    if (window.Draft) {
+      window.Draft.init({ page: "followup", user: (session && (session.student_id || session.phone)) || "mock",
+        send: function (a, p) { return api(Object.assign({ action: a }, p)); },
+        afterSave: function () { if (NEED_RELOAD && !window.Draft.pauseRefresh()) { NEED_RELOAD = false; load(true).then(function () { toast("تم التحديث ✓"); }); } } });
+      window.Draft.onChange(function (n, why) {
+        if (!STATE.data) return;
+        if (why === "discard" || why === "discardAll") load(true);                 // an unsent edit must not stay on screen: re-read the server
+        else if (why === "restore") { reapplyStaged(); refreshPage(); }
+      });
+    }
+    $("fu-refresh").hidden = false; $("fu-templates").hidden = isAsst();   // templates: owner and teachers only (assistants are denied)
     if (MOCK) $("fu-mock").hidden = false;
     loadTitles().then(function () { load(false); });
   }
@@ -1612,7 +1669,7 @@
           var r = clear($("fu-root")); r.appendChild(el("div", { class: "fu-err" }, ["تسجيل الدخول المحفوظ ناقصه رمز الجلسة. ادخل تاني (الرقم والباسورد زي ما هم)."])); r.appendChild(btn); return;
         }
         // Convenience only: the server re-checks on every call. Assistants (role) are allowed in.
-        window.StaffGuard.require(["admin","assistant"], session).then(function (role) { if (role) start(session, role); });
+        window.StaffGuard.require(null, session).then(function (role) { if (role) start(session, role); });
       }, { staff: true });
     }, function (e) { renderError(e.message); });
   }

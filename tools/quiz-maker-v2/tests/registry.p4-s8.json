@@ -1,0 +1,19 @@
+{
+  "entries": [
+    {
+      "id": "R-P4-S8-01",
+      "title": "P4 S8: p4_admin_teacher_stats: every metric, cache, shared subject, null metrics, no student data, owner only, read only",
+      "status": "active",
+      "owner": "p4-s8",
+      "cmd": ["node", "tests/test_p4_s8_stats.js"]
+    },
+    {
+      "id": "R-P4-S8-02",
+      "title": "P4 S8: dashboard/teacher-stats.html renders, sorts, shows errors, hostile text is inert (jsdom)",
+      "status": "active",
+      "owner": "p4-s8",
+      "needs": "jsdom",
+      "cmd": ["node", "tests/test_p4_s8_page.js"]
+    }
+  ]
+}

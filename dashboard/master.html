@@ -681,6 +681,7 @@ html[data-theme] .dash-loadbar-fill {
 })();
 </script>
 <script src="/assets/auth.js"></script>
+<script src="/assets/staff-guard.js"></script>
 <script src="/assets/dash-review.js"></script>
 <script>
 (function () {
@@ -1898,6 +1899,16 @@ html[data-theme] .dash-loadbar-fill {
     ]));
   }
 
+  // "Teacher · math" / "Assistant of Mona · math" under the page title. Text only; nothing for the owner.
+  function addScopeBadge() {
+    var head = document.querySelector(".dash-head");
+    if (!head || document.getElementById("scope-badge")) return;
+    var b = document.createElement("p");
+    b.id = "scope-badge"; b.className = "dash-section-note";
+    window.StaffGuard.scopeBadge(b);
+    if (!b.hidden) head.appendChild(b);
+  }
+
   window.AuthEngine.mount("#authgate", function (session) {
     document.getElementById("authgate").remove();
     if (!session.session_token) {
@@ -1916,10 +1927,10 @@ html[data-theme] .dash-loadbar-fill {
     // so even a stale/forged is_admin in a cached session can't get real
     // data past it (see the catch below, kept as a defense-in-depth
     // fallback for exactly that case).
-    if (session.is_admin === false) {
-      location.href = "student.html";
-      return;
-    }
+    // Phase 4: teachers and their scoped assistants may open this page too (the server filters the rows to their students and subject).
+    window.StaffGuard.require(null, session).then(function (role) {
+    if (!role) return;
+    window.StaffGuard.applyVisibility(document, role);
     renderLoading();
     Promise.all([
       window.AuthEngine.adminGetAll(session),
@@ -1941,6 +1952,7 @@ html[data-theme] .dash-loadbar-fill {
         STATE.catalog = results[1];
         R.registerLessons(STATE.quizRows);
         renderDashboard(session);
+        addScopeBadge();
       })
       .catch(function (err) {
         var msg = (err && err.message) || "Couldn't load the master dashboard. Try refreshing.";
@@ -1949,6 +1961,7 @@ html[data-theme] .dash-loadbar-fill {
         }
         renderError(msg);
       });
+    });
   });
 })();
 </script>

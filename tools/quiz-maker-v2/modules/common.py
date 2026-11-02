@@ -1355,7 +1355,7 @@ def _site_asset_contents(drive_web_app_url):
     preview_site_assets_changes so the "what would change" check can never
     disagree with what the sync really does."""
     out = []
-    for name in ("auth.js", "quiz.js", "assign.js", "attachments.js", "video.js", "subscribe.js", "capture.js", "upload-guard.js"):
+    for name in ("auth.js", "quiz.js", "assign.js", "attachments.js", "video.js", "subscribe.js", "capture.js", "upload-guard.js", "math-render.js"):
         content = load_asset_template(name)
         content = content.replace("{{DRIVE_ENDPOINT}}", drive_web_app_url.strip())
         out.append((name, content))
@@ -1473,10 +1473,57 @@ shown to students are every row's answer, alphabetized (so position never
 gives the answer away).
 "E:" (explanation) is optional on every question type.
 
+Math (equations): write \\( ... \\) for inline math and \\[ ... \\] for display math, on ONE line.
+"$...$" is NOT a delimiter (a price like $5 stays $5). A "*" inside the math is
+never an answer marker; only a "*" after the option (outside the math) is. For a
+literal star at the very end of an option, write \\* instead of *. In a question
+prompt (it is HTML) write \\lt and \\gt instead of < and >. Math is not rendered
+inside the answer dropdowns of a MATCH question.
+
 In both the Quiz Maker and Assignment Maker tabs, a "Ch: N" line on its
 own sets the chapter for every question after it, until the next "Ch:"
 line \u2014 same convention in both places. Questions before the first
 "Ch:" line use the chapter selected in the dropdown above this box."""
+
+
+def _split_option_marker(text):
+    """(clean_text, is_correct) for one MCQ option line (the text after "A) ").
+
+    The correct-answer marker is a "*" at the very end of the option, OUTSIDE any math. A "*" inside
+    \\( ... \\) or \\[ ... \\] (for example \\(x^*\\) or \\(a*b\\)) is part of the equation, and so is a
+    "*" that sits in math that is never closed. A trailing "\\*" is a literal star: the backslash is
+    dropped, the star stays, and the option is not marked. Every other backslash is left exactly as
+    typed (the scan skips each backslash pair, so "a\\\\*" is "a\\\\" plus a real marker)."""
+    s = text.rstrip()
+    closer = None            # None = outside math; ")" or "]" = inside \\( or \\[
+    last = None              # (index, kind, inside_math) of the final token
+    i, n = 0, len(s)
+    while i < n:
+        c = s[i]
+        if c == "\\" and i + 1 < n:
+            d = s[i + 1]
+            if closer is None and d in "([":
+                closer = ")" if d == "(" else "]"
+                last = (i, "open", False)
+            elif closer is not None and d == closer:
+                closer = None
+                last = (i, "close", True)
+            else:
+                last = (i, "escstar" if d == "*" else "other", closer is not None)
+            i += 2
+            continue
+        last = (i, "star" if c == "*" else "other", closer is not None)
+        i += 1
+    if last is None:
+        return s.strip(), False
+    idx, kind, in_math = last
+    if in_math:
+        return s.strip(), False
+    if kind == "star":
+        return s[:idx].strip(), True
+    if kind == "escstar":
+        return (s[:idx] + "*").strip(), False
+    return s.strip(), False
 
 
 def parse_bulk_graded_questions(text, current_chapter=None):
@@ -1611,10 +1658,7 @@ def parse_bulk_graded_questions(text, current_chapter=None):
 
         opt_match = re.match(r"^([A-Fa-f])\)", line)
         if mode == "mcq" and opt_match:
-            opt_text = line[2:].strip()
-            is_correct = opt_text.rstrip().endswith("*")
-            if is_correct:
-                opt_text = opt_text.rstrip()[:-1].strip()
+            opt_text, is_correct = _split_option_marker(line[2:].strip())
             options.append(opt_text)
             if is_correct:
                 correct.append(len(options) - 1)

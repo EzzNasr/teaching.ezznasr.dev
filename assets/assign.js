@@ -171,44 +171,6 @@
       });
   }
 
-  // Is this saved sign-in still the live one? One account = one active sign-in: signing in on
-  // another device replaces the token. After that, answers are still accepted but photos and
-  // videos are refused. Asked before the student starts and again before anything is sent.
-  // A network blip or an older server answers "valid", so this check can never block a student.
-  function sessionStillValid(session) {
-    if (!DRIVE_ENDPOINT || !session) return Promise.resolve(true);
-    var ctl = window.AbortController ? new AbortController() : null;
-    var timer = ctl ? setTimeout(function () { ctl.abort(); }, 8000) : null;
-    return fetch(DRIVE_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "check_session", student_id: session.student_id, session_token: session.session_token }),
-      signal: ctl ? ctl.signal : undefined,
-    }).then(function (r) { return r.json(); }).then(
-      function (d) { if (timer) clearTimeout(timer); return !(d && d.ok === true && d.valid === false); },
-      function () { if (timer) clearTimeout(timer); return true; }
-    );
-  }
-  var SIGNED_OUT_MSG = "اتسجل خروجك لأن الحساب اتفتح على جهاز تاني. ادخل تاني — إجاباتك محفوظة. / You were signed out because this account was opened on another device. Sign in again — your answers are kept.";
-  // The token to send NOW: the live one if the student signed in again since this page loaded.
-  function freshToken(session) {
-    try { var s = window.AuthEngine.getSession(); return (s && s.session_token) || session.session_token; }
-    catch (e) { return session.session_token; }
-  }
-  function isSessionError(msg) { return /session|log in|sign in/i.test(String(msg || "")); }
-  function lessonPathFromUrl() {
-    return location.pathname.split("/").filter(Boolean).filter(function (p) { return !/\.html?$/i.test(p); }).join("/");
-  }
-  // Tells the server (-> Telegram) how the photo uploads ended. The server counts the photos it
-  // really holds, so the message is a confirmation, not a claim. Never blocks anything.
-  function reportPhotos(session, lessonSlug, attemptId, expected, error) {
-    try {
-      postToDrive({ action: "report_photos", kind: "assignment", student_id: session.student_id, name: session.student_name,
-        lesson: lessonSlug, lesson_path: lessonPathFromUrl(), attempt_id: attemptId, expected: expected, error: error || "" })
-        .catch(function () { /* the ping is optional */ });
-    } catch (e) { /* the ping is optional */ }
-  }
-
   // Re-sends records that are still in the queue (the server never confirmed
   // them), for THIS student only, oldest first, at most MAX_RESEND per page
   // load. Same client_id as the first try, so a copy that did land is dropped
@@ -222,6 +184,39 @@
       }).slice(0, MAX_RESEND);
     } catch (e) { return []; }
   }
+  // P4-S1: uploads carry the live session so the server can tell a signed-in student from a bare phone
+  // number. The token is attached at send time from the current session and is NEVER written into the
+  // offline queue (a stored token would go stale and would sit in localStorage next to the answers).
+  function withSession(session, payload) {
+    if (session && session.session_token && !payload.session_token) payload.session_token = session.session_token;
+    return payload;
+  }
+
+  // P4-S1 equations: typesets \( ... \) and \[ ... \] inside `node`. A page with no math loads nothing:
+  // /assets/math-render.js (which in turn loads KaTeX) is fetched only the first time some text really
+  // contains a delimiter. If it cannot load, the text stays exactly as written.
+  var mathLoad = null;     // null until the first math text is seen, then { waiting: [nodes], failed: bool }
+  function typeset(node) {
+    try {
+      if (!node) return;
+      if (window.MathRender) { window.MathRender.render(node); return; }
+      var t = node.textContent || "";
+      if (t.indexOf("\\(") === -1 && t.indexOf("\\[") === -1) return;
+      if (mathLoad) { if (!mathLoad.failed) mathLoad.waiting.push(node); return; }
+      mathLoad = { waiting: [node], failed: false };
+      var s = document.createElement("script");
+      s.src = "/assets/math-render.js";
+      s.async = true;
+      s.onload = function () {
+        var list = mathLoad.waiting; mathLoad.waiting = [];
+        if (!window.MathRender) { mathLoad.failed = true; return; }
+        list.forEach(function (n) { try { window.MathRender.render(n); } catch (e) { /* leave as written */ } });
+      };
+      s.onerror = function () { mathLoad.waiting = []; mathLoad.failed = true; };
+      (document.head || document.documentElement).appendChild(s);
+    } catch (e) { /* equations are optional; never break the page over one */ }
+  }
+
   function resendPending(session, notify) {
     var list = pendingFor(session.student_id);
     if (!list.length) return Promise.resolve(0);
@@ -230,7 +225,7 @@
     return list.reduce(function (chain, rec) {
       return chain.then(function () {
         var action = rec.type === "quiz" ? "upload_quiz_result" : "upload_submission";
-        return postToDrive(Object.assign({}, rec, { action: action })).then(
+        return postToDrive(withSession(session, Object.assign({}, rec, { action: action }))).then(
           function () { dequeueSubmission(rec.client_id); sent++; },
           function () { failed++; }
         );
@@ -320,25 +315,11 @@
       return;
     }
 
-    function onSession(session) {
-      root.innerHTML = "";
-      root.appendChild(el("p", { class: "qz-progress" }, ["…"]));
-      sessionStillValid(session).then(function (ok) {
-        if (!ok) { signedOut(); return; }
-        root.innerHTML = "";
-        showResendNotice(root, session);
-        if (mode === "graded") startGraded(session);
-        else startAssignment(session);
-      });
-    }
-    // The saved sign-in was replaced (account opened on another device): drop it and show the
-    // sign-in form again, so nothing is filled in only to fail later on photos.
-    function signedOut() {
-      try { window.AuthEngine.clearSession(); } catch (e) { /* nothing to clear */ }
-      if (root.parentNode) root.parentNode.insertBefore(el("div", { class: "qz-error", role: "alert", dir: "auto" }, [SIGNED_OUT_MSG]), root);
-      window.AuthEngine.mount(rootSelector, onSession);
-    }
-    window.AuthEngine.mount(rootSelector, onSession);
+    window.AuthEngine.mount(rootSelector, function (session) {
+      showResendNotice(root, session);
+      if (mode === "graded") startGraded(session);
+      else startAssignment(session);
+    });
 
     function startGraded(session) {
       var data = loadGradedQuestions();
@@ -351,10 +332,11 @@
       }
 
       var state = { submitted: false, score: 0, total: 0, answers: [], record: null, syncStatus: null, widgets: {}, photoError: "", photoStatus: null };
-      var DRAFT_KEY = "teaching_hw_answers:" + session.student_id + ":" + (lesson || "");
       render();
 
-      function render() {
+      function render() { renderPage(); typeset(root); }
+
+      function renderPage() {
         root.innerHTML = "";
         if (state.submitted) { renderResult(); return; }
         renderForm();
@@ -417,31 +399,6 @@
           itemsWrap.appendChild(block);
         });
 
-        // Answers are kept on this device as the student works, so being signed out and back in
-        // (or a reload) does not lose them.
-        function saveDraft() {
-          try {
-            localStorage.setItem(DRAFT_KEY, JSON.stringify(entries.map(function (e) {
-              if (e.written) return null;
-              if (e.checks) return e.checks.filter(function (c) { return c.cb.checked; }).map(function (c) { return c.opt; });
-              return e.select ? e.select.value : e.rowSelects.map(function (rs) { return rs.value; });
-            })));
-          } catch (er) { /* no storage: no draft */ }
-        }
-        try {
-          var d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
-          if (Array.isArray(d) && d.length === entries.length) {
-            entries.forEach(function (e, i) {
-              var v = d[i];
-              if (e.written || v == null) return;
-              if (e.checks) e.checks.forEach(function (c) { c.cb.checked = v.indexOf(c.opt) !== -1; });
-              else if (e.select) e.select.value = v;
-              else e.rowSelects.forEach(function (rs, k) { rs.value = v[k] || ""; });
-            });
-          }
-        } catch (er) { /* no draft */ }
-        itemsWrap.addEventListener("change", saveDraft);
-
         var submitBtn = el("button", { class: "qz-next", type: "button" }, ["Submit assignment \u2192"]);
         submitBtn.addEventListener("click", function () { onSubmit(); });
 
@@ -455,15 +412,8 @@
             errorMsg.textContent = "Please answer every question before submitting.";
             return;
           }
-          errorMsg.textContent = "";
           submitBtn.disabled = true;
-          // Same check as at page load, right before sending: if the account was opened elsewhere
-          // in the meantime, stop HERE (answers kept) instead of submitting and losing the photos.
-          sessionStillValid(session).then(function (ok) {
-            if (ok) { grade(entries); return; }
-            saveDraft();
-            signedOut();
-          });
+          grade(entries);
         }
 
         var card = el("div", { class: "qz-card frame" }, [
@@ -486,13 +436,13 @@
           var item = e.item;
           if (e.written) {
             var w = state.widgets[item.id], n = w ? w.count() : 0, max = Math.max(1, Math.floor(Number(item.max_marks)) || 1);
-            // Written answers never count in score/total at submit: the teacher grades them and their marks
-            // are added then. score/total is therefore the auto-graded part only (MCQ / true-false / matching),
-            // and a photo that is slow or fails can no longer turn into a bad grade.
+            // Counted in the total only once it has been graded: with a photo attached the answer waits for
+            // the teacher (pending) and the grader adds its max then. No photo = 0 of max, as a blank answer.
+            if (!(n > 0)) total += max;
             answers.push({
               id: item.id, type: "written", prompt: item.prompt,
               chosen: n ? "[" + n + " photo" + (n > 1 ? "s" : "") + "]" : "", correct_answer: "", is_correct: false,
-              pending: n > 0, no_photo: !(n > 0), max: max, image_count: n,
+              pending: n > 0, max: max, image_count: n,
               chapter: (typeof item.chapter !== "undefined") ? item.chapter : null,
             });
           } else if (item.type === "match") {
@@ -557,7 +507,6 @@
 
         queueSubmission(record);
         saveLastSubmission(subject, lesson, record);
-        try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ }
         state.record = record;
         sendRecord();
       }
@@ -573,7 +522,7 @@
         var g = beginGuard({ message: "\u0628\u0646\u0628\u0639\u062a \u0627\u0644\u0635\u0648\u0631\u2026 / Sending your photos\u2026" });
         var written = state.record.answers.filter(function (a) { return a.type === "written" && state.widgets[a.id]; });
         if (!written.length) { state.photoStatus = null; return Promise.resolve(g); }
-        var failedCount = 0, sent = 0, lastError = "";
+        var failedCount = 0, sent = 0;
         var total = written.reduce(function (n, a) { return n + state.widgets[a.id].pending(); }, 0);
         g.set({ message: "\u0628\u0646\u0628\u0639\u062a \u0627\u0644\u0635\u0648\u0631\u2026 / Sending your photos\u2026", step: 0, total: total });
         state.photoStatus = "sending"; render();
@@ -581,17 +530,13 @@
           return chain.then(function () {
             return state.widgets[a.id].upload(function (item, b64) {
               g.set({ message: "\u0635\u0648\u0631\u0629 " + (sent + 1) + " \u0645\u0646 " + total + " / Photo " + (sent + 1) + " of " + total, step: sent, total: total });
-              return postToDrive({ action: "upload_written_image", kind: "assignment", student_id: session.student_id, session_token: freshToken(session),
-                lesson_path: lessonPathFromUrl(),
+              return postToDrive({ action: "upload_written_image", kind: "assignment", student_id: session.student_id, session_token: session.session_token,
+                lesson_path: location.pathname.split("/").filter(Boolean).filter(function (p) { return !/\.html?$/i.test(p); }).join("/"),
                 attempt_id: state.record.client_id, question_id: a.id, image_id: item.id, data_base64: b64, mime_type: "image/jpeg" }, function () { g.busy(); })
                 .then(function (res) { sent++; g.set({ step: sent, total: total }); return res; });
-            }).then(function (r) { if (!r || !r.ok) { failedCount++; lastError = (r && r.error) || lastError || "Upload failed."; } },
-                    function (e) { failedCount++; lastError = (e && e.message) || lastError || "Upload failed."; });
+            }).then(function (r) { if (!r || !r.ok) failedCount++; }, function () { failedCount++; });
           });
         }, Promise.resolve()).then(function () {
-          var attached = written.reduce(function (n, a) { return n + (state.widgets[a.id] ? state.widgets[a.id].count() : 0); }, 0);
-          reportPhotos(session, lesson, state.record.client_id, attached, failedCount ? lastError : "");
-          state.photoError = failedCount ? lastError : "";
           if (failedCount) { state.photoStatus = "later"; }
           else {
             state.photoStatus = "ok";
@@ -635,7 +580,7 @@
         // with the same client_id — never a duplicate — while the page says it is
         // still saving.
         // The submission goes FIRST. Nothing about photos can stop it.
-        postToDrive(Object.assign({ action: "upload_submission" }, state.record), function () { state.busy = true; g.busy(); render(); })
+        postToDrive(Object.assign({ action: "upload_submission", session_token: session.session_token }, state.record), function () { state.busy = true; g.busy(); render(); })
           .then(function () {
             state.busy = false; state.syncStatus = "ok";
             dequeueSubmission(state.record.client_id);
@@ -655,12 +600,8 @@
           el("span", { class: "tick-br" }),
           el("span", { class: "tick-bl" }),
           el("div", { class: "qz-summary__score" }, [state.score + " / " + state.total]),
-          el("div", { class: "qz-summary__label" }, [pct + "% correct (auto-graded questions) \u00b7 " + session.student_name]),
+          el("div", { class: "qz-summary__label" }, [pct + "% correct \u00b7 " + session.student_name]),
         ];
-        var noPhotoCount = (state.answers || []).filter(function (a) { return a.type === "written" && !a.pending; }).length;
-        if (noPhotoCount) {
-          children.push(el("div", { class: "qz-error", dir: "auto" }, ["\u0645\u0627 \u0627\u062a\u0628\u0639\u062a\u0634 \u0635\u0648\u0631\u0629 \u0644\u0640 " + noPhotoCount + " \u0633\u0624\u0627\u0644 \u0643\u062a\u0627\u0628\u064a. / No photo was attached for " + noPhotoCount + " written answer" + (noPhotoCount > 1 ? "s" : "") + " \u2014 tell your teacher."]));
-        }
         var waiting = (state.answers || []).filter(function (a) { return a.type === "written" && a.pending; }).length;
         if (waiting) {
           children.push(el("div", { class: "qz-progress" }, [waiting + (waiting > 1 ? " written answers are" : " written answer is") +
@@ -679,20 +620,9 @@
           children.push(el("div", { class: "qz-progress", dir: "auto" }, ["\u0628\u0646\u0628\u0639\u062a \u0627\u0644\u0635\u0648\u0631\u2026 / Sending your photos\u2026 keep this page open."]));
         } else if (state.photoStatus === "later") {
           children.push(el("div", { class: "qz-error", dir: "auto" }, ["\u062a\u0645 \u062d\u0641\u0638 \u0625\u062c\u0627\u0628\u0627\u062a\u0643 \u2713 \u0627\u0644\u0635\u0648\u0631\u0629 \u0647\u062a\u062a\u0628\u0639\u062a \u0628\u0639\u062f\u064a\u0646. / Your answers are saved. The photos didn\u2019t go through yet \u2014 tap \u201cSend photos again\u201d."]));
-          if (state.photoError) children.push(el("div", { class: "qz-error", dir: "ltr" }, ["Reason: " + state.photoError]));
-          if (isSessionError(state.photoError)) {
-            children.push(el("div", { class: "qz-error", dir: "auto" }, [SIGNED_OUT_MSG]));
-            var inBtn = el("button", { class: "qz-next", type: "button" }, ["Sign in again"]);
-            inBtn.addEventListener("click", function () {
-              try { window.AuthEngine.clearSession(); } catch (e) { /* nothing to clear */ }
-              window.AuthEngine.openSignIn();
-            });
-            children.push(inBtn);
-          } else {
-            var photoBtn = el("button", { class: "qz-next", type: "button" }, ["Send photos again"]);
-            photoBtn.addEventListener("click", function () { photoBtn.disabled = true; uploadPhotos().then(finishGuard); });
-            children.push(photoBtn);
-          }
+          var photoBtn = el("button", { class: "qz-next", type: "button" }, ["Send photos again"]);
+          photoBtn.addEventListener("click", function () { photoBtn.disabled = true; uploadPhotos().then(finishGuard); });
+          children.push(photoBtn);
         }
         if (state.syncStatus === "pending") {
           children.push(el("div", { class: "qz-progress" }, [state.busy ? "Still saving \u2014 lots of submissions are coming in. Please keep this page open\u2026" : "Saving your submission\u2026"]));
@@ -731,7 +661,9 @@
 
       render();
 
-      function render() {
+      function render() { renderPage(); typeset(root); }
+
+      function renderPage() {
         root.innerHTML = "";
 
         var errorMsg = el("div", { class: "qz-error" });
@@ -875,7 +807,7 @@
       // button) — the server drops it if the first try already landed.
       function sendPlain(record, onBusy) {
         var g = beginGuard({ message: "\u0628\u0646\u0628\u0639\u062a \u0627\u0644\u062a\u0633\u0644\u064a\u0645\u2026 / Uploading your submission\u2026" });
-        postToDrive(Object.assign({ action: "upload_submission" }, record), function () { if (onBusy) onBusy(); g.busy(); })
+        postToDrive(withSession(session, Object.assign({ action: "upload_submission" }, record)), function () { if (onBusy) onBusy(); g.busy(); })
           .then(function () { submitting = false; dequeueSubmission(record.client_id); renderConfirmation(true, true, true, record); g.success({}); })
           .catch(function (err) {
             submitting = false;

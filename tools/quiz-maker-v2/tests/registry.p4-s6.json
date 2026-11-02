@@ -1,0 +1,12 @@
+{
+  "entries": [
+    {
+      "id": "R-P4-S6-01",
+      "title": "Telegram per teacher: link flow, routing, callback authorization, replay, owner ping, unlink",
+      "status": "active",
+      "needs": [],
+      "owner": "p4-s6",
+      "cmd": ["node", "tests/test_p4_s6_telegram.js"]
+    }
+  ]
+}

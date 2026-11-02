@@ -1,0 +1,102 @@
+{
+  "entries": [
+    {
+      "id": "R-P4-S7-01",
+      "title": "Draft store: stage, replace, discard, Save in order, partial failure, double press, restore, beforeunload, timer pause",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_draft.js"
+      ]
+    },
+    {
+      "id": "R-P4-S7-02",
+      "title": "staff guard: every page x every role, old-backend fallback, forged role, visibility, scope badge",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "guard"
+      ]
+    },
+    {
+      "id": "R-P4-S7-03",
+      "title": "grading page: staged grades, Save, staging survives a re-read, roles, refused grade stays staged",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "grading"
+      ]
+    },
+    {
+      "id": "R-P4-S7-04",
+      "title": "my-team page: assistants, Telegram, confirms, neutral appoint message, non-teachers bounced",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "myteam"
+      ]
+    },
+    {
+      "id": "R-P4-S7-05",
+      "title": "team page (owner): teachers, Telegram unlink, edit log as text, non-owners bounced",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "team"
+      ]
+    },
+    {
+      "id": "R-P4-S7-06",
+      "title": "student summary: teacher-only edit card, staged edit, Save, assistants see no card",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "summary"
+      ]
+    },
+    {
+      "id": "R-P4-S7-07",
+      "title": "follow-up page: staged attendance, Save, discard re-reads the server, templates button by role",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "followup"
+      ]
+    },
+    {
+      "id": "R-P4-S7-08",
+      "title": "access page: staged locks, immediate payment decision, staged edits survive, owner-only controls, assistants",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "access"
+      ]
+    },
+    {
+      "id": "R-P4-S7-09",
+      "title": "static checks: reloads only at sign-out, staged actions not sent directly, owner-only markers, no markup injection",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "static"
+      ]
+    }
+  ]
+}

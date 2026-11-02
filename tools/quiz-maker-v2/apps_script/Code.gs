@@ -350,6 +350,9 @@ function _notifyAdmin(text, paymentId) {
         console.error("notifyAdmin failed for " + id + ": " + err);
       }
     });
+    if (paymentId) {   // P4/S6: also ping linked teachers whose subject covers this payment (never throws)
+      try { if (typeof p4_tg_notifyPayment === "function") p4_tg_notifyPayment(paymentId); } catch (e) {}
+    }
   } catch (err) {
     console.error("notifyAdmin failed: " + err);
   }
@@ -372,48 +375,16 @@ function _prettyLesson(path) {
 
 // Telegram pings for a finished homework / quiz. Called OUTSIDE the lock, only for a
 // freshly saved attempt (never a duplicate). _notifyAdmin never throws.
-//
-// The score shown is ONLY the auto-graded part (MCQ / true-false / matching). Written
-// (handwritten) answers are teacher-graded and join the score later, so they are listed
-// on their own line: how many written questions, and how many have a photo attached.
-// Photos upload AFTER the answers, so the ping says "photos on their way"; a second ping
-// (report_photos -> handleReportPhotos) confirms how many actually arrived.
-function _autoScoreLine(entries, fallbackScore, fallbackTotal) {
-  var auto = (entries || []).filter(function (q) { return q && q.type !== "written"; });
-  var score, total;
-  if (auto.length) {
-    total = auto.length;
-    score = auto.filter(function (q) { return q.is_correct === true || q.correct === true; }).length;
-  } else if (typeof fallbackScore === "number" && typeof fallbackTotal === "number") {
-    score = fallbackScore; total = fallbackTotal;
-  } else { return ""; }
-  return "\n🎯 MCQ " + score + "/" + total + (total ? " (" + Math.round(score / total * 100) + "%)" : "");
-}
-
-function _writtenLine(entries, claims) {
-  var w = (entries || []).filter(function (q) { return q && q.type === "written"; });
-  if (!w.length) return "";
-  var withPhoto = 0, marks = 0;
-  w.forEach(function (q) {
-    var id = q.qid !== undefined ? q.qid : q.id;
-    var n = Math.max(Number(q.image_count) || 0, claims && id !== undefined ? (Number(claims[String(id)]) || 0) : 0);
-    if (n > 0) withPhoto++;
-    marks += Number(q.max) || 0;
-  });
-  var line = "\n✍️ Written: " + withPhoto + "/" + w.length + " with a photo" + (marks ? " (" + marks + " marks, teacher-graded)" : "");
-  return line + (withPhoto ? "\n📷 photos uploading — a confirmation follows" : "\n⚠️ no handwritten photo attached");
-}
-
 function _notifySubmission(payload, res) {
   try {
     if (!res || !res.ok || res.duplicate) return;
     var lesson = _prettyLesson(payload.lesson_path || payload.lesson);
-    var answers = Array.isArray(payload.answers) ? payload.answers : [];
-    var score = _autoScoreLine(answers, payload.score, payload.total) + _writtenLine(answers, null);
-    var kind = "📝 <b>Homework submitted</b>";
-    var how = payload.submission_type ? "\n📦 " + _esc(payload.submission_type) : "";
-    _notifyAdmin(kind + "\n\n👤 " + _esc(payload.name || payload.student_id) +
-      "\n📘 " + _esc(lesson) + score + how);
+    var score = typeof payload.score === "number" && typeof payload.total === "number"
+      ? "\n\ud83c\udfaf " + payload.score + "/" + payload.total : "";
+    var kind = "\ud83d\udcdd <b>Homework submitted</b>";
+    var how = payload.submission_type ? "\n\ud83d\udce6 " + _esc(payload.submission_type) : "";
+    _notifyAdmin(kind + "\n\n\ud83d\udc64 " + _esc(payload.name || payload.student_id) +
+      "\n\ud83d\udcd8 " + _esc(lesson) + score + how);
   } catch (err) {
     console.error("notifySubmission failed: " + err);
   }
@@ -423,48 +394,13 @@ function _notifyQuiz(payload, res) {
   try {
     if (!res || !res.ok || res.duplicate) return;
     var lesson = _prettyLesson(payload.lesson_path || payload.lesson);
-    var qs = Array.isArray(payload.questions) ? payload.questions : [];
-    var score = _autoScoreLine(qs, payload.score, payload.total) + _writtenLine(qs, payload.photo_counts);
-    _notifyAdmin("🧠 <b>Quiz completed</b>\n\n👤 " + _esc(payload.name || payload.student_id) +
-      "\n📘 " + _esc(lesson) + (payload.quiz_title ? " — " + _esc(payload.quiz_title) : "") + score);
+    var score = typeof payload.score === "number" && typeof payload.total === "number"
+      ? "\n\ud83c\udfaf " + payload.score + "/" + payload.total : "";
+    _notifyAdmin("\ud83e\udde0 <b>Quiz completed</b>\n\n\ud83d\udc64 " + _esc(payload.name || payload.student_id) +
+      "\n\ud83d\udcd8 " + _esc(lesson) + (payload.quiz_title ? " \u2014 " + _esc(payload.quiz_title) : "") + score);
   } catch (err) {
     console.error("notifyQuiz failed: " + err);
   }
-}
-
-// The student's page calls this once its photo uploads have settled. The count of photos
-// that arrived is read from the WrittenAnswers sheet (the server's own record), not from
-// the browser, so the message can be trusted. One message per distinct outcome per attempt.
-function handleReportPhotos(payload) {
-  if (!payload.student_id) throw new Error("Missing student_id.");
-  var attempt = String(payload.attempt_id || "");
-  if (!/^[A-Za-z0-9_-]{8,100}$/.test(attempt)) throw new Error("Missing or invalid attempt_id.");
-  var student = _normalizePhone(payload.student_id);
-  var expected = Math.max(0, Math.min(60, parseInt(payload.expected, 10) || 0));
-  var counts = _p2cImageCounts(student, attempt), got = 0;
-  Object.keys(counts).forEach(function (k) { got += counts[k]; });
-  var cache = CacheService.getScriptCache();
-  var ck = "rph:" + attempt + ":" + got + ":" + expected;
-  if (cache.get(ck)) return { ok: true, received: got, duplicate: true };
-  cache.put(ck, "1", 21600);
-  var lesson = _prettyLesson(payload.lesson_path || payload.lesson);
-  var who = _esc(payload.name || student);
-  var kind = payload.kind === "assignment" ? "Homework" : "Quiz";
-  if (expected && got >= expected) {
-    _notifyAdmin("📷 <b>Photos received</b> " + got + "/" + expected + "\n\n👤 " + who + "\n📘 " + _esc(lesson) + " (" + kind + ")");
-  } else {
-    var why = String(payload.error || "").slice(0, 160);
-    _notifyAdmin("⚠️ <b>Photos incomplete</b> " + got + "/" + expected + "\n\n👤 " + who + "\n📘 " + _esc(lesson) + " (" + kind + ")" +
-      (why ? "\n❗ " + _esc(why) : "") + "\nThe student can retry from the same page.");
-  }
-  return { ok: true, received: got };
-}
-
-// Lets a page ask "is my saved sign-in still the live one?" before the student does any
-// work. Login issues one token per account, so signing in on another device ends this one.
-function handleCheckSession(payload) {
-  var st = _sessionState(payload);
-  return { ok: true, valid: st === "student" || st === "admin", state: st };
 }
 
 function _tgAdminIds() {
@@ -488,6 +424,7 @@ function handleTelegramUpdate(e, update) {
   try {
     var secret = _props().getProperty("TELEGRAM_WEBHOOK_SECRET");
     if (!secret || !e || !e.parameter || e.parameter.tg !== secret) return _json({ ok: true });
+    if (typeof p4_tg_handleUpdate === "function" && p4_tg_handleUpdate(update)) return _json({ ok: true });   // P4/S6: teacher /start links and teacher-chat taps
     var cq = update && update.callback_query;
     if (!cq || !cq.from || !cq.data) return _json({ ok: true });
 
@@ -545,6 +482,7 @@ function handleTelegramUpdate(e, update) {
 }
 
 function _requireAdmin(payload) {
+  if (typeof p4_tokenAllows === "function" && p4_tokenAllows(payload)) return;
   var expected = _props().getProperty("ADMIN_TOKEN");
   if (!expected || payload.token !== expected) {
     throw new Error("Not authorized.");
@@ -1062,6 +1000,7 @@ function _requireAdminSession(payload) {
       // Phase 3 (Phase3_Roles.gs): a valid, non-stale ASSISTANT passes ONLY for an action on P3_STAFF_ALLOW.
       // is_admin stays blank for them, so every other check (and every non-listed action) still refuses.
       if (tokenOk && !isAdmin && typeof p3_assistantAllows === "function" && p3_assistantAllows(values[i], c, payload)) return true;
+      if (tokenOk && !isAdmin && typeof p4_teacherAllows === "function" && p4_teacherAllows(values[i], c, payload)) return true;
       throw new Error("Not authorized.");
     }
   }
@@ -1278,10 +1217,53 @@ function doPost(e) {
   if (payload && payload.update_id !== undefined) return handleTelegramUpdate(e, payload);   // Telegram webhook
 
   try {
+    var __g = (typeof p4_gate === "function") ? p4_gate(payload) : null; if (__g && __g.deny) return _json(__g.deny);
     switch (payload.action) {
+      case "p4_session_scope":
+        return _json(p4_session_scope(payload));
+
+      case "p4_admin_set_teacher":
+        return _json(p4_admin_set_teacher(payload));
+
+      case "p4_admin_list_teachers":
+        return _json(p4_admin_list_teachers(payload));
+
+      case "p4_admin_set_group_owner":
+        return _json(p4_admin_set_group_owner(payload));
+
+      case "p4_admin_tg_unlink":
+        return _json(p4_admin_tg_unlink(payload));
+
+      case "p4_admin_list_edit_log":
+        return _json(p4_admin_list_edit_log(payload));
+
+      case "p4_teacher_update_student":
+        return _json(p4_teacher_update_student(payload));
+
+      case "p4_teacher_set_assistant":
+        return _json(p4_teacher_set_assistant(payload));
+
+      case "p4_teacher_list_assistants":
+        return _json(p4_teacher_list_assistants(payload));
+
+      case "p4_teacher_revoke_assistant":
+        return _json(p4_teacher_revoke_assistant(payload));
+
+      case "p4_tg_link_start":
+        return _json(p4_tg_link_start(payload));
+
+      case "p4_tg_status":
+        return _json(p4_tg_status(payload));
+
+      case "p4_tg_unlink":
+        return _json(p4_tg_unlink(payload));
+
+      case "p4_admin_teacher_stats":
+        return _json(p4_admin_teacher_stats(payload));
+
       case "ping":
         _requireAdmin(payload);
-        return _json({ ok: true, message: "pong" });
+        return _json(_p2Post("p4_pingDecorate", { ok: true, message: "pong" }, payload));
 
       case "upload_attachment":
         return _json(handleUploadAttachment(payload));
@@ -1314,7 +1296,7 @@ function doPost(e) {
         return _json(handleGetMyResults(payload));
 
       case "admin_get_all":
-        return _json(handleAdminGetAll(payload));
+        return _json(_p2Post("p4_filter", handleAdminGetAll(payload), payload));
 
       case "get_video":
         return _json(handleGetVideo(payload));
@@ -1323,7 +1305,7 @@ function doPost(e) {
         return _json(_p2AuditWrap("admin_set_video", payload, handleAdminSetVideo(payload)));
 
       case "admin_list_videos":
-        return _json(handleAdminListVideos(payload));
+        return _json(_p2Post("p4_filter", handleAdminListVideos(payload), payload));
 
       case "admin_set_lesson_lock":
         return _json(handleAdminSetLessonLock(payload));
@@ -1332,19 +1314,19 @@ function doPost(e) {
         return _json(handleRequestAccess(payload));
 
       case "admin_list_payments":
-        return _json(handleAdminListPayments(payload));
+        return _json(_p2Post("p4_filter", handleAdminListPayments(payload), payload));
 
       case "admin_decide_payment":
         return _json(handleAdminDecidePayment(payload));
 
       case "admin_grant_access":
-        return _json(_p2AuditWrap("admin_grant_access", payload, handleAdminGrantAccess(payload)));
+        return _json(_p2Post("p4_filter", _p2AuditWrap("admin_grant_access", payload, handleAdminGrantAccess(payload)), payload));
 
       case "admin_revoke_access":
         return _json(_p2AuditWrap("admin_revoke_access", payload, handleAdminRevokeAccess(payload)));
 
       case "admin_access_overview":
-        return _json(handleAdminAccessOverview(payload));
+        return _json(_p2Post("p4_filter", handleAdminAccessOverview(payload), payload));
 
       case "get_quiz_state":
         return _json(handleGetQuizState(payload));
@@ -1362,10 +1344,10 @@ function doPost(e) {
         return _json(handleAdminGetQuizContent(payload));
 
       case "admin_list_groups":
-        return _json(handleAdminListGroups(payload));
+        return _json(_p2Post("p4_filter", handleAdminListGroups(payload), payload));
 
       case "admin_group_add":
-        return _json(handleAdminGroupAdd(payload));
+        return _json(_p2Post("p4_filter", handleAdminGroupAdd(payload), payload));
 
       case "admin_group_remove":
         return _json(handleAdminGroupRemove(payload));
@@ -1377,10 +1359,10 @@ function doPost(e) {
         return _json(_p2AuditWrap("admin_group_revoke_access", payload, handleAdminGroupRevokeAccess(payload)));
 
       case "admin_list_lessons":
-        return _json(handleAdminListLessons(payload));
+        return _json(_p2Post("p4_filter", handleAdminListLessons(payload), payload));
 
       case "admin_grant_quiz_access":
-        return _json(_p2AuditWrap("admin_grant_quiz_access", payload, handleAdminGrantQuizAccess(payload)));
+        return _json(_p2Post("p4_filter", _p2AuditWrap("admin_grant_quiz_access", payload, handleAdminGrantQuizAccess(payload)), payload));
 
       case "admin_revoke_quiz_access":
         return _json(_p2AuditWrap("admin_revoke_quiz_access", payload, handleAdminRevokeQuizAccess(payload)));
@@ -1395,7 +1377,7 @@ function doPost(e) {
         return _json(handleAdminSetLessonTags(payload));
 
       case "admin_list_lesson_tags":
-        return _json(handleAdminListLessonTags(payload));
+        return _json(_p2Post("p4_filter", handleAdminListLessonTags(payload), payload));
 
       case "get_subscription_options":
         return _json(handleGetSubscriptionOptions(payload));
@@ -1404,7 +1386,7 @@ function doPost(e) {
         return _json(handleRequestSubscription(payload));
 
       case "admin_followup_overview":
-        return _json(_p2CallOr("p2_admin_followup_overview", handleAdminFollowupOverview, payload));   // S2 wraps it (requirements, parent log, week)
+        return _json(_p2Post("p4_filter", _p2CallOr("p2_admin_followup_overview", handleAdminFollowupOverview, payload), payload));   // S2 wraps it (requirements, parent log, week)
 
       case "admin_followup_set_attendance":
         return _json(_p2CallOr("p2_admin_followup_set_attendance", handleAdminFollowupSetAttendance, payload));   // S2: weekly center rule
@@ -1418,18 +1400,12 @@ function doPost(e) {
       case "record_watch":
         return _json(handleRecordWatch(payload));
 
-      case "check_session":
-        return _json(handleCheckSession(payload));
-
-      case "report_photos":
-        return _json(handleReportPhotos(payload));
-
       // ---- Phase 2 (see docs/contract.md). Handlers live in Phase2_*.gs; Phase2_Core.gs owns _p2Call.
       case "admin_student_summary":   // S2
-        return _json(_p2Call("p2_admin_student_summary", payload));
+        return _json(_p2Post("p4_filter", _p2Call("p2_admin_student_summary", payload), payload));
 
       case "admin_monthly_review":   // S2
-        return _json(_p2Call("p2_admin_monthly_review", payload));
+        return _json(_p2Post("p4_filter", _p2Call("p2_admin_monthly_review", payload), payload));
 
       case "admin_set_requirement":   // S2
         return _json(_p2Call("p2_admin_set_requirement", payload));
@@ -1438,7 +1414,7 @@ function doPost(e) {
         return _json(_p2Call("p2_admin_log_parent_notification", payload));
 
       case "admin_list_parent_notifications":   // S2
-        return _json(_p2Call("p2_admin_list_parent_notifications", payload));
+        return _json(_p2Post("p4_filter", _p2Call("p2_admin_list_parent_notifications", payload), payload));
 
       case "upload_written_image":   // S3
         return _json(_p2Call("p2_upload_written_image", payload));
@@ -1447,7 +1423,7 @@ function doPost(e) {
         return _json(_p2Call("p2_get_quiz_review", payload));
 
       case "admin_grading_queue":   // S4
-        return _json(_p2Call("p2_admin_grading_queue", payload));
+        return _json(_p2Post("p4_filter", _p2Call("p2_admin_grading_queue", payload), payload));
 
       case "admin_grade_written":   // S4
         return _json(_p2Call("p2_admin_grade_written", payload));
@@ -1518,7 +1494,33 @@ function handleUploadAttachment(payload) {
 function handleDeleteAttachment(payload) {
   _requireAdmin(payload);
   if (!payload.file_id) throw new Error("Missing file_id.");
-  DriveApp.getFileById(payload.file_id).setTrashed(true);
+  // P4-S1 (plan 0.2): the admin token alone no longer trashes ANY Drive file it is handed. The file
+  // must sit inside the attachments folder (ATTACHMENTS_FOLDER_ID, the folder handleUploadAttachment
+  // writes to), checked up the parent chain. Anything else, or anything that cannot be resolved,
+  // is refused and nothing is trashed (fails closed).
+  var rootId = _props().getProperty("ATTACHMENTS_FOLDER_ID");
+  var file = null, inside = false;
+  try {
+    if (rootId) {
+      file = DriveApp.getFileById(payload.file_id);
+      var level = [], seenIds = {}, it = file.getParents();
+      while (it.hasNext()) level.push(it.next());
+      for (var depth = 0; depth < 8 && level.length && !inside; depth++) {
+        var up = [];
+        for (var k = 0; k < level.length && !inside; k++) {
+          var fid = level[k].getId();
+          if (fid === rootId) { inside = true; break; }
+          if (seenIds[fid]) continue;
+          seenIds[fid] = true;
+          var ps = level[k].getParents();
+          while (ps.hasNext()) up.push(ps.next());
+        }
+        level = up;
+      }
+    }
+  } catch (e) { inside = false; }
+  if (!inside) throw new Error("Not authorized.");
+  file.setTrashed(true);
   return { ok: true };
 }
 
@@ -1566,6 +1568,10 @@ function handleUploadSubmission(payload) {
   // login rollout) — rejecting outright here beats silently accepting an
   // orphaned row nothing can ever match back to a student.
   if (!payload.student_id) throw new Error("Missing student_id — please sign in and try again.");
+  // P4-S1 (plan 0.3): a session_token, when sent, must belong to student_id. A payload with NO token
+  // is a record queued in a student's browser before this change; it keeps working until the Script
+  // Property P4_LEGACY_UPLOADS is set to "0" (about 14 days after deploy).
+  if (payload.session_token || _props().getProperty("P4_LEGACY_UPLOADS") === "0") _requireStudentSession(payload);
 
   var keys = _submissionKeys(payload);
   var peeked = _peekSheet("Submissions");
@@ -1622,16 +1628,6 @@ function handleUploadSubmission(payload) {
       total: typeof payload.total === "number" ? payload.total : null,
       answers: Array.isArray(payload.answers) ? payload.answers : null,
     };
-    // Written (handwritten) answers are teacher-graded and join score/total only once graded. A page cached
-    // from before that rule still counts them as zero marks, so score/total is recomputed here from the
-    // auto-graded answers alone (a no-op for current pages).
-    if (payload.submission_type === "graded" && meta.answers && meta.answers.length) {
-      var autoAns = meta.answers.filter(function (a) { return a && a.type !== "written"; });
-      if (autoAns.length) {
-        meta.total = autoAns.length;
-        meta.score = autoAns.filter(function (a) { return a.is_correct === true; }).length;
-      }
-    }
     var metaBlob = Utilities.newBlob(JSON.stringify(meta, null, 2), "application/json", stem + "--meta.json");
     made.push(folder.createFile(metaBlob));
 
@@ -1670,6 +1666,9 @@ function handleUploadQuizResult(payload) {
   // IS required though (confirmed quiz.js always sends it as of the login
   // rollout) — same reasoning as handleUploadSubmission above.
   if (!payload.student_id) throw new Error("Missing student_id — please sign in and try again.");
+  // P4-S1 (plan 0.3): same rule as handleUploadSubmission. A session_token, when sent, must validate;
+  // no token is accepted only while P4_LEGACY_UPLOADS is not "0".
+  if (payload.session_token || _props().getProperty("P4_LEGACY_UPLOADS") === "0") _requireStudentSession(payload);
   // Bug fix (found alongside the video-lock pipeline fix): quiz.js's embedded
   // quiz data only ever carried the bare lesson SLUG (e.g. "functions"), never
   // the full subject/[group/]slug path the Quizzes sheet is actually keyed by
@@ -3469,11 +3468,16 @@ function handleAdminFollowupOverview(payload) {
   }
 
   var templates = {};
-  _sheetValuesAsObjects(tplSheet).forEach(function (r) {
-    var key = String(r.key || "").trim();
-    var body = String(r.body == null ? "" : r.body);
-    if (key && body.trim() !== "" && !templates.hasOwnProperty(key)) templates[key] = body;
-  });
+  if (typeof p4_tplView_ === "function") {
+    // Phase 4: a teacher sees their own templates over the owner's; the owner sees exactly what they saw before.
+    templates = p4_tplView_(_sheetValuesAsObjects(tplSheet), (typeof p4_tplSuffix_ === "function") ? p4_tplSuffix_(payload) : "");
+  } else {
+    _sheetValuesAsObjects(tplSheet).forEach(function (r) {
+      var key = String(r.key || "").trim();
+      var body = String(r.body == null ? "" : r.body);
+      if (key && body.trim() !== "" && !templates.hasOwnProperty(key)) templates[key] = body;
+    });
+  }
 
   return { ok: true, today: today, now: _cairoIso(now), settings: settings, groups: groups, unclassified: unclassified,
            students: studentsOut, lessons: lessonsOut, all_lessons: allLessonsOut, lessons_error: lessonsError,
@@ -3685,6 +3689,9 @@ function handleAdminFollowupSaveGroup(payload) {
 // ---- admin_followup_save_templates -------------------------------------------------------------
 function handleAdminFollowupSaveTemplates(payload) {
   _requireAdminAny(payload);
+  // Phase 4: a teacher's templates are stored under their own key suffix (":<id>"); the owner's stay as they were.
+  var sfx = (typeof p4_tplSuffix_ === "function") ? p4_tplSuffix_(payload) : "";
+  if (sfx === null) throw new Error("Not authorized.");
   var t = payload.templates;
   if (!t || typeof t !== "object" || Array.isArray(t)) throw new Error("templates must be an object of {key: body}.");
   var keys = Object.keys(t);
@@ -3712,21 +3719,26 @@ function handleAdminFollowupSaveTemplates(payload) {
     var toDelete = [];
     keys.forEach(function (k) {
       var body = t[k];
-      if (body === null || String(body).trim() === "") { if (rowOf.hasOwnProperty(k)) toDelete.push(rowOf[k]); return; }
-      if (rowOf.hasOwnProperty(k)) {
-        sheet.getRange(rowOf[k], c.body).setNumberFormat("@").setValue(body);
-        sheet.getRange(rowOf[k], c.updated_at).setNumberFormat("@").setValue(now);
+      var sk = k + sfx;   // Phase 4: "" for the owner (unchanged), ":<id>" for a teacher
+      if (body === null || String(body).trim() === "") { if (rowOf.hasOwnProperty(sk)) toDelete.push(rowOf[sk]); return; }
+      if (rowOf.hasOwnProperty(sk)) {
+        sheet.getRange(rowOf[sk], c.body).setNumberFormat("@").setValue(body);
+        sheet.getRange(rowOf[sk], c.updated_at).setNumberFormat("@").setValue(now);
       } else {
-        _appendByHeader(sheet, { key: k, body: body, updated_at: now });
+        _appendByHeader(sheet, { key: sk, body: body, updated_at: now });
       }
     });
     toDelete.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
 
     var saved = {};
-    _sheetValuesAsObjects(sheet).forEach(function (r) {
-      var k = String(r.key || "").trim(), b = String(r.body == null ? "" : r.body);
-      if (k && b.trim() !== "" && !saved.hasOwnProperty(k)) saved[k] = b;
-    });
+    if (typeof p4_tplView_ === "function") {
+      saved = p4_tplView_(_sheetValuesAsObjects(sheet), sfx);
+    } else {
+      _sheetValuesAsObjects(sheet).forEach(function (r) {
+        var k = String(r.key || "").trim(), b = String(r.body == null ? "" : r.body);
+        if (k && b.trim() !== "" && !saved.hasOwnProperty(k)) saved[k] = b;
+      });
+    }
     return { ok: true, templates: saved };
   });
 }
@@ -5371,9 +5383,8 @@ function _p2cGradeQuiz(quiz, answers, imageCounts) {
   var entries = [], score = 0, total = 0;
   quiz.questions.forEach(function (q, i) {
     var e = _p2cGradeOne(q, i, byI[i], (imageCounts && imageCounts[_p2cQid(q, i)]) || 0);
-    // Written answers are teacher-graded: their marks join score/total only when graded
-    // (_gRecomputeAttempt), never at submit. A missing photo no longer lowers the grade.
-    if (e.type !== "written") { total += 1; if (e.is_correct) score += 1; }
+    if (e.type === "written") { if (!e.pending) total += e.max; }
+    else { total += 1; if (e.is_correct) score += 1; }
     entries.push(e);
   });
   return { score: score, total: total, questions: entries };
@@ -5447,30 +5458,31 @@ function _p2cFindWrittenRow(sheet, attemptId, studentId, qid) {
   return null;
 }
 
-// Phase 3 / S2: the student page posts the answers FIRST and the photos afterwards, so a written answer can
-// arrive with no photo at submit time (stored as a non-pending entry). When its photo lands later, flip it to
-// pending. The total is NOT touched: written marks are never in the submit-time total (see _p2cGradeQuiz).
-// Never touches a graded entry. Best effort: a failure here must not fail the upload (the review still shows
-// the photo as pending via has_photo).
+// Phase 3 / S2: the student page now posts the answers FIRST and the photos afterwards, so a written answer can
+// arrive with no photo at submit time (stored as a non-pending "wrong" entry whose max is already in the total).
+// When its photo lands later, flip it to pending and take its max back out of the total, exactly the state a
+// submit-with-photo would have produced. Never touches a graded entry. Best effort: a failure here must not
+// fail the upload (the review still shows the photo as pending via has_photo).
 function _p2cLatePhotoFlip(student, attempt, qid) {
   try {
     _withLock(function () {
       var sheet = _quizResultsSheet();
       if (!sheet || sheet.getLastRow() < 2) return;
       var c = _headerIndex(sheet);
-      if (!c.dedupe_key || !c.student_id || !c.questions_json) return;
+      if (!c.dedupe_key || !c.student_id || !c.questions_json || !c.total) return;
       var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
       for (var i = values.length - 1; i >= 0; i--) {
         if (String(values[i][c.dedupe_key - 1]) !== "c:" + attempt || !_phonesMatch(values[i][c.student_id - 1], student)) continue;
-        var arr = _p2cParse(String(values[i][c.questions_json - 1])), hit = false;
+        var arr = _p2cParse(String(values[i][c.questions_json - 1])), hit = false, give = 0;
         if (!Array.isArray(arr)) return;
         arr.forEach(function (q) {
           if (q && q.type === "written" && String(q.qid) === String(qid) && !q.pending && q.awarded === undefined) {
-            q.pending = true; q.image_count = 1; q.your_answer = "[1 photo]"; hit = true;
+            give = Number(q.max) || 0; q.pending = true; q.image_count = 1; q.your_answer = "[1 photo]"; hit = true;
           }
         });
         if (!hit) return;
         sheet.getRange(i + 2, c.questions_json).setValue(JSON.stringify(arr));
+        sheet.getRange(i + 2, c.total).setValue(Math.max(0, (Number(values[i][c.total - 1]) || 0) - give));
         return;
       }
     }, UPLOAD_LOCK_WAIT_MS);
@@ -7399,3 +7411,2587 @@ function _p3bAudit(payload, action, res) {
     });
   } catch (e) { /* logging must never fail the action */ }
 }
+
+// ============================================================================
+// ===== MERGED FROM Phase4_Scope.gs =====
+// ============================================================================
+// Phase4_Scope.gs  (P4 / S2: authorization core)
+//
+// Paste into the same Apps Script project as Code.gs (File > New > Script). Does NOT edit Code.gs;
+// scripts/p4_wire.py inserts the four hooks (H1 to H4) at assembly.
+//
+// What it does: works out WHO is calling (owner, teacher, scoped assistant, legacy assistant, student,
+// anon), decides per action from the P4_ACTIONS table, and filters lesson-based lists. Deny by default,
+// fail closed. Every refusal is exactly {ok:false, error:"Not authorized."}.
+// Identity comes ONLY from payload.token, or payload.student_id + payload.session_token. Nothing else.
+// Every function here starts with p4_ / p4f_ or is a P4_ global, so nothing can collide with Code.gs.
+//
+// Order of this file: 1 subjects, 2 token verification, 3 ctx, 4 ctxForPhone, 5 action table,
+// 6 gate, 7 covers/filter/hooks, 8 attachment resolution, 9 lesson filters, 10 session scope + ping,
+// 11 self test.
+
+// ============================================================================
+// 1. Subjects
+// ============================================================================
+var P4_SUBJECTS = ["programming", "english", "math"];
+
+// Per-request globals (Apps Script starts every request with a fresh global scope; p4_gate resets them anyway).
+var P4_CTX_ = null;
+var P4_GATE_RAN_ = false;
+
+function p4_deny_() { return { ok: false, error: "Not authorized." }; }
+
+function p4_log_(msg) {
+  try { if (typeof Logger !== "undefined" && Logger && Logger.log) Logger.log("[p4] " + msg); } catch (e) { /* never fails a request */ }
+}
+
+function p4_global_(name) {
+  var g = (typeof globalThis !== "undefined") ? globalThis : this;
+  return g[name];
+}
+
+// "math/sat/x", "math/sat/x#ch2", a grade scope, an old alias -> "math" | "programming" | "english" | "".
+// Only strings count. Normalised like _lessonPath (lowercase, "\" -> "/", no leading slash); any ".." is refused.
+function p4_subjectOf(keyOrScope) {
+  if (typeof keyOrScope !== "string") return "";
+  var s = keyOrScope.split("#")[0].trim().toLowerCase().replace(/\\/g, "/").replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, "");
+  if (!s || s.indexOf("..") !== -1) return "";
+  try { if (typeof p2k_canon === "function") s = String(p2k_canon(s)).toLowerCase(); } catch (e) { /* keep s */ }
+  var seg = s.split("/")[0];
+  return P4_SUBJECTS.indexOf(seg) !== -1 ? seg : "";
+}
+
+// "Math, programming ,x" -> ["math","programming"]. "*" is NOT a teacher scope (only the owner has it).
+function p4_parseScope_(s) {
+  var out = [];
+  String(s == null ? "" : s).split(",").forEach(function (p) {
+    p = p.trim().toLowerCase();
+    if (P4_SUBJECTS.indexOf(p) !== -1 && out.indexOf(p) === -1) out.push(p);
+  });
+  return out;
+}
+
+// ============================================================================
+// 2. Teacher token verification (minting, revoking, listing: S5)
+// ============================================================================
+// SHA-256 hex of a string. Apps Script digest bytes are signed: (b + 256) % 256.
+function p4_hashToken_(raw) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(raw), Utilities.Charset.UTF_8);
+  return bytes.map(function (b) { b = (b + 256) % 256; return ("0" + b.toString(16)).slice(-2); }).join("");
+}
+
+// Constant-time string equality (no early exit).
+function p4_safeEq_(a, b) {
+  a = String(a); b = String(b);
+  var n = Math.max(a.length, b.length), d = a.length ^ b.length;
+  for (var i = 0; i < n; i++) d |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return d === 0;
+}
+
+// raw token -> {name, scope:[subjects], created} or null. Looks at EVERY stored hash (no early exit).
+function p4_findTeacherToken_(raw) {
+  if (typeof raw !== "string" || !raw) return null;
+  var map;
+  try { map = JSON.parse(_props().getProperty("P4_TEACHER_TOKENS") || "{}"); } catch (e) { return null; }
+  if (!map || typeof map !== "object") return null;
+  var h = p4_hashToken_(raw), hit = null;
+  Object.keys(map).forEach(function (k) {
+    if (p4_safeEq_(k, h) && !hit) {
+      var e = map[k] || {}, scope = p4_parseScope_(e.scope);
+      if (scope.length) hit = { name: String(e.name == null ? "" : e.name), scope: scope, created: String(e.created || "") };
+    }
+  });
+  return hit;
+}
+
+// ============================================================================
+// 3. Who is calling
+// ============================================================================
+function p4_anon_() { return { kind: "anon", via: "none", id: "", subjects: [], principal: "" }; }
+
+function p4_readStudents_() {
+  var values = _students().getDataRange().getValues();
+  return { values: values, c: _studentCols(values[0]) };
+}
+
+function p4_cell_(S, i, name) {
+  var col = S.c[name];
+  return col ? S.values[i][col - 1] : "";
+}
+
+function p4_findRow_(S, phone) {
+  var target = _normalizePhone(phone);
+  if (!target) return -1;
+  for (var i = 1; i < S.values.length; i++) {
+    if (_phonesMatch(S.values[i][S.c.phone - 1], target)) return i;
+  }
+  return -1;
+}
+
+function p4_idOf_(S, i) {
+  var cell = S.values[i][S.c.phone - 1];
+  return _canonicalPhone(cell) || _normalizePhone(cell);
+}
+
+function p4_roleOf_(S, i) { return String(p4_cell_(S, i, "role") == null ? "" : p4_cell_(S, i, "role")).trim().toLowerCase(); }
+function p4_scopeOf_(S, i) { return p4_parseScope_(p4_cell_(S, i, "teacher_scope")); }
+
+// A teacher row: role "teacher" and a non-empty scope. Returns {i, id, scope} or null.
+function p4_teacherRow_(S, phone) {
+  var i = p4_findRow_(S, phone);
+  if (i < 0) return null;
+  if (p4_roleOf_(S, i) !== "teacher") return null;
+  var scope = p4_scopeOf_(S, i);
+  return scope.length ? { i: i, id: p4_idOf_(S, i), scope: scope } : null;
+}
+
+// Computes the caller's context (may throw; p4_ctx catches). Token beats session, like _requireAdminAny.
+function p4_ctxCompute_(payload) {
+  var hasToken = payload.token !== undefined && payload.token !== null && payload.token !== "";
+  if (hasToken) {
+    if (typeof payload.token !== "string") return p4_anon_();
+    var expected = _props().getProperty("ADMIN_TOKEN");
+    if (expected && p4_safeEq_(payload.token, expected)) return { kind: "owner", via: "token", id: "owner", subjects: ["*"], principal: "" };
+    var t = p4_findTeacherToken_(payload.token);
+    if (!t) return p4_anon_();
+    var principal = t.name;
+    try {
+      var S0 = p4_readStudents_(), want = t.name.trim().toLowerCase();
+      for (var j = 1; j < S0.values.length; j++) {
+        if (String(p4_cell_(S0, j, "display_name")).trim().toLowerCase() === want && p4_roleOf_(S0, j) === "teacher" && p4_scopeOf_(S0, j).length) {
+          principal = p4_idOf_(S0, j); break;
+        }
+      }
+    } catch (e) { /* no matching row: the name stands in */ }
+    return { kind: "teacher", via: "token", id: t.name, subjects: t.scope.slice(), principal: principal };
+  }
+
+  if (!payload.student_id || !payload.session_token) return p4_anon_();
+  var S = p4_readStudents_();
+  var i = p4_findRow_(S, payload.student_id);
+  if (i < 0) return p4_anon_();
+  var stored = String(p4_cell_(S, i, "session_token"));
+  if (!stored || stored !== String(payload.session_token)) return p4_anon_();
+  var id = p4_idOf_(S, i);
+  if (S.c.is_admin && _isTruthyFlag(p4_cell_(S, i, "is_admin"))) return { kind: "owner", via: "session", id: id, subjects: ["*"], principal: "" };
+
+  var role = p4_roleOf_(S, i);
+  if (role === "teacher") {
+    var scope = p4_scopeOf_(S, i);
+    if (scope.length) return { kind: "teacher", via: "session", id: id, subjects: scope, principal: id };
+  } else if (role === "assistant") {
+    var of = String(p4_cell_(S, i, "assistant_of") == null ? "" : p4_cell_(S, i, "assistant_of")).trim();
+    if (!of) return { kind: "assistant", via: "session", id: id, subjects: [], principal: "" };       // legacy owner assistant
+    var tr = p4_teacherRow_(S, of);
+    if (tr) return { kind: "assistant", via: "session", id: id, subjects: tr.scope.slice(), principal: tr.id };   // scoped
+  }
+  return { kind: "student", via: "session", id: id, subjects: [], principal: "" };
+}
+
+function p4_ctx(payload) {
+  var ctx;
+  try { ctx = p4_ctxCompute_(payload || {}); } catch (e) { ctx = p4_anon_(); }
+  P4_CTX_ = ctx;
+  return ctx;
+}
+
+// ============================================================================
+// 4. Telegram identity
+// ============================================================================
+// Fresh read of that Students row. A teacher ctx (via "telegram") only for role teacher + non-empty scope, else null.
+function p4_ctxForPhone(phone) {
+  try {
+    var S = p4_readStudents_();
+    var tr = p4_teacherRow_(S, phone);
+    if (!tr) return null;
+    return { kind: "teacher", via: "telegram", id: tr.id, subjects: tr.scope.slice(), principal: tr.id };
+  } catch (e) { return null; }
+}
+
+// ============================================================================
+// 5. The action table (contract section 5)
+// ============================================================================
+// Row: {rule, needs, link, tok, ses, filter, L, Lsoft, St, G, opt, any, res, payIf}
+//   rule   PUB pass-through | O owner only | T teacher only | LW LF SP GP GC PAY SF LINK ALLOW (teacher or scoped assistant, via needs)
+//   needs  checks that must all hold: LW lesson in scope, SP student owned, GP group owned, GC group own/free, PAY payment in scope
+//   L / St / G  payload fields the checks read ("items[].phone" = field of every list item)
+//   Lsoft  extra lesson fields, checked only when they name a known subject (a bare slug is accepted)
+//   opt    needs whose fields may be absent (then skipped); any: at least one of the optional needs must have a value
+//   res    "attachment" | "written": the file or the stored answer decides lesson (and student), not the request
+//   payIf  when payload.payment_id is present the handler ignores the other fields, so only PAY is checked
+//   link   a student by phone is being added to the teacher's scope (that student need not be owned yet)
+//   tok / ses  allowed callers: desktop token, dashboard session
+var P4_ACTIONS = (function () {
+  var t = {};
+  function add(names, row) {
+    String(names).split(/\s+/).forEach(function (n) {
+      if (!n) return;
+      var r = {};
+      Object.keys(row).forEach(function (k) { r[k] = row[k]; });
+      t[n] = r;
+    });
+  }
+  // Attachments (desktop token only)
+  add("upload_attachment", { rule: "LW", needs: ["LW"], L: ["subject"], Lsoft: ["lesson"], tok: true });
+  add("delete_attachment", { rule: "LW", needs: ["LW"], res: "attachment", tok: true });
+  // Videos
+  add("admin_set_video", { rule: "LW", needs: ["LW"], L: ["lesson"], tok: true, ses: true });
+  add("admin_list_videos", { rule: "LF", needs: [], tok: true, ses: true, filter: "p4f_admin_list_videos" });
+  // Quiz content and written models
+  add("admin_set_quiz_content admin_get_quiz_content admin_set_written_models", { rule: "LW", needs: ["LW"], L: ["lesson"], tok: true });
+  add("admin_get_written_models", { rule: "LW", needs: ["LW"], L: ["lesson"], tok: true, ses: true });
+  // Locks and tags (dashboard)
+  add("admin_set_lesson_lock admin_set_quiz_lock admin_set_lesson_tags", { rule: "LW", needs: ["LW"], L: ["lesson"], ses: true });
+  add("admin_list_lesson_tags", { rule: "LF", needs: [], ses: true, filter: "p4f_admin_list_lesson_tags" });
+  add("admin_list_lessons", { rule: "LF", needs: [], ses: true, filter: "p4f_admin_list_lessons" });
+  add("admin_set_requirement", { rule: "LW", needs: ["LW", "GP"], L: ["lesson"], G: ["group"], opt: ["GP"], ses: true });
+  // Access grants. The student being added need not be owned yet (LINK); the response is cut to {ok, registered} by S3.
+  add("admin_grant_access", { rule: "LW", needs: ["LW"], L: ["scope"], link: true, ses: true, filter: "p4f_admin_grant_access" });
+  add("admin_grant_quiz_access", { rule: "LW", needs: ["LW"], L: ["lesson"], link: true, ses: true, filter: "p4f_admin_grant_quiz_access" });
+  add("admin_revoke_access", { rule: "LW", needs: ["LW", "SP"], L: ["scope"], St: ["phone"], payIf: true, ses: true });
+  add("admin_revoke_quiz_access", { rule: "LW", needs: ["LW", "SP"], L: ["lesson"], St: ["phone"], ses: true });
+  // Groups
+  add("admin_group_add", { rule: "GC", needs: ["GC"], G: ["group"], link: true, ses: true, filter: "p4f_admin_group_add" });
+  add("admin_group_remove", { rule: "GP", needs: ["GP"], G: ["group"], ses: true });
+  add("admin_group_grant_access admin_group_revoke_access", { rule: "LW", needs: ["LW", "GP"], L: ["scope"], G: ["group"], ses: true });
+  add("admin_group_grant_quiz_access admin_group_revoke_quiz_access", { rule: "LW", needs: ["LW", "GP"], L: ["lesson"], G: ["group"], ses: true });
+  // Lists filtered by student ownership (S3)
+  add("admin_list_groups", { rule: "SF", needs: [], ses: true, filter: "p4f_admin_list_groups" });
+  add("admin_get_all", { rule: "SF", needs: [], ses: true, filter: "p4f_admin_get_all" });
+  add("admin_access_overview", { rule: "SF", needs: [], ses: true, filter: "p4f_admin_access_overview" });
+  add("admin_list_payments", { rule: "SF", needs: [], ses: true, filter: "p4f_admin_list_payments" });
+  add("admin_followup_overview", { rule: "SF", needs: [], ses: true, filter: "p4f_admin_followup_overview" });
+  add("admin_list_parent_notifications", { rule: "SF", needs: [], ses: true, filter: "p4f_admin_list_parent_notifications" });
+  add("admin_grading_queue", { rule: "SF", needs: [], ses: true, filter: "p4f_admin_grading_queue" });
+  // Payments
+  add("admin_decide_payment", { rule: "PAY", needs: ["PAY"], ses: true });
+  // Follow-up
+  add("admin_followup_set_attendance", { rule: "SP", needs: ["SP", "GP"], St: ["items[].phone"], G: ["group"], opt: ["GP"], ses: true });
+  add("admin_followup_save_group", { rule: "GP", needs: ["GP"], G: ["group"], ses: true });
+  add("admin_followup_save_templates", { rule: "ALLOW", needs: [], ses: true });
+  add("admin_student_summary", { rule: "SP", needs: ["SP"], St: ["student"], ses: true, filter: "p4f_admin_student_summary" });
+  add("admin_monthly_review", { rule: "SP", needs: ["SP", "GP"], St: ["student"], G: ["group"], opt: ["SP", "GP"], any: true, ses: true, filter: "p4f_admin_monthly_review" });
+  add("admin_log_parent_notification", { rule: "SP", needs: ["SP"], St: ["student"], ses: true });
+  // Written answers: the stored answer decides the student and the lesson
+  add("admin_grade_written get_written_image", { rule: "SP", needs: ["SP", "LW"], res: "written", ses: true });
+  // Owner only
+  add("admin_migrate_lesson_keys p3_admin_set_role p3_admin_backfill_submission", { rule: "O", needs: [] });
+  add("p3_admin_bulk_preview p3_admin_bulk_grant p3_admin_bulk_revoke", { rule: "O", needs: [] });
+  // Not in the contract table, but in the router and under the p3_admin_ prefix: owner only (see handoff).
+  add("p3_admin_list_staff p3_admin_diagnose_submissions p3_admin_restore_submissions p3_admin_flag_status", { rule: "O", needs: [] });
+  add("p4_admin_set_teacher p4_admin_list_teachers p4_admin_set_group_owner p4_admin_tg_unlink p4_admin_list_edit_log p4_admin_teacher_stats", { rule: "O", needs: [] });
+  // New teacher-side actions
+  add("p4_teacher_update_student", { rule: "T", needs: ["SP"], St: ["student"], ses: true });
+  add("p4_teacher_set_assistant p4_teacher_list_assistants p4_teacher_revoke_assistant", { rule: "T", needs: [], ses: true });
+  add("p4_tg_link_start p4_tg_status p4_tg_unlink", { rule: "T", needs: [], ses: true });
+  // Public (student or open) actions, listed explicitly
+  add("ping", { rule: "PUB", needs: [], tok: true });
+  add("p4_session_scope", { rule: "PUB", needs: [] });
+  add("check_student register_student login_student reset_password update_profile get_my_results get_video get_quiz get_quiz_review get_quiz_state " +
+      "get_subscription_options record_watch request_access request_subscription upload_submission upload_quiz_result upload_written_image p3_session_role",
+      { rule: "PUB", needs: [] });
+  return t;
+})();
+
+// A16: a scoped assistant is never allowed these, plus every p4_ action.
+var P4_ASSISTANT_DENY = ["admin_decide_payment", "admin_list_payments", "admin_followup_save_templates"].concat(
+  Object.keys(P4_ACTIONS).filter(function (a) { return a.indexOf("p4_") === 0; }));
+
+function p4_rowFor_(action) {
+  action = String(action == null ? "" : action);
+  return Object.prototype.hasOwnProperty.call(P4_ACTIONS, action) ? P4_ACTIONS[action] : null;
+}
+
+function p4_adminish_(action) {
+  return /^(admin_|p3_admin_|p4_admin_)/.test(action) || action === "upload_attachment" || action === "delete_attachment";
+}
+
+function p4_isScoped_(ctx) {
+  return !!ctx && (ctx.kind === "teacher" || (ctx.kind === "assistant" && !!ctx.principal));
+}
+
+// ============================================================================
+// 6. The gate
+// ============================================================================
+// Reads a payload value as text. Only strings and finite numbers are usable; anything else is null (= deny).
+function p4_str_(v) {
+  if (typeof v === "string") return v.trim();
+  if (typeof v === "number" && isFinite(v)) return String(v);
+  return null;
+}
+
+// Collects the values behind field specs. {vals:[text], bad:bool}. A scalar field that is absent or blank adds nothing;
+// "list[].field": every item must be an object carrying the field (otherwise bad).
+function p4_gather_(payload, specs) {
+  var out = { vals: [], bad: false };
+  (specs || []).forEach(function (spec) {
+    var at = spec.indexOf("[].");
+    if (at === -1) {
+      var v = payload[spec];
+      if (v === undefined || v === null || v === "") return;
+      var s = p4_str_(v);
+      if (s === null) { out.bad = true; return; }
+      if (s !== "") out.vals.push(s);
+      return;
+    }
+    var listName = spec.slice(0, at), field = spec.slice(at + 3), list = payload[listName];
+    if (list === undefined || list === null) return;
+    if (!Array.isArray(list)) { out.bad = true; return; }
+    list.forEach(function (it) {
+      var s2 = (it && typeof it === "object") ? p4_str_(it[field]) : null;
+      if (s2 === null || s2 === "") out.bad = true; else out.vals.push(s2);
+    });
+  });
+  return out;
+}
+
+// The stored written answer behind {submission_id, question_id}: {students:[phone], lessons:[lesson]} or null.
+function p4_resolveWritten_(payload, matchStudent) {
+  var sid = String(payload.submission_id == null ? "" : payload.submission_id).trim();
+  var qid = String(payload.question_id == null ? "" : payload.question_id).trim();
+  if (!sid || !qid) return null;
+  var sh = _dataSs().getSheetByName("WrittenAnswers");
+  if (!sh || sh.getLastRow() < 2) return null;
+  var hit = null;
+  _sheetValuesAsObjects(sh).forEach(function (r) {
+    if (hit) return;
+    if (String(r.submission_id).trim() !== sid || String(r.question_id).trim() !== qid) return;
+    if (matchStudent && payload.student && !_phonesMatch(r.student_id, payload.student)) return;
+    hit = r;
+  });
+  if (!hit || !String(hit.student_id == null ? "" : hit.student_id).trim() || !String(hit.lesson == null ? "" : hit.lesson).trim()) return null;
+  return { students: [String(hit.student_id).trim()], lessons: [String(hit.lesson).trim()] };
+}
+
+// One need against the caller. Returns true, false, or "skip" (optional and absent).
+function p4_needHolds_(need, ctx, payload, row, res) {
+  if (need === "PAY") {
+    var pay = p4_global_("p4_paymentInScope");
+    return typeof pay === "function" ? !!pay(ctx, payload) : false;
+  }
+  var specs = need === "LW" ? row.L : need === "SP" ? row.St : (need === "GP" || need === "GC") ? row.G : null;
+  if (!specs && !res) return false;
+  var g = p4_gather_(payload, specs);
+  if (res) {
+    var extra = need === "LW" ? res.lessons : need === "SP" ? res.students : null;
+    (extra || []).forEach(function (x) { g.vals.push(x); });
+  }
+  if (g.bad) return false;
+  var optional = (row.opt || []).indexOf(need) !== -1;
+  if (!g.vals.length) return optional ? "skip" : false;
+
+  var fn;
+  for (var i = 0; i < g.vals.length; i++) {
+    var v = g.vals[i];
+    if (need === "LW") {
+      if (!p4_teacherCovers(ctx, v)) return false;
+    } else if (need === "SP") {
+      fn = p4_global_("p4_ownsStudent");
+      if (typeof fn !== "function" || !fn(ctx, v)) return false;
+    } else if (need === "GP") {
+      fn = p4_global_("p4_ownsGroup");
+      if (typeof fn !== "function" || !fn(ctx, v)) return false;
+    } else if (need === "GC") {
+      fn = p4_global_("p4_groupState");
+      if (typeof fn !== "function") return false;
+      var st = fn(ctx, v);
+      if (st !== "own" && st !== "free") return false;
+    } else {
+      return false;
+    }
+  }
+  if (need === "LW" && row.Lsoft) {
+    var soft = p4_gather_(payload, row.Lsoft);
+    if (soft.bad) return false;
+    for (var k = 0; k < soft.vals.length; k++) {
+      var sj = p4_subjectOf(soft.vals[k]);
+      if (sj && !p4_teacherCovers(ctx, soft.vals[k])) return false;
+    }
+  }
+  return true;
+}
+
+// The decision for an already-resolved ctx. {} = continue, {deny} = refuse. Throws are caught by p4_gate.
+function p4_decide_(ctx, payload) {
+  var action = String(payload.action == null ? "" : payload.action);
+  var row = p4_rowFor_(action);
+  if (!row && !p4_adminish_(action)) return {};            // unknown, not admin-ish: the router decides
+  if (row && row.rule === "PUB") return {};
+  if (ctx.kind === "owner") return {};
+  if (!p4_isScoped_(ctx)) return {};                        // legacy assistants, students, anon: existing checks, unchanged
+  var DENY = { deny: p4_deny_() };
+  if (!row) return DENY;                                    // admin-ish and not in the table
+  if (row.rule === "O") return DENY;
+  if (row.rule === "T" && ctx.kind !== "teacher") return DENY;
+  if (ctx.kind === "assistant") {
+    var allow = p4_global_("P3_STAFF_ALLOW");
+    if (!Array.isArray(allow) || allow.indexOf(action) === -1) return DENY;
+    if (P4_ASSISTANT_DENY.indexOf(action) !== -1) return DENY;
+  }
+  if (ctx.via === "token" && !row.tok) return DENY;
+  if (ctx.via === "session" && !row.ses) return DENY;
+  if (ctx.via !== "token" && ctx.via !== "session") return DENY;
+
+  var needs = row.needs || [];
+  if (row.payIf && String(payload.payment_id == null ? "" : payload.payment_id).trim()) needs = ["PAY"];
+  var res = null;
+  if (row.res === "attachment") res = p4_resolveAttachment_(payload);
+  else if (row.res === "written") res = p4_resolveWritten_(payload, action === "admin_grade_written");
+  if (row.res && !res) return DENY;
+
+  var sawValue = false;
+  for (var i = 0; i < needs.length; i++) {
+    if (row.link && needs[i] === "SP") continue;            // the student being added need not be owned yet
+    var ok = p4_needHolds_(needs[i], ctx, payload, row, res);
+    if (ok === false) return DENY;
+    if (ok === true) sawValue = true;
+  }
+  if (row.any && !sawValue) return DENY;
+  return {};
+}
+
+function p4_gate(payload) {
+  P4_GATE_RAN_ = false;
+  P4_CTX_ = null;
+  payload = payload || {};
+  var ctx = p4_ctx(payload), out;
+  try {
+    out = p4_decide_(ctx, payload);
+  } catch (e) {
+    p4_log_("gate error on " + payload.action + ": " + (e && e.message));
+    out = p4_isScoped_(ctx) || ctx.kind === "owner" ? { deny: p4_deny_() } : {};   // anyone else has no extra rights to protect
+    if (out.deny) return out;
+  }
+  P4_GATE_RAN_ = !out.deny;
+  return out;
+}
+
+// ============================================================================
+// 7. Coverage, response filters and the two hooks
+// ============================================================================
+function p4_teacherCovers(ctx, keyOrSubject) {
+  if (!ctx) return false;
+  if (ctx.kind === "owner") return true;
+  if (!p4_isScoped_(ctx)) return false;
+  var s = p4_subjectOf(keyOrSubject);
+  return !!s && (ctx.subjects || []).indexOf(s) !== -1;
+}
+
+// Called by the router for every action with a filter (H4). Teachers and scoped assistants only; a missing filter fails closed.
+function p4_filter(resp, payload) {
+  var ctx = (P4_GATE_RAN_ && P4_CTX_) ? P4_CTX_ : p4_ctx(payload);
+  if (!p4_isScoped_(ctx)) return resp;
+  if (!resp || typeof resp !== "object" || resp.ok === false) return resp;
+  var row = p4_rowFor_(payload && payload.action);
+  if (!row || !row.filter) return resp;
+  var fn = p4_global_(row.filter);
+  if (typeof fn !== "function") { p4_log_("missing filter " + row.filter); return p4_deny_(); }
+  try { return fn(resp, ctx, payload); } catch (e) { p4_log_("filter error " + row.filter + ": " + (e && e.message)); return p4_deny_(); }
+}
+
+// H1: a valid teacher token on an action whose row allows tokens. Never before the gate ran in this request.
+function p4_tokenAllows(payload) {
+  if (!P4_GATE_RAN_ || !P4_CTX_ || !payload) return false;
+  if (P4_CTX_.kind !== "teacher" || P4_CTX_.via !== "token") return false;
+  var t = p4_findTeacherToken_(payload.token);
+  if (!t || t.name !== P4_CTX_.id) return false;
+  var row = p4_rowFor_(payload.action);
+  return !!row && !!row.tok && row.rule !== "O" && row.rule !== "T";
+}
+
+// H2: `row` is the caller's Students row (already matched on phone and session token), `c` the column map.
+function p4_teacherAllows(row, c, payload) {
+  if (!P4_GATE_RAN_ || !P4_CTX_ || !payload || !row || !c) return false;
+  var ctx = P4_CTX_;
+  if (ctx.kind !== "teacher" || ctx.via !== "session") return false;
+  if (!_phonesMatch(row[c.phone - 1], ctx.id)) return false;
+  if (String(row[c.session_token - 1]) !== String(payload.session_token)) return false;
+  if (!c.role || String(row[c.role - 1] == null ? "" : row[c.role - 1]).trim().toLowerCase() !== "teacher") return false;
+  var r = p4_rowFor_(payload.action);
+  return !!r && !!r.ses && r.rule !== "O";
+}
+
+// ============================================================================
+// 8. delete_attachment: resolve the file to its subject
+// ============================================================================
+// Files are stored as <subject>--<lesson>--<id>--<name> inside ATTACHMENTS_FOLDER_ID. The file must really sit in that folder,
+// and its name must start with a subject slug. Anything else cannot be resolved.
+function p4_resolveAttachment_(payload) {
+  var id = payload.file_id;
+  if (typeof id !== "string" || !id.trim()) return null;
+  try {
+    var folderId = _props().getProperty("ATTACHMENTS_FOLDER_ID");
+    if (!folderId) return null;
+    var f = DriveApp.getFileById(id.trim()), inFolder = false, parents = f.getParents();
+    while (parents.hasNext()) { if (parents.next().getId() === folderId) inFolder = true; }
+    if (!inFolder) return null;
+    var parts = String(f.getName()).split("--");
+    if (parts.length < 4 || !p4_subjectOf(parts[0])) return null;
+    var lessons = [parts[0]];
+    var lead = parts[1].split("-")[0];
+    if (p4_subjectOf(lead)) lessons.push(lead);              // the lesson part names a subject too: it must be covered as well
+    return { lessons: lessons, students: [] };
+  } catch (e) { return null; }
+}
+
+// ============================================================================
+// 9. Lesson filters (teachers and scoped assistants keep only rows of their subjects; unrecognised rows are dropped)
+// ============================================================================
+function p4_keepLessonRow_(ctx, it) {
+  if (typeof it === "string") return p4_teacherCovers(ctx, it);
+  if (!it || typeof it !== "object") return false;
+  var keys = ["lesson", "lesson_key", "scope", "track"];
+  for (var i = 0; i < keys.length; i++) {
+    if (typeof it[keys[i]] === "string") return p4_teacherCovers(ctx, it[keys[i]]);
+  }
+  return false;
+}
+
+function p4_filterLessonLists_(resp, ctx) {
+  var out = {};
+  Object.keys(resp).forEach(function (k) {
+    var v = resp[k];
+    if (Array.isArray(v)) {
+      var kept = v.filter(function (it) { return p4_keepLessonRow_(ctx, it); });
+      if (kept.length !== v.length) p4_log_("filter dropped " + (v.length - kept.length) + " of " + v.length + " in " + k);
+      out[k] = kept;
+    } else out[k] = v;
+  });
+  return out;
+}
+
+function p4f_admin_list_videos(resp, ctx, payload) { return p4_filterLessonLists_(resp, ctx); }
+function p4f_admin_list_lessons(resp, ctx, payload) { return p4_filterLessonLists_(resp, ctx); }
+function p4f_admin_list_lesson_tags(resp, ctx, payload) { return p4_filterLessonLists_(resp, ctx); }
+
+// ============================================================================
+// 10. Session scope and ping
+// ============================================================================
+// Router action p4_session_scope: the dashboard asks "what am I?". Never throws, never reveals more than the caller's own role.
+function p4_session_scope(payload) {
+  var ctx = p4_ctx(payload);
+  var role = ctx.kind === "owner" ? "admin" : ctx.kind === "anon" ? "none" : ctx.kind;
+  var out = { ok: true, role: role, kind: ctx.kind, scope: ctx.kind === "owner" ? ["*"] : (ctx.subjects || []).slice() };
+  if (ctx.kind === "assistant" && ctx.principal) {
+    try {
+      var S = p4_readStudents_(), i = p4_findRow_(S, ctx.principal);
+      out.principal_name = i < 0 ? "" : String(p4_cell_(S, i, "display_name") == null ? "" : p4_cell_(S, i, "display_name"));
+    } catch (e) { out.principal_name = ""; }
+  }
+  return out;
+}
+
+// Decorates the token ping with who the token belongs to. Signature fits _p2Post(name, resp, payload).
+function p4_pingDecorate(resp, payload) {
+  try {
+    if (!resp || typeof resp !== "object") return resp;
+    var ctx = p4_ctx(payload);                               // ping carries only a token: no sheet read unless a teacher name is looked up
+    resp.kind = ctx.kind;
+    resp.subjects = (ctx.subjects || []).slice();
+    resp.name = ctx.kind === "teacher" ? ctx.id : (ctx.kind === "owner" ? "owner" : "");
+  } catch (e) { /* the ping itself still works */ }
+  return resp;
+}
+
+// ============================================================================
+// 11. Self test (editor only): Run > p4_selfTest, then read the log. Pure checks, then the other P4 files' own tests.
+// ============================================================================
+function p4_selfTest() {
+  var fails = [], n = 0;
+  function t(name, cond) { n++; if (!cond) fails.push(name); }
+  function owner() { return { kind: "owner", via: "session", id: "o", subjects: ["*"], principal: "" }; }
+  function teacher(via) { return { kind: "teacher", via: via || "session", id: "t", subjects: ["math"], principal: "t" }; }
+  function assistant() { return { kind: "assistant", via: "session", id: "a", subjects: ["math"], principal: "t" }; }
+  function legacy() { return { kind: "assistant", via: "session", id: "l", subjects: [], principal: "" }; }
+  function denied(ctx, payload) { var r = p4_decide_(ctx, payload); return !!(r && r.deny && r.deny.ok === false && r.deny.error === "Not authorized."); }
+
+  t("subjectOf math key", p4_subjectOf("math/sat/lesson-1") === "math");
+  t("subjectOf scope #ch2", p4_subjectOf("programming/baccalaureate/grade-2-secondary#ch2") === "programming");
+  t("subjectOf junk", p4_subjectOf("") === "" && p4_subjectOf(null) === "" && p4_subjectOf(["math"]) === "" && p4_subjectOf("art/x") === "" && p4_subjectOf("math/../programming/x") === "");
+  t("subjectOf backslash and leading slash", p4_subjectOf("/Math\\sat") === "math");
+  t("parseScope", JSON.stringify(p4_parseScope_(" Math, programming,x,*,math")) === JSON.stringify(["math", "programming"]));
+  t("sha256 abc", p4_hashToken_("abc") === "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  t("safeEq", p4_safeEq_("abc", "abc") && !p4_safeEq_("abc", "abd") && !p4_safeEq_("abc", "abcd"));
+  Object.keys(P4_ACTIONS).forEach(function (a) {
+    var r = P4_ACTIONS[a];
+    t("row valid " + a, ["PUB", "O", "T", "ALLOW", "LW", "LF", "SP", "GP", "GC", "PAY", "SF"].indexOf(r.rule) !== -1 && Array.isArray(r.needs));
+    if (r.rule === "O") t("O row has no via " + a, !r.tok && !r.ses);
+  });
+  t("assistant deny list has p4_ rows", P4_ASSISTANT_DENY.indexOf("p4_tg_status") !== -1 && P4_ASSISTANT_DENY.indexOf("admin_decide_payment") !== -1);
+  t("owner passes O", !denied(owner(), { action: "p3_admin_set_role" }));
+  t("teacher denied O", denied(teacher(), { action: "p3_admin_set_role" }));
+  t("assistant denied T", denied(assistant(), { action: "p4_tg_status" }));
+  t("PUB passes teacher", !denied(teacher(), { action: "check_student" }));
+  t("unknown admin_x denied for teacher", denied(teacher(), { action: "admin_nope" }));
+  t("unknown plain action passes", !denied(teacher(), { action: "something_new" }));
+  t("student and legacy assistant fall through", !denied({ kind: "student", via: "session", id: "s", subjects: [], principal: "" }, { action: "admin_get_all" }) && !denied(legacy(), { action: "admin_get_all" }));
+  t("token on a session-only row denied", denied(teacher("token"), { action: "admin_set_lesson_lock", lesson: "math/x" }));
+  t("session on a token-only row denied", denied(teacher("session"), { action: "upload_attachment", subject: "math", lesson: "x" }));
+  t("covered lesson passes", !denied(teacher(), { action: "admin_set_lesson_lock", lesson: "math/sat/x" }));
+  t("foreign lesson denied", denied(teacher(), { action: "admin_set_lesson_lock", lesson: "programming/x/y" }));
+  t("missing lesson denied", denied(teacher(), { action: "admin_set_lesson_lock" }));
+  t("array lesson denied", denied(teacher(), { action: "admin_set_lesson_lock", lesson: ["math/x"] }));
+  t("covers: owner/teacher/legacy", p4_teacherCovers(owner(), "programming/x") && p4_teacherCovers(teacher(), "math/x") && !p4_teacherCovers(teacher(), "english/x") && !p4_teacherCovers(legacy(), "math/x"));
+  P4_GATE_RAN_ = false;
+  t("fail closed without gate", p4_tokenAllows({ token: "x", action: "ping" }) === false && p4_teacherAllows([], {}, { action: "admin_set_video" }) === false);
+
+  var msg = fails.length ? "FAIL (" + fails.length + " of " + n + "): " + fails.join("; ") : "ALL PASS (" + n + " checks)";
+  p4_log_(msg);
+  var ok = !fails.length;
+  ["p4_selfTest_people", "p4_selfTest_team", "p4_selfTest_tg"].forEach(function (name) {
+    var f = p4_global_(name);
+    if (typeof f !== "function") return;
+    var r;
+    try { r = f(); } catch (e) { r = "FAIL: threw " + (e && e.message); }
+    var good = r === true || (typeof r === "string" && r.indexOf("ALL PASS") !== -1);
+    p4_log_(name + ": " + (good ? "ALL PASS" : String(r)));
+    if (!good) { ok = false; msg += " | " + name + " failed"; }
+  });
+  p4_log_(ok ? "ALL PASS" : "NOT ALL PASS: " + msg);
+  return ok ? "ALL PASS" : msg;
+}
+// ===== END MERGED FROM Phase4_Scope.gs =====
+
+// ============================================================================
+// ===== MERGED FROM Phase4_People.gs =====
+// ============================================================================
+// =====================================================================================
+// Phase 4 / S3 - people and money: student ownership, response filters, group ownership,
+// payment scope, per-owner follow-up templates, add-by-phone rules.
+//
+// Contract: Docs/02-plans/math-teacher-sessions/00-MASTER-CONTRACT.md (v2), sections 2, 4, 5, 6.
+// Paste into Apps Script as its own file, or let scripts/p4_wire.py --merge append it to Code.gs.
+// Depends on Phase4_Scope.gs only through: p4_subjectOf(keyOrScope), and (optionally) p4_ctx(payload).
+// Every p4f_* filter is a no-op unless the caller is a teacher or a SCOPED assistant, so the owner
+// and the owner's own (unscoped) assistants see exactly what they saw before.
+// Refusal text is always: {ok:false, error:"Not authorized."}.
+// =====================================================================================
+
+var P4_LOOKUPS_PER_HOUR = 30;                                   // contract A4 / A17 (one bucket per principal)
+var P4_GROUPOWNER_HEADERS = ["group", "owner_id", "created_at"];
+var P4_PC_ = { key: "", set: null, owners: null };               // per-request cache, keyed by principal + subjects (an assistant shares his teacher's)
+var P4_GSTATE_ = {};                                             // "<principalKey>|<groupKey>" -> own|free|foreign (state at gate time)
+
+function p4_resetCache_() { P4_PC_ = { key: "", set: null, owners: null }; P4_GSTATE_ = {}; }
+
+// ---- small helpers --------------------------------------------------------------------
+
+// Canonical comparison key for an id: a phone becomes its last 10 digits, anything else is lower-cased text.
+function p4_idKey_(id) {
+  var s = String(id == null ? "" : id).trim();
+  var d = _normalizePhone(s);
+  return d.length >= 10 ? d.slice(-10) : s.toLowerCase();
+}
+
+// A teacher, or an assistant who works for a teacher. Owner and the owner's own assistants are NOT scoped.
+function p4_scoped_(ctx) {
+  return !!ctx && (ctx.kind === "teacher" || (ctx.kind === "assistant" && !!ctx.principal));
+}
+
+function p4_principalKey_(ctx) { return p4_idKey_(ctx.principal || ctx.id); }
+
+// Is this lesson key / scope inside the caller's subjects? Unknown subject never matches.
+function p4_inSubjects_(ctx, v) {
+  var subs = ctx && ctx.subjects ? ctx.subjects : [];
+  if (subs.indexOf("*") >= 0) return true;
+  var s = p4_subjectOf(String(v == null ? "" : v));
+  return !!s && subs.indexOf(s) >= 0;
+}
+
+function p4_rows_(ss, name) {
+  var sh = ss.getSheetByName(name);
+  return sh && sh.getLastRow() >= 2 ? _sheetValuesAsObjects(sh) : [];
+}
+
+function p4_cacheKey_(ctx) {
+  return ctx.kind === "owner" ? "owner" : p4_principalKey_(ctx) + "|" + (ctx.subjects || []).join(",");
+}
+
+// One Apps Script execution serves one request, so this lives exactly one request. Tests call p4_resetCache_().
+function p4_cache_(ctx) {
+  var k = p4_cacheKey_(ctx);
+  if (P4_PC_.key !== k) P4_PC_ = { key: k, set: null, owners: null };
+  return P4_PC_;
+}
+
+// The ctx for the request being served. Prefers the one the gate stored; falls back to p4_ctx(payload).
+function p4_ctxFor_(payload) {
+  try {
+    if (typeof P4_GATE_RAN_ !== "undefined" && P4_GATE_RAN_ && typeof P4_CTX_ !== "undefined" && P4_CTX_) return P4_CTX_;
+    return typeof p4_ctx === "function" ? p4_ctx(payload) : null;
+  } catch (e) { return null; }
+}
+
+// ---- group ownership --------------------------------------------------------------------
+
+// groupKey -> owner id key, from the GroupOwners tab. No tab / no row: the group belongs to the owner.
+function p4_ownersMap_(ctx) {
+  var c = p4_cache_(ctx);
+  if (c.owners) return c.owners;
+  var m = {};
+  p4_rows_(_ss(), "GroupOwners").forEach(function (r) {
+    var k = _groupKey(r.group);
+    if (k && !m.hasOwnProperty(k)) m[k] = p4_idKey_(r.owner_id);
+  });
+  c.owners = m;
+  return m;
+}
+
+function p4_ownsGroup(ctx, groupName) {
+  if (!ctx) return false;
+  if (ctx.kind === "owner") return true;
+  if (!p4_scoped_(ctx)) return false;
+  var key = _groupKey(groupName);
+  if (!key) return false;
+  var owners = p4_ownersMap_(ctx);
+  return owners.hasOwnProperty(key) && owners[key] === p4_principalKey_(ctx);
+}
+
+// own: the caller owns it. free: nobody owns it and it has no members (so it will be created for the caller).
+// foreign: anything else. The answer given at gate time is remembered so the response filter can create the owner row.
+function p4_groupState(ctx, groupName) {
+  if (!ctx) return "foreign";
+  if (ctx.kind === "owner") return "own";
+  if (!p4_scoped_(ctx)) return "foreign";
+  var key = _groupKey(groupName);
+  if (!key) return "foreign";
+  var owners = p4_ownersMap_(ctx), me = p4_principalKey_(ctx), st;
+  if (owners.hasOwnProperty(key)) {
+    st = owners[key] === me ? "own" : "foreign";
+  } else {
+    var has = false;
+    p4_rows_(_ss(), "Groups").forEach(function (r) { if (!has && _groupKey(r.group) === key) has = true; });
+    st = has ? "foreign" : "free";
+  }
+  P4_GSTATE_[me + "|" + key] = st;
+  return st;
+}
+
+// ---- student linkage ("his students") ------------------------------------------------------
+
+function p4_mark_(set, phone) { var k = _phoneKey(phone); if (k) set[k] = true; }
+
+// phoneKey -> true for every student linked to this caller (contract section 2, four rules).
+function p4_linkedSet_(ctx) {
+  var c = p4_cache_(ctx);
+  if (c.set) return c.set;
+  var set = {};
+  if (ctx.kind === "owner") {
+    _sheetValuesAsObjects(_students()).forEach(function (r) { p4_mark_(set, r.phone); });
+  } else if (p4_scoped_(ctx)) {
+    var ss = _ss(), ds = _dataSs();
+    var me = p4_principalKey_(ctx), owners = p4_ownersMap_(ctx), mine = {};
+    Object.keys(owners).forEach(function (k) { if (owners[k] === me) mine[k] = true; });
+    // 1. member of a group the teacher owns
+    p4_rows_(ss, "Groups").forEach(function (r) { if (mine[_groupKey(r.group)]) p4_mark_(set, r.phone); });
+    // 2. entitlement or quiz access for a lesson in scope
+    p4_rows_(ss, "Entitlements").forEach(function (r) { if (p4_inSubjects_(ctx, r.scope)) p4_mark_(set, r.phone); });
+    p4_rows_(ss, "QuizAccess").forEach(function (r) { if (p4_inSubjects_(ctx, r.lesson)) p4_mark_(set, r.phone); });
+    // 3. quiz result or submission for a lesson in scope
+    p4_rows_(ds, "QuizResults").forEach(function (r) { if (p4_inSubjects_(ctx, r.lesson)) p4_mark_(set, r.student_id); });
+    p4_rows_(ds, "Submissions").forEach(function (r) { if (p4_inSubjects_(ctx, r.lesson)) p4_mark_(set, r.student_id); });
+    // 4. payment or subscription request for a scope in scope
+    p4_rows_(ss, "Payments").forEach(function (r) { if (p4_inSubjects_(ctx, r.scope)) p4_mark_(set, r.phone); });
+  }
+  c.set = set;
+  return set;
+}
+
+// Array of phone keys (last 10 digits) linked to the caller. Used by S8 (stats) through typeof p4_linked_.
+function p4_linked_(ctx) { return ctx ? Object.keys(p4_linkedSet_(ctx)) : []; }
+
+function p4_ownsStudent(ctx, phoneOrRow) {
+  if (!ctx) return false;
+  if (ctx.kind === "owner") return true;
+  if (!p4_scoped_(ctx)) return false;
+  var ph = phoneOrRow && typeof phoneOrRow === "object"
+    ? (phoneOrRow.phone || phoneOrRow.student_id || phoneOrRow.student || "") : phoneOrRow;
+  var k = _phoneKey(ph);
+  return !!k && p4_linkedSet_(ctx).hasOwnProperty(k);
+}
+
+// ---- payments ----------------------------------------------------------------------------
+
+// The payment's OWN stored scope decides. A `scope` override in the request must be in the caller's subjects too.
+function p4_paymentInScope(ctx, payload) {
+  if (!ctx) return false;
+  if (ctx.kind === "owner") return true;
+  if (!p4_scoped_(ctx)) return false;
+  var id = String(payload && payload.payment_id != null ? payload.payment_id : "").trim();
+  if (!id) return false;
+  var row = null;
+  p4_rows_(_ss(), "Payments").forEach(function (r) { if (!row && String(r.payment_id).trim() === id) row = r; });
+  if (!row) return false;
+  if (!p4_inSubjects_(ctx, row.scope)) return false;
+  if (payload.scope && !p4_inSubjects_(ctx, payload.scope)) return false;
+  return true;
+}
+
+// ---- generic row filtering (fail closed) ------------------------------------------------------
+
+function p4_pick_(row, names) {
+  for (var i = 0; i < names.length; i++) {
+    var v = row[names[i]];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+  }
+  return undefined;
+}
+
+// 1 keep, 0 drop, -1 drop because no recognised key was present.
+function p4_judge_(ctx, row, rule) {
+  if (!row || typeof row !== "object") return -1;
+  var v;
+  if (rule.student) { v = p4_pick_(row, rule.student); if (v === undefined) return -1; if (!p4_ownsStudent(ctx, v)) return 0; }
+  if (rule.lesson) { v = p4_pick_(row, rule.lesson); if (v === undefined) return -1; if (!p4_inSubjects_(ctx, v)) return 0; }
+  if (rule.group) { v = p4_pick_(row, rule.group); if (v === undefined) return -1; if (!p4_ownsGroup(ctx, v)) return 0; }
+  return 1;
+}
+
+function p4_filterRows_(arr, ctx, rule, tag) {
+  if (!Array.isArray(arr)) return [];
+  var unrec = 0;
+  var out = arr.filter(function (row) {
+    var j = p4_judge_(ctx, row, rule);
+    if (j < 0) unrec++;
+    return j === 1;
+  });
+  if (unrec) { try { Logger.log("p4: dropped " + unrec + " unrecognised row(s) in " + tag); } catch (e) {} }
+  return out;
+}
+
+// Rows that are bare lesson strings or objects (all_lessons, tracks).
+function p4_filterLessonList_(arr, ctx, names, tag) {
+  if (!Array.isArray(arr)) return [];
+  var unrec = 0;
+  var out = arr.filter(function (x) {
+    if (typeof x === "string") return p4_inSubjects_(ctx, x);
+    var j = p4_judge_(ctx, x, { lesson: names });
+    if (j < 0) unrec++;
+    return j === 1;
+  });
+  if (unrec) { try { Logger.log("p4: dropped " + unrec + " unrecognised row(s) in " + tag); } catch (e) {} }
+  return out;
+}
+
+function p4_filterMap_(obj, keep) {
+  var out = {};
+  if (!obj || typeof obj !== "object") return out;
+  Object.keys(obj).forEach(function (k) { if (keep(k, obj[k])) out[k] = obj[k]; });
+  return out;
+}
+
+// Row belongs to the caller's subjects by the FIRST candidate field that is present (path, then subject, then lesson).
+function p4_rowOk_(ctx, row, names) {
+  if (!row || typeof row !== "object") return false;
+  for (var i = 0; i < names.length; i++) {
+    var v = row[names[i]];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return p4_inSubjects_(ctx, v);
+  }
+  return false;
+}
+
+// Parent-notification entries: lesson refs in scope are kept; monthly markers are kept with the note blanked
+// (a month is not tied to one subject, so its free-text note could describe another subject); the rest are dropped.
+function p4_notifKeep_(ctx, n) {
+  if (!n || typeof n !== "object") return false;
+  var ref = String(n.ref == null ? "" : n.ref).trim();
+  if (/^\d{4}-\d{2}$/.test(ref)) { n.note = ""; return true; }
+  if (ref && p4_subjectOf(ref)) return p4_inSubjects_(ctx, ref);
+  return false;
+}
+
+// Fail closed on shape drift: a scoped caller only receives the top-level keys listed here. A key a handler adds
+// later is removed (and logged) until it has been reviewed and added to the list.
+function p4_allowKeys_(resp, keys, tag) {
+  if (!resp || typeof resp !== "object") return resp;
+  Object.keys(resp).forEach(function (k) {
+    if (keys.indexOf(k) < 0) {
+      delete resp[k];
+      try { Logger.log("p4: removed unexpected key '" + k + "' from " + tag); } catch (e) {}
+    }
+  });
+  return resp;
+}
+
+// ---- filters (names fixed by the contract table) ---------------------------------------------
+
+function p4f_admin_get_all(resp, ctx, payload) {
+  if (!p4_scoped_(ctx) || !resp || resp.ok === false) return resp;
+  p4_allowKeys_(resp, ["ok", "students", "quiz_results", "submissions"], "get_all");
+  resp.students = p4_filterRows_(resp.students, ctx, { student: ["phone"] }, "get_all.students");
+  resp.quiz_results = p4_filterRows_(resp.quiz_results, ctx, { student: ["student_id"], lesson: ["lesson"] }, "get_all.quiz_results");
+  resp.submissions = p4_filterRows_(resp.submissions, ctx, { student: ["student_id"], lesson: ["lesson"] }, "get_all.submissions");
+  return resp;
+}
+
+function p4f_admin_access_overview(resp, ctx, payload) {
+  if (!p4_scoped_(ctx) || !resp || resp.ok === false) return resp;
+  p4_allowKeys_(resp, ["ok", "today", "counts", "videos", "quizzes", "groups", "roster", "payments", "access", "all_lessons", "tracks", "lessons_error", "quiz_access", "lesson_locks", "year_ends"], "access_overview");
+  resp.roster = p4_filterRows_(resp.roster, ctx, { student: ["phone"] }, "overview.roster");
+  resp.videos = p4_filterRows_(resp.videos, ctx, { lesson: ["lesson"] }, "overview.videos");
+  resp.quizzes = p4_filterRows_(resp.quizzes, ctx, { lesson: ["lesson"] }, "overview.quizzes");
+  resp.lesson_locks = p4_filterRows_(resp.lesson_locks, ctx, { lesson: ["lesson"] }, "overview.lesson_locks");
+  resp.groups = p4_filterRows_(resp.groups, ctx, { group: ["group"] }, "overview.groups");
+  resp.payments = p4_filterRows_(resp.payments, ctx, { lesson: ["scope"] }, "overview.payments");
+  resp.access = p4_filterRows_(resp.access, ctx, { student: ["phone"], lesson: ["scope"] }, "overview.access");
+  resp.quiz_access = p4_filterRows_(resp.quiz_access, ctx, { student: ["phone"], lesson: ["lesson"] }, "overview.quiz_access");
+  resp.all_lessons = p4_filterLessonList_(resp.all_lessons, ctx, ["lesson", "path"], "overview.all_lessons");
+  resp.tracks = p4_filterLessonList_(resp.tracks, ctx, ["path", "track", "folder", "name"], "overview.tracks");
+  // Recompute the counts from what is left; any count that cannot be recomputed is removed.
+  var old = resp.counts || {}, n = {};
+  var has = function (k) { return Object.prototype.hasOwnProperty.call(old, k); };
+  ["pending", "active", "ending_soon", "expired", "cancelled", "invalid", "videos_locked", "videos_open", "quizzes_locked", "lessons_locked", "groups"]
+    .forEach(function (k) { if (has(k)) n[k] = 0; });
+  var inc = function (k) { if (n.hasOwnProperty(k)) n[k]++; };
+  resp.payments.forEach(function (p) { if (p.status === "pending") inc("pending"); });
+  resp.access.forEach(function (a) {
+    if (n.hasOwnProperty(a.state)) n[a.state]++;
+    if (a.state === "active" && a.days_left !== null && a.days_left !== undefined && a.days_left <= 7) inc("ending_soon");
+  });
+  resp.videos.forEach(function (v) { inc(v.locked ? "videos_locked" : "videos_open"); });
+  resp.quizzes.forEach(function (q) { if (q.locked) inc("quizzes_locked"); });
+  resp.lesson_locks.forEach(function (l) { if (l.locked) inc("lessons_locked"); });
+  if (n.hasOwnProperty("groups")) n.groups = resp.groups.length;
+  resp.counts = n;
+  return resp;
+}
+
+function p4f_admin_list_payments(resp, ctx, payload) {
+  if (!p4_scoped_(ctx) || !resp || resp.ok === false) return resp;
+  p4_allowKeys_(resp, ["ok", "payments"], "list_payments");
+  resp.payments = p4_filterRows_(resp.payments, ctx, { lesson: ["scope"] }, "list_payments");
+  return resp;
+}
+
+function p4f_admin_list_groups(resp, ctx, payload) {
+  if (!p4_scoped_(ctx) || !resp || resp.ok === false) return resp;
+  p4_allowKeys_(resp, ["ok", "groups"], "list_groups");
+  resp.groups = p4_filterRows_(resp.groups, ctx, { group: ["group"] }, "list_groups");
+  return resp;
+}
+
+function p4f_admin_followup_overview(resp, ctx, payload) {
+  if (!p4_scoped_(ctx) || !resp || resp.ok === false) return resp;
+  p4_allowKeys_(resp, ["ok", "today", "now", "settings", "groups", "unclassified", "students", "lessons", "all_lessons", "lessons_error", "slug_collisions", "join_mismatches", "facts", "templates", "flags", "week", "requirements", "parent_log"], "followup_overview");
+  resp.groups = p4_filterRows_(resp.groups, ctx, { group: ["group"] }, "followup.groups");
+  resp.unclassified = p4_filterRows_(resp.unclassified, ctx, { student: ["phone"] }, "followup.unclassified");
+  resp.students = p4_filterMap_(resp.students, function (k, v) { return p4_ownsStudent(ctx, v && v.phone ? v.phone : k); });
+  resp.facts = p4_filterMap_(resp.facts, function (k) { return p4_ownsStudent(ctx, k); });
+  Object.keys(resp.facts).forEach(function (k) {
+    resp.facts[k] = p4_filterMap_(resp.facts[k], function (lesson) { return p4_inSubjects_(ctx, lesson); });
+  });
+  resp.lessons = p4_filterMap_(resp.lessons, function (k) { return p4_inSubjects_(ctx, k); });
+  resp.all_lessons = p4_filterRows_(resp.all_lessons, ctx, { lesson: ["path"] }, "followup.all_lessons");
+  resp.requirements = p4_filterMap_(resp.requirements, function (k) { return p4_inSubjects_(ctx, k); });
+  resp.parent_log = p4_filterMap_(resp.parent_log, function (k) { return p4_ownsStudent(ctx, k); });
+  Object.keys(resp.parent_log).forEach(function (k) {
+    resp.parent_log[k] = (resp.parent_log[k] || []).filter(function (n) { return p4_notifKeep_(ctx, n); });
+  });
+  resp.slug_collisions = [];     // lists lessons and rows across all subjects; not filterable safely
+  resp.join_mismatches = [];     // carries student rows across all subjects
+  return resp;
+}
+
+// Shared by the summary and the monthly review. Filters every list to the caller's subjects and recomputes the totals.
+function p4_summaryFilter_(s, ctx) {
+  if (!s || typeof s !== "object") return s;
+  var lk = ["path", "subject", "lesson"];
+  var okL = function (names) { return function (r) { return p4_rowOk_(ctx, r, names); }; };
+  var arr = function (x) { return Array.isArray(x) ? x : []; };
+  s.quizzes = arr(s.quizzes).filter(okL(lk));
+  s.homework = arr(s.homework).filter(okL(lk));
+  s.expected = arr(s.expected).filter(okL(["lesson"]));
+  s.attendance = arr(s.attendance).filter(okL(["lesson"]));
+  s.watch = arr(s.watch).filter(okL(["lesson"]));
+  s.video_access = arr(s.video_access).filter(okL(["lesson"]));
+  s.groups = arr(s.groups).filter(function (g) { return p4_ownsGroup(ctx, g && g.group); });
+  s.notifications = arr(s.notifications).filter(function (n) { return p4_notifKeep_(ctx, n); });
+  var items = arr(s.written && s.written.items).filter(okL(["lesson"]));
+  var w = { pending: 0, graded: 0, awarded: 0, max: 0, items: items };
+  items.forEach(function (i) {
+    if (i.graded) {
+      w.graded++;
+      if (i.awarded !== null && i.awarded !== undefined) w.awarded += i.awarded;
+      if (i.max !== null && i.max !== undefined) w.max += i.max;
+    } else w.pending++;
+  });
+  s.written = w;
+  var rnd = typeof _p2fuRound === "function" ? _p2fuRound : function (n) { return n === null ? null : Math.round(n * 100) / 100; };
+  var avg = function (xs) { return xs.length ? rnd(xs.reduce(function (a, b) { return a + b; }, 0) / xs.length) : null; };
+  var pcts = s.quizzes.filter(function (q) { return q.pct !== null && q.pct !== undefined; }).map(function (q) { return q.pct; });
+  var center = s.attendance.filter(function (a) { return a.mode === "center"; }).length;
+  var req = function (list, kind) { return list.filter(function (e) { return e[kind] && e[kind].required; }).length; };
+  var missed = function (list, kind) { return list.filter(function (e) { return e[kind] && e[kind].missed; }).length; };
+  s.totals = {
+    quiz_count: s.quizzes.length, quiz_avg_pct: avg(pcts),
+    quiz_required: req(s.expected, "quiz"), quiz_missed: missed(s.expected, "quiz"),
+    homework_count: s.homework.length,
+    homework_required: req(s.expected, "homework"), homework_missed: missed(s.expected, "homework"),
+    attendance_center: center, attendance_online: s.attendance.length - center,
+    watch_avg_pct: avg(s.watch.map(function (x) { return x.pct; }).filter(function (x) { return x !== null && x !== undefined; })),
+    written_pending: w.pending, written_graded: w.graded
+  };
+  return s;
+}
+
+var P4_NOT_AUTH_ = { ok: false, error: "Not authorized." };
+function p4_notAuth_() { return { ok: P4_NOT_AUTH_.ok, error: P4_NOT_AUTH_.error }; }
+
+function p4f_admin_student_summary(resp, ctx, payload) {
+  if (!p4_scoped_(ctx) || !resp || resp.ok === false) return resp;
+  if (!resp.student || !p4_ownsStudent(ctx, resp.student.phone)) return p4_notAuth_();
+  p4_allowKeys_(resp, ["ok", "student", "groups", "range", "totals", "quizzes", "homework", "expected", "attendance", "watch", "video_access", "written", "notifications", "lessons_error"], "student_summary");
+  return p4_summaryFilter_(resp, ctx);
+}
+
+function p4f_admin_monthly_review(resp, ctx, payload) {
+  if (!p4_scoped_(ctx) || !resp || resp.ok === false) return resp;
+  p4_allowKeys_(resp, ["ok", "month", "range", "closed", "reviews", "review"], "monthly_review");
+  if (Array.isArray(resp.reviews)) {
+    resp.reviews = resp.reviews.filter(function (rv) { return rv && p4_ownsStudent(ctx, rv.student); }).map(function (rv) {
+      if (rv.summary) rv.summary = p4_summaryFilter_(rv.summary, ctx);
+      if (rv.review && typeof rv.review === "object") rv.review.note = "";
+      return rv;
+    });
+  }
+  return resp;
+}
+
+function p4f_admin_list_parent_notifications(resp, ctx, payload) {
+  if (!p4_scoped_(ctx) || !resp || resp.ok === false) return resp;
+  p4_allowKeys_(resp, ["ok", "notifications", "not_notified"], "parent_notifications");
+  resp.notifications = (Array.isArray(resp.notifications) ? resp.notifications : []).filter(function (n) {
+    return n && p4_ownsStudent(ctx, n.student) && p4_notifKeep_(ctx, n);
+  });
+  if (Array.isArray(resp.not_notified)) {
+    resp.not_notified = resp.not_notified.filter(function (p) { return p4_ownsStudent(ctx, p); });
+  }
+  return resp;
+}
+
+function p4_gradingCounts_(ctx) {
+  try {
+    var sh = _gAnswersSheet(), pending = 0, graded = 0;
+    if (sh && sh.getLastRow() >= 2) {
+      _sheetValuesAsObjects(sh).forEach(function (r) {
+        if (!r.submission_id || !r.question_id) return;
+        if (!p4_ownsStudent(ctx, r.student_id) || !p4_inSubjects_(ctx, _gCanon(r.lesson))) return;
+        if (_gNum(r.awarded) !== null) graded++; else pending++;
+      });
+    }
+    return { pending: pending, graded: graded };
+  } catch (e) { return null; }
+}
+
+function p4f_admin_grading_queue(resp, ctx, payload) {
+  if (!p4_scoped_(ctx) || !resp || resp.ok === false) return resp;
+  p4_allowKeys_(resp, ["ok", "items", "truncated", "counts"], "grading_queue");
+  resp.items = p4_filterRows_(resp.items, ctx, { student: ["student_id", "student"], lesson: ["lesson"] }, "grading_queue");
+  resp.counts = p4_gradingCounts_(ctx);
+  return resp;
+}
+
+// ---- add-by-phone (LINK) and group creation -------------------------------------------------------
+
+// The A17 bucket: 30 lookups per hour per principal, shared with S5 (appointments, phone-collision checks).
+// p4_lookupAllowed_(ctx[, n=1]) -> true if n more lookups fit in this hour (and counts them), false otherwise (also on any error).
+// CacheService key: p4lk:<principal key>:<yyyymmddhh>
+function p4_lookupAllowed_(ctx, n) {
+  try {
+    n = n > 0 ? n : 1;
+    var cache = CacheService.getScriptCache();
+    var hour = String(_fmt(new Date(), TZ, true)).slice(0, 13).replace(/[^0-9]/g, "");
+    var key = "p4lk:" + p4_principalKey_(ctx) + ":" + hour;
+    var cur = parseInt(cache.get(key) || "0", 10) || 0;
+    if (cur + n > P4_LOOKUPS_PER_HOUR) return false;
+    cache.put(key, String(cur + n), 3600);
+    return true;
+  } catch (e) { return false; }      // fail closed
+}
+
+function p4_registeredSet_() {
+  var set = {};
+  _sheetValuesAsObjects(_students()).forEach(function (r) { p4_mark_(set, r.phone); });
+  return set;
+}
+
+function p4_linkReply_(resp, ctx, phones) {
+  if (!resp || resp.ok !== true) return p4_notAuth_();
+  var list = phones.filter(function (p) { return _phoneKey(p) !== ""; });
+  if (!p4_lookupAllowed_(ctx, Math.max(1, list.length))) return { ok: false, error: "Too many requests." };
+  var reg = p4_registeredSet_(), all = list.length > 0;
+  list.forEach(function (p) { if (!reg[_phoneKey(p)]) all = false; });
+  return { ok: true, registered: all };
+}
+
+function p4_groupOwnerId_(ctx) {
+  var id = ctx.principal || ctx.id;
+  return _normalizePhone(id).length >= 10 ? _canonicalPhone(id) : String(id);
+}
+
+function p4_createGroupOwner_(ctx, groupName) {
+  return _withLock(function () {
+    var ss = _ss();
+    var sh = _sheetByName(ss, "GroupOwners", P4_GROUPOWNER_HEADERS);
+    _ensureColumns(sh, P4_GROUPOWNER_HEADERS);
+    var key = _groupKey(groupName), exists = false;
+    p4_rows_(ss, "GroupOwners").forEach(function (r) { if (_groupKey(r.group) === key) exists = true; });
+    if (exists) return false;
+    var row = _appendByHeader(sh, { group: String(groupName), owner_id: p4_groupOwnerId_(ctx), created_at: _fmt(new Date(), TZ, true) });
+    var hdr = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    var col = hdr.indexOf("owner_id") + 1;
+    if (col > 0) sh.getRange(row, col).setNumberFormat("@").setValue(p4_groupOwnerId_(ctx));
+    return true;
+  });
+}
+
+function p4f_admin_group_add(resp, ctx, payload) {
+  if (!p4_scoped_(ctx)) return resp;
+  var phones = Array.isArray(payload.phones) ? payload.phones : [payload.phone];
+  if (resp && resp.ok === true) {
+    var name = String(resp.group || payload.group || ""), key = _groupKey(name);
+    var slot = p4_principalKey_(ctx) + "|" + key;
+    if (key && P4_GSTATE_[slot] === "free") {            // state at gate time: nobody owned it and it had no members
+      p4_createGroupOwner_(ctx, name);
+      P4_GSTATE_[slot] = "own";
+      p4_resetOwners_();
+    }
+  }
+  return p4_linkReply_(resp, ctx, phones);
+}
+
+function p4_resetOwners_() { P4_PC_.owners = null; }
+
+function p4f_admin_grant_access(resp, ctx, payload) {
+  if (!p4_scoped_(ctx)) return resp;
+  return p4_linkReply_(resp, ctx, [payload.phone]);
+}
+
+function p4f_admin_grant_quiz_access(resp, ctx, payload) {
+  if (!p4_scoped_(ctx)) return resp;
+  return p4_linkReply_(resp, ctx, [payload.phone]);
+}
+
+// ---- owner action: set or reset a group's owner -------------------------------------------------------
+
+function p4_admin_set_group_owner(payload) {
+  var ctx = typeof p4_ctx === "function" ? p4_ctx(payload) : null;
+  if (!ctx || ctx.kind !== "owner") return p4_notAuth_();
+  var group = String(payload.group == null ? "" : payload.group).trim();
+  var key = _groupKey(group);
+  if (!key) return { ok: false, error: "Missing group." };
+  var ownerPhone = String(payload.owner_phone == null ? "" : payload.owner_phone).trim();
+  return _withLock(function () {
+    var ss = _ss();
+    var members = p4_rows_(ss, "Groups").some(function (r) { return _groupKey(r.group) === key; });
+    var sh = ss.getSheetByName("GroupOwners");
+    var existingRow = 0;
+    if (sh && sh.getLastRow() >= 2) {
+      var vals = sh.getDataRange().getValues(), h = vals[0], gi = h.indexOf("group");
+      for (var i = 1; i < vals.length; i++) if (_groupKey(vals[i][gi]) === key) { existingRow = i + 1; break; }
+    }
+    if (!members && !existingRow) return { ok: false, error: "No such group." };
+    if (ownerPhone === "") {
+      if (existingRow) sh.deleteRows(existingRow, 1);
+      p4_resetCache_();
+      return { ok: true };
+    }
+    var stu = _students(), sv = stu.getDataRange().getValues(), c = _studentCols(sv[0]), isTeacher = false;
+    for (var j = 1; j < sv.length; j++) {
+      if (_phonesMatch(sv[j][c.phone - 1], ownerPhone)) {
+        var role = c.role ? String(sv[j][c.role - 1]).trim().toLowerCase() : "";
+        var scope = c.teacher_scope ? String(sv[j][c.teacher_scope - 1]).trim() : "";
+        isTeacher = role === "teacher" && scope !== "";
+        break;
+      }
+    }
+    if (!isTeacher) return { ok: false, error: "That person is not a teacher." };
+    var id = _canonicalPhone(ownerPhone);
+    var tab = _sheetByName(ss, "GroupOwners", P4_GROUPOWNER_HEADERS);
+    _ensureColumns(tab, P4_GROUPOWNER_HEADERS);
+    var hdr = tab.getRange(1, 1, 1, tab.getLastColumn()).getValues()[0];
+    var oc = hdr.indexOf("owner_id") + 1;
+    if (existingRow) {
+      tab.getRange(existingRow, oc).setNumberFormat("@").setValue(id);
+    } else {
+      var r = _appendByHeader(tab, { group: group, owner_id: id, created_at: _fmt(new Date(), TZ, true) });
+      tab.getRange(r, oc).setNumberFormat("@").setValue(id);
+    }
+    p4_resetCache_();
+    return { ok: true };
+  });
+}
+
+// ---- per-owner follow-up templates (used by the small Code.gs diff, patches/S3-templates.diff) -------------
+
+// "" = the owner's own templates (unchanged behavior). ":<id>" = a teacher's own set. null = scoped caller with no id (refuse).
+function p4_tplSuffix_(payload) {
+  var ctx = p4_ctxFor_(payload);
+  if (!ctx || !p4_scoped_(ctx)) return "";
+  var id = ctx.principal || ctx.id;
+  return id ? ":" + p4_idKey_(id) : null;
+}
+
+// rows of the FollowupTemplates tab -> {key: body}. Owner (sfx falsy): plain keys only, exactly as before.
+// Teacher: his own rows override the owner's plain ones, which remain visible as read-only defaults.
+function p4_tplView_(rows, sfx) {
+  var out = {}, mine = {};
+  (rows || []).forEach(function (r) {
+    var k = String(r.key || "").trim(), b = String(r.body == null ? "" : r.body);
+    if (!k || b.trim() === "") return;
+    var at = k.indexOf(":");
+    if (at < 0) { if (!out.hasOwnProperty(k)) out[k] = b; return; }
+    if (sfx && k.slice(at) === sfx) { var base = k.slice(0, at); if (!mine.hasOwnProperty(base)) mine[base] = b; }
+  });
+  Object.keys(mine).forEach(function (k) { out[k] = mine[k]; });
+  return out;
+}
+
+// ---- self test (S2's p4_selfTest calls this when it exists) -------------------------------------------------
+
+function p4_selfTest_people() {
+  var bad = [];
+  var chk = function (name, ok) { if (!ok) bad.push(name); };
+  chk("idKey phone", p4_idKey_("+20 100 000 0009") === "1000000009" && p4_idKey_("01000000009") === "1000000009");
+  chk("idKey name", p4_idKey_(" Mo ") === "mo");
+  var t = { kind: "teacher", via: "session", id: "01000000009", subjects: ["math"], principal: "01000000009" };
+  var a = { kind: "assistant", via: "session", id: "01000000010", subjects: ["math"], principal: "01000000009" };
+  var la = { kind: "assistant", via: "session", id: "01000000011", subjects: [], principal: "" };
+  chk("scoped teacher", p4_scoped_(t) && p4_scoped_(a) && !p4_scoped_(la) && !p4_scoped_({ kind: "owner" }));
+  chk("inSubjects", p4_inSubjects_(t, "math/x/y") && !p4_inSubjects_(t, "programming/x") && !p4_inSubjects_(t, ""));
+  var v = p4_tplView_([{ key: "a", body: "own" }, { key: "a:1000000009", body: "mine" }, { key: "b:2", body: "other" }], ":1000000009");
+  chk("tplView teacher", v.a === "mine" && !v.hasOwnProperty("b"));
+  var o = p4_tplView_([{ key: "a", body: "own" }, { key: "a:1000000009", body: "mine" }], "");
+  chk("tplView owner", o.a === "own" && Object.keys(o).length === 1);
+  return bad.length ? "FAIL: " + bad.join(", ") : "ALL PASS";
+}
+// ===== END MERGED FROM Phase4_People.gs =====
+
+// ============================================================================
+// ===== MERGED FROM Phase4_Team.gs =====
+// ============================================================================
+// ============================================================================
+// Phase4_Team.gs  (P4 / S5)  Teacher accounts, teacher-appointed assistants, student record edits.
+//
+// Contract: 00-MASTER-CONTRACT.md v2 sections 2, 3, 6, 6c. Nothing here runs at load time.
+// Depends on Code.gs helpers only (+ Phase3 role helpers when present). Every call into another
+// P4 session is guarded with typeof and fails CLOSED:
+//   S2: p4_ctx(payload)            (who is calling; kind "owner" | "teacher" | "assistant" ...)
+//   S3: p4_ownsStudent(ctx, phone), p4_lookupAllowed_(ctx)  (shared A17 bucket)
+//   S6: p4_ownerPing_(text)
+// Private helpers are prefixed p4t_ (or P4T_) and never collide with S2/S3/S6/S8 names.
+//
+// Editor functions: p4_setup, p4_mint_teacher_token, p4_revoke_teacher_token, p4_selfTest_team.
+// Router actions:   p4_admin_set_teacher, p4_admin_list_teachers, p4_admin_list_edit_log,
+//                   p4_teacher_set_assistant, p4_teacher_list_assistants, p4_teacher_revoke_assistant,
+//                   p4_teacher_update_student.
+// ============================================================================
+
+var P4T_SUBJECTS = ["programming", "english", "math"];
+var P4T_STU_COLS = ["teacher_scope", "assistant_of"];
+var P4T_GROUPOWNERS_HEADERS = ["group", "owner_id", "created_at"];
+var P4T_TELEGRAM_HEADERS = ["teacher_id", "chat_id", "linked_at"];
+var P4T_EDITLOG_HEADERS = ["ts", "actor_kind", "actor_id", "student_old", "student_new", "field", "old_value", "new_value"];
+var P4T_GENERIC = "Could not apply that change.";
+var P4T_LOCK_MS = 20000;
+var P4T_LOOKUP_LIMIT = 30;
+var P4T_LOOKUP_WINDOW_S = 3600;
+// Ships OFF: Drive meta files and written-image file names still carry the old phone and cannot
+// be rewritten (see HANDOFF section 7). An explicit "1" in Script Properties turns it on.
+var P4T_PHONE_EDIT_DEFAULT = "0";
+
+// Every store that keys data by a student's phone. book: "ss" = _ss(), "data" = _dataSs().
+var P4T_PHONE_STORES = [
+  { book: "ss", tab: "Entitlements", col: "phone" },
+  { book: "ss", tab: "Payments", col: "phone" },
+  { book: "ss", tab: "QuizAccess", col: "phone" },
+  { book: "ss", tab: "Groups", col: "phone" },
+  { book: "ss", tab: "Attendance", col: "phone" },
+  { book: "ss", tab: "WatchProgress", col: "phone" },
+  { book: "ss", tab: "ParentNotifications", col: "student" },
+  { book: "ss", tab: "MonthlyReviews", col: "student" },
+  { book: "data", tab: "QuizResults", col: "student_id" },
+  { book: "data", tab: "Submissions", col: "student_id" },
+  { book: "data", tab: "WrittenAnswers", col: "student_id" }
+];
+
+// ---------------------------------------------------------------- small pure helpers
+
+function p4t_denied_() { return { ok: false, error: "Not authorized." }; }
+function p4t_generic_() { return { ok: false, error: P4T_GENERIC }; }
+function p4t_lc_(v) { return String(v == null ? "" : v).trim().toLowerCase(); }
+
+function p4t_hash_(s) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8);
+  return bytes.map(function (b) { return ((b & 0xff) + 0x100).toString(16).slice(1); }).join("");
+}
+
+// "math, Programming" -> "math,programming". Returns null for anything unknown, "*" included.
+// "" -> "" (meaning: no scope).
+function p4t_scope_(raw) {
+  var parts = String(raw == null ? "" : raw).split(",").map(p4t_lc_).filter(function (x) { return x !== ""; });
+  var out = [];
+  for (var i = 0; i < parts.length; i++) {
+    if (P4T_SUBJECTS.indexOf(parts[i]) === -1) return null;
+    if (out.indexOf(parts[i]) === -1) out.push(parts[i]);
+  }
+  return out.join(",");
+}
+
+// Trim, strip control characters, 2 to 80 characters. Returns "" when not acceptable.
+function p4t_cleanName_(v) {
+  if (typeof v !== "string") return "";
+  var s = v.replace(/[\u0000-\u001F\u007F-\u009F]/g, "").trim();
+  var n = Array.from(s).length;
+  return n >= 2 && n <= 80 ? s : "";
+}
+
+// Egyptian mobile in canonical form (same rule as auth.js isEgyptMobile), else "".
+function p4t_cleanPhone_(v) {
+  if (typeof v !== "string" && typeof v !== "number") return "";
+  var d = _canonicalPhone(v);
+  return /^01[0125]\d{8}$/.test(d) ? d : "";
+}
+
+function p4t_maxAssistants_() {
+  var n = parseInt(_props().getProperty("P4_MAX_ASSISTANTS") || "5", 10);
+  return isNaN(n) || n < 0 ? 5 : n;
+}
+
+function p4t_phoneEditOn_() {
+  var v = _props().getProperty("P4_TEACHER_PHONE_EDIT");
+  if (v === null || v === undefined || String(v).trim() === "") v = P4T_PHONE_EDIT_DEFAULT;
+  return String(v).trim() !== "0";
+}
+
+function p4t_ctx_(payload) {
+  try { return typeof p4_ctx === "function" ? p4_ctx(payload) : null; } catch (e) { return null; }
+}
+function p4t_isOwner_(payload) { var c = p4t_ctx_(payload); return !!c && c.kind === "owner"; }
+
+function p4t_who_(payload) {
+  try { return typeof _p3Who === "function" ? _p3Who(payload) : String((payload && payload.student_id) || "admin-token"); } catch (e) { return "admin"; }
+}
+function p4t_audit_(payload, action, target, before, after) {
+  try { if (typeof p2_audit === "function") p2_audit(p4t_who_(payload), action, target, before, after); } catch (e) { /* best effort */ }
+}
+
+// A17: one lookup bucket per principal. S3's helper when present, otherwise the same idea on
+// CacheService (key p4lk:<principal or id>, 30 per rolling window). true = allowed.
+function p4t_lookup_(ctx) {
+  try {
+    if (typeof p4_lookupAllowed_ === "function") {
+      var r = p4_lookupAllowed_(ctx);
+      return !(r === false || r === null || r === undefined || (typeof r === "object" && r.ok === false));
+    }
+  } catch (e) { return false; }
+  try {
+    var id = String((ctx && (ctx.principal || ctx.id)) || "");
+    if (!id) return false;
+    var cache = CacheService.getScriptCache(), key = "p4lk:" + id;
+    var now = Math.floor(Date.now() / 1000), n = 0, t0 = now;
+    var raw = cache.get(key);
+    if (raw) { var p = String(raw).split("|"); n = parseInt(p[0], 10) || 0; t0 = parseInt(p[1], 10) || now; }
+    if (now - t0 >= P4T_LOOKUP_WINDOW_S) { n = 0; t0 = now; }
+    if (n >= P4T_LOOKUP_LIMIT) return false;
+    cache.put(key, (n + 1) + "|" + t0, Math.max(1, P4T_LOOKUP_WINDOW_S - (now - t0)));
+    return true;
+  } catch (e2) { return false; }
+}
+
+// ---------------------------------------------------------------- Students-sheet access
+
+function p4t_headers_(sheet) {
+  var last = sheet.getLastColumn();
+  return last < 1 ? [] : sheet.getRange(1, 1, 1, last).getValues()[0];
+}
+
+function p4t_ensureCol_(sheet, name) {
+  var headers = p4t_headers_(sheet);
+  for (var i = 0; i < headers.length; i++) if (String(headers[i]).trim() === name) return i + 1;
+  var last = sheet.getLastColumn();
+  if (typeof sheet.getMaxColumns === "function" && last >= sheet.getMaxColumns()) sheet.insertColumnAfter(last);
+  sheet.getRange(1, last + 1).setValue(name);
+  return last + 1;
+}
+
+// Write path: makes sure role / teacher_scope / assistant_of exist, returns {sheet, c}.
+function p4t_studentsForWrite_() {
+  var sheet = _students();
+  if (typeof _p3EnsureRoleColumn === "function") _p3EnsureRoleColumn(sheet); else p4t_ensureCol_(sheet, "role");
+  P4T_STU_COLS.forEach(function (n) { p4t_ensureCol_(sheet, n); });
+  return { sheet: sheet, c: _studentCols(p4t_headers_(sheet)) };
+}
+
+// Read path: never creates columns; a missing column reads as blank.
+function p4t_studentsRead_() {
+  var values = _students().getDataRange().getValues();
+  return { values: values, c: _studentCols(values[0]) };
+}
+
+function p4t_get_(values, c, i, name) {
+  return c[name] ? values[i][c[name] - 1] : "";
+}
+
+function p4t_findIdx_(values, c, phone) {
+  var target = _normalizePhone(phone);
+  if (!target) return -1;
+  for (var i = 1; i < values.length; i++) if (_phonesMatch(values[i][c.phone - 1], target)) return i;
+  return -1;
+}
+
+function p4t_roleOf_(values, c, i) { return p4t_lc_(p4t_get_(values, c, i, "role")); }
+function p4t_isAdminRow_(values, c, i) { return c.is_admin ? _isTruthyFlag(values[i][c.is_admin - 1]) : false; }
+function p4t_phoneOut_(v) { return _restoreLeadingZero(String(v == null ? "" : v)); }
+function p4t_nameOut_(v) { return String(v == null ? "" : v); }
+
+function p4t_setCell_(sheet, row, col, value) {
+  sheet.getRange(row, col).setNumberFormat("@").setValue(value);
+}
+
+// Appends one row as plain text (phones keep their leading 0, "=..." stays text).
+function p4t_appendText_(sheet, headers, rec) {
+  var hs = p4t_headers_(sheet);
+  var row = hs.map(function (h) { return rec.hasOwnProperty(h) && rec[h] !== null && rec[h] !== undefined ? String(rec[h]) : ""; });
+  var r = sheet.getLastRow() + 1;
+  if (r > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(), Math.max(50, r - sheet.getMaxRows()));
+  sheet.getRange(r, 1, 1, hs.length).setNumberFormat("@").setValues([row]);
+  return r;
+}
+
+function p4t_now_() { return Utilities.formatDate(new Date(), "Africa/Cairo", "yyyy-MM-dd HH:mm:ss"); }
+
+// ---------------------------------------------------------------- editor functions
+
+// Idempotent. Run once from the editor after pasting.
+function p4_setup() {
+  var done = [];
+  var S = p4t_studentsForWrite_();
+  done.push("Students columns: role, teacher_scope, assistant_of");
+  var rows = Math.max(S.sheet.getMaxRows() - 1, 1);
+  P4T_STU_COLS.forEach(function (n) { S.sheet.getRange(2, S.c[n], rows, 1).setNumberFormat("@"); });
+  var ss = _ss();
+  [["GroupOwners", P4T_GROUPOWNERS_HEADERS], ["TeacherTelegram", P4T_TELEGRAM_HEADERS], ["StudentEditLog", P4T_EDITLOG_HEADERS]].forEach(function (p) {
+    var sh = _followupSheet(ss, p[0], p[1]);
+    _ensureColumns(sh, p[1]);
+    var hs = p4t_headers_(sh), n = Math.max(sh.getMaxRows() - 1, 1);
+    hs.forEach(function (h, i) { if (p[1].indexOf(h) !== -1) sh.getRange(2, i + 1, n, 1).setNumberFormat("@"); });
+    done.push("tab " + p[0]);
+  });
+  var props = _props();
+  if (!props.getProperty("P4_TEACHER_TOKENS")) props.setProperty("P4_TEACHER_TOKENS", "{}");
+  if (!props.getProperty("P4_MAX_ASSISTANTS")) props.setProperty("P4_MAX_ASSISTANTS", "5");
+  if (props.getProperty("P4_TEACHER_PHONE_EDIT") === null || props.getProperty("P4_TEACHER_PHONE_EDIT") === undefined) props.setProperty("P4_TEACHER_PHONE_EDIT", P4T_PHONE_EDIT_DEFAULT);
+  Logger.log("p4_setup OK | " + done.join(" | ") + " | P4_TEACHER_PHONE_EDIT=" + (props.getProperty("P4_TEACHER_PHONE_EDIT")));
+  return "OK";
+}
+
+function p4t_tokens_() {
+  try {
+    var o = JSON.parse(_props().getProperty("P4_TEACHER_TOKENS") || "{}");
+    return o && typeof o === "object" && !Array.isArray(o) ? o : {};
+  } catch (e) { return {}; }
+}
+
+// Logs the raw token ONCE (Executions log). Only its SHA-256 hex is stored.
+function p4_mint_teacher_token(name, scope) {
+  var nm = String(name == null ? "" : name).trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 _.\-]{0,39}$/.test(nm)) throw new Error("Token name: 1 to 40 letters, digits, space, dot, dash or underscore.");
+  var sc = p4t_scope_(scope);
+  if (sc === null || sc === "") throw new Error("Scope must be one or more of: " + P4T_SUBJECTS.join(", ") + ".");
+  var raw = "p4t_" + Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, "");
+  _withLock(function () {
+    var all = p4t_tokens_();
+    Object.keys(all).forEach(function (h) { if (all[h] && p4t_lc_(all[h].name) === p4t_lc_(nm)) throw new Error('A token named "' + nm + '" already exists. Revoke it first.'); });
+    all[p4t_hash_(raw)] = { name: nm, scope: sc, created: p4t_now_().replace(" ", "T") };
+    _props().setProperty("P4_TEACHER_TOKENS", JSON.stringify(all));
+  });
+  Logger.log("TEACHER TOKEN for \"" + nm + "\" (scope " + sc + "). Copy it now; it is never shown again:\n" + raw);
+  return raw;
+}
+
+function p4_revoke_teacher_token(name) {
+  var nm = p4t_lc_(name), removed = 0;
+  _withLock(function () {
+    var all = p4t_tokens_();
+    Object.keys(all).forEach(function (h) { if (all[h] && p4t_lc_(all[h].name) === nm) { delete all[h]; removed++; } });
+    _props().setProperty("P4_TEACHER_TOKENS", JSON.stringify(all));
+  });
+  Logger.log("p4_revoke_teacher_token: removed " + removed + " token(s) named \"" + name + "\".");
+  return removed;
+}
+
+// ---------------------------------------------------------------- owner: accounts
+
+// {phone, scope}: scope "math" (or "math,english") makes a teacher; "" removes him.
+function p4_admin_set_teacher(payload) {
+  payload = payload || {};
+  if (!p4t_isOwner_(payload)) return p4t_denied_();
+  var phone = _normalizePhone(payload.phone);
+  if (!phone) return { ok: false, error: "Missing phone number." };
+  var scope = p4t_scope_(payload.scope);
+  if (scope === null) return { ok: false, error: "Unknown subject. Use: " + P4T_SUBJECTS.join(", ") + "." };
+  var res = _withLock(function () {
+    var S = p4t_studentsForWrite_();
+    var values = S.sheet.getDataRange().getValues(), c = S.c;
+    var i = p4t_findIdx_(values, c, phone);
+    if (i < 0) return { ok: false, error: "No student account with that phone number." };
+    if (p4t_isAdminRow_(values, c, i)) return { ok: false, error: "This account is the owner; its role can't be changed here." };
+    var row = i + 1, tPhone = _normalizePhone(values[i][c.phone - 1]);
+    var beforeRole = p4t_roleOf_(values, c, i), beforeScope = p4t_lc_(p4t_get_(values, c, i, "teacher_scope"));
+    var out = { ok: true, phone: p4t_phoneOut_(values[i][c.phone - 1]) };
+    if (scope !== "") {
+      p4t_setCell_(S.sheet, row, c.role, "teacher");
+      p4t_setCell_(S.sheet, row, c.teacher_scope, scope);
+      p4t_setCell_(S.sheet, row, c.assistant_of, "");
+      out.role = "teacher"; out.scope = scope;
+      out._before = { role: beforeRole, scope: beforeScope }; out._after = { role: "teacher", scope: scope };
+      return out;
+    }
+    // Removal. Only a teacher is demoted; any other role is left alone.
+    if (beforeRole !== "teacher") { out.role = beforeRole === "assistant" ? "assistant" : "student"; out.scope = ""; out._noop = true; return out; }
+    p4t_setCell_(S.sheet, row, c.role, "");
+    p4t_setCell_(S.sheet, row, c.teacher_scope, "");
+    var reset = 0;
+    for (var k = 1; k < values.length; k++) {
+      if (k === i) continue;
+      if (p4t_roleOf_(values, c, k) === "assistant" && String(p4t_get_(values, c, k, "assistant_of")).trim() !== "" && _phonesMatch(p4t_get_(values, c, k, "assistant_of"), tPhone)) {
+        p4t_setCell_(S.sheet, k + 1, c.role, "");
+        p4t_setCell_(S.sheet, k + 1, c.assistant_of, "");
+        reset++;
+      }
+    }
+    out.role = "student"; out.scope = ""; out._reset = reset;
+    out._before = { role: "teacher", scope: beforeScope }; out._after = { role: "student", scope: "" };
+    return out;
+  });
+  if (res && res.ok && !res._noop && res._before) p4t_audit_(payload, "p4_admin_set_teacher", res.phone, res._before, res._after);
+  if (res) { delete res._before; delete res._after; delete res._noop; delete res._reset; }
+  return res;
+}
+
+// {} -> {ok, teachers:[{phone,name,scope,telegram,assistants:[{phone,name}]}], tokens:[{name,scope,created}]}
+function p4_admin_list_teachers(payload) {
+  if (!p4t_isOwner_(payload)) return p4t_denied_();
+  var R = p4t_studentsRead_(), values = R.values, c = R.c;
+  var linked = [];
+  try {
+    var tg = _ss().getSheetByName("TeacherTelegram");
+    if (tg && tg.getLastRow() >= 2) {
+      var h = _headerIndex(tg);
+      if (h.teacher_id) tg.getRange(2, h.teacher_id, tg.getLastRow() - 1, 1).getValues().forEach(function (r) { if (String(r[0]).trim() !== "") linked.push(r[0]); });
+    }
+  } catch (e) { /* tab missing: nobody linked */ }
+  var teachers = [], byPhone = {};
+  for (var i = 1; i < values.length; i++) {
+    if (p4t_roleOf_(values, c, i) !== "teacher" || p4t_isAdminRow_(values, c, i)) continue;
+    var ph = _normalizePhone(values[i][c.phone - 1]);
+    var t = { phone: p4t_phoneOut_(values[i][c.phone - 1]), name: p4t_nameOut_(values[i][c.display_name - 1]), scope: p4t_lc_(p4t_get_(values, c, i, "teacher_scope")),
+              telegram: linked.some(function (l) { return _phonesMatch(l, ph); }), assistants: [] };
+    teachers.push(t); byPhone[ph] = t;
+  }
+  for (var k = 1; k < values.length; k++) {
+    if (p4t_roleOf_(values, c, k) !== "assistant") continue;
+    var of = p4t_get_(values, c, k, "assistant_of");
+    if (String(of).trim() === "") continue;
+    teachers.forEach(function (t2) {
+      if (_phonesMatch(of, t2.phone)) t2.assistants.push({ phone: p4t_phoneOut_(values[k][c.phone - 1]), name: p4t_nameOut_(values[k][c.display_name - 1]) });
+    });
+  }
+  var toks = p4t_tokens_(), tokens = Object.keys(toks).map(function (h2) {
+    return { name: String(toks[h2] && toks[h2].name || ""), scope: String(toks[h2] && toks[h2].scope || ""), created: String(toks[h2] && toks[h2].created || "") };
+  });
+  return { ok: true, teachers: teachers, tokens: tokens };
+}
+
+// {limit?} newest first, default 200.
+function p4_admin_list_edit_log(payload) {
+  if (!p4t_isOwner_(payload)) return p4t_denied_();
+  var limit = parseInt(payload && payload.limit, 10);
+  if (isNaN(limit) || limit < 1) limit = 200;
+  limit = Math.min(limit, 1000);
+  var sh = _ss().getSheetByName("StudentEditLog");
+  if (!sh || sh.getLastRow() < 2) return { ok: true, rows: [] };
+  var hs = p4t_headers_(sh);
+  var vals = sh.getRange(2, 1, sh.getLastRow() - 1, hs.length).getValues(), rows = [];
+  for (var r = vals.length - 1; r >= 0 && rows.length < limit; r--) {
+    var o = {};
+    hs.forEach(function (h, j) { if (h !== "") o[h] = String(vals[r][j] == null ? "" : vals[r][j]); });
+    rows.push(o);
+  }
+  return { ok: true, rows: rows };
+}
+
+// ---------------------------------------------------------------- teacher identity
+
+// The calling teacher, re-read from the sheet: {ctx, phone, name, scope} or null.
+// kind "teacher" is required HERE too; a scoped assistant is kind "assistant" and never passes.
+function p4t_teacher_(payload) {
+  var ctx = p4t_ctx_(payload);
+  if (!ctx || ctx.kind !== "teacher") return null;
+  var phone = _normalizePhone(ctx.principal || ctx.id);
+  if (!phone) return null;
+  var R = p4t_studentsRead_(), i = p4t_findIdx_(R.values, R.c, phone);
+  if (i < 0 || p4t_isAdminRow_(R.values, R.c, i) || p4t_roleOf_(R.values, R.c, i) !== "teacher") return null;
+  var scope = p4t_lc_(p4t_get_(R.values, R.c, i, "teacher_scope"));
+  if (scope === "") return null;
+  return { ctx: ctx, phone: _normalizePhone(R.values[i][R.c.phone - 1]), name: p4t_nameOut_(R.values[i][R.c.display_name - 1]), scope: scope };
+}
+
+// ---------------------------------------------------------------- teacher: assistants
+
+function p4t_countAssistants_(values, c, tPhone) {
+  var n = 0;
+  for (var i = 1; i < values.length; i++) {
+    if (p4t_roleOf_(values, c, i) === "assistant" && String(p4t_get_(values, c, i, "assistant_of")).trim() !== "" && _phonesMatch(p4t_get_(values, c, i, "assistant_of"), tPhone)) n++;
+  }
+  return n;
+}
+
+// {phone}. Always {ok:true, registered:bool}; only a plain student actually changes.
+function p4_teacher_set_assistant(payload) {
+  payload = payload || {};
+  var T = p4t_teacher_(payload);
+  if (!T) return p4t_denied_();
+  if (!p4t_lookup_(T.ctx)) return { ok: false, error: "Too many requests." };
+  var phone = _normalizePhone(payload.phone);
+  var registered = false;
+  try {
+    var R0 = p4t_studentsRead_();
+    registered = !!phone && p4t_findIdx_(R0.values, R0.c, phone) >= 0;
+    if (registered) {
+      _withLock(function () {
+        var S = p4t_studentsForWrite_();
+        var values = S.sheet.getDataRange().getValues(), c = S.c;
+        var i = p4t_findIdx_(values, c, phone);
+        if (i < 0) return;
+        var role = p4t_roleOf_(values, c, i);
+        var plain = (role === "" || role === "student") && !p4t_isAdminRow_(values, c, i) &&
+          p4t_lc_(p4t_get_(values, c, i, "teacher_scope")) === "" && String(p4t_get_(values, c, i, "assistant_of")).trim() === "";
+        if (!plain || _phonesMatch(values[i][c.phone - 1], T.phone)) return;
+        if (p4t_countAssistants_(values, c, T.phone) >= p4t_maxAssistants_()) return;
+        p4t_setCell_(S.sheet, i + 1, c.role, "assistant");
+        p4t_setCell_(S.sheet, i + 1, c.assistant_of, T.phone);
+        p4t_audit_(payload, "p4_teacher_set_assistant", p4t_phoneOut_(values[i][c.phone - 1]), { role: "", assistant_of: "" }, { role: "assistant", assistant_of: T.phone });
+      }, P4T_LOCK_MS);
+    }
+  } catch (e) { /* the answer must not depend on what happened */ }
+  return { ok: true, registered: registered };
+}
+
+function p4_teacher_list_assistants(payload) {
+  var T = p4t_teacher_(payload);
+  if (!T) return p4t_denied_();
+  var R = p4t_studentsRead_(), out = [];
+  for (var i = 1; i < R.values.length; i++) {
+    if (p4t_roleOf_(R.values, R.c, i) === "assistant" && String(p4t_get_(R.values, R.c, i, "assistant_of")).trim() !== "" && _phonesMatch(p4t_get_(R.values, R.c, i, "assistant_of"), T.phone)) {
+      out.push({ phone: p4t_phoneOut_(R.values[i][R.c.phone - 1]), name: p4t_nameOut_(R.values[i][R.c.display_name - 1]) });
+    }
+  }
+  return { ok: true, assistants: out, max: p4t_maxAssistants_() };
+}
+
+// {phone}. Only an assistant whose assistant_of is this teacher; anything else is "Not authorized.".
+function p4_teacher_revoke_assistant(payload) {
+  payload = payload || {};
+  var T = p4t_teacher_(payload);
+  if (!T) return p4t_denied_();
+  var phone = _normalizePhone(payload.phone);
+  if (!phone) return p4t_denied_();
+  var done = false;
+  try {
+    done = _withLock(function () {
+      var S = p4t_studentsForWrite_();
+      var values = S.sheet.getDataRange().getValues(), c = S.c;
+      var i = p4t_findIdx_(values, c, phone);
+      if (i < 0 || p4t_roleOf_(values, c, i) !== "assistant") return false;
+      var of = p4t_get_(values, c, i, "assistant_of");
+      if (String(of).trim() === "" || !_phonesMatch(of, T.phone)) return false;
+      p4t_setCell_(S.sheet, i + 1, c.role, "");
+      p4t_setCell_(S.sheet, i + 1, c.assistant_of, "");
+      p4t_audit_(payload, "p4_teacher_revoke_assistant", p4t_phoneOut_(values[i][c.phone - 1]), { role: "assistant", assistant_of: T.phone }, { role: "", assistant_of: "" });
+      return true;
+    }, P4T_LOCK_MS);
+  } catch (e) { done = false; }
+  return done ? { ok: true } : p4t_denied_();
+}
+
+// ---------------------------------------------------------------- teacher: student record edits
+
+// Plans one store: every cell in `col` that matches oldPhone gets newPhone. Reads the column once.
+// Returns null when the tab does not exist or is empty (nothing to rewrite); throws when the tab
+// exists but lacks the column (cannot rewrite -> the whole edit is refused before any write).
+function p4t_planStore_(store, oldPhone, newPhone) {
+  var book = store.book === "data" ? _dataSs() : _ss();
+  var sh = book.getSheetByName(store.tab);
+  if (!sh || sh.getLastRow() < 1 || sh.getLastColumn() < 1) return null;
+  var idx = _headerIndex(sh);
+  if (!idx[store.col]) throw new Error("The " + store.tab + ' sheet is missing the "' + store.col + '" column.');
+  var n = sh.getLastRow() - 1;
+  if (n < 1) return null;
+  var oldVals = sh.getRange(2, idx[store.col], n, 1).getValues(), newVals = [], hits = 0;
+  for (var i = 0; i < n; i++) {
+    var cell = oldVals[i][0];
+    if (cell !== "" && cell !== null && _phonesMatch(cell, oldPhone)) { newVals.push([newPhone]); hits++; } else newVals.push([cell]);
+  }
+  return hits ? { store: store, sheet: sh, col: idx[store.col], n: n, oldVals: oldVals, newVals: newVals, hits: hits } : null;
+}
+
+// Rewrites the phone everywhere or nowhere. Throws (after restoring what it had changed) on any failure.
+function p4t_cascade_(oldPhone, newPhone, studentsWrites) {
+  var plans = [];
+  P4T_PHONE_STORES.forEach(function (st) { var p = p4t_planStore_(st, oldPhone, newPhone); if (p) plans.push(p); });
+  var applied = [];
+  try {
+    plans.forEach(function (p) {
+      var rng = p.sheet.getRange(2, p.col, p.n, 1);
+      applied.push(p);
+      rng.setNumberFormat("@");
+      rng.setValues(p.newVals);
+    });
+    studentsWrites(applied);
+  } catch (e) {
+    for (var k = applied.length - 1; k >= 0; k--) {
+      try { applied[k].sheet.getRange(2, applied[k].col, applied[k].n, 1).setValues(applied[k].oldVals); } catch (e2) { Logger.log("p4 cascade rollback failed on " + applied[k].store.tab + ": " + e2); }
+    }
+    throw e;
+  }
+  var counts = {};
+  plans.forEach(function (p) { counts[p.store.tab] = p.hits; });
+  return counts;
+}
+
+// {student_id, session_token, student, changes:{name?, phone?, parent_phone?}}
+function p4_teacher_update_student(payload) {
+  payload = payload || {};
+  var T = p4t_teacher_(payload);
+  if (!T) return p4t_denied_();
+  var ownsFn = typeof p4_ownsStudent === "function" ? p4_ownsStudent : null;
+  var target = String(payload.student == null ? "" : payload.student);
+
+  // Ownership and "plain student" check against the CURRENT stored phone. Same answer for
+  // "does not exist", "not yours" and "not a plain student".
+  function resolve(values, c) {
+    var i = p4t_findIdx_(values, c, target);
+    if (i < 0 || !ownsFn) return -1;
+    var role = p4t_roleOf_(values, c, i);
+    if ((role !== "" && role !== "student") || p4t_isAdminRow_(values, c, i)) return -1;
+    var cur = p4t_phoneOut_(values[i][c.phone - 1]);
+    try { if (!ownsFn(T.ctx, cur)) return -1; } catch (e) { return -1; }
+    return i;
+  }
+  var R0 = p4t_studentsRead_();
+  if (resolve(R0.values, R0.c) < 0) return p4t_denied_();
+
+  // Whitelist + validation.
+  var ch = payload.changes;
+  if (!ch || typeof ch !== "object" || Array.isArray(ch)) return p4t_generic_();
+  var keys = Object.keys(ch);
+  if (!keys.length) return p4t_generic_();
+  for (var k = 0; k < keys.length; k++) if (keys[k] !== "name" && keys[k] !== "phone" && keys[k] !== "parent_phone") return p4t_generic_();
+  var want = {};
+  if (ch.hasOwnProperty("name")) { want.name = p4t_cleanName_(ch.name); if (want.name === "") return p4t_generic_(); }
+  if (ch.hasOwnProperty("phone")) { want.phone = p4t_cleanPhone_(ch.phone); if (want.phone === "") return p4t_generic_(); }
+  if (ch.hasOwnProperty("parent_phone")) { want.parent_phone = p4t_cleanPhone_(ch.parent_phone); if (want.parent_phone === "") return p4t_generic_(); }
+
+  var result = null, logRows = [], pingText = "";
+  try {
+    result = _withLock(function () {
+      var S = p4t_studentsForWrite_();
+      var values = S.sheet.getDataRange().getValues(), c = S.c;
+      var i = resolve(values, c);                              // re-check inside the lock
+      if (i < 0) return p4t_denied_();
+      var row = i + 1;
+      var curName = p4t_nameOut_(values[i][c.display_name - 1]);
+      var curPhone = p4t_phoneOut_(values[i][c.phone - 1]);
+      var curParent = c.parent_phone ? p4t_phoneOut_(values[i][c.parent_phone - 1]) : "";
+      var eff = {};
+      if (want.hasOwnProperty("name") && want.name !== curName) eff.name = want.name;
+      if (want.hasOwnProperty("phone") && _normalizePhone(want.phone) !== _normalizePhone(curPhone)) eff.phone = want.phone;
+      if (want.hasOwnProperty("parent_phone") && _normalizePhone(want.parent_phone) !== _normalizePhone(curParent)) eff.parent_phone = want.parent_phone;
+      var student = function (n, p, pp) { return { name: n, phone: p, parent_phone: pp }; };
+      if (!Object.keys(eff).length) return { ok: true, student: student(curName, curPhone, curParent) };
+
+      if (eff.hasOwnProperty("phone")) {
+        if (!p4t_phoneEditOn_()) return p4t_generic_();
+        for (var j = 1; j < values.length; j++) {
+          if (j !== i && _phonesMatch(values[j][c.phone - 1], eff.phone)) { p4t_lookup_(T.ctx); return p4t_generic_(); }
+        }
+      }
+      var newName = eff.hasOwnProperty("name") ? eff.name : curName;
+      var newPhone = eff.hasOwnProperty("phone") ? eff.phone : curPhone;
+      var newParent = eff.hasOwnProperty("parent_phone") ? eff.parent_phone : curParent;
+      var old = { name: values[i][c.display_name - 1], phone: values[i][c.phone - 1], parent: c.parent_phone ? values[i][c.parent_phone - 1] : "" };
+
+      var writeStudents = function (applied) {
+        var done = [];
+        try {
+          if (eff.hasOwnProperty("phone")) { p4t_setCell_(S.sheet, row, c.phone, newPhone); done.push(["phone", c.phone, old.phone]); }
+          if (eff.hasOwnProperty("name")) { p4t_setCell_(S.sheet, row, c.display_name, newName); done.push(["name", c.display_name, old.name]); }
+          if (eff.hasOwnProperty("parent_phone")) {
+            if (!c.parent_phone) throw new Error("The Students sheet has no parent_phone column.");
+            p4t_setCell_(S.sheet, row, c.parent_phone, newParent); done.push(["parent", c.parent_phone, old.parent]);
+          }
+        } catch (e) {
+          done.forEach(function (d) { try { S.sheet.getRange(row, d[1]).setValue(d[2]); } catch (e2) { /* best effort */ } });
+          throw e;
+        }
+      };
+      if (eff.hasOwnProperty("phone")) p4t_cascade_(curPhone, newPhone, writeStudents); else writeStudents([]);
+
+      var ts = p4t_now_();
+      ["name", "phone", "parent_phone"].forEach(function (f) {
+        if (!eff.hasOwnProperty(f)) return;
+        logRows.push({ ts: ts, actor_kind: "teacher", actor_id: T.phone, student_old: curPhone, student_new: newPhone, field: f,
+                       old_value: f === "name" ? curName : f === "phone" ? curPhone : curParent, new_value: eff[f] });
+      });
+      if (eff.hasOwnProperty("phone")) pingText = "Teacher " + T.name + " changed a student's phone.\nStudent: " + newName + "\nOld: " + curPhone + "\nNew: " + newPhone;
+      return { ok: true, student: student(newName, newPhone, newParent) };
+    }, P4T_LOCK_MS);
+  } catch (e) {
+    Logger.log("p4_teacher_update_student refused: " + (e && e.message));
+    return p4t_generic_();
+  }
+  if (result && result.ok && logRows.length) {
+    try {
+      var logSheet = _followupSheet(_ss(), "StudentEditLog", P4T_EDITLOG_HEADERS);
+      _ensureColumns(logSheet, P4T_EDITLOG_HEADERS);
+      logRows.forEach(function (r) { p4t_appendText_(logSheet, P4T_EDITLOG_HEADERS, r); });
+    } catch (e3) { Logger.log("StudentEditLog write failed: " + (e3 && e3.message)); }
+    if (pingText) { try { if (typeof p4_ownerPing_ === "function") p4_ownerPing_(pingText); } catch (e4) { /* best effort */ } }
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------- self test (pure: no sheet access)
+
+function p4_selfTest_team() {
+  var bad = [];
+  var eq = function (n, a, b) { if (a !== b) bad.push(n + ": got " + JSON.stringify(a) + " want " + JSON.stringify(b)); };
+  eq("sha256(abc)", p4t_hash_("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  eq("scope math", p4t_scope_("Math"), "math");
+  eq("scope dedupe", p4t_scope_("math, math,english"), "math,english");
+  eq("scope blank", p4t_scope_(""), "");
+  eq("scope star refused", p4t_scope_("*"), null);
+  eq("scope unknown refused", p4t_scope_("math,art"), null);
+  eq("name trims and strips", p4t_cleanName_("  Sara\u0000 Ali \n"), "Sara Ali");
+  eq("name too short", p4t_cleanName_("A"), "");
+  eq("name too long", p4t_cleanName_(new Array(82).join("x")), "");
+  eq("name not a string", p4t_cleanName_(12345), "");
+  eq("name html kept as text", p4t_cleanName_("<b>Ann</b>"), "<b>Ann</b>");
+  eq("phone ok", p4t_cleanPhone_("+20 101 234 5678"), "01012345678");
+  eq("phone lost zero", p4t_cleanPhone_("1012345678"), "01012345678");
+  eq("phone landline refused", p4t_cleanPhone_("034567890"), "");
+  eq("phone short refused", p4t_cleanPhone_("0101234"), "");
+  eq("phone object refused", p4t_cleanPhone_({}), "");
+  eq("stores listed", P4T_PHONE_STORES.length, 11);
+  var out = bad.length ? "FAIL: " + bad.join(" | ") : "ALL PASS";
+  Logger.log("p4_selfTest_team: " + out);
+  return out;
+}
+// ===== END MERGED FROM Phase4_Team.gs =====
+
+// ============================================================================
+// ===== MERGED FROM Phase4_Telegram.gs =====
+// ============================================================================
+/* Phase4_Telegram.gs - P4 / S6: Telegram per teacher (contract section 6b).
+ * A teacher links his OWN private Telegram chat to the existing payments bot. He then gets payment requests for his own
+ * subject(s) and can Approve / Reject them from there, exactly like the owner. Dashboard approval keeps working.
+ *
+ * Depends on (frozen signatures, other sessions): p4_ctxForPhone, p4_ctx, p4_teacherCovers, p4_paymentInScope (Phase4_Scope / People).
+ * Depends on Code.gs: _props, _ss, _tgCall, _tgAdminIds, _withLock, _sheetValuesAsObjects, _prettyLesson, _normalizePhone,
+ *   _phonesMatch, handleAdminDecidePayment (the SAME internal function the owner's Telegram tap calls).
+ * Security model: identity comes ONLY from the TeacherTelegram sheet (chat id -> teacher id). Nothing in callback_data or message
+ * text is trusted except the payment id, and every decision is re-checked against a FRESH read of the teacher's role and scope.
+ * Needs Script Property P4_TG_BOT_USERNAME (bot username without @). The bot token is never logged or stored here.
+ * Script Properties used: P4_TG_BOT_USERNAME, TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_CHAT_ID, ADMIN_TOKEN (all pre-existing except the first).
+ */
+
+var P4TG_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";   // 32 symbols, no 0/O/1/I
+var P4TG_CODE_LEN = 8;
+var P4TG_CODE_TTL_SEC = 900;
+var P4TG_STARTS_PER_HOUR = 5;
+var P4TG_TAB = "TeacherTelegram";
+var P4TG_HEADERS = ["teacher_id", "chat_id", "linked_at"];
+var P4TG_NOT_AUTH = { ok: false, error: "Not authorized." };
+
+/* ---------------------------------------------------------------- small helpers (private) */
+
+function p4tg_log_(msg) { try { console.log("p4tg: " + msg); } catch (e) {} }
+
+function p4tg_esc_(v) {
+  return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function p4tg_sha_(s) {
+  var d = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8);
+  return d.map(function (b) { return ("0" + ((b < 0 ? b + 256 : b)).toString(16)).slice(-2); }).join("");
+}
+
+// 8 symbols from a 32-symbol alphabet = 40 bits. Bytes come from UUID v4 (secure random); 256 % 32 == 0, so no modulo bias.
+function p4tg_newCode_() {
+  var hex = (Utilities.getUuid() + Utilities.getUuid()).replace(/[^0-9a-f]/gi, "");
+  var out = "";
+  for (var i = 0; i < P4TG_CODE_LEN; i++) out += P4TG_ALPHABET.charAt(parseInt(hex.substr(i * 2, 2), 16) % 32);
+  return out;
+}
+
+function p4tg_same_(a, b) {
+  if (typeof _phonesMatch === "function") return _phonesMatch(a, b);
+  return String(a) === String(b);
+}
+
+function p4tg_cache_() { return CacheService.getScriptCache(); }
+
+function p4tg_adminIds_() { try { return _tgAdminIds(); } catch (e) { return []; } }
+
+// One Telegram call. NEVER throws, never logs the token (it is scrubbed from any error text). Returns the parsed JSON or null.
+function p4tg_call_(method, body) {
+  var token = "";
+  try {
+    token = String(_props().getProperty("TELEGRAM_BOT_TOKEN") || "");
+    if (!token) return null;
+    var res = _tgCall(method, body);
+    var txt = res && typeof res.getContentText === "function" ? res.getContentText() : "";
+    try { return txt ? JSON.parse(txt) : {}; } catch (e) { return {}; }
+  } catch (err) {
+    var m = String(err && err.message || err);
+    if (token) m = m.split(token).join("***");
+    p4tg_log_("telegram call " + method + " failed: " + m.slice(0, 200));
+    return null;
+  }
+}
+
+// The caller must be a TEACHER using a dashboard SESSION. Assistants and token callers get null. Fresh read through p4_ctx.
+function p4tg_callerTeacher_(payload) {
+  try {
+    if (typeof p4_ctx !== "function") return null;
+    var ctx = p4_ctx(payload);
+    if (!ctx || ctx.kind !== "teacher" || ctx.via !== "session" || !ctx.id) return null;
+    return ctx;
+  } catch (e) { return null; }
+}
+
+// Fresh teacher context for a stored teacher id (role + scope re-read from the sheet by S2). null = no longer a teacher.
+function p4tg_ctxFor_(teacherId) {
+  try {
+    if (typeof p4_ctxForPhone !== "function") return null;
+    var ctx = p4_ctxForPhone(teacherId);
+    if (!ctx || ctx.kind !== "teacher" || !ctx.subjects || !ctx.subjects.length) return null;
+    return ctx;
+  } catch (e) { return null; }
+}
+
+/* ---------------------------------------------------------------- TeacherTelegram sheet */
+
+function p4tg_sheet_(create) {
+  var ss = _ss();
+  var sh = ss.getSheetByName(P4TG_TAB);
+  if (!sh && create) {
+    sh = ss.insertSheet(P4TG_TAB);   // S5's p4_setup creates the same tab with the same headers; this is the idempotent fallback
+    sh.appendRow(P4TG_HEADERS);
+  }
+  return sh || null;
+}
+
+// [{row, teacher_id, chat_id, linked_at}] (row = 1-based sheet row). Empty when the tab does not exist yet.
+function p4tg_rows_() {
+  var sh = p4tg_sheet_(false);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var vals = sh.getRange(1, 1, sh.getLastRow(), 3).getValues();
+  var out = [];
+  for (var i = 1; i < vals.length; i++) {
+    var t = String(vals[i][0] == null ? "" : vals[i][0]).trim(), c = String(vals[i][1] == null ? "" : vals[i][1]).trim();
+    if (t && c) out.push({ row: i + 1, teacher_id: t, chat_id: c, linked_at: String(vals[i][2] == null ? "" : vals[i][2]) });
+  }
+  return out;
+}
+
+// chat id -> teacher id, or "" when unknown OR ambiguous (a chat listed under two teachers is refused).
+function p4tg_teacherOfChat_(chatId) {
+  var found = "", n = 0;
+  p4tg_rows_().forEach(function (r) { if (r.chat_id === String(chatId)) { found = r.teacher_id; n++; } });
+  return n === 1 ? found : "";
+}
+
+function p4tg_deleteRows_(sh, rows) {
+  rows.slice().sort(function (a, b) { return b - a; }).forEach(function (r) { sh.deleteRows(r, 1); });
+}
+
+// One row per teacher AND one teacher per chat: a new link replaces both kinds of older row. Caller holds the lock.
+function p4tg_upsert_(teacherId, chatId) {
+  var sh = p4tg_sheet_(true);
+  var drop = [];
+  p4tg_rows_().forEach(function (r) { if (p4tg_same_(r.teacher_id, teacherId) || r.chat_id === String(chatId)) drop.push(r.row); });
+  if (drop.length) p4tg_deleteRows_(sh, drop);
+  var at = sh.getLastRow() + 1;
+  sh.getRange(at, 1, 1, 3).setNumberFormat("@");
+  sh.getRange(at, 1, 1, 3).setValues([[String(teacherId), String(chatId), new Date().toISOString()]]);
+}
+
+function p4tg_unlinkPhone_(phone) {
+  var sh = p4tg_sheet_(false);
+  if (!sh) return 0;
+  var drop = [];
+  p4tg_rows_().forEach(function (r) { if (p4tg_same_(r.teacher_id, phone)) drop.push(r.row); });
+  if (drop.length) p4tg_deleteRows_(sh, drop);
+  return drop.length;
+}
+
+/* ---------------------------------------------------------------- payments (read only) */
+
+// The payment row by id, built ONLY from the Payments sheet. null if missing.
+function p4tg_payment_(id) {
+  var sh = _ss().getSheetByName("Payments");
+  if (!sh || sh.getLastRow() < 2) return null;
+  var rows = _sheetValuesAsObjects(sh);
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].payment_id || "").trim() === String(id)) {
+      var r = rows[i];
+      return { payment_id: String(r.payment_id), phone: String(r.phone || ""), name: String(r.name || ""), scope: String(r.scope || ""),
+               reference: String(r.reference || ""), note: String(r.note || ""), status: String(r.status || "").trim().toLowerCase() };
+    }
+  }
+  return null;
+}
+
+function p4tg_paymentText_(p) {
+  var label = typeof _prettyLesson === "function" ? _prettyLesson(p.scope) : p.scope;
+  return "💳 <b>Payment request</b>\n\n👤 " + p4tg_esc_(p.name) + "\n📱 " + p4tg_esc_(p.phone) +
+    "\n📘 " + p4tg_esc_(label) + (p.note ? "\n📦 " + p4tg_esc_(p.note) : "") + "\n🧾 Ref: " + p4tg_esc_(p.reference);
+}
+
+/* ---------------------------------------------------------------- owner ping */
+
+/** Plain-text message to the owner's chat(s). Never throws. */
+function p4_ownerPing_(text) {
+  try {
+    var ids = p4tg_adminIds_();
+    for (var i = 0; i < ids.length; i++) p4tg_call_("sendMessage", { chat_id: ids[i], text: String(text == null ? "" : text).slice(0, 3500), disable_web_page_preview: true });
+  } catch (e) { p4tg_log_("ownerPing failed"); }
+}
+
+/* ---------------------------------------------------------------- teacher-facing actions (session, teacher only) */
+
+function p4tg_startAllowed_(teacherId) {
+  var cache = p4tg_cache_(), key = "p4tgr:" + p4tg_sha_(teacherId), now = Date.now();
+  var n = 0, t0 = now, raw = cache.get(key);
+  if (raw) { var p = String(raw).split("|"); n = Number(p[0]) || 0; t0 = Number(p[1]) || now; if (now - t0 >= 3600000) { n = 0; t0 = now; } }
+  if (n >= P4TG_STARTS_PER_HOUR) return false;
+  cache.put(key, (n + 1) + "|" + t0, 3600);
+  return true;
+}
+
+/** {student_id, session_token} -> {ok, link, expires_in:900}. Teacher only (assistants and tokens are refused). */
+function p4_tg_link_start(payload) {
+  try {
+    var ctx = p4tg_callerTeacher_(payload);
+    if (!ctx) return P4TG_NOT_AUTH;
+    var bot = String(_props().getProperty("P4_TG_BOT_USERNAME") || "").replace(/^@/, "").trim();
+    if (!/^[A-Za-z0-9_]{3,64}$/.test(bot)) return { ok: false, error: "Telegram is not set up yet." };
+    var allowed = _withLock(function () { return p4tg_startAllowed_(ctx.id); }, 10000);
+    if (!allowed) return { ok: false, error: "Too many attempts. Try again in an hour." };
+    var code = p4tg_newCode_();
+    p4tg_cache_().put("p4tg:" + p4tg_sha_(code), String(ctx.id), P4TG_CODE_TTL_SEC);   // only the HASH of the code is stored
+    p4tg_log_("link code issued");
+    return { ok: true, link: "https://t.me/" + bot + "?start=" + code, expires_in: P4TG_CODE_TTL_SEC };
+  } catch (err) {
+    p4tg_log_("link_start failed: " + String(err && err.message || err).slice(0, 120));
+    return { ok: false, error: "Could not create the link. Try again." };
+  }
+}
+
+function p4_tg_status(payload) {
+  try {
+    var ctx = p4tg_callerTeacher_(payload);
+    if (!ctx) return P4TG_NOT_AUTH;
+    var mine = p4tg_rows_().filter(function (r) { return p4tg_same_(r.teacher_id, ctx.id); })[0];
+    return { ok: true, linked: !!mine, since: mine ? mine.linked_at : "" };
+  } catch (err) { return { ok: false, error: "Could not read the status." }; }
+}
+
+function p4_tg_unlink(payload) {
+  try {
+    var ctx = p4tg_callerTeacher_(payload);
+    if (!ctx) return P4TG_NOT_AUTH;
+    _withLock(function () { p4tg_unlinkPhone_(ctx.id); }, 10000);
+    p4tg_log_("teacher unlinked");
+    return { ok: true };
+  } catch (err) { return { ok: false, error: "Could not unlink. Try again." }; }
+}
+
+/** Owner only: {phone} -> {ok}. Always ok, whether or not that teacher was linked. */
+function p4_admin_tg_unlink(payload) {
+  try {
+    var ctx = typeof p4_ctx === "function" ? p4_ctx(payload) : null;
+    if (!ctx || ctx.kind !== "owner") return P4TG_NOT_AUTH;
+    _withLock(function () { p4tg_unlinkPhone_(payload && payload.phone); }, 10000);
+    p4tg_log_("owner unlinked a teacher");
+    return { ok: true };
+  } catch (err) { return { ok: false, error: "Could not unlink. Try again." }; }
+}
+
+/* ---------------------------------------------------------------- notify teachers of a new payment request */
+
+/** Called from _notifyAdmin after the owner message. `arg` = a payment id (what _notifyAdmin has) or an object with payment_id.
+ *  Re-reads the payment from the sheet; sends to every linked teacher whose subjects cover the payment's own scope. Never throws. */
+function p4_tg_notifyPayment(arg) {
+  try {
+    var pid = String(arg && typeof arg === "object" ? arg.payment_id : arg == null ? "" : arg).trim();
+    if (!pid) return;
+    var rows = p4tg_rows_();
+    if (!rows.length) return;
+    var pay = p4tg_payment_(pid);
+    if (!pay || pay.status !== "pending" || typeof p4_teacherCovers !== "function") return;
+    var admin = p4tg_adminIds_(), seen = {}, sent = [];
+    var kb = { inline_keyboard: [[{ text: "✅ Approve", callback_data: "ap:" + pid }, { text: "❌ Reject", callback_data: "rj:" + pid }]] };
+    var text = p4tg_paymentText_(pay);
+    rows.forEach(function (r) {
+      try {
+        if (seen[r.chat_id] || admin.indexOf(r.chat_id) !== -1) return;   // owner already got it; one message per chat
+        seen[r.chat_id] = true;
+        var ctx = p4tg_ctxFor_(r.teacher_id);
+        if (!ctx || !p4_teacherCovers(ctx, pay.scope)) return;
+        var res = p4tg_call_("sendMessage", { chat_id: r.chat_id, text: text.slice(0, 3500), parse_mode: "HTML", disable_web_page_preview: true, reply_markup: kb });
+        var mid = res && res.result && res.result.message_id;
+        if (mid) sent.push({ c: r.chat_id, m: mid });
+      } catch (e) { p4tg_log_("notify one failed"); }
+    });
+    if (sent.length) p4tg_cache_().put("p4tgm:" + pid, JSON.stringify(sent), 21600);
+    p4tg_log_("payment ping to " + sent.length + " teacher chat(s)");
+  } catch (err) { p4tg_log_("notifyPayment failed: " + String(err && err.message || err).slice(0, 120)); }
+}
+
+/* ---------------------------------------------------------------- webhook updates */
+
+/** Returns true ONLY when this update was fully handled here (a /start link, or an ap:/rj: tap from a chat registered in
+ *  TeacherTelegram). false for everything else so the existing owner path runs unchanged. Never throws. */
+function p4_tg_handleUpdate(update) {
+  try {
+    if (!update || typeof update !== "object") return false;
+    if (update.message) return p4tg_onMessage_(update);
+    if (update.callback_query) return p4tg_onCallback_(update);
+    return false;
+  } catch (err) {
+    p4tg_log_("handleUpdate failed: " + String(err && err.message || err).slice(0, 120));
+    return false;
+  }
+}
+
+function p4tg_seen_(update) {
+  var key = "p4tgu:" + update.update_id, cache = p4tg_cache_();
+  if (update.update_id === undefined || update.update_id === null) return false;
+  if (cache.get(key)) return true;
+  cache.put(key, "1", 21600);
+  return false;
+}
+
+// "/start <code>" in a PRIVATE chat. Every failure is a silent no-op: no reply tells a valid code from an invalid or expired one.
+function p4tg_onMessage_(update) {
+  var msg = update.message, chat = msg && msg.chat;
+  if (!chat || chat.type !== "private") return false;
+  var m = /^\/start(?:@[A-Za-z0-9_]+)?\s+([A-Za-z0-9]{8})\s*$/.exec(String(msg.text || ""));
+  if (!m) return false;
+  if (p4tg_seen_(update)) return true;
+  if (!msg.from || String(msg.from.id) !== String(chat.id)) return true;
+  var hash = p4tg_sha_(String(m[1]).toUpperCase());
+  var outcome = _withLock(function () {
+    var cache = p4tg_cache_(), key = "p4tg:" + hash;
+    var teacherId = cache.get(key);
+    if (!teacherId) return null;
+    cache.remove(key);                                  // single use, even if the checks below fail
+    var ctx = p4tg_ctxFor_(teacherId);
+    if (!ctx) return null;                              // no longer a teacher
+    p4tg_upsert_(teacherId, chat.id);
+    return ctx.subjects.join(", ");
+  }, 10000);
+  if (outcome === null) { p4tg_log_("link refused"); return true; }
+  p4tg_call_("sendMessage", { chat_id: chat.id, text: "Connected. You will receive payment requests for: " + outcome + "." });
+  p4tg_log_("teacher chat linked");
+  return true;
+}
+
+function p4tg_edit_(chatId, messageId, text, entities) {
+  var body = { chat_id: chatId, message_id: messageId, text: String(text).slice(0, 4000) };
+  if (entities && entities.length) body.entities = entities;
+  p4tg_call_("editMessageText", body);   // no reply_markup = buttons removed
+}
+
+// After a decision, take the buttons off every teacher message we sent for this payment (errors ignored).
+function p4tg_stripOthers_(pid, exceptChat, exceptMsg) {
+  try {
+    var raw = p4tg_cache_().get("p4tgm:" + pid);
+    if (!raw) return;
+    JSON.parse(raw).forEach(function (x) {
+      if (String(x.c) === String(exceptChat) && String(x.m) === String(exceptMsg)) return;
+      p4tg_call_("editMessageReplyMarkup", { chat_id: x.c, message_id: x.m, reply_markup: { inline_keyboard: [] } });
+    });
+  } catch (e) {}
+}
+
+function p4tg_onCallback_(update) {
+  var cq = update.callback_query;
+  var m = /^(ap|rj):(\S+)$/.exec(String(cq && cq.data || ""));
+  if (!m) return false;
+  var chat = cq.message && cq.message.chat;
+  if (!chat || chat.type !== "private" || !cq.from || String(chat.id) !== String(cq.from.id)) return false;
+  if (p4tg_adminIds_().indexOf(String(chat.id)) !== -1) return false;     // the owner's own chats stay on the existing path
+  var teacherId = p4tg_teacherOfChat_(chat.id);                           // identity from the sheet, never from callback text
+  if (!teacherId) return false;                                           // not a registered teacher chat
+  if (p4tg_seen_(update)) return true;                                    // Telegram retries; each update is handled once
+  p4tg_call_("answerCallbackQuery", { callback_query_id: cq.id });         // clear the spinner first
+  var pid = m[2], approve = m[1] === "ap";
+
+  var ctx = p4tg_ctxFor_(teacherId);                                      // FRESH role + scope
+  if (!ctx) { p4tg_log_("refused: not a teacher any more"); return true; }
+  var inScope = false;
+  try { inScope = typeof p4_paymentInScope === "function" && p4_paymentInScope(ctx, { payment_id: pid }) === true; } catch (e) { inScope = false; }
+  if (!inScope) { p4tg_log_("refused: payment outside scope"); return true; }   // no reply, no detail
+
+  var out;
+  try {
+    out = handleAdminDecidePayment({ token: _props().getProperty("ADMIN_TOKEN"), payment_id: pid, decision: approve ? "approve" : "reject" });
+  } catch (err) {
+    var emsg = String(err && err.message || err);
+    if (/already (approved|rejected|revoked)/i.test(emsg)) {
+      p4tg_log_("already decided");
+      p4tg_edit_(chat.id, cq.message.message_id, String(cq.message.text || "") + "\n\nAlready decided", cq.message.entities);
+      p4tg_stripOthers_(pid, chat.id, cq.message.message_id);
+    } else {
+      p4tg_log_("decision failed: " + emsg.slice(0, 120));
+    }
+    return true;
+  }
+  var verdict = approve ? "✅ Approved" : "❌ Rejected";
+  p4tg_log_("decided " + (approve ? "approve" : "reject") + " by teacher");
+  p4tg_edit_(chat.id, cq.message.message_id, String(cq.message.text || "") + "\n\n" + verdict, cq.message.entities);
+  p4tg_stripOthers_(pid, chat.id, cq.message.message_id);
+  p4_ownerPing_(verdict + " by teacher " + teacherId + ": " + String(out && out.name || "") + " (payment " + pid + ")");
+  return true;
+}
+
+/* ---------------------------------------------------------------- editor self-test (no Telegram, no sheet writes) */
+
+function p4_selfTest_tg() {
+  var fails = [];
+  var ck = function (name, ok) { if (!ok) fails.push(name); };
+  ck("sha256 vector", p4tg_sha_("abc") === "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  var seen = {}, okAlpha = true, okLen = true;
+  for (var i = 0; i < 200; i++) {
+    var c = p4tg_newCode_();
+    seen[c] = true;
+    if (c.length !== P4TG_CODE_LEN) okLen = false;
+    if (!new RegExp("^[" + P4TG_ALPHABET + "]+$").test(c)) okAlpha = false;
+  }
+  ck("code length", okLen); ck("code alphabet", okAlpha); ck("codes differ", Object.keys(seen).length > 190);
+  ck("esc", p4tg_esc_("<b>&") === "&lt;b&gt;&amp;");
+  ck("start parse", /^\/start(?:@[A-Za-z0-9_]+)?\s+([A-Za-z0-9]{8})\s*$/.test("/start ABCD2345"));
+  ck("start parse rejects short", !/^\/start(?:@[A-Za-z0-9_]+)?\s+([A-Za-z0-9]{8})\s*$/.test("/start ABC"));
+  var res = fails.length ? "FAIL: " + fails.join(", ") : "ALL PASS";
+  Logger.log("p4_selfTest_tg: " + res);
+  return res;
+}
+// ===== END MERGED FROM Phase4_Telegram.gs =====
+
+// ============================================================================
+// ===== MERGED FROM Phase4_Stats.gs =====
+// ============================================================================
+// ============================================================================
+// Phase4_Stats.gs  (P4 / S8)  Owner-only, read-only view of every teacher and subject.
+//
+// Contract: 00-MASTER-CONTRACT.md v2 section 6e. One router action: p4_admin_teacher_stats.
+// Counts and sums only. No student name, phone, payment reference, note text or file id is ever
+// copied into the response: phone / student_id columns are read only to count distinct people.
+// Sheets are read in bulk (one column read per needed column), never one read per row.
+// Depends on Code.gs helpers; S2 / S3 helpers are used only through typeof guards:
+//   p4_ctx(payload), p4_subjectOf(x), p4_linked_(ctx)   (a missing one gives null, never a guess)
+// Nothing runs at load time.
+// ============================================================================
+
+var P4S_SUBJECTS = ["programming", "english", "math"];
+var P4S_CACHE_KEY = "p4stats:v1";
+var P4S_CACHE_SECONDS = 300;
+// Only the exact label Code.gs writes into Payments.note for chapter / term subscriptions
+// ("Grade 1 · Chapter 3 · 250 EGP") counts as a price. Free text typed by a student never does.
+var P4S_PRICE_RE = /^Grade \d+ · (?:Chapter|Term) \d+ · (\d+(?:\.\d+)?) ([A-Z]{3})$/;
+
+// ---------------------------------------------------------------- helpers
+
+function p4s_denied_() { return { ok: false, error: "Not authorized." }; }
+
+function p4s_subject_(key) {
+  try {
+    if (typeof p4_subjectOf === "function") return String(p4_subjectOf(key) || "");
+  } catch (e) { /* fall through */ }
+  var s = String(key == null ? "" : key).split("#")[0].trim().toLowerCase();
+  try { if (typeof p2k_canon === "function") s = String(p2k_canon(s)).toLowerCase(); } catch (e2) { /* keep s */ }
+  var first = s.split("/")[0];
+  return P4S_SUBJECTS.indexOf(first) === -1 ? "" : first;
+}
+
+function p4s_block_() {
+  return {
+    revenue: { all_time: {}, this_month: {}, last_month: {}, pending: {} },
+    payments: { approved: 0, pending: 0, rejected: 0, unpriced: 0 },
+    videos: 0,
+    lessons: { total: 0, locked: 0 },
+    quizzes: { locked: 0 },
+    students: { linked: 0, active_30d: 0 },
+    written: { awaiting: 0, oldest_days: null },
+    quiz_results_30d: 0,
+    groups: 0
+  };
+}
+
+// Sums two blocks (or parts of them). null on either side stays null. oldest_days takes the maximum.
+function p4s_merge_(a, b, key) {
+  if (key === "oldest_days") { if (a === null || a === undefined) return b === undefined ? null : b; if (b === null || b === undefined) return a; }
+  if (a === null || b === null) return null;
+  if (a === undefined) return b;
+  if (b === undefined) return a;
+  if (typeof a === "number" && typeof b === "number") return key === "oldest_days" ? Math.max(a, b) : a + b;
+  if (typeof a === "object" && typeof b === "object") {
+    var out = {};
+    Object.keys(a).concat(Object.keys(b)).forEach(function (k) { if (!out.hasOwnProperty(k)) out[k] = p4s_merge_(a[k], b[k], k); });
+    return out;
+  }
+  return a;
+}
+function p4s_clone_(o) { return JSON.parse(JSON.stringify(o)); }
+function p4s_add_(map, cur, amt) { map[cur] = Math.round(((map[cur] || 0) + amt) * 100) / 100; }
+
+function p4s_dayDiff_(laterYmd, earlierYmd) {
+  var a = /^(\d{4})-(\d{2})-(\d{2})/.exec(laterYmd), b = /^(\d{4})-(\d{2})-(\d{2})/.exec(earlierYmd);
+  if (!a || !b) return null;
+  return Math.round((Date.UTC(+a[1], +a[2] - 1, +a[3]) - Date.UTC(+b[1], +b[2] - 1, +b[3])) / 86400000);
+}
+
+function p4s_prevMonth_(ym) {
+  var y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1;
+  if (m < 1) { y--; m = 12; }
+  return y + "-" + ("0" + m).slice(-2);
+}
+
+// {n, col:{name:[...]}} for a tab. A missing tab is "no rows" (zeros); a tab with a required column
+// missing, or any read error, is null (the metrics that need it become null).
+function p4s_read_(book, tab, required, optional) {
+  try {
+    var sh = book.getSheetByName(tab);
+    return _readColumns(sh, required, optional || [], tab);
+  } catch (e) {
+    Logger.log("p4_admin_teacher_stats: could not read " + tab + ": " + (e && e.message));
+    return null;
+  }
+}
+
+function p4s_date_(v) { try { return String(_cairoDate(v) || ""); } catch (e) { return ""; } }
+function p4s_pk_(v) { try { return _phoneKey(v); } catch (e) { return ""; } }
+
+// ---------------------------------------------------------------- the action
+
+// {refresh?: bool}
+function p4_admin_teacher_stats(payload) {
+  payload = payload || {};
+  var ctx = null;
+  try { ctx = typeof p4_ctx === "function" ? p4_ctx(payload) : null; } catch (e) { ctx = null; }
+  if (!ctx || ctx.kind !== "owner") return p4s_denied_();
+
+  var cache = null;
+  try { cache = CacheService.getScriptCache(); } catch (e0) { cache = null; }
+  if (cache && payload.refresh !== true) {
+    try {
+      var hit = cache.get(P4S_CACHE_KEY);
+      if (hit) { var o = JSON.parse(hit); o.cached = true; return o; }
+    } catch (e1) { /* recompute */ }
+  }
+  var res = p4s_compute_();
+  if (cache) { try { cache.put(P4S_CACHE_KEY, JSON.stringify(res), P4S_CACHE_SECONDS); } catch (e2) { /* too big or unavailable: fine */ } }
+  return res;
+}
+
+function p4s_compute_() {
+  var ss = _ss(), dataSs = _dataSs();
+  var today = _todayCairo(), thisMonth = today.slice(0, 7), lastMonth = p4s_prevMonth_(thisMonth), since30 = _addDays(today, -30);
+
+  // ---- one bulk read per sheet (null = unreadable)
+  var S = {
+    payments: p4s_read_(ss, "Payments", ["status", "scope"], ["note", "created_at", "decided_at", "phone"]),
+    videos: p4s_read_(ss, "Videos", ["lesson", "embed_url"]),
+    lessons: p4s_read_(ss, "Lessons", ["lesson", "locked"]),
+    quizzes: p4s_read_(ss, "Quizzes", ["lesson", "locked"]),
+    results: p4s_read_(dataSs, "QuizResults", ["student_id", "lesson"], ["date"]),
+    subs: p4s_read_(dataSs, "Submissions", ["student_id", "lesson"], ["date"]),
+    written: p4s_read_(dataSs, "WrittenAnswers", ["lesson", "awarded"], ["uploaded_at"]),
+    ent: p4s_read_(ss, "Entitlements", ["phone", "scope"]),
+    qa: p4s_read_(ss, "QuizAccess", ["phone", "lesson"]),
+    groups: p4s_read_(ss, "Groups", ["group"]),
+    owners: p4s_read_(ss, "GroupOwners", ["group", "owner_id"]),
+    tg: p4s_read_(ss, "TeacherTelegram", ["teacher_id"])
+  };
+  var students = null;
+  try { var sv = _students().getDataRange().getValues(); students = { values: sv, c: _studentCols(sv[0]) }; } catch (e) { students = null; }
+  var lessonList = null;
+  try { if (typeof _allLessonsFromGithub === "function") lessonList = _allLessonsFromGithub().lessons || []; } catch (e3) { lessonList = null; }
+
+  var subjects = P4S_SUBJECTS.concat([""]);          // "" = rows whose subject is unknown (owner block only)
+  var acc = {}; subjects.forEach(function (s) { acc[s] = p4s_block_(); });
+  var people = {}, active = {};                      // subject -> {phoneKey: true}
+  subjects.forEach(function (s) { people[s] = {}; active[s] = {}; });
+
+  // ---- payments (subject = the payment row's own scope; amount = the system price label only)
+  if (S.payments) {
+    var P = S.payments.col;
+    for (var i = 0; i < S.payments.n; i++) {
+      var subj = p4s_subject_(P.scope[i]), b = acc[subj], st = String(P.status[i]).trim().toLowerCase();
+      var m = P4S_PRICE_RE.exec(String(P.note[i] || "").trim());
+      var amount = m ? parseFloat(m[1]) : null, cur = m ? m[2] : "";
+      if (st === "approved") {
+        b.payments.approved++;
+        if (amount === null) b.payments.unpriced++;
+        else {
+          p4s_add_(b.revenue.all_time, cur, amount);
+          var ym = (p4s_date_(P.decided_at[i]) || p4s_date_(P.created_at[i])).slice(0, 7);
+          if (ym === thisMonth) p4s_add_(b.revenue.this_month, cur, amount);
+          else if (ym === lastMonth) p4s_add_(b.revenue.last_month, cur, amount);
+        }
+        var pk = p4s_pk_(P.phone[i]); if (pk) people[subj][pk] = true;
+      } else if (st === "pending") {
+        b.payments.pending++;
+        if (amount !== null) p4s_add_(b.revenue.pending, cur, amount);
+        var pk2 = p4s_pk_(P.phone[i]); if (pk2) people[subj][pk2] = true;
+      } else if (st === "rejected") b.payments.rejected++;
+    }
+  }
+  // ---- videos, locks
+  if (S.videos) for (var v = 0; v < S.videos.n; v++) if (String(S.videos.col.embed_url[v]).trim() !== "") acc[p4s_subject_(S.videos.col.lesson[v])].videos++;
+  if (S.lessons) for (var l = 0; l < S.lessons.n; l++) if (_isLockedCell(S.lessons.col.locked[l]) && String(S.lessons.col.lesson[l]).trim() !== "") acc[p4s_subject_(S.lessons.col.lesson[l])].lessons.locked++;
+  if (S.quizzes) for (var q = 0; q < S.quizzes.n; q++) if (_isLockedCell(S.quizzes.col.locked[q]) && String(S.quizzes.col.lesson[q]).trim() !== "") acc[p4s_subject_(S.quizzes.col.lesson[q])].quizzes.locked++;
+  if (lessonList) lessonList.forEach(function (x) { acc[p4s_subject_(x.lesson)].lessons.total++; });
+
+  // ---- quiz results / submissions: activity and linkage
+  [["results", true], ["subs", false]].forEach(function (pair) {
+    var src = S[pair[0]]; if (!src) return;
+    for (var r = 0; r < src.n; r++) {
+      var sj = p4s_subject_(src.col.lesson[r]), k = p4s_pk_(src.col.student_id[r]);
+      if (k) people[sj][k] = true;
+      var d = p4s_date_(src.col.date[r]), recent = d !== "" && d >= since30;
+      if (recent && k) active[sj][k] = true;
+      if (recent && pair[1]) acc[sj].quiz_results_30d++;
+    }
+  });
+  if (S.ent) for (var e1 = 0; e1 < S.ent.n; e1++) { var k1 = p4s_pk_(S.ent.col.phone[e1]); if (k1) people[p4s_subject_(S.ent.col.scope[e1])][k1] = true; }
+  if (S.qa) for (var e2 = 0; e2 < S.qa.n; e2++) { var k2 = p4s_pk_(S.qa.col.phone[e2]); if (k2) people[p4s_subject_(S.qa.col.lesson[e2])][k2] = true; }
+
+  // ---- written answers waiting for a grade
+  if (S.written) {
+    for (var w = 0; w < S.written.n; w++) {
+      if (String(S.written.col.awarded[w]).trim() !== "") continue;
+      var wb = acc[p4s_subject_(S.written.col.lesson[w])];
+      wb.written.awaiting++;
+      var age = p4s_dayDiff_(today, p4s_date_(S.written.col.uploaded_at[w]));
+      if (age !== null && age >= 0 && (wb.written.oldest_days === null || age > wb.written.oldest_days)) wb.written.oldest_days = age;
+    }
+  }
+
+  // ---- null out what could not be read
+  function nullIf(src, fn) { if (!src) subjects.forEach(function (s) { fn(acc[s]); }); }
+  nullIf(S.payments, function (b) { b.revenue = null; b.payments = null; });
+  nullIf(S.videos, function (b) { b.videos = null; });
+  nullIf(S.lessons, function (b) { b.lessons.locked = null; });
+  nullIf(S.quizzes, function (b) { b.quizzes.locked = null; });
+  nullIf(S.results, function (b) { b.quiz_results_30d = null; });
+  nullIf(S.written, function (b) { b.written = null; });
+  if (!lessonList) subjects.forEach(function (s) { acc[s].lessons.total = null; });
+  if (!S.results || !S.subs || !S.ent || !S.qa || !S.payments) subjects.forEach(function (s) { acc[s].students = null; });
+  subjects.forEach(function (s) { acc[s].groups = null; });   // a group has no subject: only per teacher and for the owner
+
+  // subject-level people counts
+  if (S.results && S.subs && S.ent && S.qa && S.payments) {
+    subjects.forEach(function (s) { acc[s].students = { linked: Object.keys(people[s]).length, active_30d: Object.keys(active[s]).length }; });
+  }
+
+  // ---- teachers
+  var teachers = [], assistantsOf = {}, ownerRows = 0;
+  var sc = students ? students.c : null;
+  if (students && sc) {
+    var V = students.values;
+    var get = function (i, n) { return sc[n] ? V[i][sc[n] - 1] : ""; };
+    var lc = function (x) { return String(x == null ? "" : x).trim().toLowerCase(); };
+    for (var t = 1; t < V.length; t++) {
+      var role = lc(get(t, "role"));
+      if (role === "assistant" && String(get(t, "assistant_of")).trim() !== "") {
+        var key = p4s_pk_(get(t, "assistant_of")); assistantsOf[key] = (assistantsOf[key] || 0) + 1;
+      }
+    }
+    for (var t2 = 1; t2 < V.length; t2++) {
+      if (lc(get(t2, "role")) !== "teacher" || (sc.is_admin && _isTruthyFlag(V[t2][sc.is_admin - 1]))) continue;
+      var scope = lc(get(t2, "teacher_scope")).split(",").map(function (x) { return x.trim(); }).filter(function (x) { return P4S_SUBJECTS.indexOf(x) !== -1; });
+      if (!scope.length) continue;
+      teachers.push({ phone: _restoreLeadingZero(String(V[t2][sc.phone - 1])), name: String(get(t2, "display_name")), scope: scope });
+    }
+  }
+  var coverage = {}; teachers.forEach(function (tc) { tc.scope.forEach(function (s) { coverage[s] = (coverage[s] || 0) + 1; }); });
+
+  var ownerGroupsByTeacher = {};
+  if (S.owners) for (var g = 0; g < S.owners.n; g++) {
+    var ok = p4s_pk_(S.owners.col.owner_id[g]), gk = String(S.owners.col.group[g]).trim().toLowerCase();
+    if (ok && gk) { (ownerGroupsByTeacher[ok] = ownerGroupsByTeacher[ok] || {})[gk] = true; }
+  }
+  var tgKeys = {};
+  if (S.tg) for (var h = 0; h < S.tg.n; h++) { var tk = p4s_pk_(S.tg.col.teacher_id[h]); if (tk) tgKeys[tk] = true; }
+
+  var tBlocks = teachers.map(function (tc) {
+    var merged = null;
+    tc.scope.forEach(function (s) { var c = p4s_clone_(acc[s]); merged = merged === null ? c : p4s_merge_(merged, c); });
+    var tkey = p4s_pk_(tc.phone), block = { phone: tc.phone, name: tc.name, scope: tc.scope };
+    Object.keys(merged).forEach(function (k) { block[k] = merged[k]; });
+    // people-based metrics come from S3's linkage; without it they are null
+    block.students = null;
+    try {
+      if (typeof p4_linked_ === "function") {
+        var linked = p4_linked_({ kind: "teacher", via: "session", id: tc.phone, subjects: tc.scope, principal: tc.phone }) || [];
+        var set = {}; linked.forEach(function (x) { var kk = p4s_pk_(x && typeof x === "object" ? (x.phone || x.student_id) : x); if (kk) set[kk] = true; });
+        var act = {}; tc.scope.forEach(function (s) { Object.keys(active[s]).forEach(function (kk) { if (set[kk]) act[kk] = true; }); });
+        block.students = (S.results && S.subs) ? { linked: Object.keys(set).length, active_30d: Object.keys(act).length } : null;
+      }
+    } catch (e4) { block.students = null; }
+    block.groups = S.owners ? Object.keys(ownerGroupsByTeacher[tkey] || {}).length : null;
+    block.assistants = students ? (assistantsOf[tkey] || 0) : null;
+    block.telegram = !!tgKeys[tkey];
+    if (tc.scope.some(function (s) { return coverage[s] > 1; })) block.shared_subject = true;
+    return block;
+  });
+
+  // ---- owner (everything, unknown-subject rows included) and totals (sum of the three subjects)
+  var owner = null, totals = null;
+  subjects.forEach(function (s) { var c = p4s_clone_(acc[s]); owner = owner === null ? c : p4s_merge_(owner, c); });
+  P4S_SUBJECTS.forEach(function (s) { var c = p4s_clone_(acc[s]); totals = totals === null ? c : p4s_merge_(totals, c); });
+  var allPeople = {}, allActive = {};
+  subjects.forEach(function (s) { Object.keys(people[s]).forEach(function (k) { allPeople[k] = true; }); Object.keys(active[s]).forEach(function (k) { allActive[k] = true; }); });
+  owner.students = (S.results && S.subs && S.ent && S.qa && S.payments) ? { linked: Object.keys(allPeople).length, active_30d: Object.keys(allActive).length } : null;
+  var allGroups = {};
+  if (S.groups) { for (var gi = 0; gi < S.groups.n; gi++) { var gg = String(S.groups.col.group[gi]).trim().toLowerCase(); if (gg) allGroups[gg] = true; } owner.groups = Object.keys(allGroups).length; } else owner.groups = null;
+  owner.assistants = students ? Object.keys(assistantsOf).reduce(function (n, k) { return n + assistantsOf[k]; }, 0) : null;
+  totals.groups = null;
+  if (owner.students) { totals.students = { linked: P4S_SUBJECTS.reduce(function (n, s) { return n + (acc[s].students ? acc[s].students.linked : 0); }, 0), active_30d: P4S_SUBJECTS.reduce(function (n, s) { return n + (acc[s].students ? acc[s].students.active_30d : 0); }, 0) }; }
+  else totals.students = null;
+
+  var subjectBlocks = P4S_SUBJECTS.map(function (s) {
+    var b = p4s_clone_(acc[s]); var out = { subject: s };
+    Object.keys(b).forEach(function (k) { out[k] = b[k]; });
+    if (coverage[s] > 1) out.shared_subject = true;
+    return out;
+  });
+
+  return {
+    ok: true,
+    generated_at: _cairoIso(new Date()),
+    cached: false,
+    currency_note: "Revenue counts only approved payments whose stored note carries a system price (chapter and term subscriptions, in the currency printed there). Per-lesson payments have no stored amount: they are counted under payments.unpriced and are NOT in revenue. Figures are per currency, never converted.",
+    subjects: subjectBlocks,
+    teachers: tBlocks,
+    owner: owner,
+    totals: totals
+  };
+}
+// ===== END MERGED FROM Phase4_Stats.gs =====

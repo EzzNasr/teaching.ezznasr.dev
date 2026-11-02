@@ -1,0 +1,968 @@
+{
+  "version": 1,
+  "source": "00-MASTER-CONTRACT.md v2 section 5 (transcribed by S4)",
+  "callers": [
+    "owner",
+    "teacher_tok",
+    "teacher_ses",
+    "assistant_scoped",
+    "assistant_legacy",
+    "student",
+    "anon"
+  ],
+  "contexts": [
+    "math",
+    "programming",
+    "none"
+  ],
+  "assistant_deny": [
+    "admin_decide_payment",
+    "admin_list_payments",
+    "admin_followup_save_templates",
+    "p4_*"
+  ],
+  "rules": {
+    "PUB": "pass-through",
+    "O": "owner only",
+    "T": "teacher only (not assistants); needs still apply",
+    "TEAM": "teacher and, if in P3_STAFF_ALLOW and not denied, scoped assistant; needs apply"
+  },
+  "needs": {
+    "L": "lesson subject in scope",
+    "St": "student owned",
+    "G": "group owned",
+    "GC": "group own or free",
+    "PAY": "payment in scope"
+  },
+  "actions": [
+    {
+      "action": "upload_attachment",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "tok"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson"
+      },
+      "note": "subject also sent as `subject`"
+    },
+    {
+      "action": "delete_attachment",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "tok"
+      ],
+      "filter": null,
+      "fields": {},
+      "resolve": "file_id",
+      "note": "lesson resolved from the file's folder; unresolvable = deny"
+    },
+    {
+      "action": "admin_set_video",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "tok",
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson"
+      }
+    },
+    {
+      "action": "admin_list_videos",
+      "rule": "TEAM",
+      "needs": [],
+      "via": [
+        "tok",
+        "ses"
+      ],
+      "filter": "p4f_admin_list_videos",
+      "fields": {},
+      "kind": "list"
+    },
+    {
+      "action": "admin_set_quiz_content",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "tok"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson"
+      }
+    },
+    {
+      "action": "admin_get_quiz_content",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "tok"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson"
+      }
+    },
+    {
+      "action": "admin_set_written_models",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "tok"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson"
+      }
+    },
+    {
+      "action": "admin_get_written_models",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "tok",
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson"
+      }
+    },
+    {
+      "action": "admin_set_lesson_lock",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson"
+      }
+    },
+    {
+      "action": "admin_set_quiz_lock",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson"
+      }
+    },
+    {
+      "action": "admin_set_lesson_tags",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson"
+      }
+    },
+    {
+      "action": "admin_list_lesson_tags",
+      "rule": "TEAM",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_list_lesson_tags",
+      "fields": {},
+      "kind": "list"
+    },
+    {
+      "action": "admin_list_lessons",
+      "rule": "TEAM",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_list_lessons",
+      "fields": {},
+      "kind": "list"
+    },
+    {
+      "action": "admin_set_requirement",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson",
+        "group": "group"
+      },
+      "group_optional": true
+    },
+    {
+      "action": "admin_grant_access",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_grant_access",
+      "fields": {
+        "lesson": "scope",
+        "student": "phone"
+      },
+      "link": true
+    },
+    {
+      "action": "admin_grant_quiz_access",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_grant_quiz_access",
+      "fields": {
+        "lesson": "lesson",
+        "student": "phone"
+      },
+      "link": true
+    },
+    {
+      "action": "admin_revoke_access",
+      "rule": "TEAM",
+      "needs": [
+        "L",
+        "St"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "scope",
+        "student": "phone"
+      }
+    },
+    {
+      "action": "admin_revoke_quiz_access",
+      "rule": "TEAM",
+      "needs": [
+        "L",
+        "St"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson",
+        "student": "phone"
+      }
+    },
+    {
+      "action": "admin_group_add",
+      "rule": "TEAM",
+      "needs": [
+        "GC"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_group_add",
+      "fields": {
+        "student": "phone",
+        "group": "group"
+      },
+      "link": true
+    },
+    {
+      "action": "admin_group_remove",
+      "rule": "TEAM",
+      "needs": [
+        "G"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "student": "phone",
+        "group": "group"
+      }
+    },
+    {
+      "action": "admin_group_grant_access",
+      "rule": "TEAM",
+      "needs": [
+        "L",
+        "G"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "scope",
+        "group": "group"
+      }
+    },
+    {
+      "action": "admin_group_grant_quiz_access",
+      "rule": "TEAM",
+      "needs": [
+        "L",
+        "G"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson",
+        "group": "group"
+      }
+    },
+    {
+      "action": "admin_group_revoke_access",
+      "rule": "TEAM",
+      "needs": [
+        "L",
+        "G"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "scope",
+        "group": "group"
+      }
+    },
+    {
+      "action": "admin_group_revoke_quiz_access",
+      "rule": "TEAM",
+      "needs": [
+        "L",
+        "G"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson",
+        "group": "group"
+      }
+    },
+    {
+      "action": "admin_list_groups",
+      "rule": "TEAM",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_list_groups",
+      "fields": {},
+      "kind": "list"
+    },
+    {
+      "action": "admin_get_all",
+      "rule": "TEAM",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_get_all",
+      "fields": {},
+      "kind": "list"
+    },
+    {
+      "action": "admin_access_overview",
+      "rule": "TEAM",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_access_overview",
+      "fields": {},
+      "kind": "list"
+    },
+    {
+      "action": "admin_list_payments",
+      "rule": "TEAM",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_list_payments",
+      "fields": {},
+      "kind": "list"
+    },
+    {
+      "action": "admin_followup_overview",
+      "rule": "TEAM",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_followup_overview",
+      "fields": {},
+      "kind": "list"
+    },
+    {
+      "action": "admin_list_parent_notifications",
+      "rule": "TEAM",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_list_parent_notifications",
+      "fields": {},
+      "kind": "list"
+    },
+    {
+      "action": "admin_grading_queue",
+      "rule": "TEAM",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_grading_queue",
+      "fields": {},
+      "kind": "list"
+    },
+    {
+      "action": "admin_decide_payment",
+      "rule": "TEAM",
+      "needs": [
+        "PAY"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "payment": "payment_id"
+      },
+      "note": "optional `scope` override must also be in scope"
+    },
+    {
+      "action": "admin_followup_set_attendance",
+      "rule": "TEAM",
+      "needs": [
+        "St"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson",
+        "student": "items[].phone",
+        "group": "group"
+      },
+      "group_optional": true
+    },
+    {
+      "action": "admin_followup_save_group",
+      "rule": "TEAM",
+      "needs": [
+        "G"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "group": "group"
+      }
+    },
+    {
+      "action": "admin_followup_save_templates",
+      "rule": "TEAM",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {},
+      "note": "allowed; stored per owner (A3)"
+    },
+    {
+      "action": "admin_student_summary",
+      "rule": "TEAM",
+      "needs": [
+        "St"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_student_summary",
+      "fields": {
+        "student": "student"
+      }
+    },
+    {
+      "action": "admin_monthly_review",
+      "rule": "TEAM",
+      "needs": [
+        "St"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": "p4f_admin_monthly_review",
+      "fields": {
+        "student": "student"
+      }
+    },
+    {
+      "action": "admin_log_parent_notification",
+      "rule": "TEAM",
+      "needs": [
+        "St"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "student": "student"
+      }
+    },
+    {
+      "action": "admin_grade_written",
+      "rule": "TEAM",
+      "needs": [
+        "St",
+        "L"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "student": "student"
+      },
+      "resolve": "submission_id",
+      "note": "lesson resolved from the WrittenAnswers row"
+    },
+    {
+      "action": "get_written_image",
+      "rule": "TEAM",
+      "needs": [
+        "St",
+        "L"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {},
+      "resolve": "submission_id",
+      "note": "teacher only; owning student and admin paths unchanged. Do not map a student field to student_id: that is the caller's own session identity here."
+    },
+    {
+      "action": "admin_migrate_lesson_keys",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p3_admin_set_role",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p3_admin_backfill_submission",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p3_admin_bulk_preview",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p3_admin_bulk_grant",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p3_admin_bulk_revoke",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p4_admin_set_teacher",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p4_admin_list_teachers",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p4_admin_set_group_owner",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p4_admin_tg_unlink",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p4_admin_list_edit_log",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p4_admin_teacher_stats",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "ping",
+      "rule": "PUB",
+      "needs": [],
+      "via": [
+        "tok"
+      ],
+      "filter": null,
+      "fields": {},
+      "note": "response decorated by p4_pingDecorate"
+    },
+    {
+      "action": "p4_session_scope",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p4_teacher_update_student",
+      "rule": "T",
+      "needs": [
+        "St"
+      ],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "student": "student"
+      }
+    },
+    {
+      "action": "p4_teacher_set_assistant",
+      "rule": "T",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p4_teacher_list_assistants",
+      "rule": "T",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p4_teacher_revoke_assistant",
+      "rule": "T",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p4_tg_link_start",
+      "rule": "T",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p4_tg_status",
+      "rule": "T",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p4_tg_unlink",
+      "rule": "T",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p3_admin_list_staff",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {},
+      "note": "router action missing from contract section 5; owner only by the deny-by-default rule, S2 must list it as O"
+    },
+    {
+      "action": "p3_admin_diagnose_submissions",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {},
+      "note": "router action missing from contract section 5; owner only by the deny-by-default rule, S2 must list it as O"
+    },
+    {
+      "action": "p3_admin_restore_submissions",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {},
+      "note": "router action missing from contract section 5; owner only by the deny-by-default rule, S2 must list it as O"
+    },
+    {
+      "action": "p3_admin_flag_status",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {},
+      "note": "router action missing from contract section 5; owner only by the deny-by-default rule, S2 must list it as O"
+    },
+    {
+      "action": "check_student",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "get_my_results",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "get_quiz",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "get_quiz_review",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "get_quiz_state",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "get_subscription_options",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "get_video",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "login_student",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "p3_session_role",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "record_watch",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "register_student",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "request_access",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "request_subscription",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "reset_password",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "update_profile",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "upload_quiz_result",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "upload_submission",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "upload_written_image",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    }
+  ]
+}

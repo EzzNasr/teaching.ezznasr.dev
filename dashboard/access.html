@@ -1156,7 +1156,6 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
       <a href="master.html">Results</a>
       <a href="access.html" aria-current="page">Video access</a>
       <a href="followup.html" lang="ar">متابعة</a>
-      <a href="grading.html">Grading</a>
       <a href="team.html">Team</a>
       <a href="/">Back to site</a>
     </nav>
@@ -1202,6 +1201,8 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
 })();
 </script>
 <script src="/assets/auth.js"></script>
+<script src="/assets/staff-guard.js"></script>
+<script src="/assets/draft-store.js"></script>
 <script>
 (function () {
   "use strict";
@@ -1551,7 +1552,91 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
     if (t && head) head.insertAdjacentElement("afterend", t);
   }
 
+  // ---- Save model (Phase 4 / S7) -------------------------------------------------------------
+  // Field edits (group members, quiz / lesson / video locks) are STAGED and sent by the Save bar from
+  // assets/draft-store.js. Decisions (payments, grants, revokes) stay immediate. Every fresh load of the overview
+  // re-applies the staged edits on top, so a refresh never loses or overwrites one.
+  var STAGED = { admin_group_add: 1, admin_group_remove: 1, admin_set_quiz_lock: 1, admin_set_lesson_lock: 1, admin_set_video: 1 };
+  var NEED_RELOAD = false;
+  function isOwner() { return STATE.role === "admin"; }
+  function isAsst() { return STATE.role === "assistant" || STATE.role === "sassistant"; }
+  function stageId(p) {
+    return p.action + ":" + (p.group || p.lesson || "") + ":" + (p.slot || "") + ":" + (p.phones ? p.phones.slice().map(keyOf).sort().join(",") : "");
+  }
+  function stageLabel(p) {
+    var n = p.phones ? p.phones.length : 0;
+    if (p.action === "admin_group_add") return "Add " + n + " to \u201c" + p.group + "\u201d";
+    if (p.action === "admin_group_remove") return "Remove " + n + " from \u201c" + p.group + "\u201d";
+    if (p.action === "admin_set_quiz_lock") return (p.locked ? "Lock" : "Open") + " quiz \u00b7 " + pretty(p.lesson);
+    if (p.action === "admin_set_lesson_lock") return (p.locked ? "Lock" : "Open") + " lesson \u00b7 " + pretty(p.lesson);
+    return (p.locked ? "Lock" : "Open") + " video \u00b7 " + pretty(p.lesson);
+  }
+  // The same change drawn locally, so the page shows it at once. A new (not yet existing) group is not drawn until Save.
+  function applyLocal(p) {
+    var d = STATE.data; if (!d) return;
+    var lesson = p.lesson ? canonKey(p.lesson) : "";
+    function row(list, pred, make) {
+      var r = (list || []).filter(pred)[0];
+      if (r) return r;
+      if (make) { r = make(); list.push(r); }
+      return r;
+    }
+    if (p.action === "admin_set_quiz_lock") { d.quizzes = d.quizzes || []; row(d.quizzes, function (x) { return x.lesson === lesson; }, function () { return { lesson: lesson }; }).locked = !!p.locked; }
+    else if (p.action === "admin_set_lesson_lock") { d.lesson_locks = d.lesson_locks || []; row(d.lesson_locks, function (x) { return x.lesson === lesson; }, function () { return { lesson: lesson }; }).locked = !!p.locked; }
+    else if (p.action === "admin_set_video") { var v = row(d.videos, function (x) { return x.lesson === lesson && x.slot === p.slot; }); if (v) v.locked = !!p.locked; }
+    else if (p.action === "admin_group_remove") {
+      var g = (d.groups || []).filter(function (x) { return x.group === p.group; })[0];
+      if (g) g.members = g.members.filter(function (m) { return (p.phones || []).every(function (ph) { return keyOf(ph) !== keyOf(m.phone); }); });
+    } else if (p.action === "admin_group_add") {
+      var g2 = (d.groups || []).filter(function (x) { return x.group === p.group; })[0];
+      if (g2) (p.phones || []).forEach(function (ph) {
+        if (g2.members.some(function (m) { return keyOf(m.phone) === keyOf(ph); })) return;
+        var known = (d.roster || []).filter(function (r) { return keyOf(r.phone) === keyOf(ph); })[0];
+        g2.members.push({ phone: ph, name: known ? known.name : "", known_student: !!known });
+      });
+    }
+  }
+  function reapplyStaged() {
+    if (!window.Draft) return;
+    window.Draft.ops().forEach(function (op) { applyLocal(Object.assign({ action: op.action }, op.payload)); });
+  }
+  function stageRun(payloads) {
+    payloads.forEach(function (p) {
+      var rest = Object.assign({}, p); delete rest.action;
+      window.Draft.stage({ id: stageId(p), label: stageLabel(p), action: p.action, payload: rest,
+        onSaved: function () { NEED_RELOAD = true; },
+        onFailed: function (r) { setToast(false, (r && r.error) || "That didn't work."); refreshToast(); } });
+      applyLocal(p);
+    });
+    setToast(true, "Staged: " + payloads.map(stageLabel).join("; ") + ". Use Save to apply.");
+    STATE.open = null;
+    render();
+    return Promise.resolve();
+  }
+  function groupOwnerRow(g) {
+    var btn = el("button", { class: "ac-btn", type: "button" }, ["Group owner\u2026"]);
+    var host = el("div", { class: "ac-row" }, [btn]);
+    btn.addEventListener("click", function () {
+      btn.disabled = true;
+      api({ action: "p4_admin_list_teachers" }).then(function (r) {
+        var sel = el("select", { class: "ac-input", "aria-label": "Group owner" },
+          [el("option", { value: "" }, ["Me (owner)"])].concat((r.teachers || []).map(function (t) { return el("option", { value: t.phone }, [(t.name || t.phone) + (t.scope ? " \u00b7 " + t.scope : "")]); })));
+        var set = el("button", { class: "ac-btn primary", type: "button" }, ["Set owner"]);
+        set.addEventListener("click", function () {
+          set.disabled = true;
+          api({ action: "p4_admin_set_group_owner", group: g.group, owner_phone: sel.value }).then(function () {
+            setToast(true, "Owner of \u201c" + g.group + "\u201d updated."); render();
+          }, function (e) { setToast(false, (e && e.message) || "That didn't work."); render(); });
+        });
+        host.appendChild(sel); host.appendChild(set);
+      }, function (e) { btn.disabled = false; setToast(false, (e && e.message) || "That didn't work."); render(); });
+    });
+    return host;
+  }
+
   function run(payload, okText, btn) {
+    if (isAsst() && payload.action === "admin_decide_payment") { setToast(false, "Not authorized."); refreshToast(); if (btn) btn.disabled = false; return Promise.resolve(); }   // assistants never decide payments (contract A16)
+    if (window.Draft && STAGED[payload.action]) return stageRun([payload]);
     STATE.toast = null;
     refreshToast();
     return api(payload).then(
@@ -1572,6 +1657,7 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
   // that were locked on their own). Stops at the first failure; whatever already went through
   // stays done, and the refresh below shows the real state.
   function runMany(payloads, okText, btn) {
+    if (window.Draft && payloads.every(function (p) { return STAGED[p.action]; })) return stageRun(payloads);
     STATE.toast = null;
     refreshToast();
     return payloads.reduce(function (chain, p) {
@@ -1626,7 +1712,8 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
     return loadAliases().then(function () { return api({ action: "admin_access_overview" }); }).then(
       function (data) {
         STATE.data = canonOverview(data);
-        if (!STATE.tab) { var t0 = null; try { t0 = sessionStorage.getItem("access-tab"); } catch (e) {} STATE.tab = t0 || (data.counts.pending > 0 ? "requests" : "access"); }
+        reapplyStaged();
+        if (!STATE.tab) { var t0 = null; try { t0 = sessionStorage.getItem("access-tab"); } catch (e) {} STATE.tab = t0 || (data.counts.pending > 0 && !isAsst() ? "requests" : "access"); }
         render();
       },
       function (err) {
@@ -1703,6 +1790,7 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
       ["bulk", "Bulk access", null],
       ["grant", "Give access", null],
     ];
+    list = list.filter(function (t) { return t[0] === "bulk" ? isOwner() : !((t[0] === "requests" || t[0] === "history") && isAsst()); });
     return el("div", { class: "dash-tabs ac-tabs", role: "group", "aria-label": "Sections" }, list.map(function (t) {
       var b = el("button", { class: "dash-tab" + (STATE.tab === t[0] ? " is-active" : ""), type: "button", "data-tab": t[0], "aria-pressed": String(STATE.tab === t[0]) },
         [t[1], t[2] === null ? null : el("small", {}, [t[2]])]);
@@ -2481,6 +2569,7 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
       : STATE.open === key + ":quiz-grant" ? "quiz-grant" : STATE.open === key + ":quiz-revoke" ? "quiz-revoke" : null;
     if (openMode) card.appendChild(groupApplyPanel(d, g, openMode));
     else card.appendChild(el("div", { class: "ac-actions" }, [grantBtn, revokeBtn, quizGrantBtn, quizRevokeBtn]));
+    if (isOwner()) card.appendChild(groupOwnerRow(g));
     return card;
   }
 
@@ -3013,6 +3102,7 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
       statCard(c.videos_locked + " / " + c.videos_open, "videos locked / open"),
       statCard(c.quizzes_locked, "quizzes currently locked", perYear(quizzesLockedBy)),
     ]));
+    if ((STATE.tab === "bulk" && !isOwner()) || ((STATE.tab === "requests" || STATE.tab === "history") && isAsst())) STATE.tab = "access";
     root.appendChild(tabsNode(d));
     var panel = STATE.tab === "requests" ? requestsPanel(d)
       : STATE.tab === "access" ? accessPanel(d)
@@ -3061,10 +3151,21 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
   window.AuthEngine.mount("#authgate", function (session) {
     document.getElementById("authgate").remove();
     if (!session.session_token) { renderNeedsRelogin(); return; }
-    // Convenience only: the server re-checks is_admin on every call.
-    if (session.is_admin === false) { location.href = "student.html"; return; }
-    STATE.session = session;
-    load(false);
+    // Convenience only: the server re-checks the caller on every call.
+    window.StaffGuard.require(null, session).then(function (role) {
+      if (!role) return;
+      STATE.session = session; STATE.role = role;
+      window.StaffGuard.applyVisibility(document, role);
+      window.Draft.init({ page: "access", user: session.student_id || session.phone || "",
+        send: function (a, p) { return api(Object.assign({ action: a }, p)).then(function (r) { if (r && r.ok === false) throw new Error(r.error || "Request failed."); return r; }); },
+        afterSave: function () { if (NEED_RELOAD && !window.Draft.pauseRefresh()) { NEED_RELOAD = false; load(true); } } });
+      window.Draft.onChange(function (n, why) {
+        if (!STATE.data) return;
+        if (why === "discard" || why === "discardAll") load(true);       // an unsent edit must not stay on screen
+        else if (why === "restore") { reapplyStaged(); render(); }
+      });
+      load(false);
+    });
   });
 })();
 </script>

@@ -12,9 +12,20 @@ import os
 import urllib.error
 import urllib.request
 
+from . import teacher_mode
+
 
 class DriveBridgeError(Exception):
     pass
+
+
+def _guard(subject_or_lesson):
+    """Teacher mode (modules/teacher_mode.py): refuse a subject outside the teacher's scope before any network
+    call. Raised as DriveBridgeError so the tabs' existing error handling shows it. The server enforces the same."""
+    try:
+        teacher_mode.guard_subject(subject_or_lesson)
+    except teacher_mode.TeacherModeError as e:
+        raise DriveBridgeError(str(e))
 
 
 def _post_json(web_app_url, payload, timeout=30):
@@ -49,6 +60,7 @@ def _post_json(web_app_url, payload, timeout=30):
 def upload_attachment(web_app_url, admin_token, subject, lesson, file_path, title):
     """Admin-only: push a file into the ATTACHMENTS Drive folder (configured
     server-side in Code.gs). Returns {"file_id": ..., "view_url": ...}."""
+    _guard(subject)
     filename = os.path.basename(file_path)
     mime_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
     with open(file_path, "rb") as f:
@@ -73,6 +85,8 @@ def delete_attachment(web_app_url, admin_token, file_id):
 
 
 def test_connection(web_app_url, admin_token):
+    """Ping the bridge. Returns the full response: with the Phase 4 backend it also carries
+    {"kind", "subjects", "name"} (owner / teacher); see teacher_mode.identity_from_ping()."""
     payload = {"action": "ping", "token": admin_token}
     return _post_json(web_app_url, payload)
 
@@ -88,6 +102,7 @@ def set_video(web_app_url, admin_token, lesson, slot, video_url, locked=None):
     locked: True/False, or leave as None to leave an existing row's lock
     state untouched (a brand-new row then starts locked, server-side
     default — see admin_set_video in Code.gs)."""
+    _guard(lesson)
     payload = {
         "action": "admin_set_video",
         "token": admin_token,
@@ -130,6 +145,7 @@ def set_quiz_content(web_app_url, admin_token, lesson, quiz_json):
     lesson. This is what get_quiz reads at view time — the questions never
     need to be baked into quiz.html's own source once this has run, the same
     way a video's URL doesn't need to be baked in once set_video has run."""
+    _guard(lesson)
     payload = {
         "action": "admin_set_quiz_content",
         "token": admin_token,
@@ -155,6 +171,7 @@ def set_written_models(web_app_url, admin_token, lesson, models):
     """Admin-only: store each written question's model answer + max marks in the backend's
     WrittenModels tab (upsert). Kept apart from the quiz content because get_quiz hands that
     to every student."""
+    _guard(lesson)
     return _post_json(web_app_url, {"action": "admin_set_written_models", "token": admin_token,
                                     "lesson": lesson, "models": models})
 

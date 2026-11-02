@@ -33,7 +33,7 @@ for (const e of reg.entries) {
     const cmd = e.cmd[0] === 'python' ? py : e.cmd[0];
     if (!cmd) { verdict = 'SKIP'; detail = 'python not found'; }
     else {
-      const r = cp.spawnSync(cmd, e.cmd.slice(1), { cwd, encoding: 'utf8', timeout: 300000 });
+      const r = cp.spawnSync(cmd, e.cmd.slice(1), { cwd, encoding: 'utf8', timeout: 300000, env: Object.assign({}, process.env, e.env || {}) });
       const out = (r.stdout || '') + (r.stderr || '');
       const nf = (out.match(/^FAIL /gm) || []).length, np = (out.match(/^PASS /gm) || []).length;
       const ok = r.status === 0;

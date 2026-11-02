@@ -20,11 +20,6 @@
   .g-bar{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:0 0 14px; }
   .g-bar label{ display:flex; flex-direction:column; gap:3px; font:600 11px var(--mono); color:var(--ink-dim); letter-spacing:.04em; text-transform:uppercase; }
   .g-bar select,.g-bar input{ font:14px var(--sans); padding:7px 9px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); min-width:130px; }
-  .g-kinds{ display:inline-flex; gap:4px; padding:4px; margin:0 0 16px; border:1px solid var(--line); border-radius:12px; background:var(--panel-soft, var(--panel)); max-width:100%; }
-  .g-kind{ font:600 14px var(--sans); padding:9px 18px; border-radius:9px; border:0; background:transparent; color:var(--ink-dim); cursor:pointer; display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
-  .g-kind:hover{ color:var(--ink); }
-  .g-kind[aria-selected="true"]{ background:var(--ink); color:var(--bg, #fff); }
-  .g-kind .g-n{ font:600 11px var(--mono); padding:1px 7px; border-radius:999px; background:color-mix(in srgb, currentColor 16%, transparent); }
   .g-tabs{ display:flex; gap:6px; margin-left:auto; }
   .g-tab{ font:600 12.5px var(--mono); padding:7px 12px; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; }
   .g-tab[aria-pressed="true"]{ background:var(--ink); color:var(--bg, #fff); }
@@ -56,7 +51,6 @@
   .g-saved{ font:12px var(--mono); color:var(--status-shipped); }
   kbd{ font:11px var(--mono); border:1px solid var(--line); border-radius:4px; padding:0 4px; }
   @media (max-width:820px){ .g-layout,.g-pair{ grid-template-columns:1fr; } .g-list{ max-height:200px; } }
-  @media (max-width:480px){ .g-kinds{ display:flex; } .g-kind{ flex:1 1 0; justify-content:center; padding:9px 10px; } }
 </style>
 </head>
 <body>
@@ -69,7 +63,8 @@
       <a href="access.html" data-admin-only>Video access</a>
       <a href="followup.html" lang="ar">متابعة</a>
       <a href="grading.html" aria-current="page">Grading</a>
-      <a href="team.html" data-admin-only>Team</a>
+      <a href="my-team.html" data-teacher-only>My team</a>
+      <a href="team.html" data-owner-only>Team</a>
     </nav>
   </div>
 </header>
@@ -77,7 +72,7 @@
 <main>
   <div class="wrap page-head">
     <h1>Grading</h1>
-    <p class="lede">Written answers waiting for marks, split into quizzes and homework. Photo on the right, your model answer on the left.</p>
+    <p class="lede">Written answers waiting for marks. Photo on the right, your model answer on the left.</p>
   </div>
   <div class="wrap">
     <div id="authgate"></div>
@@ -92,8 +87,8 @@
   "use strict";
   var MOCK = /[?&]mock=1\b/.test(location.search);
   var root = document.getElementById("g-root");
-  var S = { session: null, all: [], items: [], i: 0, kind: "quiz", status: "pending", f: { year: "", group: "", lesson: "", student_id: "" },
-            counts: { pending: 0, graded: 0 }, kindCounts: { quiz: 0, homework: 0 }, opts: { quiz: { lessons: {}, students: {} }, homework: { lessons: {}, students: {} } }, imgCache: {}, rot: 0, busy: false };
+  var S = { session: null, items: [], i: 0, status: "pending", f: { year: "", group: "", lesson: "", student_id: "" },
+            counts: { pending: 0, graded: 0 }, opts: { lessons: {}, students: {} }, imgCache: {}, rot: 0, busy: false };
 
   function el(tag, attrs, kids) {
     var n = document.createElement(tag); attrs = attrs || {};
@@ -113,8 +108,7 @@
   var MOCK_ITEMS = [
     { submission_id: "a1", kind: "quiz", student_id: "0100", name: "Sara", year: "Senior 2", lesson: "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-2-how-ai-works", question_id: "w1", prompt: "Explain overfitting.", model_answer: "A model memorises training data and fails on new data.", max: 3, awarded: null, note: "", graded_at: "", has_image: true },
     { submission_id: "a2", kind: "quiz", student_id: "0101", name: "Omar", year: "Senior 2", lesson: "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-2-how-ai-works", question_id: "w1", prompt: "Explain overfitting.", model_answer: "A model memorises training data and fails on new data.", max: 3, awarded: null, note: "", graded_at: "", has_image: true },
-    { submission_id: "a3", kind: "quiz", student_id: "0102", name: "Mona", year: "Senior 1", lesson: "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-1-information-and-media", question_id: "w2", prompt: "ما هي المعلومات؟", model_answer: "بيانات لها معنى.", max: 2, awarded: null, note: "", graded_at: "", has_image: false },
-    { submission_id: "h1", kind: "homework", student_id: "0100", name: "Sara", year: "Senior 2", lesson: "programming/baccalaureate/grade-2-secondary/chapter-1-lesson-2-how-ai-works", question_id: "h1w1", prompt: "Give one real-life AI example.", model_answer: "Voice assistants, spam filters, recommendations.", max: 2, awarded: null, note: "", graded_at: "", has_image: true }
+    { submission_id: "a3", kind: "quiz", student_id: "0102", name: "Mona", year: "Senior 1", lesson: "programming/baccalaureate/grade-1-secondary/chapter-1-lesson-1-information-and-media", question_id: "w2", prompt: "ما هي المعلومات؟", model_answer: "بيانات لها معنى.", max: 2, awarded: null, note: "", graded_at: "", has_image: false }
   ];
   function api(payload) {
     if (MOCK) return mockApi(payload);
@@ -144,47 +138,25 @@
   }
 
   // ---------- loading ----------
-  function filters() {
-    // Always ask for everything: quiz/homework and pending/graded are split client-side so the toggle is instant.
-    var p = { action: "admin_grading_queue", status: "all" };
+  function filters(withStatus) {
+    var p = { action: "admin_grading_queue", status: withStatus || S.status };
     ["year", "group", "lesson"].forEach(function (k) { if (S.f[k]) p[k] = S.f[k]; });
     if (S.f.student_id) p.student = S.f.student_id;   // "student", not "student_id": adminCall overwrites student_id with the signed-in admin
     return p;
   }
-  function kindOf(it) { return it.kind === "homework" ? "homework" : "quiz"; }
   function loadOptions() {          // lesson/student dropdowns come from everything, not the filtered view
     return api({ action: "admin_grading_queue", status: "all" }).then(function (r) {
-      S.opts = { quiz: { lessons: {}, students: {} }, homework: { lessons: {}, students: {} } };
-      r.items.forEach(function (x) { var o = S.opts[kindOf(x)]; o.lessons[x.lesson] = 1; o.students[x.student_id] = x.name || x.student_id; });
+      S.opts = { lessons: {}, students: {} };
+      r.items.forEach(function (x) { S.opts.lessons[x.lesson] = 1; S.opts.students[x.student_id] = x.name || x.student_id; });
     });
-  }
-  function applyView(keepKey) {     // S.all -> counts + the list for the current kind/status
-    S.kindCounts = { quiz: 0, homework: 0 }; S.counts = { pending: 0, graded: 0 };
-    S.all.forEach(function (x) {
-      var k = kindOf(x), g = x.awarded !== null;
-      if (!g) S.kindCounts[k]++;
-      if (k === S.kind) { if (g) S.counts.graded++; else S.counts.pending++; }
-    });
-    S.items = S.all.filter(function (x) {
-      if (kindOf(x) !== S.kind) return false;
-      var g = x.awarded !== null;
-      return S.status === "all" || (S.status === "graded" ? g : !g);
-    });
-    var idx = keepKey ? S.items.map(key).indexOf(keepKey) : -1;
-    S.i = idx >= 0 ? idx : 0; S.rot = 0;
   }
   function load(keepKey) {
     return api(filters()).then(function (r) {
-      S.all = r.items; S.truncated = !!r.truncated;
-      applyView(keepKey);
+      S.items = r.items; S.counts = r.counts; S.truncated = !!r.truncated;
+      var idx = keepKey ? S.items.map(key).indexOf(keepKey) : -1;
+      S.i = idx >= 0 ? idx : 0; S.rot = 0;
       render();
     }).catch(function (e) { clear(root).appendChild(el("div", { class: "g-state g-err", text: e.message })); });
-  }
-  function setKind(k) {
-    if (k === S.kind) return;
-    S.kind = k; S.f.lesson = ""; S.f.student_id = "";   // the lesson/student lists differ per kind
-    try { localStorage.setItem("grading-kind", k); } catch (e) {}
-    if (S.f.year || S.f.group) { load(); } else { applyView(); render(); }
   }
 
   // ---------- rendering ----------
@@ -194,32 +166,27 @@
   }
   function render() {
     clear(root);
-    var O = S.opts[S.kind], lessons = Object.keys(O.lessons).sort(), students = Object.keys(O.students).sort(function (a, b) { return O.students[a] < O.students[b] ? -1 : 1; });
+    var lessons = Object.keys(S.opts.lessons).sort(), students = Object.keys(S.opts.students).sort(function (a, b) { return S.opts.students[a] < S.opts.students[b] ? -1 : 1; });
     var set = function (k) { return function (v) { S.f[k] = v; load(); }; };
     var groupIn = el("input", { type: "text", value: S.f.group, placeholder: "e.g. Sat 5pm", on: { change: function () { S.f.group = groupIn.value.trim(); load(); } } });
-    var kinds = el("div", { class: "g-kinds", role: "tablist", "aria-label": "Quizzes or homework" }, [["quiz", "Quizzes"], ["homework", "Homework"]].map(function (k) {
-      return el("button", { class: "g-kind", type: "button", role: "tab", "aria-selected": String(S.kind === k[0]), on: { click: function () { setKind(k[0]); } } },
-        [k[1], S.kindCounts[k[0]] ? el("span", { class: "g-n", text: String(S.kindCounts[k[0]]), title: "waiting for marks" }) : null]);
-    }));
-    root.appendChild(kinds);
     root.appendChild(el("div", { class: "g-bar" }, [
       select("Year", S.f.year, [["", "All"], ["Senior 1", "Senior 1"], ["Senior 2", "Senior 2"]], set("year")),
       el("label", {}, ["Group", groupIn]),
       select("Lesson", S.f.lesson, [["", "All lessons"]].concat(lessons.map(function (l) { return [l, lessonLabel(l)]; })), set("lesson")),
-      select("Student", S.f.student_id, [["", "All students"]].concat(students.map(function (s) { return [s, O.students[s]]; })), set("student_id")),
+      select("Student", S.f.student_id, [["", "All students"]].concat(students.map(function (s) { return [s, S.opts.students[s]]; })), set("student_id")),
       el("div", { class: "g-tabs" }, ["pending", "graded", "all"].map(function (s) {
         var n = s === "pending" ? S.counts.pending : s === "graded" ? S.counts.graded : S.counts.pending + S.counts.graded;
-        return el("button", { class: "g-tab", type: "button", text: s + " " + n, "aria-pressed": String(S.status === s), on: { click: function () { S.status = s; applyView(); render(); } } });
+        return el("button", { class: "g-tab", type: "button", text: s + " " + n, "aria-pressed": String(S.status === s), on: { click: function () { S.status = s; load(); } } });
       }))
     ]));
     if (!S.items.length) {
-      root.appendChild(el("div", { class: "g-state", text: S.status === "pending" ? "Nothing waiting for grading in " + (S.kind === "homework" ? "homework" : "quizzes") + ". 🎉" : "Nothing here with these filters." }));
+      root.appendChild(el("div", { class: "g-state", text: S.status === "pending" ? "Nothing waiting for grading. 🎉" : "Nothing here with these filters." }));
       return;
     }
     if (S.truncated) root.appendChild(el("div", { class: "g-state", text: "Showing the first 500. Narrow the filters to see the rest." }));
     var list = el("div", { class: "g-list", role: "listbox" }, S.items.map(function (it, i) {
-      return el("button", { class: "g-row" + (it.awarded !== null ? " is-done" : ""), type: "button", "aria-current": String(i === S.i),
-        on: { click: function () { go(i); } } }, [it.name || it.student_id, el("small", { text: lessonLabel(it.lesson) + " · " + it.question_id })]);
+      return el("button", { class: "g-row" + (isDone(it) ? " is-done" : ""), type: "button", "aria-current": String(i === S.i),
+        on: { click: function () { go(i); } } }, [it.name || it.student_id, el("small", { text: lessonLabel(it.lesson) + " · " + it.question_id + (stagedOf(it) ? " · staged" : "") })]);
     }));
     root.appendChild(el("div", { class: "g-layout" }, [list, card(S.items[S.i])]));
     var cur = list.querySelector('[aria-current="true"]'); if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest" });
@@ -227,10 +194,10 @@
     loadImage(S.items[S.i]);
   }
   function card(it) {
-    var max = it.max, marks = el("input", { id: "g-marks", type: "number", min: 0, max: max == null ? "" : max, step: 0.5, value: it.awarded === null ? "" : it.awarded, "aria-label": "Marks" });
-    var note = el("input", { id: "g-note", type: "text", value: it.note || "", placeholder: "Note for the student (optional)", dir: "auto" });
-    var msg = el("span", { id: "g-msg", class: "g-saved" });
-    var save = el("button", { class: "g-btn primary", type: "button", id: "g-save", text: "Save & next", on: { click: function () { saveCur(); } } });
+    var max = it.max, marks = el("input", { id: "g-marks", type: "number", min: 0, max: max == null ? "" : max, step: 0.5, value: (stagedOf(it) ? stagedOf(it).awarded : (it.awarded === null ? "" : it.awarded)), "aria-label": "Marks" });
+    var note = el("input", { id: "g-note", type: "text", value: (stagedOf(it) ? stagedOf(it).note : (it.note || "")), placeholder: "Note for the student (optional)", dir: "auto" });
+    var msg = el("span", { id: "g-msg", class: "g-saved", text: stagedOf(it) ? "Staged. Use Save at the bottom to send." : "" });
+    var save = el("button", { class: "g-btn primary", type: "button", id: "g-save", text: "Stage & next", on: { click: function () { saveCur(); } } });
     var imgBox = el("div", { id: "g-img" }, [el("div", { class: "g-state", text: it.has_image ? "Loading photo…" : "No photo uploaded for this answer." })]);
     return el("div", { class: "g-card" }, [
       el("div", { class: "g-meta", text: (it.name || it.student_id) + " · " + it.year + " · " + lessonLabel(it.lesson) + " · " + (S.i + 1) + "/" + S.items.length }),
@@ -246,7 +213,7 @@
         el("button", { class: "g-btn", type: "button", text: "Full", on: { click: function () { if (max != null) marks.value = max; } } }),
         note, save, msg
       ]),
-      el("div", { class: "g-keys" }, [el("kbd", { text: "Enter" }), " save & next · ", el("kbd", { text: "Alt+←/→" }), " previous / next · ", el("kbd", { text: "Alt+F" }), " full marks · ", el("kbd", { text: "Alt+Z" }), " zero"])
+      el("div", { class: "g-keys" }, [el("kbd", { text: "Enter" }), " stage & next · ", el("kbd", { text: "Alt+←/→" }), " previous / next · ", el("kbd", { text: "Alt+F" }), " full marks · ", el("kbd", { text: "Alt+Z" }), " zero"])
     ]);
   }
   function loadImage(it) {
@@ -264,26 +231,39 @@
 
   // ---------- actions ----------
   function go(i) { if (i < 0 || i >= S.items.length) return; S.i = i; S.rot = 0; render(); }
+  // Save model (Phase 4 / S7): a grade is STAGED here and sent by the page's Save bar. The staged marks live in
+  // Draft, so a filter change or a re-fetch never loses them.
+  function stagedOf(it) { var op = window.Draft && window.Draft.get("grade:" + key(it)); return op ? op.payload : null; }
+  function isDone(it) { return it.awarded !== null || !!stagedOf(it); }
+  function applySaved(it, v, note) {              // the server accepted it: update the row and the counters in place
+    var wasPending = it.awarded === null;
+    it.awarded = v; it.note = note;
+    if (wasPending) { S.counts.pending--; S.counts.graded++; }
+    if (S.status === "pending") {
+      var cur = S.items[S.i], at = S.items.indexOf(it);
+      if (at >= 0) { S.items.splice(at, 1); S.i = cur === it ? Math.min(at, Math.max(0, S.items.length - 1)) : Math.max(0, S.items.indexOf(cur)); }
+    }
+    render();
+  }
   function saveCur() {
-    if (S.busy) return; var it = S.items[S.i]; if (!it) return;
-    var marks = document.getElementById("g-marks"), msg = document.getElementById("g-msg"), btn = document.getElementById("g-save");
+    var it = S.items[S.i]; if (!it) return;
+    var marks = document.getElementById("g-marks"), msg = document.getElementById("g-msg");
     var v = marks.value.trim();
     if (v === "" || isNaN(+v) || +v < 0) { msg.className = "g-saved g-err"; msg.textContent = "Enter marks (0 or more)."; return; }
     if (it.max != null && +v > it.max) { msg.className = "g-saved g-err"; msg.textContent = "Max is " + it.max + "."; return; }
-    S.busy = true; btn.disabled = true; msg.className = "g-saved"; msg.textContent = "Saving…";
-    api({ action: "admin_grade_written", submission_id: it.submission_id, question_id: it.question_id, student: it.student_id, awarded: +v, note: document.getElementById("g-note").value })
-      .then(function () {
-        it.awarded = +v; it.note = document.getElementById("g-note").value;
-        S.busy = false;
-        var next = -1;                                   // next ungraded after this one, else wrap, else stay
-        for (var d = 1; d <= S.items.length; d++) { var j = (S.i + d) % S.items.length; if (S.items[j].awarded === null) { next = j; break; } }
-        if (S.status === "pending") { S.items.splice(S.i, 1); S.i = next < 0 ? 0 : (next > S.i ? next - 1 : next); }
-        else S.i = next < 0 ? S.i : next;
-        var cur = S.items[S.i], ck = cur ? key(cur) : null;
-        applyView(ck);                                   // refresh counts from S.all (it was updated in place)
-        render();
-      })
-      .catch(function (e) { S.busy = false; btn.disabled = false; msg.className = "g-saved g-err"; msg.textContent = e.message; });
+    var note = document.getElementById("g-note").value;
+    window.Draft.stage({
+      id: "grade:" + key(it),
+      label: "Grade " + (it.name || it.student_id) + " · " + lessonLabel(it.lesson) + " · " + it.question_id,
+      action: "admin_grade_written",
+      payload: { submission_id: it.submission_id, question_id: it.question_id, student: it.student_id, awarded: +v, note: note },
+      onSaved: function () { applySaved(it, +v, note); },
+      onFailed: function (r) { var m = document.getElementById("g-msg"); if (m && key(S.items[S.i] || {}) === key(it)) { m.className = "g-saved g-err"; m.textContent = (r && r.error) || "Could not save."; } }
+    });
+    var next = -1;                                   // next item that is neither graded nor staged, else stay
+    for (var d = 1; d <= S.items.length; d++) { var j = (S.i + d) % S.items.length; if (!isDone(S.items[j])) { next = j; break; } }
+    if (next >= 0) S.i = next;
+    render();
   }
   document.addEventListener("keydown", function (e) {
     var t = e.target, typing = t && (t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && t.type === "text") || t.tagName === "SELECT");
@@ -298,19 +278,24 @@
   // ---------- boot ----------
   function start(session, role) {
     S.session = session;
-    try { var k = new URLSearchParams(location.search).get("kind") || localStorage.getItem("grading-kind"); if (k === "homework" || k === "quiz") S.kind = k; } catch (e) {}
-    if (role !== "admin") Array.prototype.forEach.call(document.querySelectorAll("[data-admin-only]"), function (a) { a.style.display = "none"; });
+    if (window.StaffGuard) window.StaffGuard.applyVisibility(document, role);
+    if (role === "assistant") Array.prototype.forEach.call(document.querySelectorAll("[data-admin-only]"), function (a) { a.style.display = "none"; });   // the owner's own assistants cannot open master/access
+    if (window.Draft) {
+      window.Draft.init({ page: "grading", user: (session && (session.student_id || session.phone)) || "mock",
+        send: function (a, p) { return api(Object.assign({ action: a }, p)); } });
+      window.Draft.onChange(function () { if (S.items.length) render(); });
+    }
     clear(root).appendChild(el("div", { class: "g-state", text: "Loading…" }));
     loadOptions().then(function () { return load(); }).catch(function (e) { clear(root).appendChild(el("div", { class: "g-state g-err", text: e.message })); });
   }
   function loadScript(src) { return new Promise(function (ok, bad) { var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = function () { bad(new Error("Couldn't load " + src)); }; document.head.appendChild(s); }); }
   function boot() {
-    if (MOCK) { var g = document.getElementById("authgate"); if (g) g.remove(); start(null); return; }
-    loadScript("/assets/auth.js").then(function () { return loadScript("/assets/staff-guard.js"); }).then(function () {
+    if (MOCK) { var g = document.getElementById("authgate"); if (g) g.remove(); loadScript("/assets/draft-store.js").then(function () { start(null, "admin"); }); return; }
+    loadScript("/assets/auth.js").then(function () { return loadScript("/assets/staff-guard.js"); }).then(function () { return loadScript("/assets/draft-store.js"); }).then(function () {
       window.AuthEngine.mount("#authgate", function (session) {
         var gate = document.getElementById("authgate"); if (gate) gate.remove();
         if (!session.session_token) { clear(root).appendChild(el("div", { class: "g-state g-err", text: "Your saved sign-in has no session. Sign out and sign in again." })); return; }
-        window.StaffGuard.require(["admin","assistant"], session).then(function (role) { if (role) start(session, role); });   // convenience only; the server re-checks
+        window.StaffGuard.require(null, session).then(function (role) { if (role) start(session, role); });   // convenience only; the server re-checks
       }, { staff: true });
     }, function (e) { clear(root).appendChild(el("div", { class: "g-state g-err", text: e.message })); });
   }

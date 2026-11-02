@@ -101,7 +101,18 @@ function load(codeGsPath, opts = {}) {
   const merged = files.length && fs.existsSync(files[0]) && /^function p2_flag\b/m.test(fs.readFileSync(files[0], 'utf8'));
   files.forEach(f => {
     if (!fs.existsSync(f) && merged && /^Phase2_.*\.gs$/.test(require('path').basename(f))) return;
-    vm.runInContext(fs.readFileSync(f, 'utf8'), ctx, { filename: require('path').basename(f) });
+    let src = fs.readFileSync(f, 'utf8');
+    // P4 assembly: the S2/S3/S5/S8 unit tests stub S2's identity functions and were written against an UNWIRED Code.gs.
+    // P4_UNWIRED=1 (set per entry in registry.json) removes hooks H1-H4 in memory so they keep testing the chunks alone.
+    // The wired whole is covered by test_p4_s4_matrix.js and test_p4_s4_acceptance.js (no flag).
+    if ((opts.unwired || process.env.P4_UNWIRED === '1') && /^Code\.gs$/.test(require('path').basename(f))) {
+      src = src.replace(/^[ \t]*if \(typeof p4_tokenAllows === "function".*$/m, '')
+               .replace(/^[ \t]*if \(tokenOk && !isAdmin && typeof p4_teacherAllows === "function".*$/m, '')
+               .replace(/^[ \t]*var __g = \(typeof p4_gate === "function"\).*$/m, '')
+               .replace(/_json\(_p2Post\("p4_filter", ([\s\S]*?), payload\)\);/g, '_json($1);')
+               .replace(/_json\(_p2Post\("p4_pingDecorate", ([\s\S]*?), payload\)\);/g, '_json($1);');
+    }
+    vm.runInContext(src, ctx, { filename: require('path').basename(f) });
   });
   // Code.gs's doPost calls att_route_ (AttendanceAll.gs). Tests that don't care about attendance get a no-op hook
   // so the router keeps working; a test that loads AttendanceAll.gs itself (array form) keeps the real one.

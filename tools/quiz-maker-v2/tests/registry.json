@@ -838,6 +838,421 @@
       ],
       "status": "active",
       "owner": "lesson-order"
+    },
+    {
+      "id": "R-P4-S1-01",
+      "title": "P4-S1 hardening: delete_attachment parent check, upload session check, P4_LEGACY_UPLOADS, client sends session",
+      "status": "active",
+      "owner": "p4-s1",
+      "cmd": [
+        "node",
+        "tests/test_p4_s1_hardening.js"
+      ],
+      "note": "Before assembly this builds a patched temp copy of Code.gs from patches/S1-hardening.diff (needs the `patch` tool); after assembly it tests the repo Code.gs directly"
+    },
+    {
+      "id": "R-P4-S1-02",
+      "title": "P4-S1 math-render.js + on-demand loader in jsdom with real KaTeX: only \\( \\) and \\[ \\], lazy load, missing KaTeX harmless, Arabic order. NEEDS jsdom (npm i --no-save jsdom); without it the test SKIPs and the runner shows \"0 pass\"",
+      "status": "active",
+      "owner": "p4-s1",
+      "cmd": [
+        "node",
+        "tests/test_p4_s1_math.js"
+      ],
+      "needs": "jsdom"
+    },
+    {
+      "id": "R-P4-S1-03",
+      "title": "P4-S1 bulk parser: * inside math is not a marker, trailing * is, \\* is literal, backslashes survive to the page JSON",
+      "status": "active",
+      "owner": "p4-s1",
+      "cmd": [
+        "python",
+        "tests/test_p4_s1_parser.py"
+      ]
+    },
+    {
+      "id": "R-P4-S2-01",
+      "title": "P4 authorization core: ctx, action table, gate, hooks, lesson filters",
+      "status": "active",
+      "needs": [],
+      "owner": "p4-s2",
+      "cmd": [
+        "node",
+        "tests/test_p4_s2_scope.js"
+      ],
+      "env": {
+        "P4_UNWIRED": "1"
+      }
+    },
+    {
+      "id": "R-P4-S3-01",
+      "title": "contract surface: every function named in the contract exists; self test",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "surface"
+      ]
+    },
+    {
+      "id": "R-P4-S3-02",
+      "title": "student linkage: each of the four rules alone, none, multi-subject union, assistant shares principal cache",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "linkage"
+      ]
+    },
+    {
+      "id": "R-P4-S3-03",
+      "title": "group ownership and group state (own / free / foreign)",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "groups"
+      ]
+    },
+    {
+      "id": "R-P4-S3-04",
+      "title": "response filters: get_all, access overview, payments, groups, follow-up overview, summary, monthly, notifications, grading queue",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "filters"
+      ],
+      "env": {
+        "P4_UNWIRED": "1"
+      }
+    },
+    {
+      "id": "R-P4-S3-05",
+      "title": "filters drop unknown top-level keys for scoped callers (shape drift fails closed)",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "drift"
+      ]
+    },
+    {
+      "id": "R-P4-S3-06",
+      "title": "add-by-phone: registered boolean only, 30 per hour bucket, group creation owner row",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "link"
+      ],
+      "env": {
+        "P4_UNWIRED": "1"
+      }
+    },
+    {
+      "id": "R-P4-S3-07",
+      "title": "payment scope: own stored scope decides, crafted scope override refused",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "payments"
+      ]
+    },
+    {
+      "id": "R-P4-S3-08",
+      "title": "p4_admin_set_group_owner: owner only, target must be a teacher, reset",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "owner"
+      ]
+    },
+    {
+      "id": "R-P4-S3-09",
+      "title": "shared student and scoped assistant end to end",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "shared"
+      ],
+      "env": {
+        "P4_UNWIRED": "1"
+      }
+    },
+    {
+      "id": "R-P4-S3-10",
+      "title": "per-owner follow-up templates (needs patches/S3-templates.diff applied; prints SKIP otherwise)",
+      "status": "active",
+      "owner": "p4-s3",
+      "cmd": [
+        "node",
+        "tests/test_p4_s3_people.js",
+        "templates"
+      ],
+      "note": "runs for real only after patches/S3-templates.diff is applied to Code.gs",
+      "env": {
+        "P4_UNWIRED": "1"
+      }
+    },
+    {
+      "id": "R-P4-S4-01",
+      "title": "p4_wire.py: merge, hooks H1-H5, idempotence, CRLF, broken anchors fail loudly",
+      "status": "retired",
+      "needs": "node",
+      "owner": "p4-s4",
+      "cmd": [
+        "node",
+        "tests/test_p4_s4_wire.js"
+      ],
+      "note": "pre-assembly tooling test (needs an unmerged tree); passed 46/0 and 22/0 before assembly. Retired after p4_wire --merge --wire."
+    },
+    {
+      "id": "R-P4-S4-02",
+      "title": "merge_registry_fragments.py: eight fragments, duplicates, activate, check",
+      "status": "retired",
+      "needs": "node",
+      "owner": "p4-s4",
+      "cmd": [
+        "node",
+        "tests/test_p4_s4_registry.js"
+      ],
+      "note": "pre-assembly tooling test (needs an unmerged tree); passed 46/0 and 22/0 before assembly. Retired after p4_wire --merge --wire."
+    },
+    {
+      "id": "R-P4-S4-03",
+      "title": "p4_matrix.json fixture matches the real router (every admin action classified, field names exist)",
+      "status": "active",
+      "needs": "node",
+      "owner": "p4-s4",
+      "cmd": [
+        "node",
+        "tests/test_p4_s4_matrix_fixture.js"
+      ]
+    },
+    {
+      "id": "R-P4-S4-04",
+      "title": "authorization matrix: every action x 7 callers x lesson context x ownership (needs merged Phase 4)",
+      "status": "active",
+      "needs": "node",
+      "owner": "p4-s4",
+      "cmd": [
+        "node",
+        "tests/test_p4_s4_matrix.js"
+      ]
+    },
+    {
+      "id": "R-P4-S4-05",
+      "title": "acceptance run of plan section 9 steps 1-12, 15 on the assembled backend (needs merged Phase 4)",
+      "status": "active",
+      "needs": "node",
+      "owner": "p4-s4",
+      "cmd": [
+        "node",
+        "tests/test_p4_s4_acceptance.js"
+      ]
+    },
+    {
+      "id": "R-P4-S4-06",
+      "title": "S4 test support world builds (actors, groups, payments, SHA-256 and UrlFetch stubs)",
+      "status": "active",
+      "needs": "node",
+      "owner": "p4-s4",
+      "cmd": [
+        "node",
+        "tests/test_p4_s4_support.js"
+      ]
+    },
+    {
+      "id": "R-P4-S4-07",
+      "title": "desktop teacher mode: subject filter, guards, startup against a local ping server",
+      "status": "active",
+      "needs": "python",
+      "owner": "p4-s4",
+      "cmd": [
+        "python",
+        "tests/test_p4_s4_teacher_mode.py"
+      ]
+    },
+    {
+      "id": "R-P4-S5-01",
+      "title": "P4 S5: teacher accounts and tokens, teacher-appointed assistants, student record edits, edit log",
+      "status": "active",
+      "owner": "p4-s5",
+      "cmd": [
+        "node",
+        "tests/test_p4_s5_team.js"
+      ],
+      "env": {
+        "P4_UNWIRED": "1"
+      }
+    },
+    {
+      "id": "R-P4-S5-02",
+      "title": "P4 S5: phone cascade over every phone-keyed sheet, rollback, busy lock, P4_TEACHER_PHONE_EDIT flag",
+      "status": "active",
+      "owner": "p4-s5",
+      "cmd": [
+        "node",
+        "tests/test_p4_s5_cascade.js"
+      ]
+    },
+    {
+      "id": "R-P4-S6-01",
+      "title": "Telegram per teacher: link flow, routing, callback authorization, replay, owner ping, unlink",
+      "status": "active",
+      "needs": [],
+      "owner": "p4-s6",
+      "cmd": [
+        "node",
+        "tests/test_p4_s6_telegram.js"
+      ]
+    },
+    {
+      "id": "R-P4-S8-01",
+      "title": "P4 S8: p4_admin_teacher_stats: every metric, cache, shared subject, null metrics, no student data, owner only, read only",
+      "status": "active",
+      "owner": "p4-s8",
+      "cmd": [
+        "node",
+        "tests/test_p4_s8_stats.js"
+      ],
+      "env": {
+        "P4_UNWIRED": "1"
+      }
+    },
+    {
+      "id": "R-P4-S8-02",
+      "title": "P4 S8: dashboard/teacher-stats.html renders, sorts, shows errors, hostile text is inert (jsdom)",
+      "status": "active",
+      "owner": "p4-s8",
+      "needs": "jsdom",
+      "cmd": [
+        "node",
+        "tests/test_p4_s8_page.js"
+      ]
+    },
+    {
+      "id": "R-P4-S7-01",
+      "title": "Draft store: stage, replace, discard, Save in order, partial failure, double press, restore, beforeunload, timer pause",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_draft.js"
+      ]
+    },
+    {
+      "id": "R-P4-S7-02",
+      "title": "staff guard: every page x every role, old-backend fallback, forged role, visibility, scope badge",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "guard"
+      ]
+    },
+    {
+      "id": "R-P4-S7-03",
+      "title": "grading page: staged grades, Save, staging survives a re-read, roles, refused grade stays staged",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "grading"
+      ]
+    },
+    {
+      "id": "R-P4-S7-04",
+      "title": "my-team page: assistants, Telegram, confirms, neutral appoint message, non-teachers bounced",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "myteam"
+      ]
+    },
+    {
+      "id": "R-P4-S7-05",
+      "title": "team page (owner): teachers, Telegram unlink, edit log as text, non-owners bounced",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "team"
+      ]
+    },
+    {
+      "id": "R-P4-S7-06",
+      "title": "student summary: teacher-only edit card, staged edit, Save, assistants see no card",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "summary"
+      ]
+    },
+    {
+      "id": "R-P4-S7-07",
+      "title": "follow-up page: staged attendance, Save, discard re-reads the server, templates button by role",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "followup"
+      ]
+    },
+    {
+      "id": "R-P4-S7-08",
+      "title": "access page: staged locks, immediate payment decision, staged edits survive, owner-only controls, assistants",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "access"
+      ]
+    },
+    {
+      "id": "R-P4-S7-09",
+      "title": "static checks: reloads only at sign-out, staged actions not sent directly, owner-only markers, no markup injection",
+      "status": "active",
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_pages.js",
+        "static"
+      ]
+    },
+    {
+      "id": "R-P4-S7-10",
+      "title": "S7 fake DOM helper loads (library used by R-P4-S7-02..09)",
+      "status": "active",
+      "needs": [],
+      "owner": "p4-s7",
+      "cmd": [
+        "node",
+        "tests/test_p4_s7_fakedom.js"
+      ]
     }
   ]
 }

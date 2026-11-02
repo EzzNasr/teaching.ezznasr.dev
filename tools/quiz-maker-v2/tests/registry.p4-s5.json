@@ -1,0 +1,18 @@
+{
+  "entries": [
+    {
+      "id": "R-P4-S5-01",
+      "title": "P4 S5: teacher accounts and tokens, teacher-appointed assistants, student record edits, edit log",
+      "status": "active",
+      "owner": "p4-s5",
+      "cmd": ["node", "tests/test_p4_s5_team.js"]
+    },
+    {
+      "id": "R-P4-S5-02",
+      "title": "P4 S5: phone cascade over every phone-keyed sheet, rollback, busy lock, P4_TEACHER_PHONE_EDIT flag",
+      "status": "active",
+      "owner": "p4-s5",
+      "cmd": ["node", "tests/test_p4_s5_cascade.js"]
+    }
+  ]
+}

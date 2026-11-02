@@ -118,6 +118,10 @@ class Site:
         if path in ASSETS:
             ctype = "text/css" if path.endswith(".css") else "application/javascript"
             return route.fulfill(status=200, content_type=ctype, body=ASSETS[path])
+        if path.startswith("/assets/") and path not in ASSETS and path not in self.pages:   # P4: dashboards now load staff-guard.js / draft-store.js straight from the repo
+            fp = os.path.join(SITE_ROOT, path.lstrip("/"))
+            if os.path.isfile(fp):
+                return route.fulfill(status=200, content_type="text/css" if fp.endswith(".css") else "application/javascript", body=read(fp))
         if path in self.pages:
             return route.fulfill(status=200, content_type="text/html", body=self.pages[path])
         kind = "quiz" if path.endswith("quiz.html") else "assignment" if path.endswith("assignment.html") else "lesson"

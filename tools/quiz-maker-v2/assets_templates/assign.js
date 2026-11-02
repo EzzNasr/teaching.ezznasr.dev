@@ -184,6 +184,39 @@
       }).slice(0, MAX_RESEND);
     } catch (e) { return []; }
   }
+  // P4-S1: uploads carry the live session so the server can tell a signed-in student from a bare phone
+  // number. The token is attached at send time from the current session and is NEVER written into the
+  // offline queue (a stored token would go stale and would sit in localStorage next to the answers).
+  function withSession(session, payload) {
+    if (session && session.session_token && !payload.session_token) payload.session_token = session.session_token;
+    return payload;
+  }
+
+  // P4-S1 equations: typesets \( ... \) and \[ ... \] inside `node`. A page with no math loads nothing:
+  // /assets/math-render.js (which in turn loads KaTeX) is fetched only the first time some text really
+  // contains a delimiter. If it cannot load, the text stays exactly as written.
+  var mathLoad = null;     // null until the first math text is seen, then { waiting: [nodes], failed: bool }
+  function typeset(node) {
+    try {
+      if (!node) return;
+      if (window.MathRender) { window.MathRender.render(node); return; }
+      var t = node.textContent || "";
+      if (t.indexOf("\\(") === -1 && t.indexOf("\\[") === -1) return;
+      if (mathLoad) { if (!mathLoad.failed) mathLoad.waiting.push(node); return; }
+      mathLoad = { waiting: [node], failed: false };
+      var s = document.createElement("script");
+      s.src = "/assets/math-render.js";
+      s.async = true;
+      s.onload = function () {
+        var list = mathLoad.waiting; mathLoad.waiting = [];
+        if (!window.MathRender) { mathLoad.failed = true; return; }
+        list.forEach(function (n) { try { window.MathRender.render(n); } catch (e) { /* leave as written */ } });
+      };
+      s.onerror = function () { mathLoad.waiting = []; mathLoad.failed = true; };
+      (document.head || document.documentElement).appendChild(s);
+    } catch (e) { /* equations are optional; never break the page over one */ }
+  }
+
   function resendPending(session, notify) {
     var list = pendingFor(session.student_id);
     if (!list.length) return Promise.resolve(0);
@@ -192,7 +225,7 @@
     return list.reduce(function (chain, rec) {
       return chain.then(function () {
         var action = rec.type === "quiz" ? "upload_quiz_result" : "upload_submission";
-        return postToDrive(Object.assign({}, rec, { action: action })).then(
+        return postToDrive(withSession(session, Object.assign({}, rec, { action: action }))).then(
           function () { dequeueSubmission(rec.client_id); sent++; },
           function () { failed++; }
         );
@@ -301,7 +334,9 @@
       var state = { submitted: false, score: 0, total: 0, answers: [], record: null, syncStatus: null, widgets: {}, photoError: "", photoStatus: null };
       render();
 
-      function render() {
+      function render() { renderPage(); typeset(root); }
+
+      function renderPage() {
         root.innerHTML = "";
         if (state.submitted) { renderResult(); return; }
         renderForm();
@@ -545,7 +580,7 @@
         // with the same client_id — never a duplicate — while the page says it is
         // still saving.
         // The submission goes FIRST. Nothing about photos can stop it.
-        postToDrive(Object.assign({ action: "upload_submission" }, state.record), function () { state.busy = true; g.busy(); render(); })
+        postToDrive(Object.assign({ action: "upload_submission", session_token: session.session_token }, state.record), function () { state.busy = true; g.busy(); render(); })
           .then(function () {
             state.busy = false; state.syncStatus = "ok";
             dequeueSubmission(state.record.client_id);
@@ -626,7 +661,9 @@
 
       render();
 
-      function render() {
+      function render() { renderPage(); typeset(root); }
+
+      function renderPage() {
         root.innerHTML = "";
 
         var errorMsg = el("div", { class: "qz-error" });
@@ -770,7 +807,7 @@
       // button) — the server drops it if the first try already landed.
       function sendPlain(record, onBusy) {
         var g = beginGuard({ message: "\u0628\u0646\u0628\u0639\u062a \u0627\u0644\u062a\u0633\u0644\u064a\u0645\u2026 / Uploading your submission\u2026" });
-        postToDrive(Object.assign({ action: "upload_submission" }, record), function () { if (onBusy) onBusy(); g.busy(); })
+        postToDrive(withSession(session, Object.assign({ action: "upload_submission" }, record)), function () { if (onBusy) onBusy(); g.busy(); })
           .then(function () { submitting = false; dequeueSubmission(record.client_id); renderConfirmation(true, true, true, record); g.success({}); })
           .catch(function (err) {
             submitting = false;
