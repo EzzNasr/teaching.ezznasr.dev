@@ -36,6 +36,29 @@ SITE = "https://site.test"   # https: the sign-in code needs a secure context (c
 passed = failed = 0
 
 
+def play(pg):
+    """The video shows a click-to-play poster first (lite embed); tap it, then the iframe appears.
+    On a quiz / assignment page that is still covered ("finish it first") the poster is hidden under the cover:
+    then nothing is tapped and slot_video_id() reads the id from the poster instead."""
+    pg.wait_for_selector(".media-slot .vp-poster, .media-slot iframe", state="attached")
+    if pg.locator(".media-slot .vp-poster").count() and pg.is_visible(".media-slot .vp-poster"):
+        pg.click(".media-slot .vp-poster")
+        pg.wait_for_selector(".media-slot iframe")
+
+
+def slot_video_id(pg):
+    """The video the slot holds: from the iframe, or from the poster image (i.ytimg.com/vi/<id>/...)."""
+    if pg.locator(".media-slot iframe").count():
+        return yt_id(pg.get_attribute(".media-slot iframe", "src"))
+    st = pg.get_attribute(".media-slot .vp-poster", "style") or ""
+    return st.split("/vi/")[1].split("/")[0] if "/vi/" in st else ""
+
+
+def yt_id(src):
+    """Video id from an embed URL (www.youtube-nocookie.com/embed/<id>?controls=0&...)."""
+    return str(src or "").split("?")[0].rstrip("/").split("/")[-1]
+
+
 def check(name, cond, extra=""):
     global passed, failed
     if cond:
@@ -213,9 +236,9 @@ def run(browser):
     set_video(LESSON, "lesson", ID_OPEN, locked=False)
     s = Site(browser)
     pg = s.open()
-    pg.wait_for_selector(".media-slot iframe")
+    play(pg)
     src = pg.get_attribute(".media-slot iframe", "src")
-    check("unlocked: logged-out visitor gets the iframe", src == "https://www.youtube.com/embed/" + ID_OPEN, src)
+    check("unlocked: logged-out visitor gets the iframe", yt_id(src) == ID_OPEN and "youtube-nocookie.com/embed/" in src, src)
     check("unlocked: no locked box, iframe titled from the page heading", pg.locator(".vp-box").count() == 0 and pg.get_attribute(".media-slot iframe", "title") == "Step three lesson")
     s.close()
 
@@ -258,10 +281,10 @@ def run(browser):
     check("after login the box turns into the payment form", pg.locator(".vp-form .vp-input").count() == 1 and pg.locator("iframe").count() == 0)
     check("...still no URL for a student who has not paid", not any(ID_LOCKED in b for b in s.bodies))
 
-    pg.click(".vp-form button:has-text('I paid')")
-    check("'I paid' with an empty reference is stopped on the page", "reference" in pg.inner_text(".vp-status").lower() and not any(c.get("action") == "request_access" for c in s.calls), s.calls)
+    pg.click(".vp-form button.vp-btn")
+    check("'I paid' with an empty reference is stopped on the page", "رقم التحويل" in pg.inner_text(".vp-status") and not any(c.get("action") == "request_access" for c in s.calls), s.calls)
     pg.fill(".vp-input", "wallet 01099998888 / 200")
-    pg.click(".vp-form button:has-text('I paid')")
+    pg.click(".vp-form button.vp-btn")
     pg.wait_for_selector("text=Payment note received")
     check("'I paid' shows 'Payment note received' and unlocks nothing", pg.locator("iframe").count() == 0)
     queue = api(dict(TOK, action="admin_list_payments"))["payments"]
@@ -271,14 +294,14 @@ def run(browser):
     pg.reload()
     pg.wait_for_selector("text=Payment note received")
     check("after a reload the page still says waiting (the server remembers)", True)
-    pg.click("button:has-text('Check again')")
+    pg.click("button:has-text('Check status')")
     pg.wait_for_selector("text=Payment note received")
     check("'Check again' while still pending stays pending", pg.locator("iframe").count() == 0)
 
     api(dict(TOK, action="admin_decide_payment", payment_id=mine[0]["payment_id"], decision="approve", days=30))
-    pg.click("button:has-text('Check again')")
-    pg.wait_for_selector(".media-slot iframe")
-    check("after approval 'Check again' shows the video", pg.get_attribute(".media-slot iframe", "src") == "https://www.youtube.com/embed/" + ID_LOCKED)
+    pg.click("button:has-text('Check status')")
+    play(pg)
+    check("after approval 'Check again' shows the video", yt_id(pg.get_attribute(".media-slot iframe", "src")) == ID_LOCKED)
     check("...and the locked box is gone", pg.locator(".vp-box").count() == 0)
     s.close()
 
@@ -297,7 +320,7 @@ def run(browser):
     s = Site(browser, session=sess)
     pg = s.open()
     pg.wait_for_selector(".vp-form")
-    check("rejected request: says so and the form is there to try again", "wasn't approved" in pg.inner_text(".vp-box"))
+    check("rejected request: says so and the form is there to try again", "لم تتم الموافقة" in pg.inner_text(".vp-box"), pg.inner_text(".vp-box"))
     s.close()
 
     # ---- 8. quiz / assignment keep the 'finish it first' rule --------------------------------------------------
@@ -307,20 +330,20 @@ def run(browser):
     set_video(LESSON, "assignment", ID_ASSIGN, locked=True)
     s = Site(browser, session=paid)
     pg = s.open("/zz-test/step3/quiz.html")
-    pg.wait_for_selector(".media-slot iframe")
-    check("quiz page: a paid student gets the solution iframe", pg.get_attribute(".media-slot iframe", "src").endswith(ID_QUIZ))
+    play(pg)
+    check("quiz page: a paid student gets the solution video", slot_video_id(pg) == ID_QUIZ, slot_video_id(pg))
     check("...blurred behind 'Finish the quiz below to unlock this video.'", "Finish the quiz" in pg.text_content(".video-lock") and "is-locked" in pg.get_attribute(".media-slot", "class"))
     pg.evaluate("localStorage.setItem('teaching_last_attempt:zz:step3','1'); document.getElementById('quiz-root').appendChild(document.createElement('div'))")
     pg.wait_for_function("!document.querySelector('.video-lock')")
     check("finishing the quiz removes the cover", "is-locked" not in pg.get_attribute(".media-slot", "class"))
     pg.reload()
-    pg.wait_for_selector(".media-slot iframe")
+    play(pg)
     check("...and it stays open after a reload", pg.locator(".video-lock").count() == 0)
     s.close()
 
     s = Site(browser, session=paid)
     pg = s.open("/zz-test/step3/assignment.html")
-    pg.wait_for_selector(".media-slot iframe")
+    play(pg)
     check("assignment page: covered with the submit-first message", "Submit the assignment" in pg.text_content(".video-lock"))
     s.close()
 
@@ -331,8 +354,8 @@ def run(browser):
     admin = session_for("01000000014", "pw14")
     s = Site(browser, session=admin)
     pg = s.open()
-    pg.wait_for_selector(".media-slot iframe")
-    check("admin: sees a locked video, with a badge saying students can't", "Locked for students" in pg.text_content(".vp-badge"))
+    play(pg)
+    check("admin: sees a locked video, with a badge saying students can't", "locked for students" in pg.text_content(".vp-badge").lower(), pg.text_content(".vp-badge"))
     s.close()
 
     # ---- 10. things going wrong ------------------------------------------------------------------------------------

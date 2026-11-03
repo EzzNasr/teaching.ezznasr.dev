@@ -83,7 +83,8 @@
         "#p4-draft-bar button{font:inherit;padding:6px 14px;border-radius:8px;border:1px solid var(--line,#bbb);" +
         "background:var(--bg,#fff);color:inherit;cursor:pointer}" +
         "#p4-draft-bar button.p4d-primary{background:var(--accent,#2457d6);color:#fff;border-color:var(--accent,#2457d6)}" +
-        "#p4-draft-bar button[disabled]{opacity:.55;cursor:default}";
+        "#p4-draft-bar button[disabled]{opacity:.55;cursor:default}" +
+        "body.p4-draft-on{padding-bottom:var(--p4-bar-h,56px)}";
       document.head.appendChild(st);
     }
     bar = document.createElement("div");
@@ -109,6 +110,24 @@
     if (!bar) return;
     var n = ops.length, offer = offered && offered.length && !n;
     bar.className = (n || offer) ? "is-on" : "";
+    // The bar is fixed to the bottom of the screen: tell the page how tall it is so toasts, bottom sheets and the last
+    // rows of the page are drawn above it instead of under it (body.p4-draft-on + --p4-bar-h, see the CSS above).
+    try {
+      var on = !!(n || offer), root = document.documentElement;
+      if (document.body && document.body.classList) document.body.classList.toggle("p4-draft-on", on);
+      if (root && root.style) root.style.setProperty("--p4-bar-h", on ? ((bar.offsetHeight || 56) + "px") : "0px");
+      // The bar wraps to 2-3 lines on a phone once its buttons and message are filled in (below), so measure again
+      // after layout and whenever it changes size; the first reading alone was too small (toast stayed under it).
+      if (on && !bar._p4Measure) {
+        bar._p4Measure = function () {
+          var h = bar.className === "is-on" ? (bar.offsetHeight || 56) + "px" : "0px";
+          root.style.setProperty("--p4-bar-h", h);
+        };
+        if (window.ResizeObserver) new ResizeObserver(bar._p4Measure).observe(bar);
+        window.addEventListener("resize", bar._p4Measure);
+      }
+      if (on && window.requestAnimationFrame) requestAnimationFrame(bar._p4Measure);
+    } catch (e) { /* layout hint only */ }
     saveBtn.hidden = !n; discardBtn.hidden = !(n || offer); restoreBtn.hidden = !offer;
     saveBtn.textContent = "Save (" + n + ")";
     saveBtn.disabled = !!saving;

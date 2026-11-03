@@ -271,7 +271,8 @@ var P4_ACTIONS = (function () {
   add("ping", { rule: "PUB", needs: [], tok: true });
   add("p4_session_scope", { rule: "PUB", needs: [] });
   add("check_student register_student login_student reset_password update_profile get_my_results get_video get_quiz get_quiz_review get_quiz_state " +
-      "get_subscription_options record_watch request_access request_subscription upload_submission upload_quiz_result upload_written_image p3_session_role",
+      "get_subscription_options record_watch request_access request_subscription upload_submission upload_quiz_result upload_written_image p3_session_role " +
+      "check_session report_photos",   // 99d91f0 (restored): is my sign-in still the live one / photos settled
       { rule: "PUB", needs: [] });
   return t;
 })();

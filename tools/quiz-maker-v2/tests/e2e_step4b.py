@@ -16,6 +16,7 @@ from playwright.sync_api import sync_playwright
 REPO = E.SITE_ROOT
 api, sha, TOK = E.api, E.sha, E.TOK
 L1 = "programming/other/functions"
+QPATH = "/" + L1 + "/quiz.html"   # quiz.js takes the lesson from the page address
 
 passed = failed = 0
 def check(name, cond, extra=""):
@@ -43,24 +44,24 @@ def run(browser):
     E.ASSETS["/assets/quiz.js"] = E.read(E.QM, "assets_templates", "quiz.js").replace(
         "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec",
         E.GAS,
-    )
+    ).replace("{{DRIVE_ENDPOINT}}", E.GAS)   # the template now carries a placeholder (filled in by the generator)
     stu = D.reg("01000000030", "pw", "Lina")
 
     # ---- quiz gate on the actual quiz page --------------------------------------------------------
     api(dict(TOK, action="admin_set_quiz_lock", lesson=L1, locked=True))
-    s = E.Site(browser, session=stu, pages={"/quiz.html": quiz_page_html()})
-    pg = s.open("/quiz.html")
-    pg.wait_for_selector("text=Not open yet")
-    check("a locked quiz shows a 'not open yet' screen, no questions", "Ask your teacher" in pg.inner_text("body") and pg.locator(".qz-options").count() == 0)
+    s = E.Site(browser, session=stu, pages={QPATH: quiz_page_html()})
+    pg = s.open(QPATH)
+    pg.wait_for_selector("text=Quiz locked")
+    check("a locked quiz shows a 'not open yet' screen, no questions", "isn't open yet" in pg.inner_text("body") and pg.locator(".qz-options").count() == 0)
     api(dict(TOK, action="admin_set_quiz_lock", lesson=L1, locked=False))
     pg.click("button:has-text('Check again')")
     pg.wait_for_selector(".qz-card")
-    check("'Check again' opens it once unlocked", "ask your teacher" not in pg.inner_text("body").lower())
+    check("'Check again' opens it once unlocked", "quiz locked" not in pg.inner_text("body").lower())
     s.ctx.close()
 
     api(dict(TOK, action="admin_set_quiz_lock", lesson=L1, locked=False))
-    s = E.Site(browser, session=stu, pages={"/quiz.html": quiz_page_html()})
-    pg = s.open("/quiz.html")
+    s = E.Site(browser, session=stu, pages={QPATH: quiz_page_html()})
+    pg = s.open(QPATH)
     pg.wait_for_selector(".qz-card")
     check("an unlocked (or ungated) quiz opens straight away", "begin quiz" in pg.inner_text("body").lower())
     s.ctx.close()
@@ -68,11 +69,11 @@ def run(browser):
     s = E.Site(browser)
     s.mode = "offline"
     s2 = E.Site.__new__(E.Site)
-    s2.ctx = browser.new_context(); s2.calls = []; s2.bodies = []; s2.mode = "offline"; s2.pages = {"/quiz.html": quiz_page_html()}
+    s2.ctx = browser.new_context(); s2.calls = []; s2.bodies = []; s2.mode = "offline"; s2.pages = {QPATH: quiz_page_html()}
     s2.ctx.route(E.SITE + "/**", s2._site); s2.ctx.route("https://script.google.com/**", s2._gas)
     s2.ctx.add_init_script("localStorage.setItem('teaching_session', %s)" % json.dumps(json.dumps(stu)))
     s2.page = s2.ctx.new_page(); s2.page.set_default_timeout(7000)
-    s2.page.goto(E.SITE + "/quiz.html")
+    s2.page.goto(E.SITE + QPATH)
     s2.page.wait_for_selector(".qz-card", timeout=10000)
     check("a network error checking the gate fails OPEN (doesn't trap the student)", "begin quiz" in s2.page.inner_text("body").lower())
     s2.ctx.close(); s.ctx.close()
@@ -90,7 +91,8 @@ def run(browser):
     check("the gated lesson shows locked", "locked" in card.inner_text().lower())
     card.locator("button", has_text="Open it").click()
     card.locator('[data-panel="quiz-lock"] button', has_text="Open it").click()
-    pg.wait_for_selector(".ac-toast.is-ok")
+    D.save(pg)   # P4-S7: staged until Save
+    pg.wait_for_function("document.querySelector('.ac-toast.is-ok') && /now open/.test(document.querySelector('.ac-toast').textContent)")
     check("opening it from the dashboard works", "now open" in pg.inner_text(".ac-toast"))
     check("SERVER: get_quiz_state confirms it's open", api({"action": "get_quiz_state", "lesson": L1})["locked"] is False)
     pg.click('[data-tab="quizzes"]')
@@ -104,34 +106,39 @@ def run(browser):
     pg = s.page
     pg.wait_for_selector('[data-tab="groups"]')
     pg.click('[data-tab="groups"]')
+    # the create form: a name + students ticked from the roster or a typed phone (roster picking: e2e_groups.py)
     pg.wait_for_selector("input[placeholder*='Grade 2']")
     pg.fill("input[placeholder*='Grade 2']", "Test Group")
-    pg.fill("input[placeholder*='first student']", "01000000002")
-    pg.click("button:has-text('Create group')")
+    pg.locator('input[aria-label="Phone to add"]').last.fill("01000000002")
+    pg.locator("button", has_text="Create group").last.click()
+    D.save(pg)
     pg.wait_for_selector(".ac-toast.is-ok")
-    check("creating a group confirms and names the student", "Created" in pg.inner_text(".ac-toast") and "Sara" in pg.inner_text(".ac-toast"), pg.inner_text(".ac-toast"))
+    check("creating a group confirms and names the group", "Created" in pg.inner_text(".ac-toast") and "Test Group" in pg.inner_text(".ac-toast"), pg.inner_text(".ac-toast"))
     check("SERVER: the group now exists with one member", any(g["group"] == "Test Group" and len(g["members"]) == 1 for g in api(dict(TOK, action="admin_list_groups"))["groups"]))
     gcard = pg.locator('[data-group="Test Group"]')
     check("the group card lists the member", "Sara" in gcard.inner_text())
-    gcard.locator("input[placeholder='01xxxxxxxxx']").fill("01000000003")
-    gcard.locator("button:has-text('Add')").click()
-    pg.wait_for_selector(".ac-toast.is-ok")
-    check("adding a second member works", "Omar" in pg.inner_text(".ac-toast"))
+    gcard.locator('input[aria-label="Phone to add"]').fill("01000000003")
+    gcard.locator("button", has_text="Add").last.click()
+    D.save(pg)
+    pg.wait_for_function("document.querySelector('.ac-toast.is-ok') && /Omar|Added/.test(document.querySelector('.ac-toast').textContent)")
+    check("adding a second member works", "Added 1 student" in pg.inner_text(".ac-toast"), pg.inner_text(".ac-toast"))
     gcard = pg.locator('[data-group="Test Group"]')
     check("both members now show on the card", gcard.inner_text().count("Sara") if False else ("Sara" in gcard.inner_text() and "Omar" in gcard.inner_text()))
     gcard.locator("button:has-text('Give this group access')").click()
     panel = gcard.locator(".ac-panel")
-    panel.locator("select").first.select_option(L1)
+    panel.locator("label", has_text="What").locator("select").select_option(L1)   # the first menu is now Year
     panel.locator("button:has-text('Give the group access')").click()
-    pg.wait_for_selector(".ac-toast.is-ok")
+    D.save(pg)
+    pg.wait_for_function("document.querySelector('.ac-toast.is-ok') && /Gave/.test(document.querySelector('.ac-toast').textContent)")
     check("bulk grant via the dashboard confirms count and scope", "Gave 2 members" in pg.inner_text(".ac-toast") and "Functions" in pg.inner_text(".ac-toast"), pg.inner_text(".ac-toast"))
     check("SERVER: both members can now watch", D.can_watch({"student_id": "01000000002", "session_token": api({'action':'login_student','phone':'01000000002','password_hash':D.sha('b')})['session_token']}, L1))
     gcard = pg.locator('[data-group="Test Group"]')
     gcard.locator("button:has-text('Revoke from this group')").click()
     panel = gcard.locator(".ac-panel")
-    panel.locator("select").first.select_option(L1)
+    panel.locator("label", has_text="What").locator("select").select_option(L1)   # the first menu is now Year
     panel.locator("button:has-text('Revoke from the whole group')").click()
-    pg.wait_for_selector(".ac-toast.is-ok")
+    D.save(pg)
+    pg.wait_for_function("document.querySelector('.ac-toast.is-ok') && /Removed/.test(document.querySelector('.ac-toast').textContent)")
     check("bulk revoke via the dashboard confirms", "Removed access" in pg.inner_text(".ac-toast"), pg.inner_text(".ac-toast"))
     check("SERVER: access is gone", not D.can_watch({"student_id": "01000000002", "session_token": api({'action':'login_student','phone':'01000000002','password_hash':D.sha('b')})['session_token']}, L1))
     s.ctx.close()

@@ -464,6 +464,7 @@
   // ---- Save model (Phase 4 / S7) ---------------------------------------------------------------
   // Field edits (attendance marks, group settings, lesson requirements, templates, group assignments) are STAGED and
   // sent by the Save bar from assets/draft-store.js. Parent-contact marks and monthly marks stay immediate.
+  var OPEN_AFTER_SAVE = null;   // a group the teacher just assigned students to: open its tab once Save has reloaded the page
   var NEED_RELOAD = false;      // set when a saved edit changed what the overview would list (group settings, new members)
   function isAsst() { return STATE.role === "assistant" || STATE.role === "sassistant"; }
   function stageOp(op) { return window.Draft.stage(op); }
@@ -765,7 +766,9 @@
       onFailed: function (res) { rollback(); toast(errText(new Error((res && res.error) || "")), { err: true }); } });
     if (!opts.silent) {
       var modeTxt = items[0].mode === "center" ? "سنتر" : (items[0].mode === "online" ? "أونلاين" : "غير محدد");
-      toast("جاهز للحفظ: " + who + ": " + modeTxt, { undo: function () {
+      // Center = free unlock until Friday: keep telling the teacher when it ends (as before the Save button, P4-S7).
+      var wkE = STATE.data.week, exp = (items.some(function (it) { return it.mode === "center"; }) && wkE && wkE.end) ? " — ينتهي يوم الجمعة " + dmOf(wkE.end) : "";
+      toast("جاهز للحفظ: " + who + ": " + modeTxt + exp, { undo: function () {
         if (window.Draft.has(id)) { window.Draft.discard(id); rollback(); return; }
         var wk = STATE.data.week;
         setAttendance(g, items.map(function (it) { var k = pkOf(it.phone); return { phone: it.phone, mode: (prev[k] && prev[k].att) || "" }; }), { silent: true, week_confirm: wk && wk.start });
@@ -1137,7 +1140,7 @@
         phones.forEach(function (ph) {
           var who = (STATE.data.students[pkOf(ph)] || {}).name || ph;
           stageOp({ id: "gadd:" + gname.toLowerCase() + ":" + pkOf(ph), label: "Add " + who + " to " + gname, action: "admin_group_add", payload: { group: gname, phone: ph },
-            onSaved: function () { NEED_RELOAD = true; } });
+            onSaved: function () { NEED_RELOAD = true; OPEN_AFTER_SAVE = gname; } });
         });
         closeSheet();
         toast("جاهز للحفظ: تعيين " + phones.length + " طالب لجروب " + gname + " — اضغط Save تحت");
@@ -2270,7 +2273,12 @@
     if (window.Draft) {
       window.Draft.init({ page: "followup", user: (session && (session.student_id || session.phone)) || "mock",
         send: function (a, p) { return api(Object.assign({ action: a }, p)); },
-        afterSave: function () { if (NEED_RELOAD && !window.Draft.pauseRefresh()) { NEED_RELOAD = false; load(true).then(function () { toast("تم التحديث ✓"); }); } } });
+        afterSave: function () { if (NEED_RELOAD && !window.Draft.pauseRefresh()) { NEED_RELOAD = false; load(true).then(function () {
+            var want = OPEN_AFTER_SAVE; OPEN_AFTER_SAVE = null;
+            var g2 = want && allGroups().filter(function (x) { return x.group.toLowerCase() === want.toLowerCase(); })[0];
+            if (g2) selectTab(g2.key);
+            toast("تم التحديث ✓");
+          }); } } });
       window.Draft.onChange(function (n, why) {
         if (!STATE.data) return;
         if (why === "save") flushPendingDone(false);                              // v2: restored drafts have no callbacks

@@ -245,6 +245,7 @@ def main():
         check("an empty group name is refused", "اكتب اسم الجروب" in page.inner_text(".fu-toast"))
         page.fill("#fu-assign-name", "S1 Sun 4pm")
         page.click("#fu-assign-go")
+        page.click("#p4-draft-save")   # P4-S7: the group assignment is staged until Save
         page.wait_for_function("document.querySelector(\".fu-tab[aria-selected='true']\") && document.querySelector(\".fu-tab[aria-selected='true']\").textContent.includes('S1 Sun 4pm')")
         check("R-007 the new group exists, is selected and holds the 3 students", page.locator(".fu-stu").count() == 3 and "S1 Sun 4pm" in page.inner_text(".fu-tab[aria-selected='true']"))
         check("R-007 the group menu is no longer needed: roles card is back", page.locator("#fu-role-a").count() == 1)
@@ -254,6 +255,7 @@ def main():
         pg.wait_for_selector(".fu-stu")
         pg.click("[data-year='1']"); pg.wait_for_selector("#fu-assign"); pg.click("#fu-assign"); pg.wait_for_selector("#fu-assign-group")
         pg.select_option("#fu-assign-group", "__new"); pg.fill("#fu-assign-name", "S1 Sun 4pm"); pg.click("#fu-assign-go")
+        pg.click("#p4-draft-save")
         pg.wait_for_function("__calls.filter(c => c.action === 'admin_group_add').length === 3")
         ga = calls(pg, "admin_group_add")
         check("assign sends one admin_group_add per student with the group name", sorted(c["phone"] for c in ga) == ["01512345012", "01512345013", "01512345014"] and all(c["group"] == "S1 Sun 4pm" for c in ga), ga)
@@ -281,6 +283,7 @@ def main():
         ctx.close()
         ctx, pg, errors = real_page(browser, base, FUR, mutate=s_other_year_lessons)
         pg.wait_for_selector(".fu-stu"); pg.click("[data-year='1']"); pg.wait_for_selector(".fu-dialog"); pg.click(".fu-dialog .fu-btn.primary")
+        pg.click("#p4-draft-save")   # P4-S7: clearing the lesson is staged until Save
         pg.wait_for_function("__calls.some(c => c.action === 'admin_followup_save_group')")
         sg = calls(pg, "admin_followup_save_group")[0]
         check("R-008 clearing saves current_lesson = '' for that group only", sg["group"] == "Tue 4pm" and sg["current_lesson"] == "" and sg["review_lessons"], sg)

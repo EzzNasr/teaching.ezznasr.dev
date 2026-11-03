@@ -77,6 +77,7 @@ def run(browser):
     card.locator(".ac-pick[open] .ac-pickitem", has_text="Sara").locator("input").check()
     card.locator(".ac-pick[open] .ac-pickitem", has_text="Hana").locator("input").check()
     card.locator("button", has_text="Remove 2").click()
+    pg.click("#p4-draft-save")   # P4-S7: removals are staged until Save
     pg.wait_for_selector(".ac-toast.is-ok")
     check("two members removed in one go", sorted(m["name"] for m in groups()["Section A"]["members"]) == ["Nour", "Omar"])
     s.ctx.close()

@@ -978,6 +978,22 @@
       "via": [],
       "filter": null,
       "fields": {}
+    },
+    {
+      "action": "check_session",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "report_photos",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
     }
   ]
 }

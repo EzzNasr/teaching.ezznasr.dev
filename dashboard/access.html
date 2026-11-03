@@ -1157,6 +1157,7 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
       <a href="access.html" aria-current="page">Video access</a>
       <a href="followup.html" lang="ar">متابعة</a>
       <a href="requirements.html" lang="ar">المطلوبات</a>
+      <a href="grading.html">Grading</a>
       <a href="team.html">Team</a>
       <a href="/">Back to site</a>
     </nav>
@@ -1601,11 +1602,21 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
     if (!window.Draft) return;
     window.Draft.ops().forEach(function (op) { applyLocal(Object.assign({ action: op.action }, op.payload)); });
   }
-  function stageRun(payloads) {
+  // okText = the confirmation the old instant path showed ("Approved Sara…", "… is now open."): shown once Save has
+  // sent every op of this batch, so the "Staged: … Use Save to apply." line does not stay up after a save.
+  function stageRun(payloads, okText) {
+    var left = payloads.length;
     payloads.forEach(function (p) {
       var rest = Object.assign({}, p); delete rest.action;
       window.Draft.stage({ id: stageId(p), label: stageLabel(p), action: p.action, payload: rest,
-        onSaved: function () { NEED_RELOAD = true; },
+        onSaved: function (res) {
+          NEED_RELOAD = true;
+          if (--left > 0) return;
+          var txt = "";
+          try { txt = typeof okText === "function" ? okText(res || {}) : okText; } catch (e) { txt = ""; }
+          setToast(true, txt || ("Saved: " + payloads.map(stageLabel).join("; ") + "."));
+          refreshToast();
+        },
         onFailed: function (r) { setToast(false, (r && r.error) || "That didn't work."); refreshToast(); } });
       applyLocal(p);
     });
@@ -1637,7 +1648,7 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
 
   function run(payload, okText, btn) {
     if (isAsst() && payload.action === "admin_decide_payment") { setToast(false, "Not authorized."); refreshToast(); if (btn) btn.disabled = false; return Promise.resolve(); }   // assistants never decide payments (contract A16)
-    if (window.Draft && STAGED[payload.action]) return stageRun([payload]);
+    if (window.Draft && STAGED[payload.action]) return stageRun([payload], okText);
     STATE.toast = null;
     refreshToast();
     return api(payload).then(
@@ -1658,7 +1669,7 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
   // that were locked on their own). Stops at the first failure; whatever already went through
   // stays done, and the refresh below shows the real state.
   function runMany(payloads, okText, btn) {
-    if (window.Draft && payloads.every(function (p) { return STAGED[p.action]; })) return stageRun(payloads);
+    if (window.Draft && payloads.every(function (p) { return STAGED[p.action]; })) return stageRun(payloads, okText);
     STATE.toast = null;
     refreshToast();
     return payloads.reduce(function (chain, p) {

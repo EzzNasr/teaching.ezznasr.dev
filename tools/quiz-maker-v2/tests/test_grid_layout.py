@@ -20,11 +20,14 @@ def ok(c, m):
     if not c: raise AssertionError(m)
     passed += 1; print("PASS " + m)
 
+TITLES = {}
+def pos_of(slug): return C.lesson_position(slug, TITLES.get(slug, ""))   # same rule as modules/common.py uses to lay the page out
 def parse(html):
     """-> list of ('head', chapter-id) / ('card', slug, number) in page order"""
     out = []
-    for m in re.finditer(r'<div class="chapter-head"[^>]*id="([^"]+)"|<a class="lesson" href="\./([^/"]+)/">\s*<span class="number">(\d+)</span>', html):
+    for m in re.finditer(r'<div class="chapter-head"[^>]*id="([^"]+)"|<a class="lesson" href="\./([^/"]+)/">\s*<span class="number">(\d+)</span>(?:\s*<h3>([^<]*)</h3>)?', html):
         out.append(("head", m.group(1)) if m.group(1) else ("card", m.group(2), m.group(3)))
+        if not m.group(1): TITLES[m.group(2)] = m.group(4) or ""   # the card title: the builder falls back to it ("Chapter 1 | general Exam")
     return out
 
 def page(cards, label="Open lesson"):
@@ -76,7 +79,7 @@ try:
         folders = sorted(x for x in os.listdir(d) if os.path.isdir(os.path.join(d, x)))
         ok(sorted(c[1] for c in cards) == folders, g + ": every lesson folder is listed exactly once")
         ok([int(c[2]) for c in cards] == list(range(1, len(cards) + 1)), g + ": numbers run 1..%d with no gap or repeat, in page order" % len(cards))
-        pos = [C.lesson_position(c[1]) for c in cards]
+        pos = [pos_of(c[1]) for c in cards]
         keyed = [(p[0] if p[0] is not None else -1, p[1] or 0) for p in pos]
         ok(keyed == sorted(keyed), g + ": page order is by chapter, then lesson number")
         heads = [x[1] for x in seq if x[0] == "head"]
@@ -86,7 +89,7 @@ try:
         for x in seq:
             if x[0] == "head": cur = x[1]
             else:
-                ch = C.lesson_position(x[1])[0]; good &= (cur == ("chapter-%d" % ch)) if ch is not None else (cur == "intro")
+                ch = pos_of(x[1])[0]; good &= (cur == ("chapter-%d" % ch)) if ch is not None else (cur == "intro")
         ok(good, g + ": every lesson is under its own chapter's heading")
         ok(not re.search(r"Chaper|\bchapter 2 lesson 2\b", html), g + ": no typo'd lesson titles left in the list")
 finally:

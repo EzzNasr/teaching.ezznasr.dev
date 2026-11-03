@@ -373,18 +373,66 @@ function _prettyLesson(path) {
   }).join(" \u203a ") || String(path || "");
 }
 
+// "Grade 2 Secondary › Chapter 2 Lesson 3 Incident Response…" + quiz title "Chapter 2 Lesson 3 | Incident Response…":
+// the title names the same lesson, so it replaces the last part instead of being added after an em dash (the
+// lesson name used to appear twice in the Telegram message). A title that says something else is still added.
+function _lessonWithTitle_(pretty, title) {
+  pretty = String(pretty || ""); title = String(title == null ? "" : title).trim();
+  if (!title) return pretty;
+  var norm = function (x) { return String(x).toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, ""); };
+  var parts = pretty.split(" \u203a "), last = parts[parts.length - 1], nt = norm(title), nl = norm(last);
+  if (!nt) return pretty;
+  if (nt === nl || nl.indexOf(nt) === 0 || nt.indexOf(nl) === 0 || norm(pretty).indexOf(nt) !== -1) {
+    parts[parts.length - 1] = title.length >= last.length || nt === nl ? title : last;
+    return parts.join(" \u203a ");
+  }
+  return pretty + " \u2014 " + title;
+}
+
 // Telegram pings for a finished homework / quiz. Called OUTSIDE the lock, only for a
 // freshly saved attempt (never a duplicate). _notifyAdmin never throws.
+//
+// The score shown is ONLY the auto-graded part (MCQ / true-false / matching). Written
+// (handwritten) answers are teacher-graded and join the score later, so they are listed
+// on their own line: how many written questions, and how many have a photo attached.
+// Photos upload AFTER the answers, so the ping says "photos on their way"; a second ping
+// (report_photos -> handleReportPhotos) confirms how many actually arrived.
+function _autoScoreLine(entries, fallbackScore, fallbackTotal) {
+  var auto = (entries || []).filter(function (q) { return q && q.type !== "written"; });
+  var score, total;
+  if (auto.length) {
+    total = auto.length;
+    score = auto.filter(function (q) { return q.is_correct === true || q.correct === true; }).length;
+  } else if (typeof fallbackScore === "number" && typeof fallbackTotal === "number") {
+    score = fallbackScore; total = fallbackTotal;
+  } else { return ""; }
+  return "\n🎯 MCQ " + score + "/" + total + (total ? " (" + Math.round(score / total * 100) + "%)" : "");
+}
+
+function _writtenLine(entries, claims) {
+  var w = (entries || []).filter(function (q) { return q && q.type === "written"; });
+  if (!w.length) return "";
+  var withPhoto = 0, marks = 0;
+  w.forEach(function (q) {
+    var id = q.qid !== undefined ? q.qid : q.id;
+    var n = Math.max(Number(q.image_count) || 0, claims && id !== undefined ? (Number(claims[String(id)]) || 0) : 0);
+    if (n > 0) withPhoto++;
+    marks += Number(q.max) || 0;
+  });
+  var line = "\n✍️ Written: " + withPhoto + "/" + w.length + " with a photo" + (marks ? " (" + marks + " marks, teacher-graded)" : "");
+  return line + (withPhoto ? "\n📷 photos uploading — a confirmation follows" : "\n⚠️ no handwritten photo attached");
+}
+
 function _notifySubmission(payload, res) {
   try {
     if (!res || !res.ok || res.duplicate) return;
     var lesson = _prettyLesson(payload.lesson_path || payload.lesson);
-    var score = typeof payload.score === "number" && typeof payload.total === "number"
-      ? "\n\ud83c\udfaf " + payload.score + "/" + payload.total : "";
-    var kind = "\ud83d\udcdd <b>Homework submitted</b>";
-    var how = payload.submission_type ? "\n\ud83d\udce6 " + _esc(payload.submission_type) : "";
-    _notifyAdmin(kind + "\n\n\ud83d\udc64 " + _esc(payload.name || payload.student_id) +
-      "\n\ud83d\udcd8 " + _esc(lesson) + score + how);
+    var answers = Array.isArray(payload.answers) ? payload.answers : [];
+    var score = _autoScoreLine(answers, payload.score, payload.total) + _writtenLine(answers, null);
+    var kind = "📝 <b>Homework submitted</b>";
+    var how = payload.submission_type ? "\n📦 " + _esc(payload.submission_type) : "";
+    _notifyAdmin(kind + "\n\n👤 " + _esc(payload.name || payload.student_id) +
+      "\n📘 " + _esc(lesson) + score + how);
   } catch (err) {
     console.error("notifySubmission failed: " + err);
   }
@@ -394,13 +442,48 @@ function _notifyQuiz(payload, res) {
   try {
     if (!res || !res.ok || res.duplicate) return;
     var lesson = _prettyLesson(payload.lesson_path || payload.lesson);
-    var score = typeof payload.score === "number" && typeof payload.total === "number"
-      ? "\n\ud83c\udfaf " + payload.score + "/" + payload.total : "";
-    _notifyAdmin("\ud83e\udde0 <b>Quiz completed</b>\n\n\ud83d\udc64 " + _esc(payload.name || payload.student_id) +
-      "\n\ud83d\udcd8 " + _esc(lesson) + (payload.quiz_title ? " \u2014 " + _esc(payload.quiz_title) : "") + score);
+    var qs = Array.isArray(payload.questions) ? payload.questions : [];
+    var score = _autoScoreLine(qs, payload.score, payload.total) + _writtenLine(qs, payload.photo_counts);
+    _notifyAdmin("🧠 <b>Quiz completed</b>\n\n👤 " + _esc(payload.name || payload.student_id) +
+      "\n📘 " + _esc(_lessonWithTitle_(lesson, payload.quiz_title)) + score);
   } catch (err) {
     console.error("notifyQuiz failed: " + err);
   }
+}
+
+// The student's page calls this once its photo uploads have settled. The count of photos
+// that arrived is read from the WrittenAnswers sheet (the server's own record), not from
+// the browser, so the message can be trusted. One message per distinct outcome per attempt.
+function handleReportPhotos(payload) {
+  if (!payload.student_id) throw new Error("Missing student_id.");
+  var attempt = String(payload.attempt_id || "");
+  if (!/^[A-Za-z0-9_-]{8,100}$/.test(attempt)) throw new Error("Missing or invalid attempt_id.");
+  var student = _normalizePhone(payload.student_id);
+  var expected = Math.max(0, Math.min(60, parseInt(payload.expected, 10) || 0));
+  var counts = _p2cImageCounts(student, attempt), got = 0;
+  Object.keys(counts).forEach(function (k) { got += counts[k]; });
+  var cache = CacheService.getScriptCache();
+  var ck = "rph:" + attempt + ":" + got + ":" + expected;
+  if (cache.get(ck)) return { ok: true, received: got, duplicate: true };
+  cache.put(ck, "1", 21600);
+  var lesson = _prettyLesson(payload.lesson_path || payload.lesson);
+  var who = _esc(payload.name || student);
+  var kind = payload.kind === "assignment" ? "Homework" : "Quiz";
+  if (expected && got >= expected) {
+    _notifyAdmin("📷 <b>Photos received</b> " + got + "/" + expected + "\n\n👤 " + who + "\n📘 " + _esc(lesson) + " (" + kind + ")");
+  } else {
+    var why = String(payload.error || "").slice(0, 160);
+    _notifyAdmin("⚠️ <b>Photos incomplete</b> " + got + "/" + expected + "\n\n👤 " + who + "\n📘 " + _esc(lesson) + " (" + kind + ")" +
+      (why ? "\n❗ " + _esc(why) : "") + "\nThe student can retry from the same page.");
+  }
+  return { ok: true, received: got };
+}
+
+// Lets a page ask "is my saved sign-in still the live one?" before the student does any
+// work. Login issues one token per account, so signing in on another device ends this one.
+function handleCheckSession(payload) {
+  var st = _sessionState(payload);
+  return { ok: true, valid: st === "student" || st === "admin", state: st };
 }
 
 function _tgAdminIds() {
@@ -1404,6 +1487,12 @@ function doPost(e) {
       case "record_watch":
         return _json(handleRecordWatch(payload));
 
+      case "check_session":
+        return _json(handleCheckSession(payload));
+
+      case "report_photos":
+        return _json(handleReportPhotos(payload));
+
       // ---- Phase 2 (see docs/contract.md). Handlers live in Phase2_*.gs; Phase2_Core.gs owns _p2Call.
       case "admin_student_summary":   // S2
         return _json(_p2Post("p4_filter", _p2Call("p2_admin_student_summary", payload), payload));
@@ -1634,6 +1723,16 @@ function handleUploadSubmission(payload) {
       total: typeof payload.total === "number" ? payload.total : null,
       answers: Array.isArray(payload.answers) ? payload.answers : null,
     };
+    // Written (handwritten) answers are teacher-graded and join score/total only once graded. A page cached
+    // from before that rule still counts them as zero marks, so score/total is recomputed here from the
+    // auto-graded answers alone (a no-op for current pages).
+    if (payload.submission_type === "graded" && meta.answers && meta.answers.length) {
+      var autoAns = meta.answers.filter(function (a) { return a && a.type !== "written"; });
+      if (autoAns.length) {
+        meta.total = autoAns.length;
+        meta.score = autoAns.filter(function (a) { return a.is_correct === true; }).length;
+      }
+    }
     var metaBlob = Utilities.newBlob(JSON.stringify(meta, null, 2), "application/json", stem + "--meta.json");
     made.push(folder.createFile(metaBlob));
 
@@ -5509,8 +5608,9 @@ function _p2cGradeQuiz(quiz, answers, imageCounts) {
   var entries = [], score = 0, total = 0;
   quiz.questions.forEach(function (q, i) {
     var e = _p2cGradeOne(q, i, byI[i], (imageCounts && imageCounts[_p2cQid(q, i)]) || 0);
-    if (e.type === "written") { if (!e.pending) total += e.max; }
-    else { total += 1; if (e.is_correct) score += 1; }
+    // Written answers are teacher-graded: their marks join score/total only when graded
+    // (_gRecomputeAttempt), never at submit. A missing photo no longer lowers the grade.
+    if (e.type !== "written") { total += 1; if (e.is_correct) score += 1; }
     entries.push(e);
   });
   return { score: score, total: total, questions: entries };
@@ -5584,31 +5684,30 @@ function _p2cFindWrittenRow(sheet, attemptId, studentId, qid) {
   return null;
 }
 
-// Phase 3 / S2: the student page now posts the answers FIRST and the photos afterwards, so a written answer can
-// arrive with no photo at submit time (stored as a non-pending "wrong" entry whose max is already in the total).
-// When its photo lands later, flip it to pending and take its max back out of the total, exactly the state a
-// submit-with-photo would have produced. Never touches a graded entry. Best effort: a failure here must not
-// fail the upload (the review still shows the photo as pending via has_photo).
+// Phase 3 / S2: the student page posts the answers FIRST and the photos afterwards, so a written answer can
+// arrive with no photo at submit time (stored as a non-pending entry). When its photo lands later, flip it to
+// pending. The total is NOT touched: written marks are never in the submit-time total (see _p2cGradeQuiz).
+// Never touches a graded entry. Best effort: a failure here must not fail the upload (the review still shows
+// the photo as pending via has_photo).
 function _p2cLatePhotoFlip(student, attempt, qid) {
   try {
     _withLock(function () {
       var sheet = _quizResultsSheet();
       if (!sheet || sheet.getLastRow() < 2) return;
       var c = _headerIndex(sheet);
-      if (!c.dedupe_key || !c.student_id || !c.questions_json || !c.total) return;
+      if (!c.dedupe_key || !c.student_id || !c.questions_json) return;
       var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
       for (var i = values.length - 1; i >= 0; i--) {
         if (String(values[i][c.dedupe_key - 1]) !== "c:" + attempt || !_phonesMatch(values[i][c.student_id - 1], student)) continue;
-        var arr = _p2cParse(String(values[i][c.questions_json - 1])), hit = false, give = 0;
+        var arr = _p2cParse(String(values[i][c.questions_json - 1])), hit = false;
         if (!Array.isArray(arr)) return;
         arr.forEach(function (q) {
           if (q && q.type === "written" && String(q.qid) === String(qid) && !q.pending && q.awarded === undefined) {
-            give = Number(q.max) || 0; q.pending = true; q.image_count = 1; q.your_answer = "[1 photo]"; hit = true;
+            q.pending = true; q.image_count = 1; q.your_answer = "[1 photo]"; hit = true;
           }
         });
         if (!hit) return;
         sheet.getRange(i + 2, c.questions_json).setValue(JSON.stringify(arr));
-        sheet.getRange(i + 2, c.total).setValue(Math.max(0, (Number(values[i][c.total - 1]) || 0) - give));
         return;
       }
     }, UPLOAD_LOCK_WAIT_MS);
@@ -7870,7 +7969,8 @@ var P4_ACTIONS = (function () {
   add("ping", { rule: "PUB", needs: [], tok: true });
   add("p4_session_scope", { rule: "PUB", needs: [] });
   add("check_student register_student login_student reset_password update_profile get_my_results get_video get_quiz get_quiz_review get_quiz_state " +
-      "get_subscription_options record_watch request_access request_subscription upload_submission upload_quiz_result upload_written_image p3_session_role",
+      "get_subscription_options record_watch request_access request_subscription upload_submission upload_quiz_result upload_written_image p3_session_role " +
+      "check_session report_photos",   // 99d91f0 (restored): is my sign-in still the live one / photos settled
       { rule: "PUB", needs: [] });
   return t;
 })();

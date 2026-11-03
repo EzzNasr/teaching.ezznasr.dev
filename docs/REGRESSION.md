@@ -8,6 +8,9 @@ Permanent, append-only. Machine-readable source: `tools/quiz-maker-v2/tests/regi
 1. **Every change must pass the whole registry plus its own new cases.** Run `node scripts/run_registry.js`
    (add `--e2e` for the Playwright ones). A release uses `--strict`, which refuses any pending or
    TODO entry.
+   GitHub Actions runs `bash scripts/test_all.sh --strict --e2e --require-all` on every push: nothing may be skipped
+   (no Playwright, no jsdom or a test that skipped itself = FAIL). After editing `registry.json`, run
+   `python scripts/gen_regression_table.py` (R-DOC-1 fails otherwise).
 2. **IDs are never reused or renumbered.** A case is retired only by setting `"status": "retired"` with a
    written reason in `note` (and a line in the change log below). Never delete an entry.
 3. **Statuses.** `active` must pass. `pending` is expected to fail until its owning session ships
@@ -37,63 +40,157 @@ repo, so R-E23 to R-E26 are reserved and unused.
 
 ## The registry
 
-| ID | Case | Status | Test |
-|---|---|---|---|
-| R-E01 | login, reset, lockouts, full-grid writes | active | `tests/test_accounts_and_sheets.js` |
-| R-E02 | uploads: lock scope, races, busy lock, clean-up | active | `tests/test_item6.js` |
-| R-E03 | quiz.js / assign.js retry behaviour | active | `tests/test_client_post.js` |
-| R-E04 | video lock: who sees a URL, toggle, fail-closed, cache | active | `tests/test_videos.js` |
-| R-E05 | payments: I-paid requests, approvals, entitlements, expiry, scopes | active | `tests/test_access.js` |
-| R-E06 | revoking access, cancelled payments, access-dashboard overview | active | `tests/test_revoke.js` |
-| R-E07 | locking/unlocking a quiz itself | active | `tests/test_quiz_gate.js` |
-| R-E08 | student groups: membership, bulk grant/revoke | active | `tests/test_groups.js` |
-| R-E09 | one active session per account | active | `tests/test_single_session.js` |
-| R-E10 | quiz access override rows | active | `tests/test_quiz_access_override.js` |
-| R-E11 | chapter/term subscriptions and the paywall | active | `tests/test_subscriptions.js` |
-| R-E12 | follow-up backend: overview facts, attendance, group + template saves, record_watch | active | `tests/test_followup.js` |
-| R-E13 | real overview output vs followup-logic.js data shape | active | `tests/test_followup_contract.js` |
-| R-E14 | follow-up status rules + Cairo deadlines (pure) | active | `tests/test_followup_logic.js` |
-| R-E15 | message rendering: placeholders, bidi, WhatsApp, 1200-char cap | active | `tests/test_followup_templates.js` |
-| R-E16 | video.js watch-coverage tracker | active | `tests/test_watch_tracker.js` |
-| R-E17 | locked-video box on a lesson page | active | `tests/e2e_video.py` |
-| R-E18 | roster picker on the Groups tab | active | `tests/e2e_groups.py` |
-| R-E19 | video-access admin dashboard | active | `tests/e2e_dashboard.py` |
-| R-E20 | quiz gate on the quiz page + Quiz-gate/Groups tabs | active | `tests/e2e_step4b.py` |
-| R-E21 | Lessons tab per-video open/lock | active | `tests/e2e_lesson_video_lock.py` |
-| R-E22 | follow-up page: layouts, verdicts, message sheet, dark mode | active | `tests/e2e_followup.py` |
-| R-001 | Every lesson folder: canonical, og:url, JSON-LD url, data-lesson, quiz lesson equal the folder's own name | active | `tests/test_lesson_pages.js` |
-| R-001b | lesson-aliases.json and Phase2_Keys.gs agree; the 3 renames are mapped | active | `tests/test_R001b_alias_sync.js` |
-| R-002 | Quiz and homework pages of every lesson load (static: all internal links resolve) | active | `tests/test_lesson_pages.js` |
-| R-003 | Old-key and typo'd-key grants still unlock the lesson under the new key | active | `tests/test_R003_R005_R006_rename_incident.js` |
-| R-004 | access.html order is year, chapter, lesson number; no duplicate group per lesson | active | `tests/e2e_R004_access_order.py` |
-| R-005 | Quiz/homework under an old bare slug show as done on the follow-up page | active | `tests/test_R003_R005_R006_rename_incident.js` |
-| R-006 | Entitled student for the current lesson never shows video locked | active | `tests/test_R003_R005_R006_rename_incident.js` |
-| R-007 | Senior 1 with zero groups: empty state + assign action, never a blank select | active | `tests/e2e_p2_followup.py` |
-| R-008 | Switching year clears or confirms a current lesson from the other year | active | (runs with R-007) |
-| R-009 | Quiz-required and homework-required are independent; optional never counts as missed | active | `tests/test_p2_followup.js` |
-| R-010 | Center attendance: current lesson only; expires at week end; undo removes only its rows | active | `tests/test_R010_center_week.js` |
-| R-011 | Student summary equals raw QuizResults and Submissions for the range | active | (runs with R-009) |
-| R-012 | Monthly review totals equal the summary for the same range | active | (runs with R-009) |
-| R-013 | Parent notification log: create, edit, filter not-notified, persists | active | (runs with R-009) |
-| R-014 | Camera capture, file fallback, upload retry, draft survives reload | active | `tests/test_capture.js` (backend), R-014b `tests/test_capture_client.js`, R-014e `tests/e2e_capture.py` (browser) |
-| R-015 | Server never returns correct answers before submission (direct call) | active | `tests/test_R015_R016_review.js` |
-| R-016 | After submit: all questions correct vs wrong; written ones pending grading | active | (runs with R-015) |
-| R-017 | Grading updates score, correct/wrong list and average; regrade idempotent | active | `tests/test_grading.js` |
-| R-018 | A student cannot fetch another student's image | active | `tests/test_grading.js` |
-| R-019 | Arabic RTL intact on follow-up, summary, review, grading pages (screenshots) | pending S5 | (to write) `tests/e2e_R019_rtl.py` |
-| R-020 | Migrations: dry-run changes nothing; twice equals once; backup tab exists | active | `tests/test_keys.js` |
-| R-021 | check_asset_drift.py reports In sync | active | `check_asset_drift.py` |
-| R-022 | Audit log records grants, revokes, center decisions, grading changes | pending S5 | (to write) `tests/test_R022_audit_coverage.js` |
-| R-P01 | Phase 2 plumbing: router hook, flags, audit helper, test clock, .gs hygiene | active | `tests/test_phase2_core.js` |
-| R-P02 | Phase 2 contract conformance (auth, flags, shapes) for every handler that exists | active | `tests/test_phase2_contract.js` |
-| R-001c | check_lesson_paths.py: every lesson folder is self-consistent (S1 generator-side guard) | active | `check_lesson_paths.py` |
-| R-I01 | Integration seams S1+S4+S5: contract migrate shape, one AuditLog header, session-auth grading queue, flags, header contract | active | `tests/test_integration_s1_s4.js` |
-| R-S4a | Quiz Maker: model answers never reach the public quiz JSON; merge restores them on reopen | active | `tests/test_written_authoring.py` |
-| R-F01 | S2 follow-up status logic (required vs optional, deadlines, year, center week) | active | `tests/test_p2_followup_logic.js` |
-| R-F02 | S2 message templates (monthly review text, parent log wording, RTL, WhatsApp limits) | active | `tests/test_p2_followup_templates.js` |
-| R-I02 | Integration seams S2: router wiring, fallback if not pasted, flags, shared AuditLog, admin-session identity, canonical keys | active | `tests/test_integration_s2.js` |
+
+<!-- registry-table:start (generated by scripts/gen_regression_table.py; do not edit by hand) -->
+
+133 entries: 131 active, 2 retired. Browser tests (Needs = playwright) run with `--e2e`; CI runs everything with `--require-all`.
+
+| ID | Case | Status | Needs | Test |
+|---|---|---|---|---|
+| R-E01 | login, reset, lockouts, full-grid writes | active |  | `tests/test_accounts_and_sheets.js` |
+| R-E02 | uploads: lock scope, races, busy lock, clean-up | active |  | `tests/test_item6.js` |
+| R-E03 | quiz.js / assign.js retry behaviour | active |  | `tests/test_client_post.js` |
+| R-E04 | video lock: who sees a URL, toggle, fail-closed, cache | active |  | `tests/test_videos.js` |
+| R-E05 | payments: I-paid requests, approvals, entitlements, expiry, scopes | active |  | `tests/test_access.js` |
+| R-E06 | revoking access, cancelled payments, access-dashboard overview | active |  | `tests/test_revoke.js` |
+| R-E07 | locking/unlocking a quiz itself | active |  | `tests/test_quiz_gate.js` |
+| R-E08 | student groups: membership, bulk grant/revoke | active |  | `tests/test_groups.js` |
+| R-E09 | one active session per account | active |  | `tests/test_single_session.js` |
+| R-E10 | quiz access override rows | active |  | `tests/test_quiz_access_override.js` |
+| R-E11 | chapter/term subscriptions and the paywall | active |  | `tests/test_subscriptions.js` |
+| R-E12 | follow-up backend: overview facts, attendance, group + template saves, record_watch | active |  | `tests/test_followup.js` |
+| R-E13 | real overview output vs followup-logic.js data shape | active |  | `tests/test_followup_contract.js` |
+| R-E14 | follow-up status rules + Cairo deadlines (pure) | active |  | `tests/test_followup_logic.js` |
+| R-E15 | message rendering: placeholders, bidi, WhatsApp, 1200-char cap | active |  | `tests/test_followup_templates.js` |
+| R-E16 | video.js watch-coverage tracker | active |  | `tests/test_watch_tracker.js` |
+| R-E17 | locked-video box on a lesson page | active | playwright | `tests/e2e_video.py` |
+| R-E18 | roster picker on the Groups tab | active | playwright | `tests/e2e_groups.py` |
+| R-E19 | video-access admin dashboard | active | playwright | `tests/e2e_dashboard.py` |
+| R-E20 | quiz gate on the quiz page + Quiz-gate/Groups tabs | active | playwright | `tests/e2e_step4b.py` |
+| R-E21 | Lessons tab per-video open/lock | active | playwright | `tests/e2e_lesson_video_lock.py` |
+| R-E22 | follow-up page: layouts, verdicts, message sheet, dark mode | active | playwright | `tests/e2e_followup.py` |
+| R-001 | Every lesson folder: canonical, og:url, JSON-LD url, data-lesson, quiz lesson equal the folder's own name | active |  | `tests/test_lesson_pages.js` |
+| R-001b | lesson-aliases.json and Phase2_Keys.gs agree; the 3 renames are mapped | active |  | `tests/test_R001b_alias_sync.js` |
+| R-002 | Quiz and homework pages of every lesson load (static: all internal links resolve) | active |  | `tests/test_lesson_pages.js` |
+| R-003 | Old-key and typo'd-key grants still unlock the lesson under the new key | active |  | `tests/test_R003_R005_R006_rename_incident.js` |
+| R-004 | access.html order is year, chapter, lesson number; no duplicate group per lesson | active | playwright | `tests/e2e_R004_access_order.py` |
+| R-005 | Quiz/homework under an old bare slug show as done on the follow-up page | active |  | `tests/test_R003_R005_R006_rename_incident.js` |
+| R-006 | Entitled student for the current lesson never shows video locked | active |  | `tests/test_R003_R005_R006_rename_incident.js` |
+| R-007 | Senior 1 with zero groups: empty state + assign action, never a blank select | active | playwright | `tests/e2e_p2_followup.py` |
+| R-008 | Switching year clears or confirms a current lesson from the other year | active | playwright | (runs with R-007) |
+| R-009 | Quiz-required and homework-required are independent; optional never counts as missed | active |  | `tests/test_p2_followup.js` |
+| R-010 | Center attendance: current lesson only; expires at week end; undo removes only its rows | active |  | `tests/test_R010_center_week.js` |
+| R-011 | Student summary equals raw QuizResults and Submissions for the range | active |  | (runs with R-009) |
+| R-012 | Monthly review totals equal the summary for the same range | active |  | (runs with R-009) |
+| R-013 | Parent notification log: create, edit, filter not-notified, persists | active |  | (runs with R-009) |
+| R-014 | Camera capture, file fallback, upload retry, draft survives reload | active |  | `tests/test_capture.js` |
+| R-014b | capture.js: compress, retry, draft survives reload (pure client logic) | active |  | `tests/test_capture_client.js` |
+| R-014e | Camera + file fallback in a real browser against the real backend | active | playwright | `tests/e2e_capture.py` |
+| R-015 | Server never returns correct answers before submission (direct call) | active |  | `tests/test_R015_R016_review.js` |
+| R-016 | After submit: all questions correct vs wrong; written ones pending grading | active |  | (runs with R-015) |
+| R-017 | Grading updates score, correct/wrong list and average; regrade idempotent | active |  | `tests/test_grading.js` |
+| R-018 | A student cannot fetch another student's image | active |  | `tests/test_grading.js` |
+| R-019 | Arabic RTL intact on follow-up, summary, review, grading pages (screenshots) | active | playwright | `tests/e2e_R019_rtl.py` |
+| R-020 | Migrations: dry-run changes nothing; twice equals once; backup tab exists | active |  | `tests/test_keys.js` |
+| R-021 | check_asset_drift.py reports In sync | active |  | `check_asset_drift.py` |
+| R-022 | Audit log records grants, revokes, center decisions, grading changes | active |  | `tests/test_R022_audit_coverage.js` |
+| R-P01 | Phase 2 plumbing: router hook, flags, audit helper, test clock, .gs hygiene | active |  | `tests/test_phase2_core.js` |
+| R-P02 | Phase 2 contract conformance (auth, flags, shapes) for every handler that exists | active |  | `tests/test_phase2_contract.js` |
+| R-001c | check_lesson_paths.py: every lesson folder is self-consistent (S1 generator-side guard) | active |  | `check_lesson_paths.py` |
+| R-I01 | Integration seams S1+S4+S5: contract migrate shape, one AuditLog header, session-auth grading queue, flags, header contract | active |  | `tests/test_integration_s1_s4.js` |
+| R-S4a | Quiz Maker: model answers never reach the public quiz JSON; merge restores them on reopen | active |  | `tests/test_written_authoring.py` |
+| R-F01 | S2 follow-up status logic (required vs optional, deadlines, year, center week) | active |  | `tests/test_p2_followup_logic.js` |
+| R-F02 | S2 message templates (monthly review text, parent log wording, RTL, WhatsApp limits) | active |  | `tests/test_p2_followup_templates.js` |
+| R-I02 | Integration seams S2: router wiring, fallback if not pasted, flags, shared AuditLog, admin-session identity, canonical keys | active |  | `tests/test_integration_s2.js` |
+| R-023 | Homework lessons and quiz lessons are chosen separately per group; legacy groups follow the shared list; summary expects each kind only for its own lessons | active |  | `tests/test_R023_split_lessons.js` |
+| R-024 | Written (photo) questions in quizzes and homework use the CURRENT total: ungraded written marks are not counted, graded ones are; regrade is idempotent; follow-up facts match | active |  | `tests/test_R024_written_totals.js` |
+| R-025 | access.html merges old/typo'd lesson keys into the current lesson (one row, not two) | active |  | `tests/test_access_alias_client.js` |
+| R-A01 | Attendance flags (AttFlags.gs): GEO_FAR/WEAK/DENIED, SAME_PHONE_MULTI_ID, IDENTICAL_COORDS, REPEATED | active |  | `tests/attendance/flags.test.js` |
+| R-A02 | Attendance end to end: real .gs + real client crypto/api, Telegram ad:/dd:, flags, roster, export | active |  | `tests/attendance/e2e.test.js` |
+| R-A03 | Attendance admin roster page against the real server code | active |  | `tests/attendance/admin_roster.test.js` |
+| R-A04 | Code.gs routes att_* to att_dispatch_ and Telegram ad:/dd: taps to att_decideFromTelegram_ (payments ap:/rj: unchanged) | active |  | `tests/test_attendance_wiring.js` |
+| R-A05 | Attendance student page: location gate before sign-in, failure reasons, blocking overlay, retry/watchdog, no auto check-in | active |  | `tests/attendance/student_page.test.js` |
+| R-A06 | Attendance multi-user backend: accounts, login/lockout, owner scoping, geo reasons, upgrade rule, overview, review | active |  | `tests/attendance/multiuser.test.js` |
+| R-A07 | Attendance dashboard (admin.js against the real backend): password-or-token login, teacher isolation in History, review, admin Users + All sessions | active |  | `tests/attendance/dashboard.test.js` |
+| R-A08 | Attendance multi-user in real Chromium: 2 teachers at once, geolocation granted/blocked/far, escape hatch, upgrade, offline retry, both dashboards | active | playwright | `tests/attendance/e2e_multiuser.py` |
+| R-P3-F1 | S1 follow-up core: contacted state, week/month boundaries, filter sort order, flag notices, Phase3_Flags.gs against the real router | active |  | `tests/test_p3_followup.js` |
+| R-P3-F2 | S1 follow-up page in a browser: contact chips, counter, filter+sort+hash, flag-off banner, monthly month boundary, required-rule guide | active | playwright | `tests/e2e_p3_followup.py` |
+| R-P3-ROLES | Phase 3: assistant role allow-list, role column, admin-only role management | active |  | `tests/test_p3_roles.js` |
+| R-P3-B1 | S4 bulk access: preview/grant/revoke, dedupe, cap, group rules, audit | active |  | `tests/test_p3_bulk_access.js` |
+| R-P3-B2 | S4 Bulk access tab in a browser: tick, preview, apply, revoke, give back | active | playwright | `tests/e2e_p3_bulk_access.py` |
+| R-P3-R1 | S2 submission recovery: diagnose/restore/backfill, upload order, pending queue | active |  | `tests/test_p3_recovery.js` |
+| R-P3-P1 | S2 compact lesson picker (combobox) | active |  | `tests/test_p3_picker.js` |
+| R-P3-ASST | Assistant's working day: follow-up, mark contacted, group switch, summary, written answers + photo + grading, admin-only still refused | active |  | `tests/test_p3_assistant_flow.js` |
+| R-UG1 | Upload guard: full-screen do-not-close screen on file upload (warning, close-block, done, offline retry) | active | playwright | `tests/e2e_upload_guard.py` |
+| R-G01 | Grade 1 / 2 lesson lists: sectioned by chapter, ordered by chapter then lesson, numbered consecutively (also after add/remove) | active |  | `tests/test_grid_layout.py` |
+| R-P4-S1-01 | P4-S1 hardening: delete_attachment parent check, upload session check, P4_LEGACY_UPLOADS, client sends session | active |  | `tests/test_p4_s1_hardening.js` |
+| R-P4-S1-02 | P4-S1 math-render.js + on-demand loader in jsdom with real KaTeX: only \( \) and \[ \], lazy load, missing KaTeX harmless, Arabic order. NEEDS jsdom (npm i --no-save jsdom); without it the test SKIPs and the runner shows "0 pass" | active | jsdom | `tests/test_p4_s1_math.js` |
+| R-P4-S1-03 | P4-S1 bulk parser: * inside math is not a marker, trailing * is, \* is literal, backslashes survive to the page JSON | active |  | `tests/test_p4_s1_parser.py` |
+| R-P4-S2-01 | P4 authorization core: ctx, action table, gate, hooks, lesson filters | active |  | `tests/test_p4_s2_scope.js` |
+| R-P4-S3-01 | contract surface: every function named in the contract exists; self test | active |  | `tests/test_p4_s3_people.js` |
+| R-P4-S3-02 | student linkage: each of the four rules alone, none, multi-subject union, assistant shares principal cache | active |  | `tests/test_p4_s3_people.js` |
+| R-P4-S3-03 | group ownership and group state (own / free / foreign) | active |  | `tests/test_p4_s3_people.js` |
+| R-P4-S3-04 | response filters: get_all, access overview, payments, groups, follow-up overview, summary, monthly, notifications, grading queue | active |  | `tests/test_p4_s3_people.js` |
+| R-P4-S3-05 | filters drop unknown top-level keys for scoped callers (shape drift fails closed) | active |  | `tests/test_p4_s3_people.js` |
+| R-P4-S3-06 | add-by-phone: registered boolean only, 30 per hour bucket, group creation owner row | active |  | `tests/test_p4_s3_people.js` |
+| R-P4-S3-07 | payment scope: own stored scope decides, crafted scope override refused | active |  | `tests/test_p4_s3_people.js` |
+| R-P4-S3-08 | p4_admin_set_group_owner: owner only, target must be a teacher, reset | active |  | `tests/test_p4_s3_people.js` |
+| R-P4-S3-09 | shared student and scoped assistant end to end | active |  | `tests/test_p4_s3_people.js` |
+| R-P4-S3-10 | per-owner follow-up templates (needs patches/S3-templates.diff applied; prints SKIP otherwise) | active |  | `tests/test_p4_s3_people.js` |
+| R-P4-S4-01 | p4_wire.py: merge, hooks H1-H5, idempotence, CRLF, broken anchors fail loudly | retired: pre-assembly tooling test (needs an unmerged tree); passed 46/0 and 22/0 before assembly. Retired after p4_wire --merge --wire. | node | `tests/test_p4_s4_wire.js` |
+| R-P4-S4-02 | merge_registry_fragments.py: eight fragments, duplicates, activate, check | retired: pre-assembly tooling test (needs an unmerged tree); passed 46/0 and 22/0 before assembly. Retired after p4_wire --merge --wire. | node | `tests/test_p4_s4_registry.js` |
+| R-P4-S4-03 | p4_matrix.json fixture matches the real router (every admin action classified, field names exist) | active | node | `tests/test_p4_s4_matrix_fixture.js` |
+| R-P4-S4-04 | authorization matrix: every action x 7 callers x lesson context x ownership (needs merged Phase 4) | active | node | `tests/test_p4_s4_matrix.js` |
+| R-P4-S4-05 | acceptance run of plan section 9 steps 1-12, 15 on the assembled backend (needs merged Phase 4) | active | node | `tests/test_p4_s4_acceptance.js` |
+| R-P4-S4-06 | S4 test support world builds (actors, groups, payments, SHA-256 and UrlFetch stubs) | active | node | `tests/test_p4_s4_support.js` |
+| R-P4-S4-07 | desktop teacher mode: subject filter, guards, startup against a local ping server | active | python | `tests/test_p4_s4_teacher_mode.py` |
+| R-P4-S5-01 | P4 S5: teacher accounts and tokens, teacher-appointed assistants, student record edits, edit log | active |  | `tests/test_p4_s5_team.js` |
+| R-P4-S5-02 | P4 S5: phone cascade over every phone-keyed sheet, rollback, busy lock, P4_TEACHER_PHONE_EDIT flag | active |  | `tests/test_p4_s5_cascade.js` |
+| R-P4-S6-01 | Telegram per teacher: link flow, routing, callback authorization, replay, owner ping, unlink | active |  | `tests/test_p4_s6_telegram.js` |
+| R-P4-S8-01 | P4 S8: p4_admin_teacher_stats: every metric, cache, shared subject, null metrics, no student data, owner only, read only | active |  | `tests/test_p4_s8_stats.js` |
+| R-P4-S8-02 | P4 S8: dashboard/teacher-stats.html renders, sorts, shows errors, hostile text is inert (jsdom) | active | jsdom | `tests/test_p4_s8_page.js` |
+| R-P4-S7-01 | Draft store: stage, replace, discard, Save in order, partial failure, double press, restore, beforeunload, timer pause | active |  | `tests/test_p4_s7_draft.js` |
+| R-P4-S7-02 | staff guard: every page x every role, old-backend fallback, forged role, visibility, scope badge | active |  | `tests/test_p4_s7_pages.js` |
+| R-P4-S7-03 | grading page: staged grades, Save, staging survives a re-read, roles, refused grade stays staged | active |  | `tests/test_p4_s7_pages.js` |
+| R-P4-S7-04 | my-team page: assistants, Telegram, confirms, neutral appoint message, non-teachers bounced | active |  | `tests/test_p4_s7_pages.js` |
+| R-P4-S7-05 | team page (owner): teachers, Telegram unlink, edit log as text, non-owners bounced | active |  | `tests/test_p4_s7_pages.js` |
+| R-P4-S7-06 | student summary: teacher-only edit card, staged edit, Save, assistants see no card | active |  | `tests/test_p4_s7_pages.js` |
+| R-P4-S7-07 | follow-up page: staged attendance, Save, discard re-reads the server, templates button by role | active |  | `tests/test_p4_s7_pages.js` |
+| R-P4-S7-08 | access page: staged locks, immediate payment decision, staged edits survive, owner-only controls, assistants | active |  | `tests/test_p4_s7_pages.js` |
+| R-P4-S7-09 | static checks: reloads only at sign-out, staged actions not sent directly, owner-only markers, no markup injection | active |  | `tests/test_p4_s7_pages.js` |
+| R-P4-S7-10 | S7 fake DOM helper loads (library used by R-P4-S7-02..09) | active |  | `tests/test_p4_s7_fakedom.js` |
+| R-FU2-S1-1 | follow-up v2 page (no browser): 12-hour formatter, no Cairo / no <input type=time>, script order, fixture 3.4/3.5 fields, stub shape, scenario phases vs the real engine | active |  | `tests/test_followup_v2_ui.js` |
+| R-FU2-S1-2 | follow-up v2 page on a 390px phone (?mock=1): Today tab, hero per golden phase, dots, deep links, reminder sent, advance card, walk-through + fallback, requirement off, 12-hour pickers, notification settings, degraded layout | active | playwright | `tests/e2e_followup_v2.py` |
+| R-FU2-NOTIFY | Follow-up v2 notifications: hourly tick, dedup, quiet hours, snooze/enabled, Telegram callbacks, mark-done, settings, overview hook, "Alex" never "Cairo" | active |  | `tests/test_fu2_notify.js` |
+| R-FU2-S3-1 | follow-up v2 event engine: eventsFor / dueNow, golden examples, DST weeks | active |  | `tests/test_followup_events.js` |
+| R-FU2-S3-2 | follow-up v2 parity: browser module vs generated FollowupLogic.gs (incl. 6 DST fixtures) + build --check | active |  | `tests/test_followup_parity.js` |
+| R-FU2-S3-3 | parent-message walk-through: flow core (pure) | active |  | `tests/test_followup_walk.js` |
+| R-FU2-S3-4 | parent-message walk-through on a 390px phone (own harness page) | active | playwright | `tests/e2e_followup_walk.py` |
+| R-FU2-S3-5 | FollowupLogic.gs is current with its two sources | active |  | `scripts/build_server_logic.py` |
+| R-REQ1 | Requirements: pure rules (defaults = today, precedence, validation, custom keys) | active |  | `tests/test_req_logic.js` |
+| R-REQ2 | Requirements: server copy (Requirements.gs) and client copy (requirements-logic.js) agree | active |  | `tests/test_req_parity.js` |
+| R-REQ3 | Requirements: five actions, audit, assistant access, hook, checks, history (real Code.gs) | active |  | `tests/test_req_server.js` |
+| R-REQ4 | Requirements page at 390px in mock mode: toggle, override, copy, manual check, preview, history | active | playwright | `tests/e2e_requirements.py` |
+| R-FU2-CORE | Follow-up v2 core: routing admin_fu2_*/admin_req_*, allow-list (assistants), overview hooks, internal overview, Telegram fu: callbacks, group duplicates | active |  | `tests/test_fu2_core.js` |
+| R-FU2-ONEGROUP | One group per student: in_other_group, move:true, all-or-nothing bulk, audit, atomic under the lock | active |  | `tests/test_one_group.js` |
+| R-FU2-MONTHLY | Monthly report requirements section + sent/closed snapshot | active |  | `tests/test_monthly_requirements.js` |
+| R-FU2-E2E-GROUP | access.html: confirm before moving, current group in picker, two-groups banner (real Code.gs + FollowupRouter.gs, Chromium) | active | playwright | `tests/e2e_one_group.py` |
+| R-FU2-E2E-SUMMARY | student-summary.html: Requirements card in the summary and the monthly report (mock, 390px) | active | playwright | `tests/e2e_student_summary_requirements.py` |
+| R-FU2-P4-1 | follow-up v2 x Phase 4 integration: who may call admin_fu2_*/admin_req_*, one group per student per teacher, what a teacher's overview / monthly review carries | active |  | `tests/test_fu2_p4_integration.js` |
+| R-NOTIFY-1 | Telegram 'Quiz completed': the lesson name appears once (no path name + em dash + same quiz title) | active |  | `tests/test_notify_lesson_title.js` |
+| R-RESTORE-1 | 99d91f0 kept: one active sign-in per account (check_session), photo report (report_photos), written marks out of the auto score | active |  | `tests/test_session_photos_99d91f0.js` |
+| R-DOC-1 | docs/REGRESSION.md table matches tests/registry.json (regenerate with scripts/gen_regression_table.py) | active |  | `scripts/gen_regression_table.py` |
+
+<!-- registry-table:end -->
 
 ## Change log
+
+- 2026-11-03 (follow-up v2 x math teacher integration, restore): every entry active and green, browser tests included.
+  R-E17 / R-E19 / R-E20 brought up to date with the pages (click-to-play video, Arabic paywall, folded access groups,
+  Videos tab merged into Lessons, quiz template placeholder); R-E18 / R-E21 / R-E22 / R-007 / R-008 press the Save bar
+  (P4-S7). New: R-NOTIFY-1 (lesson name once in the quiz Telegram message), R-RESTORE-1 (99d91f0 sign-in check and photo
+  report, undone once by an old-snapshot assembly), R-DOC-1 (this table is generated and checked). CI now runs
+  `test_all.sh --strict --e2e --require-all` as ONE required job: a skipped case fails.
 
 - v1.1 (integration 1, 2026-10-21): R-001..R-006, R-001b, R-017, R-018, R-020 now active; R-001c, R-I01, R-S4a added. R-E17/E19/E20 fail identically on the original repo in the sandbox (known, not Phase 2).
 - v1 (Session 5): first publication; R-E01..R-E22 imported unchanged; R-001..R-022 from rollout plan v2; R-001b, R-P01, R-P02 added.

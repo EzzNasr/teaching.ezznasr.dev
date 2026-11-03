@@ -1,10 +1,11 @@
-node -v#!/usr/bin/env bash
+#!/usr/bin/env bash
 # Master test gate. EVERY patch goes through this before commit/push/deploy.
 #
 #   scripts/test_all.sh                 fast gate: syntax + registry (Node) + drift + lesson paths + orphan check
 #   scripts/test_all.sh --e2e           also the Playwright browser tests (slow, ~2 min, needs `pip install playwright`)
 #   scripts/test_all.sh --strict        release gate: also fails on pending/TODO registry entries and unregistered tests
 #   scripts/test_all.sh --only R-E1     pass-through to the registry runner (id or prefix)
+#   scripts/test_all.sh --require-all   CI: a case that is skipped (no Playwright, no jsdom, no python) FAILS instead
 #   scripts/test_all.sh --live          also smoke-test the DEPLOYED Apps Script endpoint (read-only; needs internet). Run after every deploy.
 #   scripts/test_all.sh --install-hook  install a git pre-push hook that runs the fast gate (bypass: git push --no-verify)
 #
@@ -16,18 +17,19 @@ SITE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 QM="$SITE/tools/quiz-maker-v2"
 cd "$SITE" || exit 2
 
-E2E=0; STRICT=0; LIVE=0; ONLY=""
+E2E=0; STRICT=0; LIVE=0; ONLY=""; REQALL=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --e2e) E2E=1 ;;
     --strict) STRICT=1 ;;
+    --require-all) REQALL=1 ;;
     --live) LIVE=1 ;;
     --only) ONLY="${2:-}"; shift ;;
     --install-hook)
       hook="$(git rev-parse --git-path hooks/pre-push 2>/dev/null)" || { echo "not a git repo"; exit 2; }
       printf '#!/usr/bin/env bash\nexec "$(git rev-parse --show-toplevel)/scripts/test_all.sh"\n' > "$hook"
       chmod +x "$hook"; echo "installed $hook  (skip once with: git push --no-verify)"; exit 0 ;;
-    -h|--help) sed -n '2,14p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,15p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "unknown option $1"; exit 2 ;;
   esac
   shift
@@ -83,6 +85,7 @@ stage "2. regression registry"
 ARGS=()
 [ $E2E -eq 1 ] && ARGS+=(--e2e)
 [ $STRICT -eq 1 ] && ARGS+=(--strict)
+[ $REQALL -eq 1 ] && ARGS+=(--require-all)
 [ -n "$ONLY" ] && ARGS+=(--only "$ONLY")
 node scripts/run_registry.js "${ARGS[@]}" | tee "$TMP/reg.txt" | grep -v '^PASS '
 NPASS=$(grep -c '^PASS ' "$TMP/reg.txt")

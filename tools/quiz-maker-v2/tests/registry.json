@@ -1446,6 +1446,37 @@
         "node",
         "tests/test_fu2_p4_integration.js"
       ]
+    },
+    {
+      "id": "R-NOTIFY-1",
+      "title": "Telegram 'Quiz completed': the lesson name appears once (no path name + em dash + same quiz title)",
+      "status": "active",
+      "owner": "integration",
+      "cmd": [
+        "node",
+        "tests/test_notify_lesson_title.js"
+      ]
+    },
+    {
+      "id": "R-RESTORE-1",
+      "title": "99d91f0 kept: one active sign-in per account (check_session), photo report (report_photos), written marks out of the auto score",
+      "status": "active",
+      "owner": "integration",
+      "cmd": [
+        "node",
+        "tests/test_session_photos_99d91f0.js"
+      ]
+    },
+    {
+      "id": "R-DOC-1",
+      "title": "docs/REGRESSION.md table matches tests/registry.json (regenerate with scripts/gen_regression_table.py)",
+      "status": "active",
+      "owner": "integration",
+      "cmd": [
+        "python",
+        "../../scripts/gen_regression_table.py",
+        "--check"
+      ]
     }
   ]
 }

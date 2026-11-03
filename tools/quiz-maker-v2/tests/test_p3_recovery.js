@@ -143,12 +143,14 @@ const read = f => fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n');
         Promise, JSON, Object, Error, location: { pathname: '/programming/x/lesson/assignment.html' },
         session: { student_id: '01000000002', session_token: 'tok' },
         state: { record: { client_id: 'cid-abcdefgh', answers: [{ id: 'q1', type: 'written' }, { id: 'q2', type: 'written' }] }, widgets: {}, syncStatus: null, busy: false, photoStatus: null },
+        // 99d91f0 helpers (restored 2026-11-03): newest token, lesson path, and the "photos received" ping
+        lesson: 'lesson', freshToken: (se) => se.session_token, lessonPathFromUrl: () => 'programming/x/lesson', reportPhotos: () => {},
         render() {}, beginGuard: () => { const n = { set: () => n, busy: () => n, success: () => n, fail: () => n, close: () => n }; return n; }, dequeueSubmission: id => dequeued.push(id),
         postToDrive: (p) => { calls.push(p.action); if (p.action === 'upload_submission') return scenario.submissionFails ? Promise.reject(new Error('Couldn\'t reach the server.')) : Promise.resolve({ ok: true });
           return scenario.photosRefused ? Promise.reject(new Error('Feature disabled: FF_CAMERA')) : Promise.resolve({ ok: true }); },
       };
       let cleared = 0;
-      const widget = { pending: () => 1, upload: (send) => send({ id: 'img-00000001' }, 'b64').then(() => ({ ok: true }), (e) => ({ ok: false, error: e.message })), clear: () => { cleared++; } };
+      const widget = { pending: () => 1, count: () => 1, upload: (send) => send({ id: 'img-00000001' }, 'b64').then(() => ({ ok: true }), (e) => ({ ok: false, error: e.message })), clear: () => { cleared++; } };
       sb.state.widgets = { q1: widget, q2: widget };
       vm.createContext(sb);
       vm.runInContext(code + '\nthis.sendRecord = sendRecord;', sb);

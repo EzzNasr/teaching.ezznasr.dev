@@ -77,3 +77,22 @@ Not done: R-019 (RTL) and R-022 (audit coverage) still TODO; S3 did not deliver 
 - Assignment tab: "+ Written (photo)" button, edit, model answers synced to WrittenModels on Update and merged back on load; written item id = qid.
 - Bulk paste (both tabs): WRITTEN:/W:, Marks:/Max:, Model:, E:.
 - Homework now excludes a pending written answer from `total` (assign.js); result page says it is waiting. R-024 added.
+
+## Integration 7 (Nov 3): Follow-up v2 (S1-S5) on top of Phase 4 (math teacher), and the restore of reverted work
+Full write-up: `Docs/INTEGRATION-REPORT.md` (outside the repo).
+- Merge: follow-up v2 S1-S5 onto `0757045` (Phase 4 S1-S8). New P4 row `admin_fu2_mark_done`; one group per student
+  **per teacher**; teachers get no cross-subject requirement counts; overview allow-list gains `tz_label`,
+  `unclassified_requirements`. Guarded by R-FU2-P4-1 (`test_fu2_p4_integration.js`).
+- **Reverted work found and restored.** `0757045` was assembled from a copy of the site older than Nov 1 and silently
+  undid `99d91f0` (one active sign-in per account: `check_session`; photo report: `report_photos`; written marks out of
+  the auto score) and most of `5c6efc9` (grading page quiz/homework split). `9877ddf` undid the desktop teacher mode
+  in `app_main.py`. All three re-applied with a 3-way merge on top of P4 + follow-up v2; the Quiz Maker templates
+  (`assets_templates/quiz.js`, `assign.js`) synced so new lessons ship them too. Guarded by R-RESTORE-1 and R-P4-S4-07.
+  How it was found: for every commit, the lines it added that are missing at HEAD (`git show <c>` vs the file).
+- Bugs fixed: the Save bar (P4-S7) covered the Undo toast and bottom sheets on phones (its height was read before
+  layout); bulk "all center" lost the "access ends Friday" line; assigning students to a new group no longer opened
+  it after Save; the access page dropped its confirmations ("Approved Sara...", "... is now open") once actions became
+  staged; the quiz Telegram message named the lesson twice (path name, em dash, then the quiz title).
+- Tests: every registry entry green including the browser tests (R-E17/19/20 brought up to date with the pages; the
+  staged flows press Save). CI = one required job `test_all.sh --strict --e2e --require-all`. R-DOC-1 keeps
+  `REGRESSION.md` generated from `registry.json`.

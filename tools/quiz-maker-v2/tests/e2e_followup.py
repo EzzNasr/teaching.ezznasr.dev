@@ -579,18 +579,21 @@ def main():
         check("real mode: no mock badge, overview requested via adminCall", not pg.is_visible("#fu-mock") and pg.evaluate("__calls.some(function (c) { return c.action === 'admin_followup_overview'; })"))   # StaffGuard asks p3_session_role first
         pg.click("#stu-1012345001 .fu-stu-head")
         pg.click("#stu-1012345001 [data-att='center']")
+        pg.click("#p4-draft-save")   # P4-S7: attendance is staged until Save
         pg.wait_for_function("__calls.some(c => c.action==='admin_followup_set_attendance')")
         call = pg.evaluate("__calls.filter(c => c.action==='admin_followup_set_attendance')[0]")
         check("set_attendance payload matches the contract",
               call["lesson"].endswith("chapter-2-lesson-2-functions") and call["grant"] is True and call["items"] == [{"phone": "01012345001", "mode": "center"}], call)
         pg.click("#fu-all-online")
         pg.click(".fu-dialog .fu-btn.primary")
+        pg.click("#p4-draft-save")
         pg.wait_for_function("__calls.filter(c => c.action==='admin_followup_set_attendance').length===2")
         call = pg.evaluate("__calls.filter(c => c.action==='admin_followup_set_attendance')[1]")
         check("bulk attendance sends every member in one batch", len(call["items"]) == 5 and all(i["mode"] == "online" for i in call["items"]), call)
         pg.evaluate("document.querySelector('.fu-det').open = true")
         pg.fill("#fu-note", "ملاحظة")
         pg.click("#fu-save-settings")
+        if pg.is_visible("#p4-draft-save"): pg.click("#p4-draft-save")   # P4-S7: group settings are staged until Save
         pg.wait_for_function("__calls.some(c => c.action==='admin_followup_save_group')")
         g = pg.evaluate("__calls.filter(c => c.action==='admin_followup_save_group').pop()")
         keys = {"action", "group", "weekday", "time", "current_lesson", "review_lessons", "note", "parents_contacted", "watch_deadline_override", "hw_deadline_override"}

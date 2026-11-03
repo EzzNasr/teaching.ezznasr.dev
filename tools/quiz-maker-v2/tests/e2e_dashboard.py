@@ -70,6 +70,23 @@ def can_watch(sess, lesson, slot="lesson"):
     return bool(r.get("embed_url"))
 
 
+def save(pg):
+    """P4-S7: access changes are staged; the Save bar sends them."""
+    pg.wait_for_timeout(100)
+    if pg.locator("#p4-draft-save").count() and pg.is_visible("#p4-draft-save"):
+        pg.click("#p4-draft-save")
+
+
+def expand(pg):
+    """The access list is grouped by year and lesson in folded <details> (redesign after R-004): open them all."""
+    pg.wait_for_selector(".dash-section h2")
+    b = pg.locator(".ac-tools button", has_text="Expand all")
+    if b.count():
+        b.first.click()
+    pg.wait_for_timeout(150)   # a filter change redraws the list a moment later; open whatever is still folded
+    pg.evaluate("document.querySelectorAll('.dash-section details').forEach(function (d) { d.open = true; })")
+
+
 def open_dash(browser, session, width=1180, dark=False):
     s = E.Site(browser, session=session, pages={"/dashboard/access.html": DASH_HTML})
     s.ctx.close()
@@ -132,7 +149,7 @@ def run(browser):
     s = open_dash(browser, admin)
     pg = s.page
     pg.wait_for_selector(".dash-stats")
-    check("page loads for an admin and greets with the title", "Video access" in pg.inner_text("h1"), pg.inner_text("body")[:200])
+    check("page loads for an admin and greets with the title", "Lesson access" in pg.inner_text(".dash-head h1"), pg.inner_text("body")[:200])
     stats = pg.inner_text(".dash-stats")
     check("stats: 2 requests waiting", "2" in pg.locator(".dash-stat b").nth(0).inner_text(), stats)
     check("opens on the Requests tab because something is waiting", "is-active" in pg.get_attribute('[data-tab="requests"]', "class"))
@@ -142,6 +159,7 @@ def run(browser):
     check("a request card shows name, phone, reference, note, lesson and time", all(x in txt for x in ["Sara", "01000000002", "wallet-sara-123", "paid this morning", "Functions", L1, P["sara"]]), txt)
     check("it says this would be her first access to that lesson", "None" in txt or "first" in txt, txt)
     pg.click('[data-tab="access"]')
+    expand(pg)
     pg.click("details.ac-help summary")
     check("help block explains the rules", pg.locator("details.ac-help summary").count() == 1 and "revoke" in pg.inner_text("details.ac-help").lower())
     s.ctx.close()
@@ -153,8 +171,11 @@ def run(browser):
     s.ctx.close()
     forged = dict(S["nour"], is_admin=True)
     s = open_dash(browser, forged)
-    s.page.wait_for_selector(".dash-err")
-    check("a forged is_admin flag gets the server's refusal, not data", "doesn't have admin access" in s.page.inner_text(".dash-err"), s.page.inner_text("body")[:200])
+    # The role-aware guard (P4-S7) asks the SERVER who this is (p3_session_role): a forged flag is sent to the
+    # student's own dashboard, and no admin data ever reaches the page.
+    s.page.wait_for_url("**/student.html")
+    check("a forged is_admin flag is sent to the student dashboard by the server's answer, not data",
+          "student.html" in s.page.url and not any(str(c.get("action", "")).startswith("admin_") for c in getattr(s, "calls", [])), getattr(s, "calls", []))
     s.ctx.close()
 
     # ---- 3. approving a request --------------------------------------------------------------------------------------------------------
@@ -206,31 +227,40 @@ def run(browser):
     pg = s.page
     pg.wait_for_selector('[data-tab="access"]')
     pg.click('[data-tab="access"]')
+    expand(pg)
     pg.wait_for_selector("[data-access]")
     names = pg.inner_text(".dash-section")
     check("default filter shows active access only (Nour, Hana, Sara x2, the no-account number)", "Nour" in names and "Hana" in names and "Mo" not in [w.strip() for w in names.split("\n")][:0] and "01099999999" in names, names[:400])
     nour = pg.locator('[data-access^="01000000004|"]')
-    t = nour.inner_text()
+    t = nour.inner_text() + "\n" + nour.locator("xpath=ancestor::details[1]").locator("summary").inner_text()   # the lesson name heads its group
     check("an access card shows who, what, until when (with days left), since when and how", all(x in t for x in ["Nour", "Functions", plus(today, 30), "30 days left", "wallet-nour", "Payment " + P["nour"]]), t)
     check("the unknown number is flagged as having no account", "no account with this number yet" in pg.locator('[data-access^="01099999999|"]').inner_text())
     check("a never-ending manual grant says so and where it came from", "Never expires" in pg.locator('[data-access^="01000000002|english/*"]').inner_text() and "Added by hand" in pg.locator('[data-access^="01000000002|english/*"]').inner_text())
     pg.select_option('[data-status="access"]', "ending")
+    expand(pg)
     check("'Ending within 7 days' shows only Hana", pg.locator("[data-access]").count() == 1 and "Hana" in pg.inner_text("[data-access]"), pg.locator("[data-access]").count())
     check("...with a 'ends soon' badge", "ends soon" in pg.inner_text("[data-access]").lower())
     pg.select_option('[data-status="access"]', "expired")
+    expand(pg)
     check("'Expired' shows Omar's ended grant, 'ended … ago'", pg.locator("[data-access]").count() == 1 and "ended" in pg.inner_text("[data-access]") and "ago" in pg.inner_text("[data-access]") and "2020-01-05" in pg.inner_text("[data-access]"), pg.inner_text(".dash-section")[:300])
     pg.select_option('[data-status="access"]', "problem")
+    expand(pg)
     txt = pg.inner_text(".dash-section")
     check("'Cancelled / needs fixing' shows the hand-cancelled payment and explains why", "Mo" in txt and "switched off" in txt and "rejected" in txt, txt[:400])
     pg.select_option('[data-status="access"]', "all")
+    expand(pg)
     n_all = pg.locator("[data-access]").count()
     pg.fill('[data-search="access"]', "hana")
+    expand(pg)
     check("search narrows the list by name (and keeps the typing)", pg.locator("[data-access]").count() == 1 and pg.input_value('[data-search="access"]') == "hana", pg.locator("[data-access]").count())
     pg.fill('[data-search="access"]', "")
+    expand(pg)
     check("clearing the search brings everything back", pg.locator("[data-access]").count() == n_all)
     pg.fill('[data-search="access"]', "zzz-nothing")
+    expand(pg)
     check("no match says so", "Nothing matches" in pg.inner_text(".dash-section"))
     pg.fill('[data-search="access"]', "")
+    expand(pg)
     pg.select_option('[data-status="access"]', "active")
     s.ctx.close()
 
@@ -240,6 +270,7 @@ def run(browser):
     pg = s.page
     pg.wait_for_selector('[data-tab="access"]')
     pg.click('[data-tab="access"]')
+    expand(pg)
     nour = pg.locator('[data-access^="01000000004|"]')
     nour.locator('[data-open="revoke"]').click()
     panel = nour.locator('[data-panel="revoke"]')
@@ -250,6 +281,7 @@ def run(browser):
     check("Cancel leaves the access alone", can_watch(S["nour"], L1) and nour.locator('[data-panel]').count() == 0)
     nour.locator('[data-open="revoke"]').click()
     nour.locator('[data-do="revoke"]').click()
+    save(pg)
     pg.wait_for_selector(".ac-toast.is-ok")
     check("revoking confirms and names the payment it marked revoked", "Revoked Nour" in pg.inner_text(".ac-toast") and P["nour"] in pg.inner_text(".ac-toast"), pg.inner_text(".ac-toast"))
     check("her card is gone from the active list", pg.locator('[data-access^="01000000004|"]').count() == 0)
@@ -262,11 +294,14 @@ def run(browser):
     pg = s.page
     pg.wait_for_selector('[data-tab="access"]')
     pg.click('[data-tab="access"]')
+    expand(pg)
     pg.select_option('[data-status="access"]', "problem")
+    expand(pg)
     mo = pg.locator('[data-access^="01000000006|"]')
     mo.locator('[data-open="revoke"]').click()
     check("removing a cancelled row is described as tidying, not revoking", "Remove this row" in mo.locator('[data-panel="revoke"]').inner_text())
     mo.locator('[data-do="revoke"]').click()
+    save(pg)
     pg.wait_for_selector(".ac-toast.is-ok")
     check("...and the payment keeps its 'rejected' status", any(p["payment_id"] == P["mo"] and p["status"] == "rejected" for p in overview()["payments"]))
     s.ctx.close()
@@ -276,11 +311,13 @@ def run(browser):
     pg = s.page
     pg.wait_for_selector('[data-tab="access"]')
     pg.click('[data-tab="access"]')
+    expand(pg)
     hana = pg.locator('[data-access^="01000000005|"]')
     hana.locator('[data-open="renew"]').click()
     panel = hana.locator('[data-panel="renew"]')
     check("Extend… previews that it adds to the end date she already has", "added to the end date" in panel.locator(".ac-preview").inner_text() and plus(today, 33) in panel.locator(".ac-preview").inner_text(), panel.locator(".ac-preview").inner_text())
     panel.locator('[data-do="renew"]').click()
+    save(pg)
     pg.wait_for_selector(".ac-toast.is-ok")
     after = [a for a in overview()["access"] if a["phone"].endswith("1000000005")][0]
     check("SERVER: her end date moved out by 30 days", after["expires_at"] == plus(today, 33), after)
@@ -305,32 +342,24 @@ def run(browser):
     check("an approved request shows the access it gave and its state", "approved" in ht.lower() and plus(today, 33) in ht and "currently active" in ht, ht)
     hh.locator('[data-open="revoke-pay"]').click()
     hh.locator('[data-do="revoke"]').click()
+    save(pg)
     pg.wait_for_selector(".ac-toast.is-ok")
     check("revoking from the history works by payment id", not can_watch(S["hana"], L2) and any(p["payment_id"] == P["hana"] and p["status"] == "revoked" for p in overview()["payments"]))
     s.ctx.close()
 
-    # ---- 9. videos ------------------------------------------------------------------------------------------------------------------------------------------------
+    # ---- 9. videos ------------------------------------------------------------------------------------------------
+    # The old "Videos" tab is now part of the Lessons tab: each lesson card has one switch per video (lesson / quiz
+    # solution / assignment solution). Opening and locking them end to end is tested in e2e_lesson_video_lock.py (R-E21).
     s = open_dash(browser, admin)
     pg = s.page
-    pg.wait_for_selector('[data-tab="videos"]')
-    pg.click('[data-tab="videos"]')
-    pg.wait_for_selector("[data-video]")
-    check("all four video slots are listed", pg.locator("[data-video]").count() == 4)
-    v1 = pg.locator('[data-video="%s|lesson"]' % L1)
-    t = v1.inner_text()
-    check("a locked video says who can watch it and how many students that is", "locked" in t.lower() and "You + 1 student" in t and "AAAAAAAAAAA" in t, t)
-    check("an open video says everyone", "Everyone" in pg.locator('[data-video="%s|lesson"]' % L3).inner_text())
-    v1.locator('[data-open="lock"]').click()
-    vt = v1.locator('[data-panel="open"]').inner_text()
-    check("opening a video to everyone asks first and warns it can't be undone for those who saw it", "Open this video to everyone" in vt and "can't take back" in vt.replace("not take back", "can't take back") or "not take back" in vt, vt)
-    v1.locator('[data-do="open"]').click()
-    pg.wait_for_selector(".ac-toast.is-ok")
-    check("SERVER: the video is now open to a signed-out visitor", api({"action": "get_video", "lesson": L1, "slot": "lesson"}).get("embed_url", "").endswith("AAAAAAAAAAA"))
-    pg.locator('[data-video="%s|lesson"] [data-open="lock"]' % L1).click()
-    pg.wait_for_selector(".ac-toast.is-ok")
-    pg.wait_for_function("document.querySelector('.ac-toast') && document.querySelector('.ac-toast').textContent.indexOf('now locked') !== -1")
-    check("'Lock it' locks again right away (no question needed)", "now locked" in pg.inner_text(".ac-toast") and not api({"action": "get_video", "lesson": L1, "slot": "lesson"}).get("embed_url"))
+    pg.wait_for_selector('[data-tab="lessons"]')
+    check("there is no separate Videos tab any more", pg.locator('[data-tab="videos"]').count() == 0)
+    pg.click('[data-tab="lessons"]')
+    expand(pg)
+    pg.wait_for_selector("[data-video-toggle]", state="attached")
+    check("the Lessons tab carries the video switches", pg.locator("[data-video-toggle]").count() >= 1, pg.locator("[data-video-toggle]").count())
     s.ctx.close()
+
 
     # ---- 10. giving access by hand -----------------------------------------------------------------------------------------------------------------------------------
     s = open_dash(browser, admin)
@@ -364,7 +393,7 @@ def run(browser):
     s.ctx.close()
 
     # ---- 11. small screens ----------------------------------------------------------------------------------------------------------------------------------------------------
-    for tab in ("requests", "access", "history", "videos", "grant"):
+    for tab in ("requests", "access", "history", "lessons", "quizzes", "groups", "bulk", "grant"):
         s = open_dash(browser, admin, width=390)
         pg = s.page
         pg.wait_for_selector('[data-tab="%s"]' % tab)

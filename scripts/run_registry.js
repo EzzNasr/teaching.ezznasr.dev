@@ -13,6 +13,9 @@ const site = path.resolve(__dirname, '..');
 const reg = JSON.parse(fs.readFileSync(path.join(site, 'tools/quiz-maker-v2/tests/registry.json'), 'utf8'));
 const args = process.argv.slice(2), has = f => args.includes(f), val = f => (args.includes(f) ? args[args.indexOf(f) + 1] : null);
 const only = val('--only'), strict = has('--strict'), e2e = has('--e2e');
+// --require-all (CI): nothing may be skipped. A browser test without Playwright, or a test that skipped itself because a
+// dependency (jsdom...) is missing and so checked nothing, is a FAIL instead of a quiet green.
+const requireAll = has('--require-all') || process.env.REQUIRE_ALL_TESTS === '1';
 const cwd = path.join(site, reg.cwd);
 const py = (() => { for (const c of ['python3', 'python', 'py']) { const r = cp.spawnSync(c, ['--version']); if (!r.error && r.status === 0) return c; } return null; })();
 const hasPw = py && cp.spawnSync(py, ['-c', 'import playwright']).status === 0;
@@ -28,10 +31,10 @@ for (const e of reg.entries) {
   if (e.status === 'retired') continue;
   if (e.same_run_as && results[e.same_run_as]) { const r0 = results[e.same_run_as]; verdict = r0.verdict === 'SKIP' ? 'SKIP' : (e.status === 'active' ? (r0.ok ? 'PASS' : 'FAIL') : (r0.ok ? 'XPASS' : 'XFAIL')); detail = 'same run as ' + e.same_run_as + ' ' + r0.detail; if (r0.verdict === 'SKIP') detail = r0.detail; }
   else if (!e.cmd) { verdict = 'TODO'; detail = e.expected_file ? 'expects ' + e.expected_file : ''; }
-  else if (e.needs === 'playwright' && !(e2e && hasPw)) { verdict = 'SKIP'; detail = e2e ? 'playwright not installed' : 'use --e2e'; }
+  else if (e.needs === 'playwright' && !(e2e && hasPw)) { verdict = requireAll ? 'FAIL' : 'SKIP'; detail = e2e ? 'playwright not installed' : 'use --e2e'; }
   else {
     const cmd = e.cmd[0] === 'python' ? py : e.cmd[0];
-    if (!cmd) { verdict = 'SKIP'; detail = 'python not found'; }
+    if (!cmd) { verdict = requireAll ? 'FAIL' : 'SKIP'; detail = 'python not found'; }
     else {
       const r = cp.spawnSync(cmd, e.cmd.slice(1), { cwd, encoding: 'utf8', timeout: 300000, env: Object.assign({}, process.env, e.env || {}) });
       const out = (r.stdout || '') + (r.stderr || '');
@@ -39,7 +42,9 @@ for (const e of reg.entries) {
       const ok = r.status === 0;
       detail = `${np} pass, ${nf} fail` + (r.error ? ' (' + r.error.message + ')' : '');
       verdict = e.status === 'active' ? (ok ? 'PASS' : 'FAIL') : (ok ? 'XPASS' : 'XFAIL');
-      results[e.id] = { ok, detail };
+      // a test that could not check something prints a line starting "SKIP " (the convention in tests/): under --require-all that is a FAIL
+      if (requireAll && ok && /^SKIP /m.test(out)) { verdict = 'FAIL'; detail = 'skipped (missing dependency or not wired): ' + (out.match(/^SKIP .*/m) || [''])[0].slice(0, 140); }
+      results[e.id] = { ok: verdict !== 'FAIL' && ok, detail };
       if (!ok && has('--verbose')) console.log(out.split('\n').filter(l => /^FAIL/.test(l)).join('\n'));
     }
   }

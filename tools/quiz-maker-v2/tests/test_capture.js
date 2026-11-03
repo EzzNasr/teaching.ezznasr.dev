@@ -80,7 +80,9 @@ props.FF_DEFERRED_ANSWERS = '1';
   t('answers submit ok', r.ok, JSON.stringify(r));
   const sh = tab('QuizResults'), last = sh.getLastRow();
   const row = n => sh.get(last, colOf(sh, n));
-  t('score computed server-side: all 4 auto questions right, client score ignored (4 of 4+4 marks)', row('score') === 4 && row('total') === 8, row('score') + '/' + row('total'));
+  // 99d91f0 (owner rule, Nov 1): written answers are teacher-graded and join score/total only once graded, so the
+// submit-time total is the 4 auto questions (it used to be 4 + 4 written marks = 8, which lowered the grade until marking).
+t('score computed server-side: all 4 auto questions right, client score ignored, written marks not in the total yet (4/4)', row('score') === 4 && row('total') === 4, row('score') + '/' + row('total'));
   const qs = JSON.parse(row('questions_json'));
   t('entries carry correct answers for the review', qs[0].correct_answer === 'yes' && qs[1].correct_answer === 'a, c' && qs[2].correct_answer === 'False');
   r = submit(SB, { client_id: 'attempt-0200', answers: [{ i: 0, v: 0 }, { i: 1, v: [0] }, { i: 2, v: 0 }, { i: 3, v: ['green', 'red'] }] });

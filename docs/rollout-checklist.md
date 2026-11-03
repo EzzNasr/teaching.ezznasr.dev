@@ -1,5 +1,9 @@
 # Phase 2 rollout checklist (Session 5)
 
+> **As of 2026-11-03 this is history:** Phase 2 has shipped. R-E17 / R-E19 / R-E20 now pass (and run in CI). For the
+> current release (follow-up v2 + math teacher + the restored Nov 1 work) use the deploy steps in
+> `Docs/INTEGRATION-REPORT.md` section 7 and `Docs/04-runbooks/followup-v2-deploy.md`.
+
 Ship order from the plan: **S1 alone first**, then S4, S3, S2 in parallel, S5 throughout.
 Integration merge order: S1, S4, S3, S2 (section 4).
 

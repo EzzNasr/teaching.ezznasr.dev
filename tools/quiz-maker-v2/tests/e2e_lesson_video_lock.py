@@ -55,6 +55,7 @@ def run(browser):
     card.locator('[data-video-toggle="lesson"]').click()
     pg.wait_for_selector('[data-panel="video-lock"]')
     pg.click('[data-panel="video-lock"] .ac-btn.primary')
+    if pg.is_visible("#p4-draft-save"): pg.click("#p4-draft-save")   # P4-S7: staged until Save
     pg.wait_for_timeout(500)
     check("lesson video is now open on the server", vid_state("lesson") is False)
     check("quiz video untouched", vid_state("quiz") is True)
@@ -71,6 +72,7 @@ def run(browser):
     box = pg.locator("#lsn-also-open")
     check("the 'also open videos' box is offered and ticked", box.count() == 1 and box.is_checked())
     pg.click('[data-panel="lesson-lock"] .ac-btn.primary')
+    if pg.is_visible("#p4-draft-save"): pg.click("#p4-draft-save")   # P4-S7: staged until Save
     pg.wait_for_timeout(700)
     check("lesson is open", not [l for l in D.overview()["lesson_locks"] if l["lesson"] == L and l["locked"]])
     check("both videos opened by the same click", vid_state("lesson") is False and vid_state("quiz") is False)
@@ -85,6 +87,7 @@ def run(browser):
     pg.wait_for_selector("#lsn-also-open")
     pg.uncheck("#lsn-also-open")
     pg.click('[data-panel="lesson-lock"] .ac-btn.primary')
+    if pg.is_visible("#p4-draft-save"): pg.click("#p4-draft-save")   # P4-S7: staged until Save
     pg.wait_for_timeout(700)
     check("unticked: lesson opens but videos stay locked", vid_state("lesson") is True and vid_state("quiz") is True)
     s.ctx.close()

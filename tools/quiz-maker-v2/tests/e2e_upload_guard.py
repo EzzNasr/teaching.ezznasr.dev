@@ -38,6 +38,8 @@ def run(browser, tmp):
     held = []
 
     def slow(route):          # hold the request until the test lets it go (later routes run first; fallback() reaches the real backend)
+        if '"check_session"' in (route.request.post_data or ""):   # 99d91f0: the page asks "still signed in?" before the form
+            return route.fallback()
         held.append(route)
     p.s.ctx.route("https://script.google.com/**", slow)
 
