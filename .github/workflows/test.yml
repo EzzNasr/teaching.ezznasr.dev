@@ -1,37 +1,39 @@
 name: tests
 # Every push and pull request must pass the master gate (scripts/test_all.sh) before it is safe to merge into main,
 # which GitHub Pages serves. See docs/TESTING.md.
+#
+# ONE required job runs EVERYTHING: syntax, every registry entry (Node, Python, jsdom AND the Playwright browser tests),
+# generated-file / drift checks and the "every test file is registered" check. --require-all turns a skipped case
+# (Playwright or jsdom missing, python missing, a test that skipped itself) into a failure, so a green run always
+# means every feature's tests actually ran. A test added to tests/registry.json runs here automatically.
 on:
   push:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   gate:
-    name: Gate (syntax + regression registry)
+    name: Gate (syntax + full regression registry incl. browser tests)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
+      - name: Test dependencies (jsdom for the DOM tests, Playwright + Chromium for the browser tests)
+        run: |
+          npm install --no-save --no-package-lock jsdom@24
+          pip install playwright
+          python -m playwright install --with-deps chromium
       - name: Phase 2 sections of Code.gs match Phase2_*.gs
         run: python scripts/sync_phase2.py --check
-      - name: Master gate
-        run: bash scripts/test_all.sh --strict
-
-  browser:
-    name: Browser tests (Playwright)
-    runs-on: ubuntu-latest
-    # Informational until it has been seen green once on GitHub's runners (three of these timed out in an offline
-    # sandbox). When it is green, delete the next line and it becomes a required check like `gate`.
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - uses: actions/setup-python@v5
-        with: { python-version: '3.12' }
-      - run: pip install playwright && python -m playwright install --with-deps chromium
-      - run: node scripts/run_registry.js --e2e
+      - name: Generated FollowupLogic.gs matches assets/followup-events.js
+        run: python scripts/build_server_logic.py --check
+      - name: Master gate (everything, nothing skipped)
+        run: bash scripts/test_all.sh --strict --e2e --require-all
