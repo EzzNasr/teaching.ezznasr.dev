@@ -12,7 +12,7 @@ let pass = 0, fail = 0;
 const t = (n, c, x) => { (c ? pass++ : fail++); console.log((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : '  -> ' + (typeof x === 'string' ? x : JSON.stringify(x)))); };
 const eq = (n, a, b) => t(n, JSON.stringify(a) === JSON.stringify(b), 'got ' + JSON.stringify(a) + ' expected ' + JSON.stringify(b));
 
-const APP = fs.readFileSync(path.join(root, 'assets', 'followup-app.js'), 'utf8');
+const APP = fs.readFileSync(path.join(root, 'assets', 'followup-app.js'), 'utf8').replace(/\r\n/g, '\n'); // a Windows checkout has CRLF; the regexes below expect LF
 const HTML = fs.readFileSync(path.join(root, 'dashboard', 'followup.html'), 'utf8');
 const FIX = JSON.parse(fs.readFileSync(path.join(root, 'dashboard', '_fixtures', 'followup-overview.json'), 'utf8'));
 

@@ -29,7 +29,7 @@
   };
 
   var STATE = { session: null, role: "admin", data: null, overview: null, overviewErr: "", tab: "global", group: "", copyFrom: "",
-                month: "", mreq: "", student: "", history: null, loading: false, busy: {}, newOpen: false, dlg: null };
+                month: "", mreq: "", student: "", history: null, loading: false, busy: {}, newOpen: false, newDraft: { ar: "", en: "" }, dlg: null };
 
   // ---- tiny DOM helpers ----------------------------------------------------------------------------
   function $(id) { return document.getElementById(id); }
@@ -345,13 +345,14 @@
     if (!STATE.newOpen) {
       wrap.appendChild(el("div", { class: "rq-row rq-between" }, [
         el("div", {}, [el("h3", {}, ["مطلوب جديد (يدوي)"]), el("p", { class: "rq-measure" }, ["مثال: السلوك في الحصة، أو إحضار الكراسة. بتقيّمه بنفسك كل شهر."])]),
-        el("button", { class: "rq-btn primary", id: "rq-new-open", type: "button", disabled: count >= RL.MAX_CUSTOM, onclick: function () { STATE.newOpen = true; render(true); } }, ["+ مطلوب جديد"])
+        el("button", { class: "rq-btn primary", id: "rq-new-open", type: "button", disabled: count >= RL.MAX_CUSTOM, onclick: function () { STATE.newOpen = true; STATE.newDraft = { ar: "", en: "" }; render(true); } }, ["+ مطلوب جديد"])
       ]));
       if (count >= RL.MAX_CUSTOM) wrap.appendChild(el("p", { class: "rq-errline" }, ["وصلت للحد الأقصى (" + RL.MAX_CUSTOM + " مطلوب يدوي)."]));
       return wrap;
     }
-    var ar = el("input", { class: "rq-in", id: "rq-new-ar", type: "text", maxlength: "80", placeholder: "مثلاً: السلوك في الحصة" });
-    var en = el("input", { class: "rq-in rq-ltr", id: "rq-new-en", type: "text", maxlength: "80", placeholder: "Behaviour in class (optional)" });
+    // The draft lives in STATE so a re-render (another save landing while the teacher types) keeps what was typed.
+    var ar = el("input", { class: "rq-in", id: "rq-new-ar", type: "text", maxlength: "80", placeholder: "مثلاً: السلوك في الحصة", value: STATE.newDraft.ar, oninput: function (ev) { STATE.newDraft.ar = ev.target.value; } });
+    var en = el("input", { class: "rq-in rq-ltr", id: "rq-new-en", type: "text", maxlength: "80", placeholder: "Behaviour in class (optional)", value: STATE.newDraft.en, oninput: function (ev) { STATE.newDraft.en = ev.target.value; } });
     var err = el("div", { class: "rq-errline", id: "rq-new-err", hidden: true });
     wrap.appendChild(el("h3", {}, ["مطلوب جديد (يدوي)"]));
     wrap.appendChild(el("label", { class: "rq-field", for: "rq-new-ar" }, [el("span", {}, ["الاسم بالعربي"]), ar]));
@@ -365,7 +366,7 @@
         var taken = {}; catalog().forEach(function (c) { taken[c.key] = true; });
         if (!key) key = "custom_" + Math.random().toString(36).slice(2, 8);
         var base = key, n = 2; while (taken[key]) { key = base.slice(0, 36) + "_" + n; n++; }
-        STATE.newOpen = false;
+        STATE.newOpen = false; STATE.newDraft = { ar: "", en: "" };
         write("new", { action: "admin_req_save_global", key: key, patch: { kind: "manual", label_ar: a, label_en: e } }, "اتضاف المطلوب ✓");
       } }, ["إضافة"]),
       el("button", { class: "rq-btn", id: "rq-new-cancel", type: "button", onclick: function () { STATE.newOpen = false; render(true); } }, ["إلغاء"])

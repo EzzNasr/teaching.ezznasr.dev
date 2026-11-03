@@ -46,6 +46,8 @@ for (const e of reg.entries) {
       if (requireAll && ok && /^SKIP /m.test(out)) { verdict = 'FAIL'; detail = 'skipped (missing dependency or not wired): ' + (out.match(/^SKIP .*/m) || [''])[0].slice(0, 140); }
       results[e.id] = { ok: verdict !== 'FAIL' && ok, detail };
       if (!ok && has('--verbose')) console.log(out.split('\n').filter(l => /^FAIL/.test(l)).join('\n'));
+      // a crash (traceback, timeout) prints no FAIL line, so show the end of stderr: CI logs are often the only copy
+      if (!ok && (requireAll || has('--verbose')) && (r.stderr || '').trim()) console.log((r.stderr || '').trim().split('\n').slice(-12).map(l => '    | ' + l).join('\n'));
     }
   }
   if (!results[e.id]) results[e.id] = { ok: verdict === 'PASS' || verdict === 'XPASS', detail, verdict };

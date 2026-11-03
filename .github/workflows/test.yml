@@ -26,10 +26,10 @@ jobs:
         with: { node-version: 22 }
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
-      - name: Test dependencies (jsdom for the DOM tests, Playwright + Chromium for the browser tests)
+      - name: Test dependencies (jsdom for the DOM tests, Playwright + Chromium for the browser tests, Pillow for the photo-capture tests)
         run: |
           npm install --no-save --no-package-lock jsdom@24
-          pip install playwright
+          pip install playwright pillow
           python -m playwright install --with-deps chromium
       - name: Phase 2 sections of Code.gs match Phase2_*.gs
         run: python scripts/sync_phase2.py --check

@@ -18,6 +18,7 @@ Needs Node (for the backend) and the repo layout it lives in.
 import hashlib
 import json
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -29,7 +30,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 QM = os.path.dirname(HERE)                                   # tools/quiz-maker-v2
 SITE_ROOT = os.path.abspath(os.path.join(QM, "..", ".."))    # the repo
 CODE_GS = os.path.join(QM, "apps_script", "Code.gs")
-PORT = 8765
+
+
+def _free_port():
+    # A fixed port (it used to be 8765) collides with a backend an earlier test left running, and the test
+    # then talks to that stale server. e2e_capture / e2e_one_group / e2e_p3_bulk_access reuse this via E.PORT.
+    with socket.socket() as so:
+        so.bind(("127.0.0.1", 0))
+        return so.getsockname()[1]
+
+
+PORT = _free_port()
 GAS = "https://script.google.com/macros/s/TEST/exec"
 SITE = "https://site.test"   # https: the sign-in code needs a secure context (crypto.subtle)
 
@@ -113,7 +124,9 @@ def start_backend():
     proc = subprocess.Popen(
         ["node", os.path.join(HERE, "e2e_backend.js"), CODE_GS, str(PORT)], stdout=subprocess.PIPE, text=True
     )
-    proc.stdout.readline()  # "ready"
+    if proc.stdout.readline().strip() != "ready":
+        proc.kill()
+        raise SystemExit("e2e_backend.js did not start on port %d" % PORT)
     return proc
 
 
