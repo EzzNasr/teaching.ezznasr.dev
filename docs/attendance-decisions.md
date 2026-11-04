@@ -60,6 +60,13 @@ The plans this answers are in `D:\projects\teaching-site-new\Docs\02-plans\` (ou
 - `tests/attendance/multiuser.test.js` checks that `LATE_GRACE_SEC` is the same on the client and the server.
 
 ## 3. Deploy (launch week)
+**Done 2026-11-04 04:34: Version 60** of deployment `AKfycbzpyJWSI9aRseig...` (same `/exec` URL; Execute as Me, access Anyone).
+The project files were brought to the repo exactly (checked by fingerprint): `AttendanceAll.gs` (this work), `Code.gs` (Nov 3
+`2d7275a`: Telegram score lines, `report_photos`, `check_session`, written answers out of the submit-time total) and
+`FollowupLogic.gs` (`39d326d`: a homework lesson's own due date). `att_selfTest` 30/30, `att_scriptedRun` 43/43, both load tests
+PASS, test rows cleaned up. The live URL answers `att_status`, `report_photos` and `check_session`. **Rollback:** Manage
+deployments > Edit > Version 59.
+
 1. Apps Script: paste `AttendanceAll.gs`, then **Deploy > Manage deployments > Edit > New version**, never "New deployment".
    The `/exec` URL in `contract/att_config.js` must not change.
 2. Run `att_selfTest()`; expect `ALL PASS`.
@@ -88,8 +95,9 @@ Fill in after running:
 | Date | Run | Recorded | Needed a retry | Median | 90 % | Slowest | Notes |
 |---|---|---|---|---|---|---|---|
 | 2026-11-04 | `att_loadTest()` | 0/70 | 70 | - | - | - | **Invalid run**: every request got HTTP 401. The test used `ScriptApp.getService().getUrl()`, which from the editor is the `/dev` URL (editors only), so nothing reached the server. Fixed: it now uses the students' `/exec` URL and checks it first. Re-run. |
-| | `att_loadTest()` | | | | | | |
-| | `att_loadTestFirstDay()` | | | | | | |
+| 2026-11-04 04:09 | `att_loadTest()` (70, all at once) | **70/70**, 70 rows, 70 unique | 20 (BUSY once) | 37.5 s | 59.1 s | 59.1 s | **PASS.** Round 1: 50 recorded, 20 BUSY (each request waited up to ~28 s for the lock); round 2: the 20 recorded. About 0.5 s per check-in inside the lock. Nothing else was running. |
+| 2026-11-04 04:14 | `att_loadTestFirstDay()` (70, identical coordinates) | 49 signed up, 19 checked in when the run was cut off | - | - | - | - | **Inconclusive.** One of the 70 requests hung for 6 minutes (Google killed it at 360 s). `UrlFetchApp.fetchAll` waited for it, so the test never reached its next round and hit its own 6-minute limit before logging. All 70 fake students also had identical coordinates, so every check-in was flagged and also queued for the project lock in the flag code (fixed, F5). |
+| 2026-11-04 04:35 | `att_loadTestFirstDay()` (70, realistic spots), Version 60 | **70/70**, 70 rows, 70 unique, 70 students + 70 devices | 49 | 254 s * | 278 s * | 289 s * | **PASS.** Rounds: 34 s (30 signed up, 32 BUSY, 8 over Google's concurrency limit), 32 s (21 recorded, 19 signed up), 174 s * (15 + 26, 8 BUSY), 20 s, 7 s. *Round 3 waited on one hung request again (see F11), which inflates every time after it: without it the whole class was through in about 2 minutes. A real phone stuck like that re-sends after its 30 s watchdog. 0 flags. |
 
 The test checks its URL with one request before starting and stops at once (writing nothing) if the answer is not the attendance
 JSON. It uses Script Property `ATT_LOADTEST_URL`, else `ATT_WEBAPP_URL`, else the built-in students' URL (the same as
@@ -97,6 +105,15 @@ JSON. It uses Script Property `ATT_LOADTEST_URL`, else `ATT_WEBAPP_URL`, else th
 
 How to read it: everything recorded with the slowest under ~2 minutes means launch is fine. If the slowest gets close to
 5 + 2 minutes, or anything fails, do F1 before more students are added.
+
+### What the runs showed (2026-11-04)
+- About **0.5 s per check-in inside the lock**: a class of 70 tapping at the same second is through in about 1 minute, a first
+  lecture (sign-up + check-in) in about 2. The 5-minute session plus the 120 s grace leaves a wide margin.
+- With 70 at once, some requests get BUSY (the 25 s lock wait ran out) and some get Google's "too many at once" page (`NOT_JSON_200`,
+  about 30 run at a time). Both are retried by the page; nothing was lost or doubled in any run.
+- **One request in a burst of 70 can hang for minutes** (seen in both first-day runs). The other requests kept getting the lock
+  while it hung, so it does not block the class: only that one student waits for the page's 30 s watchdog and re-send. See F11.
+- Real lectures are gentler than these tests: phones scan over a minute or two, not all in the same second.
 
 ## 5. Capacity: what is known
 - One check-in holds the project-wide lock only for the dedupe check and the append. Everything else happens outside the lock:
@@ -116,11 +133,13 @@ How to read it: everything recorded with the slowest under ~2 minutes means laun
 | F2 | **Tiers and limits** (pricing plan) | Nothing in the code caps students, groups, teachers or session size. Selling a 70- or 100-student tier needs a per-teacher limit check in `att_startSession_` / `att_signup_`, plus the matching load-test number. |
 | F3 | **WhatsApp follow-up automation** (on hold, D3) | Preconditions: (a) a spare SIM, so a ban never hits the number parents know; (b) a stable always-on sender; (c) port the message templates (`assets/followup-templates.js`) to the server through `scripts/build_server_logic.py`, as was done for logic and events, because messages are built in the browser today; (d) use the per-student `parent_log` (kind, ref, sent_at) as the sent log, keyed by student + kind + session, not the per-group `parents_contacted`; (e) write the attempt before sending, so a crash cannot double-send; (f) if GitHub Actions is ever used: a **private** repo, never the session or phone numbers in logs or artifacts (this repo is public). Sender host idea: an old Android phone with the spare SIM on home Wi-Fi, running Termux + Node + Baileys (see the note below the table). |
 | F4 | **Telegram close summary does not count late-grace check-ins** | The summary is sent the moment the session closes. Check-ins accepted in the next 120 s are in the sheet, the roster and the export, but not in that message. Option: a one-shot trigger about 2.5 minutes after close that sends "+N late". |
-| F5 | **Flag digest lock** | `attt_withLock_` (Telegram flag queue) waits up to 3 s for the same project lock on every flagged check-in during a burst. It is best effort (it carries on without the lock), so it only adds latency. Reduce it to about 1 s, or move the queue to a lock-free cache key per flag. |
+| F5 | ~~**Flag digest lock**~~ **Done 2026-11-04 (Version 60).** | `attt_withLock_` (the Telegram flag queue) now uses `LockService.getUserLock()` instead of the project script lock, so a flagged check-in no longer queues for the check-in/quiz lock a second time. Still best effort. Covered by R-A09. |
 | F6 | **History read grows with the semester** | `att_attend` reads all of `AttCheckins` before the lock (needed by the REPEATED flag, which counts the student's earlier flagged check-ins). Later: cache a per-student flagged count, or archive past semesters into another tab. |
 | F7 | **Nightly backup** of the attendance spreadsheet (pricing plan) | A daily time trigger that copies the file to a dated Drive copy and keeps the last N. Not done yet. |
 | F8 | **Privacy note for professors** | Student locations are stored per check-in (`lat`/`lng`/`acc`). A short note on what is stored, who sees it, and how long it is kept. |
 | F9 | `attend/admin/e2e.test.js` | A stale copy of `tests/attendance/e2e.test.js` that cannot run from that folder, and is not in the registry. Delete it, or point it at the real one. |
+| F11 | **One request in a big burst can hang for minutes** | Seen twice in the first-day load test (1 of 70 each time, 173 s and 360 s). The lock kept moving for everyone else, so it was not holding it; it is most likely stuck inside a Google service call (Sheets). The student page already copes (30 s watchdog, then a new try with the same request; the server de-duplicates). Watch for it in the first real lectures (Apps Script > Executions, anything far over 30 s). If it shows up in real use: log timings around each sheet call to find which one stalls. |
+| F12 | Load test waits on the slowest request | `UrlFetchApp.fetchAll` has no timeout, so one hung request stalls the whole round (and inflates the reported times). It now logs every round as it happens, so a cut-off run still shows its progress. |
 | F10 | **Teacher view of "still trying"** | The dashboard shows only recorded check-ins. A student stuck in retries is invisible to the teacher until recorded or given up. Optional: the page could report "pending" through a cheap lock-free call. |
 
 ### Note: the old Honor/Huawei phone as the WhatsApp sender (F3)

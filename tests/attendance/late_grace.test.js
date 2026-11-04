@@ -101,6 +101,26 @@ console.log("short lock: duplicates are still caught");
   E.gas.ctx.LockService = busy;
 }
 
+console.log("a flagged check-in takes the project lock only once (flag queue uses the user lock)");
+{
+  const E = env(); E.signup("20240001", "a");
+  const real = E.gas.ctx.LockService, calls = { script: 0, user: 0 };
+  E.gas.ctx.LockService = { getScriptLock: () => { calls.script++; return { tryLock: () => true, releaseLock() {} }; },
+    getUserLock: () => { calls.user++; return { tryLock: () => true, releaseLock() {} }; } };
+  const far = { lat: 31.3, lng: 30.0, acc: 10 };   // ~13 km away -> GEO_FAR, a real (review) flag -> queued for the Telegram digest
+  const r = E.attend("20240001", "a", null, far);
+  E.gas.ctx.LockService = real;
+  ok(r.status === "recorded", "the far check-in is recorded");
+  ok(calls.script === 1 && calls.user === 1, "script lock once (the check-in), user lock once (the flag queue): " + JSON.stringify(calls));
+  const q = JSON.parse(E.gas.run('CacheService.getScriptCache().get(ATTT_QUEUE_KEY)') || "[]");
+  ok(q.length === 1 && q[0].f.indexOf("GEO_FAR") >= 0, "the flag is in the digest queue");
+  E.gas.ctx.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }), getUserLock: () => { throw new Error("no user lock here"); } };
+  E.signup("20240002", "x");
+  E.gas.ctx.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }), getUserLock: () => { throw new Error("no user lock here"); } };
+  ok(E.attend("20240002", "x", null, far).status === "recorded", "no user lock available: a FLAGGED check-in is still recorded (best effort)");
+  E.gas.ctx.LockService = real;
+}
+
 console.log("sign-up retry is idempotent");
 {
   const E = env();

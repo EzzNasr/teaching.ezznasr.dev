@@ -976,7 +976,13 @@ function att_loadRun_(N, firstDay) {
       "is deployed with 'Execute as: Me' and 'Who has access: Anyone'. Nothing was written.";
     Logger.log(msg); return false;
   }
-  var geo = { lat: 31.2, lng: 29.9, acc: 10 }, t0 = Date.now(), log = ["url: " + url];
+  var geo = { lat: 31.2, lng: 29.9, acc: 10 }, t0 = Date.now(), log = [];
+  // Each student stands at a slightly different spot (within ~20 m of the hall), like a real class. Identical coordinates for
+  // everyone would flag every check-in IDENTICAL_COORDS, which a real lecture does not do.
+  function at(i) { return { lat: 31.2 + ((i * 37) % 100 - 50) * 0.000003, lng: 29.9 + ((i * 53) % 100 - 50) * 0.000003, acc: 8 + (i % 13) }; }
+  // Every line is also written as it happens, so a run stopped by the 6-minute limit still shows how far it got.
+  function note(line) { log.push(line); console.log(line); }
+  note("url: " + url);
   var room = att_dispatch_({ action: "att_calibrate_room", token: A, name: "ATT-TEST-ROOM", samples: [geo] });
   var s = att_dispatch_({ action: "att_start_session", token: A, course: "ATT-TEST", room_id: room.room.room_id });
   // stop at the session close + grace, or before Apps Script's 6-minute limit for this run, whichever comes first
@@ -985,7 +991,7 @@ function att_loadRun_(N, firstDay) {
   function sid(i) { return String(99980000 + i); }
   if (!firstDay) {   // returning students: register them directly first (not timed)
     for (var i = 0; i < N; i++) {
-      var r = att_dispatch_({ action: "att_signup", ticket: tk(), student_id: sid(i), name: "Load " + i, secret: "loadtest-secret-" + i, fp: "lt" + i, geo: geo });
+      var r = att_dispatch_({ action: "att_signup", ticket: tk(), student_id: sid(i), name: "Load " + i, secret: "loadtest-secret-" + i, fp: "lt" + i, geo: at(i) });
       if (!r.ok) throw new Error("signup " + i + ": " + r.code);
     }
   }
@@ -999,8 +1005,8 @@ function att_loadRun_(N, firstDay) {
     round++;
     var reqs = idx.map(function (k) {
       var body = step[k] === "signup"
-        ? { action: "att_signup", ticket: tk(), student_id: sid(k), name: "Load " + k, secret: "loadtest-secret-" + k, fp: "lt" + k, geo: geo }
-        : { action: "att_attend", ticket: tk(), student_id: sid(k), secret: "loadtest-secret-" + k, fp: "lt" + k, geo: geo };
+        ? { action: "att_signup", ticket: tk(), student_id: sid(k), name: "Load " + k, secret: "loadtest-secret-" + k, fp: "lt" + k, geo: at(k) }
+        : { action: "att_attend", ticket: tk(), student_id: sid(k), secret: "loadtest-secret-" + k, fp: "lt" + k, geo: at(k) };
       return { url: url, method: "post", contentType: "text/plain;charset=utf-8", muteHttpExceptions: true, followRedirects: true, payload: JSON.stringify(body) };
     });
     var rs = Date.now(), resp = UrlFetchApp.fetchAll(reqs), rc = {};
@@ -1012,9 +1018,9 @@ function att_loadRun_(N, firstDay) {
       var c = o.code || "?"; rc[c] = (rc[c] || 0) + 1; codes[c] = (codes[c] || 0) + 1; retried[k] = 1;
       if (!/^(BUSY|SERVER_ERROR|NOT_JSON_.*|\?)$/.test(c)) step[k] = "done-failed:" + c;   // a definite refusal is not retried (and fails the test)
     });
-    log.push("round " + round + ": sent " + reqs.length + " in " + ((Date.now() - rs) / 1000).toFixed(1) + " s -> " + JSON.stringify(rc));
+    note("round " + round + ": sent " + reqs.length + " in " + ((Date.now() - rs) / 1000).toFixed(1) + " s -> " + JSON.stringify(rc));
     var keys = Object.keys(rc);
-    if (keys.length && keys.every(function (c) { return /^NOT_JSON_40[134]$/.test(c); })) { log.push("every answer was " + keys.join("/") + ": wrong URL or access setting, stopping (see att_loadUrl_)"); break; }
+    if (keys.length && keys.every(function (c) { return /^NOT_JSON_40[134]$/.test(c); })) { note("every answer was " + keys.join("/") + ": wrong URL or access setting, stopping (see att_loadUrl_)"); break; }
     if (step.some(function (x) { return x !== "done" && x.indexOf("done-failed") !== 0; })) Utilities.sleep(2000 + Math.floor(Math.random() * 2000));   // like the page: wait, then retry
     if (step.every(function (x) { return x === "done" || x.indexOf("done-failed") === 0; })) break;
   }
@@ -1473,9 +1479,13 @@ function attt_fmtDigest_(d) {
 
 // ---------- flag queue (CacheService) ----------
 
+// The flag queue uses the USER lock, not the script lock (2026-11-04, docs/attendance-decisions.md F5). The web app executes as the
+// owner, so every request shares this one user lock, but it is a different lock from the script lock that check-ins and every
+// Code.gs quiz/homework submission queue on. Before, each flagged check-in queued for the script lock a second time (up to 3 s), so a
+// burst of flagged check-ins halved check-in throughput. Still best effort: if the lock is not had in time the queue is updated anyway.
 function attt_withLock_(fn) {
   var lock = null, got = false;
-  try { lock = LockService.getScriptLock(); got = lock.tryLock(3000); } catch (e) { got = false; }
+  try { lock = LockService.getUserLock(); got = lock.tryLock(3000); } catch (e) { got = false; }
   try { return fn(); } // best effort even if the lock was not obtained
   finally { if (got) { try { lock.releaseLock(); } catch (e) { /* ignore */ } } }
 }

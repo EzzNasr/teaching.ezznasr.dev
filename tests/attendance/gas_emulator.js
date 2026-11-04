@@ -45,7 +45,7 @@ function build() {
       get: k => { const e = cache[k]; if (!e) return null; if (e.exp && e.exp <= Date.now() + cacheShift) { delete cache[k]; return null; } return e.v; },
       put: (k, v, ttl) => { cache[k] = { v, exp: ttl ? Date.now() + cacheShift + ttl * 1000 : 0 }; },
       remove: k => { delete cache[k]; } }) },
-    LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
+    LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }), getUserLock: () => ({ tryLock: () => true, releaseLock() {} }) },
     SpreadsheetApp: { openById: () => ss, getActiveSpreadsheet: () => ss },
     UrlFetchApp: {
       fetch: (url, opt) => {
