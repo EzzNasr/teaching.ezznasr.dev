@@ -45,6 +45,10 @@
       <input id="name" maxlength="60" autocomplete="name">
     </div>
     <button id="save" disabled>SAVE ATTENDANCE</button>
+    <div id="saveHint">
+      <p>Tap, then wait for the green &#10003; screen.</p>
+      <p lang="ar" dir="rtl">اضغط، ثم انتظر الشاشة الخضراء &#10003;</p>
+    </div>
     <div class="row">
       <button id="signup" type="button">Sign up (first time)</button>
       <button id="change" type="button">Change device</button>
@@ -55,12 +59,17 @@
   <section id="done" hidden aria-live="polite">
     <svg viewBox="0 0 24 24" width="72" height="72" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7.5 12.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <h1 id="doneTitle">Attendance recorded</h1>
+    <p id="doneTitleAr" lang="ar" dir="rtl">تم تسجيل الحضور</p>
     <p id="doneName"></p>
     <p id="doneTime"></p>
+    <p id="doneClose">You can close this page now.<br><span lang="ar" dir="rtl">يمكنك إغلاق الصفحة الآن.</span></p>
     <p id="doneNote"></p>
   </section>
 
-  <div id="msg" class="info" role="status" aria-live="polite"></div>
+  <div id="msgBox">
+    <div id="msg" class="info" role="status" aria-live="polite"></div>
+    <div id="msgAr" class="info" lang="ar" dir="rtl" aria-live="polite"></div>
+  </div>
   <div id="note">Device, location and timing are logged for each check-in.</div>
 </main>
 
@@ -68,9 +77,15 @@
 <div id="busy" hidden role="alertdialog" aria-modal="true" aria-labelledby="busyStep" aria-describedby="busyWarn" tabindex="-1">
   <div id="busyCard">
     <div id="spin" aria-hidden="true"></div>
+    <div id="busyAlert" hidden><svg viewBox="0 0 24 24" width="64" height="64" aria-hidden="true" focusable="false"><path d="M12 3.2L1.8 20.5h20.4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 9.5v5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.4" r="1.2" fill="currentColor"/></svg></div>
     <div id="busyStep">Saving&hellip;</div>
+    <div id="busyStepAr" lang="ar" dir="rtl"></div>
     <div id="busyWarn">Don't close this page.</div>
+    <div id="busyWarnAr" lang="ar" dir="rtl"></div>
     <div id="busyErr" hidden></div>
+    <div id="busyErrAr" lang="ar" dir="rtl" hidden></div>
+    <div id="busyNext" hidden></div>
+    <div id="busyNextAr" lang="ar" dir="rtl" hidden></div>
     <button id="busyRetry" type="button" hidden>Retry</button>
   </div>
 </div>

@@ -57,3 +57,33 @@ button:disabled{opacity:.4;cursor:not-allowed}
 @keyframes att-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){#spin{animation:none;border-top-color:#334155;border-right-color:var(--pri)}}
 :focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+
+/* ---- Nov 2026: English + Arabic, and colour that says the state: amber = NOT saved yet, green = saved ---- */
+[lang="ar"]{font-family:system-ui,-apple-system,"Segoe UI","Noto Sans Arabic","Geeza Pro",Tahoma,sans-serif;line-height:1.6}
+#saveHint{text-align:center;color:var(--mut);font-size:15px;margin-top:-4px}
+#saveHint p{margin:0}
+#msgBox{display:flex;flex-direction:column}
+#msg.has-ar{border-radius:12px 12px 0 0;padding-bottom:4px}
+#msgAr{text-align:center;font-size:17px;padding:4px 10px 10px;border-radius:0 0 12px 12px}
+#msgAr:empty{display:none}
+#msgAr.err{background:#450a0a;color:#fecaca}
+#msgAr.ok{background:#052e16;color:#bbf7d0}
+#msgAr.info{background:var(--card)}
+#busyStepAr{font-size:22px;font-weight:700;margin-top:-10px}
+#busyStepAr:empty,#busyWarnAr:empty{display:none}
+#busyWarn,#busyWarnAr{width:100%;background:#facc15;color:#111827;font-weight:700;font-size:17px;padding:10px 14px}
+#busyWarn{border-radius:12px 12px 0 0;margin-bottom:-14px;padding-bottom:4px}
+#busyWarnAr{border-radius:0 0 12px 12px;padding-top:4px;font-size:18px}
+#busyErr,#busyErrAr{background:transparent;color:#fde68a;padding:0 6px}
+#busyErrAr{margin-top:-10px}
+#busyNext,#busyNextAr{color:var(--mut);font-size:15px;font-variant-numeric:tabular-nums}
+#busyNextAr{margin-top:-10px}
+#busyAlert{color:#facc15;line-height:0}
+/* waiting between automatic tries: the whole screen turns amber so it can't be mistaken for the green "recorded" screen */
+#busy.waiting{background:rgba(66,32,6,.97)}
+#busy.waiting #busyStep,#busy.waiting #busyStepAr{color:#facc15;font-size:28px}
+#busy.waiting #busyRetry{background:#334155;border:1px solid #64748b}
+/* saved: a green panel, in both languages, that says the page can be closed */
+#done{background:#052e16;border:2px solid var(--ok);border-radius:20px;padding:24px 16px}
+#doneTitleAr{font-size:24px;font-weight:700;color:var(--fg)!important;margin-top:-6px!important}
+#doneClose{color:#bbf7d0!important;font-size:17px;font-weight:600}

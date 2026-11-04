@@ -43,13 +43,18 @@
     NETWORK: "No connection. Check your internet and try again.",
     GENERIC: "Something went wrong. Try again.",
     // Retry card (nothing was confirmed by the server, so we never say "saved"). The page retries by itself (2026-11-04).
+    // Nov 2026: every save-flow message also has an Arabic line (AR below). The overlay is amber while NOTHING is saved and the
+    // done screen is green, so a student can tell the two apart without reading.
     NOT_SAVED_T: "NOT saved yet",
-    NETWORK_RETRY: "No connection. Your attendance is not saved yet. Check your internet and stay on this page: it keeps trying by itself.",
-    BUSY_RETRY: "The server is busy. Your attendance is not saved yet. Stay on this page: it keeps trying by itself.",
-    SERVER_RETRY: "The server had a problem. Your attendance is not saved yet. Stay on this page: it keeps trying by itself.",
-    AUTO_SERVER: "Something went wrong. Your attendance is not saved yet. Stay on this page: it keeps trying by itself.",
-    UNCONFIRMED: "This is taking too long. Your attendance is not confirmed yet. Stay on this page: it keeps trying by itself.",
-    RETRY_IN: "Trying again in {s} s (try {n}). Don't close this page.",
+    DONT_CLOSE: "Don't close this page. Wait for the green screen.",
+    STAY: "Stay on this page. It keeps trying by itself.",
+    NETWORK_RETRY: "No connection. Check your internet.",
+    BUSY_RETRY: "The server is busy right now.",
+    SERVER_RETRY: "The server had a problem.",
+    AUTO_SERVER: "Something went wrong.",
+    UNCONFIRMED: "This is taking too long: the server has not confirmed it yet.",
+    RETRY_IN: "Trying again in {s} s (try {n}).",
+    TRY_NOW: "Try now",
     RESUMING: "Your check-in was not saved yet. Trying again\u2026",
     GAVE_UP: "Your attendance could NOT be saved: the server could not be reached in time. Show this screen to your instructor now (ID {id}).",
     TAB_PENDING: "NOT saved yet - Attendance",
@@ -67,6 +72,30 @@
     GATE_FAIL_1: "Location is still unavailable.",
     HELP_BLOCKED: "How to turn location on",
     HELP_WEAK: "To get a better location signal"
+  };
+  // Arabic for the save flow (same keys as MESSAGES). Shown on its own line under the English one.
+  var AR = {
+    SAVING: "\u062c\u0627\u0631\u064d \u062d\u0641\u0638 \u0627\u0644\u062d\u0636\u0648\u0631\u2026",
+    LOCATING: "\u062c\u0627\u0631\u064d \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0645\u0648\u0642\u0639\u2026",
+    DEVICE: "\u062c\u0627\u0631\u064d \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u062c\u0647\u0627\u0632\u2026",
+    REGISTERING: "\u062c\u0627\u0631\u064d \u0627\u0644\u062a\u0633\u062c\u064a\u0644\u2026",
+    SENDING: "\u062c\u0627\u0631\u064d \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0637\u0644\u0628\u2026",
+    TRY_N: "(\u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 {n})",
+    NOT_SAVED_T: "\u0644\u0645 \u064a\u062a\u0645 \u062d\u0641\u0638 \u0627\u0644\u062d\u0636\u0648\u0631 \u0628\u0639\u062f",
+    DONT_CLOSE: "\u0644\u0627 \u062a\u063a\u0644\u0642 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062d\u0629. \u0627\u0646\u062a\u0638\u0631 \u0627\u0644\u0634\u0627\u0634\u0629 \u0627\u0644\u062e\u0636\u0631\u0627\u0621.",
+    STAY: "\u0627\u0628\u0642\u064e \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062d\u0629. \u0633\u062a\u062a\u0643\u0631\u0631 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u062a\u0644\u0642\u0627\u0626\u064a\u064b\u0627.",
+    NETWORK_RETRY: "\u0644\u0627 \u064a\u0648\u062c\u062f \u0627\u062a\u0635\u0627\u0644. \u062a\u062d\u0642\u0651\u0642 \u0645\u0646 \u0627\u0644\u0625\u0646\u062a\u0631\u0646\u062a.",
+    BUSY_RETRY: "\u0627\u0644\u062e\u0627\u062f\u0645 \u0645\u0634\u063a\u0648\u0644 \u0627\u0644\u0622\u0646.",
+    SERVER_RETRY: "\u062d\u062f\u062b\u062a \u0645\u0634\u0643\u0644\u0629 \u0641\u064a \u0627\u0644\u062e\u0627\u062f\u0645.",
+    AUTO_SERVER: "\u062d\u062f\u062b \u062e\u0637\u0623 \u0645\u0627.",
+    UNCONFIRMED: "\u0627\u0644\u0623\u0645\u0631 \u064a\u0633\u062a\u063a\u0631\u0642 \u0648\u0642\u062a\u064b\u0627 \u0637\u0648\u064a\u0644\u064b\u0627: \u0644\u0645 \u064a\u0624\u0643\u0651\u062f \u0627\u0644\u062e\u0627\u062f\u0645 \u0627\u0644\u062d\u0641\u0638 \u0628\u0639\u062f.",
+    RETRY_IN: "\u0645\u062d\u0627\u0648\u0644\u0629 \u062c\u062f\u064a\u062f\u0629 \u062e\u0644\u0627\u0644 {s} \u062b\u0627\u0646\u064a\u0629 (\u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 {n}).",
+    TRY_NOW: "\u062d\u0627\u0648\u0644 \u0627\u0644\u0622\u0646",
+    RESUMING: "\u0644\u0645 \u064a\u062a\u0645 \u062d\u0641\u0638 \u0627\u0644\u062d\u0636\u0648\u0631 \u0628\u0639\u062f. \u062c\u0627\u0631\u064d \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649\u2026",
+    GAVE_UP: "\u062a\u0639\u0630\u0651\u0631 \u062d\u0641\u0638 \u062d\u0636\u0648\u0631\u0643: \u0644\u0645 \u0646\u062a\u0645\u0643\u0646 \u0645\u0646 \u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u062e\u0627\u062f\u0645 \u0641\u064a \u0627\u0644\u0648\u0642\u062a \u0627\u0644\u0645\u062d\u062f\u062f. \u0627\u0639\u0631\u0636 \u0647\u0630\u0647 \u0627\u0644\u0634\u0627\u0634\u0629 \u0639\u0644\u0649 \u0627\u0644\u0645\u062d\u0627\u0636\u0631 \u0627\u0644\u0622\u0646 (\u0631\u0642\u0645 \u0627\u0644\u0637\u0627\u0644\u0628 {id}).",
+    TAB_PENDING: "\u0644\u0645 \u064a\u064f\u062d\u0641\u0638 \u0628\u0639\u062f",
+    SESSION_CLOSED: "\u0627\u0646\u062a\u0647\u0649 \u0648\u0642\u062a \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062d\u0636\u0648\u0631 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062d\u0627\u0636\u0631\u0629.",
+    QR_EXPIRED: "\u0627\u0646\u062a\u0647\u062a \u0635\u0644\u0627\u062d\u064a\u0629 \u0631\u0645\u0632 QR. \u0627\u0645\u0633\u062d \u0627\u0644\u0634\u0627\u0634\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."
   };
   var STEPS = {
     blocked: {
@@ -92,13 +121,19 @@
     gate: $("gate"), gateTitle: $("gateTitle"), gateText: $("gateText"), gateBtn: $("gateBtn"), gateHelp: $("gateHelp"),
     gateHelpTitle: $("gateHelpTitle"), gateSteps: $("gateSteps"), gateMsg: $("gateMsg"), gateSkipBox: $("gateSkipBox"), gateSkip: $("gateSkip"),
     form: $("form"), done: $("done"), doneName: $("doneName"), doneTime: $("doneTime"), doneNote: $("doneNote"),
-    busy: $("busy"), spin: $("spin"), busyStep: $("busyStep"), busyWarn: $("busyWarn"), busyErr: $("busyErr"), busyRetry: $("busyRetry") };
+    busy: $("busy"), spin: $("spin"), busyStep: $("busyStep"), busyWarn: $("busyWarn"), busyErr: $("busyErr"), busyRetry: $("busyRetry"),
+    busyAlert: $("busyAlert"), busyStepAr: $("busyStepAr"), busyWarnAr: $("busyWarnAr"), busyErrAr: $("busyErrAr"),
+    busyNext: $("busyNext"), busyNextAr: $("busyNextAr"), msgAr: $("msgAr") };
   var st = { secret: null, fp: null, id: null, name: "", recognized: false, ticket: null, ticketExp: 0,
     closeMs: 0, offset: 0, busy: false, dead: false, done: false,
     view: "none", perm: "unknown", fix: null, geoFail: null, geoAttempts: 0, geoFails: 0, skipped: false, acquiring: false,
     run: 0, lastKind: "attend", wd: null, wl: null, sess: "", pend: null, rt: null, retryAt: 0 };
 
-  function say(text, kind) { el.msg.textContent = text || ""; el.msg.className = kind || "info"; }
+  // ar: the Arabic line shown under the English one (optional).
+  function say(text, kind, ar) {
+    el.msg.textContent = text || ""; el.msg.className = (kind || "info") + (ar ? " has-ar" : "");
+    el.msgAr.textContent = ar || ""; el.msgAr.className = kind || "info";
+  }
   function fmt(tpl, id) { return tpl.replace("{id}", id || ""); }
   var tf = new Intl.DateTimeFormat("en-GB", { timeZone: CFG.TZ, hour: "2-digit", minute: "2-digit", second: "2-digit" });
   function srvNow() { return Date.now() + st.offset; }
@@ -247,23 +282,23 @@
     });
   }
   function mmss(ms) { var s = Math.max(0, Math.ceil(ms / 1000)); return ("0" + Math.floor(s / 60)).slice(-2) + ":" + ("0" + (s % 60)).slice(-2); }
-  function kill(msg) {
+  function kill(msg, ar) {
     st.dead = true; st.busy = false; clearTimeout(st.wd); hideBusy(); unlock();
     el.save.disabled = true; el.signup.disabled = true; el.change.disabled = true; el.gateBtn.disabled = true; el.gateSkip.disabled = true;
     if (st.view === "gate") view("none");
-    if (msg) say(msg, "err");
+    if (msg) say(msg, "err", ar);
   }
   function tick() {
     if (!st.closeMs) return;
     var left = st.closeMs - srvNow();
     el.clock.textContent = mmss(left);
-    if (st.retryAt && st.busy) el.busyWarn.textContent = retryLine();
+    if (st.retryAt && st.busy) nextLine();
     if (st.dead || st.done) return;
     // A check-in that is still being saved (or retried) is allowed to finish: the server's late grace decides, not our countdown.
     if (left <= 0 && st.busy) { el.sub.textContent = "Still saving your check-in\u2026"; return; }
-    if (left <= 0) { el.sub.textContent = ""; return kill(MESSAGES.SESSION_CLOSED); }
+    if (left <= 0) { el.sub.textContent = ""; return kill(MESSAGES.SESSION_CLOSED, AR.SESSION_CLOSED); }
     // A request already in flight is allowed to finish: the server decides, not our countdown.
-    if (st.ticketExp <= srvNow() && !st.busy) { el.sub.textContent = ""; return kill(MESSAGES.QR_EXPIRED); }
+    if (st.ticketExp <= srvNow() && !st.busy) { el.sub.textContent = ""; return kill(MESSAGES.QR_EXPIRED, AR.QR_EXPIRED); }
     el.sub.textContent = "QR valid " + mmss(st.ticketExp - srvNow());
   }
 
@@ -361,8 +396,8 @@
     el.signup.hidden = false; el.change.hidden = false; el.change.className = "pri";
   }
   function errMsg(r, id) {
-    if (r.code === "SESSION_CLOSED") { kill(MESSAGES.SESSION_CLOSED); return; }
-    if (r.code === "TICKET_EXPIRED" || r.code === "TOKEN_EXPIRED") { kill(MESSAGES.QR_EXPIRED); return; }
+    if (r.code === "SESSION_CLOSED") { kill(MESSAGES.SESSION_CLOSED, AR.SESSION_CLOSED); return; }
+    if (r.code === "TICKET_EXPIRED" || r.code === "TOKEN_EXPIRED") { kill(MESSAGES.QR_EXPIRED, AR.QR_EXPIRED); return; }
     var own = st.recognized ? st.id : id;
     if (ROUTE[r.code]) toChangeDevice(id);
     if (r.code === "UNKNOWN_STUDENT" && el.name) { el.signup.hidden = false; el.namebox.hidden = false; try { el.name.focus(); } catch (e) {} }
@@ -380,35 +415,49 @@
   }
 
   // ---------- blocking overlay: from tap to server answer ----------
-  function showBusy(step) {
-    el.busy.hidden = false; el.spin.hidden = false; el.busyStep.textContent = step; el.busyWarn.hidden = false; el.busyWarn.textContent = "Don't close this page.";
-    el.busyErr.hidden = true; el.busyRetry.hidden = true;
+  // Steps shown while a request is on its way: [English, Arabic].
+  var STEP = { loc: ["Checking location\u2026", AR.LOCATING], dev: ["Verifying device\u2026", AR.DEVICE], reg: ["Registering\u2026", AR.REGISTERING],
+    save: ["Saving attendance\u2026", AR.SAVING], req: ["Sending request\u2026", AR.SENDING] };
+  function stepText(k, n) {
+    var t = STEP[k] || STEP.save;
+    return n ? [t[0] + " (try " + (n + 1) + ")", t[1] + " " + AR.TRY_N.replace("{n}", n + 1)] : t;
+  }
+  function showBusy(k, n) {
+    var t = stepText(k, n);
+    el.busy.hidden = false; el.busy.className = "saving"; el.spin.hidden = false; el.busyAlert.hidden = true;
+    el.busyStep.textContent = t[0]; el.busyStepAr.textContent = t[1];
+    el.busyWarn.hidden = false; el.busyWarn.textContent = MESSAGES.DONT_CLOSE; el.busyWarnAr.textContent = AR.DONT_CLOSE;
+    el.busyErr.hidden = true; el.busyErrAr.hidden = true; el.busyNext.hidden = true; el.busyNextAr.hidden = true; el.busyRetry.hidden = true;
     try { el.busy.focus(); } catch (e) {}
   }
-  function setStep(t) { if (st.busy && el.busyRetry.hidden) el.busyStep.textContent = t; }
-  // Waiting between two automatic tries: the overlay stays up and says plainly that NOTHING is saved yet.
-  function showWaiting(text) {
-    el.busy.hidden = false; el.spin.hidden = false; el.busyStep.textContent = MESSAGES.NOT_SAVED_T;
-    el.busyErr.textContent = text; el.busyErr.hidden = false;
-    el.busyRetry.textContent = "Try now"; el.busyRetry.hidden = false;
-    el.busyWarn.hidden = false; el.busyWarn.textContent = retryLine();
+  function setStep(k) { if (st.busy && el.busyRetry.hidden) { var t = stepText(k, st.pend && st.pend.n); el.busyStep.textContent = t[0]; el.busyStepAr.textContent = t[1]; } }
+  // Waiting between two automatic tries: the overlay turns amber and says plainly, in both languages, that NOTHING is saved yet.
+  function showWaiting(key) {
+    el.busy.hidden = false; el.busy.className = "waiting"; el.spin.hidden = true; el.busyAlert.hidden = false;
+    el.busyStep.textContent = MESSAGES.NOT_SAVED_T; el.busyStepAr.textContent = AR.NOT_SAVED_T;
+    el.busyWarn.hidden = false; el.busyWarn.textContent = MESSAGES.STAY; el.busyWarnAr.textContent = AR.STAY;
+    el.busyErr.textContent = MESSAGES[key] || MESSAGES.AUTO_SERVER; el.busyErr.hidden = false;
+    el.busyErrAr.textContent = AR[key] || AR.AUTO_SERVER; el.busyErrAr.hidden = false;
+    el.busyRetry.textContent = MESSAGES.TRY_NOW + "  \u00b7  " + AR.TRY_NOW; el.busyRetry.hidden = false;
+    el.busyNext.hidden = false; el.busyNextAr.hidden = false; nextLine();
   }
-  function retryLine() {
-    var s = Math.max(0, Math.ceil((st.retryAt - Date.now()) / 1000));
-    return MESSAGES.RETRY_IN.replace("{s}", s).replace("{n}", ((st.pend && st.pend.n) || 0) + 2);
+  function nextLine() {
+    var s = Math.max(0, Math.ceil((st.retryAt - Date.now()) / 1000)), n = ((st.pend && st.pend.n) || 0) + 2;
+    el.busyNext.textContent = MESSAGES.RETRY_IN.replace("{s}", s).replace("{n}", n);
+    el.busyNextAr.textContent = AR.RETRY_IN.replace("{s}", s).replace("{n}", n);
   }
-  function hideBusy() { el.busy.hidden = true; el.busyWarn.textContent = "Don't close this page."; }
+  function hideBusy() { el.busy.hidden = true; el.busy.className = ""; }
   function lock() {
     try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then(function (l) { if (st.busy) st.wl = l; else { try { l.release(); } catch (e) {} } }).catch(function () {}); } catch (e) {}
   }
   function unlock() { try { if (st.wl) st.wl.release(); } catch (e) {} st.wl = null; }
-  function begin(step) {
-    st.busy = true; setBtns(); say("", "info"); showBusy(step); lock();
+  function begin(k) {
+    st.busy = true; setBtns(); say("", "info"); showBusy(k); lock();
   }
   // No answer within SUBMIT_WATCHDOG_MS: the request may still arrive (its late "recorded" is honoured), but a new try is scheduled.
   function armWatchdog() {
     clearTimeout(st.wd);
-    st.wd = setTimeout(function () { if (st.busy && !st.done && !st.dead && st.pend && !st.rt) autoRetry(MESSAGES.UNCONFIRMED); }, K.SUBMIT_WATCHDOG_MS);
+    st.wd = setTimeout(function () { if (st.busy && !st.done && !st.dead && st.pend && !st.rt) autoRetry("UNCONFIRMED"); }, K.SUBMIT_WATCHDOG_MS);
   }
   function end() { clearTimeout(st.wd); clearTimeout(st.rt); st.rt = null; st.retryAt = 0; st.busy = false; hideBusy(); unlock(); setBtns(); }
 
@@ -431,10 +480,10 @@
     if (!p || p.v !== 1 || p.s !== sess || !p.ticket || !p.id || !p.c || (p.kind !== "attend" && p.kind !== "signup")) { if (p) lsSet(PEND_KEY, ""); return null; }
     return p;
   }
-  function markPending() { try { document.title = MESSAGES.TAB_PENDING; } catch (e) {} }
+  function markPending() { try { document.title = MESSAGES.TAB_PENDING.replace(" - ", " / " + AR.TAB_PENDING + " - "); } catch (e) {} }
 
   // Retryable problem (busy, no connection, server error, no answer): try again by itself until the deadline, with growing waits.
-  function autoRetry(text) {
+  function autoRetry(key) {
     if (st.done || st.dead || !st.pend) return;
     clearTimeout(st.wd); clearTimeout(st.rt);
     var left = deadline(st.pend.kind) - srvNow();
@@ -442,7 +491,7 @@
     var n = st.pend.n || 0, d = K.RETRY_DELAYS_MS[Math.min(n, K.RETRY_DELAYS_MS.length - 1)];
     d = Math.max(500, Math.min(Math.round(d * (0.75 + Math.random() * 0.5)), left));   // random spread so a whole class doesn't retry in step
     st.retryAt = Date.now() + d;
-    showWaiting(text);
+    showWaiting(key);
     st.rt = setTimeout(fireRetry, d);
   }
   function fireRetry() {
@@ -455,20 +504,20 @@
   function giveUp() {
     var id = st.pend ? st.pend.id : st.id;
     clearPend(); end();
-    kill(fmt(MESSAGES.GAVE_UP, id));
+    kill(fmt(MESSAGES.GAVE_UP, id), fmt(AR.GAVE_UP, id));
   }
   function attempt() {
     var my = ++st.run;
     st.busy = true; setBtns(); lock();
-    showBusy(st.pend.kind === "change" ? "Sending request\u2026" : st.pend.n ? "Saving attendance\u2026 (try " + (st.pend.n + 1) + ")" : "Saving attendance\u2026");
-    return send(my).catch(function () { if (my === st.run && !st.done) autoRetry(MESSAGES.AUTO_SERVER); });
+    showBusy(st.pend.kind === "change" ? "req" : "save", st.pend.n);
+    return send(my).catch(function () { if (my === st.run && !st.done) autoRetry("AUTO_SERVER"); });
   }
   function retry() { if (st.rt) fireRetry(); }   // "Try now": skip the wait
 
   // ---------- flows ----------
   function guard() {
     if (st.dead || st.busy || st.done) return false;
-    if (!st.ticket || st.ticketExp <= srvNow()) { kill(MESSAGES.QR_EXPIRED); return false; }
+    if (!st.ticket || st.ticketExp <= srvNow()) { kill(MESSAGES.QR_EXPIRED, AR.QR_EXPIRED); return false; }
     return true;
   }
   function pAttend(id, c) { return { ticket: st.ticket, student_id: id, secret: st.secret, fp: c.fp, geo: c.geo, diag: diag() }; }
@@ -485,7 +534,7 @@
   function fail(r, id, my) {
     if (my !== st.run || st.done) return;
     var k = RETRYABLE[r.code];
-    if (k) return autoRetry(MESSAGES[k]);
+    if (k) return autoRetry(k);
     clearPend(); end(); errMsg(r, id);
   }
   function finishAttend(r, id, my) {
@@ -495,7 +544,7 @@
     st.dead = false; st.id = id; st.recognized = true; saveAll("att_id", id); success(r);
   }
   function doAttend(id, c, my) {
-    setStep("Saving attendance\u2026");
+    setStep("save");
     return api.call("att_attend", pAttend(id, c)).then(function (r) { return finishAttend(r, id, my); });
   }
   // One try of the pending request (st.pend).
@@ -510,7 +559,7 @@
       });
     }
     if (P.kind === "signup") {
-      setStep("Registering\u2026");
+      setStep("reg");
       return api.call("att_signup", pSignup(id, c)).then(function (r) {
         if (!r.ok) return fail(r, id, my);
         if (my !== st.run || st.done) return;    // a newer try is already on its way
@@ -533,10 +582,10 @@
     if (kind === "signup" && !el.name.value.trim()) { say(MESSAGES.NAME_REQUIRED, "err"); return Promise.resolve(); }
     var need = kind !== "change", my = ++st.run;
     st.lastKind = kind;
-    begin(need ? "Checking location\u2026" : "Sending request\u2026");
+    begin(need ? "loc" : "req");
     return ensureFix(need).then(function () {
       if (my !== st.run) return null;
-      setStep("Verifying device\u2026");
+      setStep("dev");
       return fingerprint();
     }).then(function (fp) {
       if (fp === null || my !== st.run) return null;
@@ -545,7 +594,7 @@
       return send(my);
     }).catch(function () {
       if (my !== st.run || st.done) return;
-      if (st.pend) return autoRetry(MESSAGES.AUTO_SERVER);
+      if (st.pend) return autoRetry("AUTO_SERVER");
       end(); say(MESSAGES.GENERIC, "err");
     });
   }
@@ -557,7 +606,7 @@
     if (p.c && p.c.geo && !p.c.geo.denied) st.fix = { lat: p.c.geo.lat, lng: p.c.geo.lng, acc: p.c.geo.acc, ts: Date.now() };
     view("form"); render();
     el.sid.value = st.pend.id; if (st.pend.kind === "signup") el.name.value = st.pend.name;
-    tick(); markPending(); say(MESSAGES.RESUMING, "info");
+    tick(); markPending(); say(MESSAGES.RESUMING, "info", AR.RESUMING);
     st.lastKind = st.pend.kind;
     attempt();
     return true;
