@@ -28,7 +28,10 @@ const A = { token: "adm-secret" }, geo = () => ({ lat: 31.2001, lng: 29.9187, ac
   console.log("legit re-registration is NOT flagged");
   const n0 = gas.sheets.AttFlagLog._g.length;
   ok((await reg("20240011", "Mona Adel", "Z")).code === "ID_TAKEN", "new phone claiming a taken ID -> ID_TAKEN (change-device flow)");
-  ok((await reg("20240011", "Mona Adel", "A")).code === "ID_TAKEN", "same phone, own ID again -> ID_TAKEN");
+  // Nov 2026: a sign-up retried after a lost answer (busy server) must not bounce the student into change-device.
+  const again = await reg("20240011", "Mona Adel", "A");
+  ok(again.ok && again.status === "registered" && gas.sheets.AttStudents._g.filter(r => r[0] === "20240011").length === 1,
+    "same phone, own ID again -> already registered (a retry), no second row");
   ok(gas.sheets.AttFlagLog._g.length === n0, "...neither writes a flag");
   console.log("attend + other cheat");
   ok((await att("20240011", "A")).ok, "mate 1 attends");

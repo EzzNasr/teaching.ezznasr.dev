@@ -10,8 +10,14 @@
     GEO_LOW_TIMEOUT_MS: CFG.GEO_LOW_TIMEOUT_MS || 10000,
     GEO_MAX_AGE_MS: CFG.GEO_MAX_AGE_MS || 60000,
     GEO_SKIP_AFTER_FAILS: CFG.GEO_SKIP_AFTER_FAILS || 2,
-    SUBMIT_WATCHDOG_MS: CFG.SUBMIT_WATCHDOG_MS || 30000
+    SUBMIT_WATCHDOG_MS: CFG.SUBMIT_WATCHDOG_MS || 30000,
+    // Automatic retry (2026-11-04): waits between tries (then the last value repeats), each spread +-25 % at random. The page keeps
+    // trying until the server's late grace runs out (LATE_GRACE_SEC after the QR ticket expires / the session closes), minus a margin.
+    RETRY_DELAYS_MS: CFG.RETRY_DELAYS_MS || [2000, 4000, 8000, 12000, 15000],
+    LATE_GRACE_MS: (CFG.LATE_GRACE_SEC || 120) * 1000,
+    DEADLINE_MARGIN_MS: 4000
   };
+  var PEND_KEY = "att_pending", TITLE = (function () { try { return document.title || "Attendance"; } catch (e) { return "Attendance"; } })();
 
   // Wording is the agreed message table (S5). Students only ever see their OWN id; flags are never revealed.
   // {id} is only ever this device's own stored/typed ID.
@@ -36,11 +42,17 @@
     NO_STORAGE: "Open this page in Chrome or Safari. This in-app browser can't save your device.",
     NETWORK: "No connection. Check your internet and try again.",
     GENERIC: "Something went wrong. Try again.",
-    // S1: retry card (nothing was confirmed by the server, so we never say \"saved\")
-    NETWORK_RETRY: "No connection. Your attendance is not saved yet. Check your internet, then tap Retry.",
-    BUSY_RETRY: "The server is busy. Your attendance is not saved yet. Tap Retry.",
-    SERVER_RETRY: "The server had a problem. Your attendance is not saved yet. Tap Retry.",
-    UNCONFIRMED: "This is taking too long. Your attendance is not confirmed yet. Tap Retry.",
+    // Retry card (nothing was confirmed by the server, so we never say "saved"). The page retries by itself (2026-11-04).
+    NOT_SAVED_T: "NOT saved yet",
+    NETWORK_RETRY: "No connection. Your attendance is not saved yet. Check your internet and stay on this page: it keeps trying by itself.",
+    BUSY_RETRY: "The server is busy. Your attendance is not saved yet. Stay on this page: it keeps trying by itself.",
+    SERVER_RETRY: "The server had a problem. Your attendance is not saved yet. Stay on this page: it keeps trying by itself.",
+    AUTO_SERVER: "Something went wrong. Your attendance is not saved yet. Stay on this page: it keeps trying by itself.",
+    UNCONFIRMED: "This is taking too long. Your attendance is not confirmed yet. Stay on this page: it keeps trying by itself.",
+    RETRY_IN: "Trying again in {s} s (try {n}). Don't close this page.",
+    RESUMING: "Your check-in was not saved yet. Trying again\u2026",
+    GAVE_UP: "Your attendance could NOT be saved: the server could not be reached in time. Show this screen to your instructor now (ID {id}).",
+    TAB_PENDING: "NOT saved yet - Attendance",
     // S1: location gate
     GATE_ASK_T: "Turn on location to check in",
     GATE_ASK: "Attendance only counts inside the lecture hall. Your location is read when you save.",
@@ -84,7 +96,7 @@
   var st = { secret: null, fp: null, id: null, name: "", recognized: false, ticket: null, ticketExp: 0,
     closeMs: 0, offset: 0, busy: false, dead: false, done: false,
     view: "none", perm: "unknown", fix: null, geoFail: null, geoAttempts: 0, geoFails: 0, skipped: false, acquiring: false,
-    run: 0, lastKind: "attend", wd: null, wl: null };
+    run: 0, lastKind: "attend", wd: null, wl: null, sess: "", pend: null, rt: null, retryAt: 0 };
 
   function say(text, kind) { el.msg.textContent = text || ""; el.msg.className = kind || "info"; }
   function fmt(tpl, id) { return tpl.replace("{id}", id || ""); }
@@ -245,7 +257,10 @@
     if (!st.closeMs) return;
     var left = st.closeMs - srvNow();
     el.clock.textContent = mmss(left);
+    if (st.retryAt && st.busy) el.busyWarn.textContent = retryLine();
     if (st.dead || st.done) return;
+    // A check-in that is still being saved (or retried) is allowed to finish: the server's late grace decides, not our countdown.
+    if (left <= 0 && st.busy) { el.sub.textContent = "Still saving your check-in\u2026"; return; }
     if (left <= 0) { el.sub.textContent = ""; return kill(MESSAGES.SESSION_CLOSED); }
     // A request already in flight is allowed to finish: the server decides, not our countdown.
     if (st.ticketExp <= srvNow() && !st.busy) { el.sub.textContent = ""; return kill(MESSAGES.QR_EXPIRED); }
@@ -323,6 +338,7 @@
     } catch (e) {}
   }
   function onVisible() {
+    if (!document.hidden && st.rt && Date.now() >= st.retryAt - 1000) fireRetry();   // the phone was locked during the wait: try at once
     if (document.hidden || st.view !== "gate" || st.acquiring || st.dead) return;
     refreshPerm().then(function (s) { if (s === "granted" && st.view === "gate" && !st.acquiring) gateAttempt(true); });
   }
@@ -370,10 +386,16 @@
     try { el.busy.focus(); } catch (e) {}
   }
   function setStep(t) { if (st.busy && el.busyRetry.hidden) el.busyStep.textContent = t; }
-  function showRetry(text) {
-    el.busy.hidden = false; el.spin.hidden = true; el.busyStep.textContent = "Not saved yet"; el.busyWarn.textContent = "Keep this page open.";
-    el.busyErr.textContent = text; el.busyErr.hidden = false; el.busyRetry.hidden = false;
-    try { el.busyRetry.focus(); } catch (e) {}
+  // Waiting between two automatic tries: the overlay stays up and says plainly that NOTHING is saved yet.
+  function showWaiting(text) {
+    el.busy.hidden = false; el.spin.hidden = false; el.busyStep.textContent = MESSAGES.NOT_SAVED_T;
+    el.busyErr.textContent = text; el.busyErr.hidden = false;
+    el.busyRetry.textContent = "Try now"; el.busyRetry.hidden = false;
+    el.busyWarn.hidden = false; el.busyWarn.textContent = retryLine();
+  }
+  function retryLine() {
+    var s = Math.max(0, Math.ceil((st.retryAt - Date.now()) / 1000));
+    return MESSAGES.RETRY_IN.replace("{s}", s).replace("{n}", ((st.pend && st.pend.n) || 0) + 2);
   }
   function hideBusy() { el.busy.hidden = true; el.busyWarn.textContent = "Don't close this page."; }
   function lock() {
@@ -382,14 +404,66 @@
   function unlock() { try { if (st.wl) st.wl.release(); } catch (e) {} st.wl = null; }
   function begin(step) {
     st.busy = true; setBtns(); say("", "info"); showBusy(step); lock();
-    clearTimeout(st.wd); st.wd = setTimeout(function () { if (st.busy && !st.done && !st.dead) showRetry(MESSAGES.UNCONFIRMED); }, K.SUBMIT_WATCHDOG_MS);
   }
-  function end() { clearTimeout(st.wd); st.busy = false; hideBusy(); unlock(); setBtns(); }
-  function retry() {
-    if (st.done || st.dead) return;
-    st.run++; end();            // any answer still on its way for the old attempt is handled in finish()
-    run(st.lastKind);
+  // No answer within SUBMIT_WATCHDOG_MS: the request may still arrive (its late "recorded" is honoured), but a new try is scheduled.
+  function armWatchdog() {
+    clearTimeout(st.wd);
+    st.wd = setTimeout(function () { if (st.busy && !st.done && !st.dead && st.pend && !st.rt) autoRetry(MESSAGES.UNCONFIRMED); }, K.SUBMIT_WATCHDOG_MS);
   }
+  function end() { clearTimeout(st.wd); clearTimeout(st.rt); st.rt = null; st.retryAt = 0; st.busy = false; hideBusy(); unlock(); setBtns(); }
+
+  // ---------- the pending check-in: re-sent as-is on every try, kept on the phone so a reload resumes it ----------
+  // Same ticket, same location and fingerprint every time: retrying never waits for GPS again, and the server de-duplicates.
+  function deadline(kind) {
+    var close = isFinite(st.closeMs) && st.closeMs > 0 ? st.closeMs : Infinity;
+    if (kind === "change") return st.ticketExp - 2000;                                  // device requests get no late grace
+    return Math.min(st.ticketExp, close) + K.LATE_GRACE_MS - K.DEADLINE_MARGIN_MS;      // the server's late grace (ATT_C.LATE_GRACE_SEC)
+  }
+  function savePend() {
+    if (!st.pend || st.pend.kind === "change") return;
+    var P = st.pend;
+    lsSet(PEND_KEY, JSON.stringify({ v: 1, s: st.sess, ticket: st.ticket, ticketExp: st.ticketExp, closeMs: st.closeMs, offset: st.offset,
+      kind: P.kind, id: P.id, name: P.name || "", c: P.c, n: P.n || 0 }));
+  }
+  function clearPend() { st.pend = null; lsSet(PEND_KEY, ""); try { document.title = TITLE; } catch (e) {} }
+  function loadPend(sess) {
+    var p = null; try { p = JSON.parse(lsGet(PEND_KEY) || "null"); } catch (e) { p = null; }
+    if (!p || p.v !== 1 || p.s !== sess || !p.ticket || !p.id || !p.c || (p.kind !== "attend" && p.kind !== "signup")) { if (p) lsSet(PEND_KEY, ""); return null; }
+    return p;
+  }
+  function markPending() { try { document.title = MESSAGES.TAB_PENDING; } catch (e) {} }
+
+  // Retryable problem (busy, no connection, server error, no answer): try again by itself until the deadline, with growing waits.
+  function autoRetry(text) {
+    if (st.done || st.dead || !st.pend) return;
+    clearTimeout(st.wd); clearTimeout(st.rt);
+    var left = deadline(st.pend.kind) - srvNow();
+    if (!(left > 0)) return giveUp();
+    var n = st.pend.n || 0, d = K.RETRY_DELAYS_MS[Math.min(n, K.RETRY_DELAYS_MS.length - 1)];
+    d = Math.max(500, Math.min(Math.round(d * (0.75 + Math.random() * 0.5)), left));   // random spread so a whole class doesn't retry in step
+    st.retryAt = Date.now() + d;
+    showWaiting(text);
+    st.rt = setTimeout(fireRetry, d);
+  }
+  function fireRetry() {
+    clearTimeout(st.rt); st.rt = null; st.retryAt = 0;
+    if (st.done || st.dead || !st.pend) return;
+    if (!(deadline(st.pend.kind) - srvNow() > 0)) return giveUp();
+    st.pend.n = (st.pend.n || 0) + 1; savePend();
+    attempt();
+  }
+  function giveUp() {
+    var id = st.pend ? st.pend.id : st.id;
+    clearPend(); end();
+    kill(fmt(MESSAGES.GAVE_UP, id));
+  }
+  function attempt() {
+    var my = ++st.run;
+    st.busy = true; setBtns(); lock();
+    showBusy(st.pend.kind === "change" ? "Sending request\u2026" : st.pend.n ? "Saving attendance\u2026 (try " + (st.pend.n + 1) + ")" : "Saving attendance\u2026");
+    return send(my).catch(function () { if (my === st.run && !st.done) autoRetry(MESSAGES.AUTO_SERVER); });
+  }
+  function retry() { if (st.rt) fireRetry(); }   // "Try now": skip the wait
 
   // ---------- flows ----------
   function guard() {
@@ -398,7 +472,7 @@
     return true;
   }
   function pAttend(id, c) { return { ticket: st.ticket, student_id: id, secret: st.secret, fp: c.fp, geo: c.geo, diag: diag() }; }
-  function pSignup(id, c) { var p = pAttend(id, c), n = el.name.value.trim().slice(0, 60); if (n) p.name = n; return p; }
+  function pSignup(id, c) { var p = pAttend(id, c), n = st.pend && st.pend.name; if (n) p.name = n; return p; }
   function pChange(id, c) { return { ticket: st.ticket, student_id: id, new_secret: st.secret, fp: c.fp }; }
   // Make sure a recent fix exists at submit time. Failure never blocks the check-in: it is sent with its reason.
   function ensureFix(need) {
@@ -407,21 +481,47 @@
       if (r.ok) { st.fix = r.pos; st.geoFail = null; } else st.geoFail = { reason: r.reason };   // an older fix, if any, is still used
     });
   }
-  // A failed answer: retryable problems keep the overlay (never claim success); everything else returns to the form.
+  // A failed answer: retryable problems keep the overlay and retry by themselves (never claim success); anything else is final.
   function fail(r, id, my) {
-    if (my !== st.run) return;
+    if (my !== st.run || st.done) return;
     var k = RETRYABLE[r.code];
-    if (k) return showRetry(MESSAGES[k]);
-    end(); errMsg(r, id);
+    if (k) return autoRetry(MESSAGES[k]);
+    clearPend(); end(); errMsg(r, id);
   }
   function finishAttend(r, id, my) {
     if (st.done) return;
     if (!r.ok) return fail(r, id, my);
-    end();                      // also covers a late "recorded" answer for an attempt the student already retried
-    st.id = id; st.recognized = true; saveAll("att_id", id); success(r);
+    clearPend(); end();         // also covers a late "recorded" answer for an attempt that was already retried or given up on
+    st.dead = false; st.id = id; st.recognized = true; saveAll("att_id", id); success(r);
   }
   function doAttend(id, c, my) {
+    setStep("Saving attendance\u2026");
     return api.call("att_attend", pAttend(id, c)).then(function (r) { return finishAttend(r, id, my); });
+  }
+  // One try of the pending request (st.pend).
+  function send(my) {
+    var P = st.pend, id = P.id, c = P.c;
+    armWatchdog();
+    if (P.kind === "change") {
+      return api.call("att_change_device", pChange(id, c)).then(function (r) {
+        if (!r.ok) return fail(r, id, my);
+        if (my !== st.run) return;
+        clearPend(); end(); el.change.hidden = true; el.signup.hidden = true; el.save.hidden = false; say(MESSAGES.CHANGE_PENDING, "info"); el.save.disabled = true;
+      });
+    }
+    if (P.kind === "signup") {
+      setStep("Registering\u2026");
+      return api.call("att_signup", pSignup(id, c)).then(function (r) {
+        if (!r.ok) return fail(r, id, my);
+        if (my !== st.run || st.done) return;    // a newer try is already on its way
+        st.id = id; st.recognized = true; st.name = (P.name || "").slice(0, 60); if (st.name) saveAll("att_name", st.name);
+        P.kind = "attend"; savePend();           // from now on only the check-in is retried (never the sign-up again)
+        return saveAll("att_id", id).then(function () {
+          render(); return doAttend(id, c, my);   // the same ticket covers sign-up then attend (overlay stays up across both calls)
+        });
+      });
+    }
+    return doAttend(id, c, my);
   }
   // kind: attend | signup | change
   function run(kind) {
@@ -440,33 +540,33 @@
       return fingerprint();
     }).then(function (fp) {
       if (fp === null || my !== st.run) return null;
-      var c = { geo: need ? geoPayload() : null, fp: fp };
-      if (kind === "change") {
-        setStep("Sending request\u2026");
-        return api.call("att_change_device", pChange(id, c)).then(function (r) {
-          if (!r.ok) return fail(r, id, my);
-          end(); el.change.hidden = true; el.signup.hidden = true; el.save.hidden = false; say(MESSAGES.CHANGE_PENDING, "info"); el.save.disabled = true;
-        });
-      }
-      if (kind === "signup") {
-        setStep("Registering\u2026");
-        return api.call("att_signup", pSignup(id, c)).then(function (r) {
-          if (!r.ok) return fail(r, id, my);
-          st.id = id; st.recognized = true; st.name = el.name.value.trim().slice(0, 60); if (st.name) saveAll("att_name", st.name);
-          return saveAll("att_id", id).then(function () {
-            render(); setStep("Saving attendance\u2026");
-            return doAttend(id, c, my);   // ASSUMPTION: ticket reusable for signup then attend (overlay stays up across both calls)
-          });
-        });
-      }
-      setStep("Saving attendance\u2026");
-      return doAttend(id, c, my);
-    }).catch(function () { if (my === st.run && !st.done) showRetry(MESSAGES.GENERIC + " Your attendance is not saved yet."); });
+      st.pend = { kind: kind, id: id, name: kind === "signup" ? el.name.value.trim().slice(0, 60) : "", c: { geo: need ? geoPayload() : null, fp: fp }, n: 0 };
+      savePend(); if (need) markPending();
+      return send(my);
+    }).catch(function () {
+      if (my !== st.run || st.done) return;
+      if (st.pend) return autoRetry(MESSAGES.AUTO_SERVER);
+      end(); say(MESSAGES.GENERIC, "err");
+    });
+  }
+  // The page was closed / reloaded while a check-in was still trying: carry on with the SAME request (no new scan, no new location).
+  function resume(p) {
+    st.ticket = p.ticket; st.ticketExp = Number(p.ticketExp) || 0; st.closeMs = Number(p.closeMs) || 0; st.offset = Number(p.offset) || 0;
+    if (!(deadline(p.kind) - srvNow() > 0)) { lsSet(PEND_KEY, ""); return false; }
+    st.pend = { kind: p.kind, id: String(p.id), name: String(p.name || "").slice(0, 60), c: p.c, n: Number(p.n) || 0 };
+    if (p.c && p.c.geo && !p.c.geo.denied) st.fix = { lat: p.c.geo.lat, lng: p.c.geo.lng, acc: p.c.geo.acc, ts: Date.now() };
+    view("form"); render();
+    el.sid.value = st.pend.id; if (st.pend.kind === "signup") el.name.value = st.pend.name;
+    tick(); markPending(); say(MESSAGES.RESUMING, "info");
+    st.lastKind = st.pend.kind;
+    attempt();
+    return true;
   }
 
   // ---------- boot ----------
   function boot() {
     var q = new URLSearchParams(location.search), sess = q.get("s"), tok = q.get("t");
+    st.sess = sess || "";
     el.save.addEventListener("click", function () { run("attend"); });
     el.signup.addEventListener("click", function () { run("signup"); });
     el.change.addEventListener("click", function () { run("change"); });
@@ -485,8 +585,11 @@
     }).then(function () {
       if (IN_APP.test(navigator.userAgent)) say(MESSAGES.NO_STORAGE, "info");
       render();
+      var pend = loadPend(sess);
+      if (pend && resume(pend)) return { resumed: true };
       return fetchTicket(sess, tok);
     }).then(function (r) {
+      if (r && r.resumed) return;   // carrying on with a check-in that was still trying when the page closed
       if (!r.ok) { kill(MESSAGES[r.code] || MESSAGES.GENERIC); return; }
       tick();
       // Location comes first. No auto check-in any more: a returning student sees "Welcome back" and taps once, after the gate.

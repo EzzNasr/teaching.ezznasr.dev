@@ -734,6 +734,27 @@
       "owner": "S4-att"
     },
     {
+      "id": "R-A09",
+      "title": "Attendance production hardening: 120 s late grace (ticket expiry, time close, teacher close), short lock still catches duplicates, idempotent sign-up retry",
+      "cmd": [
+        "node",
+        "../../tests/attendance/late_grace.test.js"
+      ],
+      "status": "active",
+      "owner": "att-prod"
+    },
+    {
+      "id": "R-A10",
+      "title": "Attendance live feed + two-mates cheating scenario (masked), legit re-registration not flagged",
+      "cmd": [
+        "node",
+        "../../tests/attendance/feed.test.js"
+      ],
+      "status": "active",
+      "owner": "att-prod",
+      "note": "Existed but was never registered; registered Nov 2026 when the sign-up retry rule changed (same phone + same ID again = already registered)."
+    },
+    {
       "id": "R-P3-F1",
       "title": "S1 follow-up core: contacted state, week/month boundaries, filter sort order, flag notices, Phase3_Flags.gs against the real router",
       "status": "active",

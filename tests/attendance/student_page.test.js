@@ -237,6 +237,79 @@ const timers = []; const origSI = global.setInterval;
   p.els.gateSkip.click(); p.els.sid.value = "20240001"; p.els.name.value = "Ali"; p.els.save.click(); await until(() => p.shown().join() === "done", "done");
   ok(/could not be verified/.test(p.els.doneNote.textContent), "done screen tells a skipped student it was recorded for review");
 
+  // ---------- Nov 2026: automatic retry, "not saved yet", late grace, resume after reload (docs/attendance-decisions.md) ----------
+  const ME = { att_secret: "a".repeat(64), att_id: "20240001" }, FAST = { RETRY_DELAYS_MS: [20, 20] };
+  const nAtt = pg => pg.apiCalls.filter(c => c.action === "att_attend").length;
+  console.log("automatic retry (no tap needed)");
+  let k = 0;
+  p = boot({ perm: "granted", cfg: { RETRY_DELAYS_MS: [400, 400] }, ls: Object.assign({}, ME), api: (a) => { if (a !== "att_attend") return undefined; k++; return k <= 2 ? { ok: false, code: "BUSY" } : undefined; } });
+  await until(() => p.shown().join() === "form", "form"); p.els.save.click();
+  await until(() => !p.els.busyRetry.hidden, "waiting card");
+  ok(/NOT saved yet/.test(p.els.busyStep.textContent) && /not saved yet/i.test(p.els.busyErr.textContent) && /stay on this page/i.test(p.els.busyErr.textContent), "waiting: 'NOT saved yet' + 'stay on this page'");
+  ok(/Trying again in \d+ s/.test(p.els.busyWarn.textContent) && p.els.busyRetry.textContent === "Try now", "waiting: countdown to the next try + a 'Try now' button");
+  ok(/NOT saved yet/.test(p.ctx.document.title), "the browser tab title says NOT saved yet");
+  let prev2 = false; p.winH.beforeunload.forEach(f => f({ preventDefault() { prev2 = true; } })); ok(prev2, "closing the page while it retries asks the browser to confirm");
+  ok(JSON.parse(p.ls.att_pending).kind === "attend", "the pending check-in is kept on the phone while it retries");
+  await until(() => p.shown().join() === "done", "recorded after two automatic retries", 3000);
+  ok(nAtt(p) === 3 && p.geoCalls.length === 1, "3 tries, location read once (each retry re-sends the same request)");
+  ok(new Set(p.apiCalls.filter(c => c.action === "att_attend").map(c => c.payload.ticket + JSON.stringify(c.payload.geo))).size === 1, "every try carries the same ticket and the same location");
+  ok(p.ls.att_pending === "" && !/NOT saved/.test(p.ctx.document.title), "saved: the pending check-in is cleared and the tab title restored");
+
+  k = 0;
+  p = boot({ perm: "granted", cfg: FAST, ls: Object.assign({}, ME), api: (a) => { if (a !== "att_attend") return undefined; k++; return k === 1 ? { ok: false, code: "NETWORK" } : { ok: false, code: "DEVICE_ID_CONFLICT" }; } });
+  await until(() => p.shown().join() === "form", "form"); p.els.save.click(); await until(() => /DETECTED/.test(p.els.msg.textContent), "definite refusal after a retry", 2000);
+  ok(p.els.busy.hidden && p.ls.att_pending === "", "a definite refusal stops the retries and clears the pending check-in");
+
+  console.log("no answer at all -> a new try by itself");
+  k = 0;
+  p = boot({ perm: "granted", cfg: Object.assign({ SUBMIT_WATCHDOG_MS: 60 }, FAST), ls: Object.assign({}, ME), api: (a) => { if (a !== "att_attend") return undefined; k++; return k === 1 ? new Promise(() => {}) : undefined; } });
+  await until(() => p.shown().join() === "form", "form"); p.els.save.click();
+  await until(() => p.shown().join() === "done", "recorded by the automatic retry after the watchdog", 2000);
+  ok(nAtt(p) === 2, "watchdog -> one automatic re-send, no tap");
+
+  console.log("sign-up is never re-sent once it succeeded");
+  let su2 = 0, at2 = 0;
+  p = boot({ perm: "granted", cfg: FAST, api: (a) => { if (a === "att_signup") { su2++; return su2 === 1 ? { ok: false, code: "BUSY" } : { ok: true, status: "registered" }; } if (a === "att_attend") { at2++; return at2 === 1 ? { ok: false, code: "BUSY" } : undefined; } return undefined; } });
+  await until(() => p.shown().join() === "form", "form"); p.els.sid.value = "20245555"; p.els.name.value = "Nour"; p.els.signup.click();
+  await until(() => p.shown().join() === "done", "signed up and recorded", 2000);
+  ok(su2 === 2 && at2 === 2, "busy sign-up retried once, busy check-in retried once, sign-up not repeated after it worked (" + su2 + "/" + at2 + ")");
+  ok(p.last("att_signup").payload.name === "Nour", "the retried sign-up still carries the name");
+
+  console.log("the session closes while it is still retrying");
+  const closeSoon = Date.now() + 300;
+  k = 0;
+  p = boot({ perm: "granted", cfg: { RETRY_DELAYS_MS: [150] }, ls: Object.assign({}, ME), api: (a) => {
+    if (a === "att_ticket") return { ok: true, ticket: "T", expires_at: closeSoon, close_utc: new Date(closeSoon).toISOString(), server_utc: new Date().toISOString() };
+    if (a !== "att_attend") return undefined; k++; return Date.now() < closeSoon + 400 ? { ok: false, code: "BUSY" } : undefined; } });
+  await until(() => p.shown().join() === "form", "form"); p.els.save.click();
+  await until(() => p.shown().join() === "done", "recorded inside the late grace", 3000);
+  ok(k >= 3 && !/closed/i.test(p.els.msg.textContent), "the page kept retrying past the close (late grace) and was recorded, never 'closed'");
+
+  console.log("gives up only when the late grace is over");
+  p = boot({ perm: "granted", cfg: { RETRY_DELAYS_MS: [30], LATE_GRACE_SEC: 0.001 }, ls: Object.assign({}, ME), api: (a) => {
+    if (a === "att_ticket") return { ok: true, ticket: "T", expires_at: Date.now() + 4600, close_utc: new Date(Date.now() + 300000).toISOString(), server_utc: new Date().toISOString() };
+    return a === "att_attend" ? { ok: false, code: "BUSY" } : undefined; } });
+  await until(() => p.shown().join() === "form", "form"); p.els.save.click();
+  await until(() => /could NOT be saved/.test(p.els.msg.textContent), "give-up message", 3000);
+  ok(/20240001/.test(p.els.msg.textContent) && /instructor/.test(p.els.msg.textContent) && p.els.busy.hidden, "give up: overlay closes, says NOT saved, shows the student's ID, sends them to the instructor");
+  ok(p.ls.att_pending === "" && p.shown().join() !== "done", "...nothing pending is left and no success is shown");
+  const triesAtGiveUp = nAtt(p); await wait(120); ok(nAtt(p) === triesAtGiveUp, "...and the retries stop");
+
+  console.log("page closed while retrying -> reopening the link carries on");
+  const pend = { v: 1, s: "S-1", ticket: "TK-OLD", ticketExp: Date.now() + 100000, closeMs: Date.now() + 100000, offset: 0, kind: "attend", id: "20240001", name: "",
+    c: { geo: { lat: 31.25, lng: 29.95, acc: 9 }, fp: "fpX" }, n: 2 };
+  p = boot({ perm: "granted", ls: Object.assign({ att_pending: JSON.stringify(pend) }, ME) });
+  await until(() => p.shown().join() === "done", "resumed and recorded");
+  ok(!p.acts().includes("att_ticket") && p.last("att_attend").payload.ticket === "TK-OLD", "resume re-sends with the saved ticket (the QR token in the link has long expired)");
+  ok(p.last("att_attend").payload.geo.lat === 31.25 && p.geoCalls.length === 0, "...with the saved location, without asking for location again");
+  ok(p.ls.att_pending === "", "...and clears it once recorded");
+  p = boot({ perm: "granted", ls: Object.assign({ att_pending: JSON.stringify(Object.assign({}, pend, { s: "S-OTHER" })) }, ME) });
+  await until(() => p.shown().join() === "form", "form");
+  ok(p.acts()[0] === "att_ticket" && p.ls.att_pending === "", "a pending check-in for ANOTHER session is dropped; the page starts normally");
+  p = boot({ perm: "granted", ls: Object.assign({ att_pending: JSON.stringify(Object.assign({}, pend, { ticketExp: Date.now() - 200000, closeMs: Date.now() - 200000 })) }, ME) });
+  await until(() => p.shown().join() === "form", "form");
+  ok(p.acts()[0] === "att_ticket" && p.ls.att_pending === "", "a pending check-in past the late grace is dropped; the page starts normally");
+
   console.log(`\n${pass} passed`);
   process.exit(0);
 })().catch(e => { console.error("FAIL:", e && e.message || e); process.exit(1); });

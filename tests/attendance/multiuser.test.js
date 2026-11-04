@@ -354,7 +354,7 @@ const crow = (D, sid, id) => detail(D, sid).checkins.find(c => c.student_id === 
   const CFG = require(path.join(site, "contract/att_config.js"));
   if (CFG.GEO_HIGH_TIMEOUT_MS === undefined) console.log("  --  contract/att_config.js has no geo constants yet (Session 1 not landed): parity check skipped");
   else {
-    const keys = ["TICKET_SEC", "GEO_HIGH_TIMEOUT_MS", "GEO_LOW_TIMEOUT_MS", "GEO_MAX_AGE_MS", "GEO_SKIP_AFTER_FAILS", "SUBMIT_WATCHDOG_MS", "WINDOW_SEC", "GRACE_SEC", "SESSION_MIN", "GEO_RADIUS_M", "GEO_WEAK_ACC_M"];
+    const keys = ["TICKET_SEC", "GEO_HIGH_TIMEOUT_MS", "GEO_LOW_TIMEOUT_MS", "GEO_MAX_AGE_MS", "GEO_SKIP_AFTER_FAILS", "SUBMIT_WATCHDOG_MS", "WINDOW_SEC", "GRACE_SEC", "SESSION_MIN", "GEO_RADIUS_M", "GEO_WEAK_ACC_M", "LATE_GRACE_SEC"];
     ok(keys.every(k => CFG[k] === T.gas.run("ATT_C." + k)), "contract/att_config.js and ATT_C hold identical frozen constants");
   }
   for (const a of ["constructor", "__proto__", "toString", "hasOwnProperty", "att_nope"]) ok(T.D({ action: a, token: A }).code === "UNKNOWN_ACTION" && T.D({ action: a }).code === "UNKNOWN_ACTION", "action '" + a + "' -> UNKNOWN_ACTION");
