@@ -87,8 +87,13 @@ Fill in after running:
 
 | Date | Run | Recorded | Needed a retry | Median | 90 % | Slowest | Notes |
 |---|---|---|---|---|---|---|---|
+| 2026-11-04 | `att_loadTest()` | 0/70 | 70 | - | - | - | **Invalid run**: every request got HTTP 401. The test used `ScriptApp.getService().getUrl()`, which from the editor is the `/dev` URL (editors only), so nothing reached the server. Fixed: it now uses the students' `/exec` URL and checks it first. Re-run. |
 | | `att_loadTest()` | | | | | | |
 | | `att_loadTestFirstDay()` | | | | | | |
+
+The test checks its URL with one request before starting and stops at once (writing nothing) if the answer is not the attendance
+JSON. It uses Script Property `ATT_LOADTEST_URL`, else `ATT_WEBAPP_URL`, else the built-in students' URL (the same as
+`contract/att_config.js`).
 
 How to read it: everything recorded with the slowest under ~2 minutes means launch is fine. If the slowest gets close to
 5 + 2 minutes, or anything fails, do F1 before more students are added.

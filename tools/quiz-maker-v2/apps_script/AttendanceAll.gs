@@ -954,13 +954,29 @@ function att_scriptedRun() {
  *  Every student is sent at once over HTTP (UrlFetchApp.fetchAll). Anyone who gets BUSY / a server error / a non-JSON answer (Google's
  *  concurrency limit) is sent again in the next round after a short wait, the way the student page retries, until all are recorded
  *  or the session's 5 minutes + LATE_GRACE_SEC run out. The log shows every round, the worst wait, and PASS/FAIL.
- *  Rows use course ATT-TEST and IDs 9998xxxx: run att_cleanupTest() afterwards. Set ATT_LOADTEST_URL if this project's /exec URL
- *  is not the one the students use. */
+ *  Rows use course ATT-TEST and IDs 9998xxxx: run att_cleanupTest() afterwards.
+ *  URL: the students' /exec URL (Script Property ATT_LOADTEST_URL, else ATT_WEBAPP_URL, else ATT_DEFAULT_WEBAPP_URL - the same one as
+ *  contract/att_config.js). NOT ScriptApp.getService().getUrl(): run from the editor that is the /dev URL, which answers 401 to anyone
+ *  without the editor's sign-in (the Nov 4 run: 1120 x NOT_JSON_401, nothing reached the server). */
 function att_loadTest(n) { return att_loadRun_(n || 70, false); }
 function att_loadTestFirstDay(n) { return att_loadRun_(n || 70, true); }
+function att_loadUrl_() {
+  var p = PropertiesService.getScriptProperties();
+  return p.getProperty("ATT_LOADTEST_URL") || p.getProperty("ATT_WEBAPP_URL") || ATT_DEFAULT_WEBAPP_URL;
+}
 function att_loadRun_(N, firstDay) {
-  var A = att_adminToken_(), url = PropertiesService.getScriptProperties().getProperty("ATT_LOADTEST_URL") || ScriptApp.getService().getUrl();
-  var geo = { lat: 31.2, lng: 29.9, acc: 10 }, t0 = Date.now(), log = [];
+  var A = att_adminToken_(), url = att_loadUrl_();
+  // Preflight: one harmless request. Anything but a JSON answer means the URL is wrong (401 = /dev URL, 404 = old deployment id): stop now.
+  var pre = UrlFetchApp.fetch(url, { method: "post", contentType: "text/plain;charset=utf-8", muteHttpExceptions: true, followRedirects: true,
+    payload: JSON.stringify({ action: "att_status", session_id: "S-LOADTEST-PREFLIGHT" }) }), preOk = false;
+  try { preOk = JSON.parse(pre.getContentText()).code === "NO_SESSION"; } catch (e) { preOk = false; }
+  if (!preOk) {
+    var msg = "loadtest STOPPED before starting: " + url + " answered HTTP " + pre.getResponseCode() + " (not the attendance JSON). " +
+      "Use the students' /exec URL (the API_URL in contract/att_config.js): set Script Property ATT_LOADTEST_URL to it, and check the web app " +
+      "is deployed with 'Execute as: Me' and 'Who has access: Anyone'. Nothing was written.";
+    Logger.log(msg); return false;
+  }
+  var geo = { lat: 31.2, lng: 29.9, acc: 10 }, t0 = Date.now(), log = ["url: " + url];
   var room = att_dispatch_({ action: "att_calibrate_room", token: A, name: "ATT-TEST-ROOM", samples: [geo] });
   var s = att_dispatch_({ action: "att_start_session", token: A, course: "ATT-TEST", room_id: room.room.room_id });
   // stop at the session close + grace, or before Apps Script's 6-minute limit for this run, whichever comes first
@@ -997,6 +1013,8 @@ function att_loadRun_(N, firstDay) {
       if (!/^(BUSY|SERVER_ERROR|NOT_JSON_.*|\?)$/.test(c)) step[k] = "done-failed:" + c;   // a definite refusal is not retried (and fails the test)
     });
     log.push("round " + round + ": sent " + reqs.length + " in " + ((Date.now() - rs) / 1000).toFixed(1) + " s -> " + JSON.stringify(rc));
+    var keys = Object.keys(rc);
+    if (keys.length && keys.every(function (c) { return /^NOT_JSON_40[134]$/.test(c); })) { log.push("every answer was " + keys.join("/") + ": wrong URL or access setting, stopping (see att_loadUrl_)"); break; }
     if (step.some(function (x) { return x !== "done" && x.indexOf("done-failed") !== 0; })) Utilities.sleep(2000 + Math.floor(Math.random() * 2000));   // like the page: wait, then retry
     if (step.every(function (x) { return x === "done" || x.indexOf("done-failed") === 0; })) break;
   }
