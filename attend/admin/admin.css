@@ -6,3 +6,93 @@
 /* Header and credits */.brand{display:flex;align-items:center;gap:14px;padding:15px 17px;margin-bottom:20px;border:1px solid var(--line);border-radius:16px;border-bottom:3px solid var(--accent);background:rgba(255,255,255,.88);box-shadow:0 7px 24px rgba(27,57,72,.06)}.brand-text{flex:1 1 auto;min-width:0}.uni{font-family:Georgia,"Times New Roman",serif;font-size:18px;font-weight:700;letter-spacing:.02em;color:var(--navy)}.fac{font-family:Georgia,"Times New Roman",serif;font-size:14px;color:var(--mut);font-style:italic}.sys{flex:none;color:var(--pri-dark);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;text-align:right}.credit{margin:26px 0 8px;padding-top:15px;border-top:1px solid var(--line);text-align:center;color:var(--mut);font-size:12px;display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;align-items:center}.credit b{color:var(--navy)}.credit i{width:4px;height:4px;border-radius:50%;background:var(--accent)}.credit div{flex:1 1 100%;font-size:11px;opacity:.8}#pbrand{position:absolute;top:2vmin;left:0;right:0;text-align:center;font-size:max(12px,1.9vmin);letter-spacing:.14em;text-transform:uppercase;color:#c6d7e9;font-weight:800}
 :focus-visible{outline:3px solid rgba(49,95,145,.34);outline-offset:2px}@media(max-width:680px){main{padding:13px 13px 12px}.brand{margin-bottom:15px;padding:12px}.sys{display:none}.uni{font-size:16px}nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:9px}nav h1{grid-column:1/-1}nav button{width:100%;padding:0 8px;font-size:13px}.card{padding:15px}.row{gap:8px}.row>*{flex:1 1 145px}#pctl{right:8px;bottom:8px;gap:5px}#pctl button{min-width:42px;padding:0 9px;font-size:12px}th,td{padding:8px}}@media(max-width:390px){nav{grid-template-columns:1fr 1fr}nav button{font-size:12px}.row>*{flex-basis:100%}.brand{gap:10px}.uni{font-size:14px}.fac{font-size:12px}}@media(prefers-reduced-motion:reduce){button{transition:none}}
 /* Multi-user */.who{flex:1 1 100%;padding:0 5px 6px;color:var(--mut);font-size:13px}.scroll{overflow-x:auto;margin-top:8px}h3{margin:18px 0 6px;font-size:14px;color:var(--navy)}.stats{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}.stat{flex:1 1 120px;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:#f8fafb}.stat b{display:block;font-size:22px;color:var(--navy)}.stat span{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}.tag.warn{background:#fff6e0;color:#7a5a05}.tag.bad{background:#fff0ef;color:#8f2924}.tag.good{background:#e8f3ec;color:#256040}table.his{font-size:13px;white-space:nowrap}table.his td.n{text-align:right;font-variant-numeric:tabular-nums}table.his tr.rej td{opacity:.55}.chk{display:flex;gap:8px;align-items:center;margin:10px 0}.chk input{width:auto;min-height:0}.secret{margin:12px 0;padding:14px;border:2px solid var(--pri);border-radius:13px;background:#eef4fa}.secret code{display:block;margin:8px 0;padding:12px;font:700 20px/1.3 ui-monospace,Consolas,monospace;letter-spacing:.06em;word-break:break-all;background:#fff;border-radius:9px;user-select:all}table.his input.note{min-height:36px;width:150px;padding:0 8px}table.his button{min-height:36px;padding:0 10px;font-size:13px}.pill-off{color:var(--bad);font-weight:700}table.his td.dec{white-space:normal;min-width:200px}table.his td.dec input.note{display:block;width:100%;margin-bottom:6px}table.his td.dec button{margin-right:6px}
+
+/* ───────── polish (2026-11-04): calmer surfaces, clear states, gentle motion ───────── */
+:root{--ease:cubic-bezier(.2,.7,.2,1);--ring:0 0 0 4px rgba(49,95,145,.16);--soft:#f6f9fb}
+html,body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+main{animation:att-fade .35s var(--ease) both}
+/* header: name + role chip */
+.who{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--fg);font-weight:650}
+.who .role{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--pri-dark);background:#eaf0f7;border-radius:999px;padding:3px 9px}
+/* tabs: a quiet bar with one raised pill for the open tab */
+nav{gap:6px;background:rgba(255,255,255,.92);backdrop-filter:saturate(1.2) blur(6px)}
+nav button{border-color:transparent;background:transparent;color:#4a6273;font-weight:650;transition:background .18s var(--ease),color .18s var(--ease),box-shadow .18s var(--ease),transform .08s}
+nav button:hover:not(:disabled){background:var(--soft);border-color:transparent}
+nav button.on{background:#fff;color:var(--pri-dark);border-color:var(--line);box-shadow:0 1px 2px rgba(23,43,60,.06),0 4px 14px rgba(23,43,60,.07),inset 0 -2px 0 var(--pri)}
+nav #logout{margin-left:auto;color:var(--mut)}
+/* a tab or panel appearing slides up a little; its cards follow one after another */
+#panel>section:not([hidden]),#login:not([hidden]),#hisDetail:not([hidden]),#hisList:not([hidden]),#summary:not([hidden]),#secret:not([hidden]){animation:att-rise .32s var(--ease) both}
+#panel>section:not([hidden])>.card:nth-child(2){animation:att-rise .36s .05s var(--ease) both}
+#panel>section:not([hidden])>.card:nth-child(3){animation:att-rise .4s .1s var(--ease) both}
+.card{transition:box-shadow .2s var(--ease)}
+h2{display:flex;align-items:center;gap:10px}
+.hint{margin:-4px 0 4px;color:var(--mut);font-size:14px}
+/* buttons */
+button{transition:background .15s var(--ease),border-color .15s var(--ease),box-shadow .15s var(--ease),transform .08s var(--ease),opacity .15s}
+button.pri,button.ok{box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 6px 16px rgba(36,76,118,.18)}
+button.bad{box-shadow:0 6px 16px rgba(185,56,56,.16)}
+button:active:not(:disabled){transform:translateY(1px) scale(.985)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:none;box-shadow:var(--ring)}
+button[aria-busy="true"]{position:relative;color:transparent!important;pointer-events:none}
+button[aria-busy="true"]::after{content:"";position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;border:2.5px solid currentColor;border-color:rgba(255,255,255,.95) rgba(255,255,255,.95) rgba(255,255,255,.3) rgba(255,255,255,.3);animation:att-spin .7s linear infinite}
+button:not(.pri):not(.ok):not(.bad)[aria-busy="true"]::after{border-color:#315f91 #315f91 #cbd8dd #cbd8dd}
+/* inputs */
+input,select{transition:border-color .15s var(--ease),box-shadow .15s var(--ease),background .15s}
+input:hover,select:hover{border-color:#b4c6cf}
+input:focus,select:focus{border-color:var(--pri);box-shadow:var(--ring)}
+/* status lines: ok / error become small pills that fade in; loading gets a spinner */
+.msg.ok,.msg.err{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:10px;animation:att-pop .28s var(--ease) both}
+.msg.ok{background:#eaf3ee;color:#22603f}
+.msg.err{background:#fdeeee;color:#a52e2a}
+.msg.ok::before,.msg.err::before{flex:none;display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:12px;font-weight:900;color:#fff}
+.msg.ok::before{content:"\2713";background:#2f7d52}
+.msg.err::before{content:"!";background:#b93838}
+.msg.loading::before{content:"";display:inline-block;width:12px;height:12px;margin-right:8px;vertical-align:-1px;border-radius:50%;border:2px solid #cbd8dd;border-top-color:var(--pri);animation:att-spin .7s linear infinite}
+/* tables */
+table tr{transition:background .15s}
+table tr:not(:first-child):hover{background:#f7fafc}
+th{background:#fbfcfd}
+table.his th:first-child,table.ros th:first-child{border-top-left-radius:10px}
+.tag{border-radius:999px;padding:3px 10px;font-weight:650}
+/* badges pop when the number changes */
+.badge{transition:transform .2s var(--ease)}
+.badge.pop{animation:att-badge .45s var(--ease)}
+/* live feed: only NEW lines slide in */
+.ev{transition:background .3s}
+.ev.new{animation:att-slide .45s var(--ease) both}
+#pfeed .ev{background:rgba(255,255,255,.92)}
+/* projector: smooth countdown bar, counters bump when they change */
+#protbar{transition:transform .2s linear}
+#pcount.bump{animation:att-bump .5s var(--ease)}
+#qr{transition:opacity .2s}
+#pctl{transition:opacity .25s var(--ease)}
+/* request cards */
+#reqList .card{box-shadow:none;border-color:var(--line);animation:att-rise .3s var(--ease) both}
+/* sign-in */
+#login{max-width:440px;margin:40px auto}
+@keyframes att-fade{from{opacity:0}to{opacity:1}}
+@keyframes att-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes att-pop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+@keyframes att-slide{from{opacity:0;transform:translateX(-10px);background:#dfe9f5}to{opacity:1;transform:none}}
+@keyframes att-badge{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+@keyframes att-bump{0%{transform:scale(1)}35%{transform:scale(1.06)}100%{transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+@media(max-width:680px){nav #logout{margin-left:0}#login{margin:16px auto}}
+/* polish, second pass: log out in the corner, green = accept, review lists become cards on phones */
+nav{position:relative}
+nav #logout{position:absolute;top:12px;right:12px;margin:0;min-height:38px;padding:0 12px;font-size:13px}
+button.ok{background:#2f7d52;border-color:#2f7d52}
+button.ok:hover:not(:disabled){background:#246843;border-color:#246843}
+button.ok{box-shadow:0 6px 16px rgba(47,125,82,.2)}
+@media(max-width:680px){
+  nav{padding-right:9px}
+  nav .who{grid-column:1/-1;padding:0 4px 4px}
+  nav #logout{position:static;grid-column:1/-1;min-height:40px}
+  #flagList table,#flagList tbody,#flagList tr,#flagList td,#manList table,#manList tbody,#manList tr,#manList td{display:block;width:100%}
+  #flagList tr:first-child,#manList tr:first-child{display:none}
+  #flagList tr,#manList tr{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:#fff;animation:att-rise .3s var(--ease) both}
+  #flagList td,#manList td{border:0;padding:4px 0}
+  #flagList td.dec button{min-width:110px}
+  #flagList .scroll,#flagList{overflow:visible}
+}
+table.his td.n{text-align:left}

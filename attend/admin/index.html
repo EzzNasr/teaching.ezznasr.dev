@@ -35,8 +35,8 @@
       <button data-tab="requests">Phone changes<span id="pendBadge" class="badge" hidden>0</span></button>
       <button data-tab="flagged">Needs review<span id="flagBadge" class="badge" hidden>0</span></button>
       <button data-tab="roster">All students</button>
-      <button data-tab="calib">Rooms</button>
-      <button data-tab="history">Past lectures</button>
+      <button data-tab="calib">Calibrate room</button>
+      <button data-tab="history">History</button>
       <button id="tabOverview" data-tab="overview" hidden>All teachers</button>
       <button id="tabUsers" data-tab="users" hidden>Teacher accounts</button>
       <button id="logout">Log out</button>
@@ -63,8 +63,7 @@
 
     <section id="t-manual" hidden>
       <div class="card">
-        <h2>Mark a student present by hand</h2>
-        <p class="msg">Mark a student present from this laptop: a student without a working phone, or one whose check-in page showed an error. It is saved with your name, the time and the reason, and counts like any other check-in.</p>
+        <h2>Mark present by hand</h2>
         <label for="manSession">Lecture</label><select id="manSession"></select>
         <div class="row">
           <div><label for="manId">Student ID</label><input id="manId" inputmode="numeric" autocomplete="off" maxlength="12"></div>
@@ -86,12 +85,11 @@
     </section>
 
     <section id="t-requests" hidden>
-      <div class="card"><h2>Students asking to use a new phone</h2><p class="msg">A student whose phone changed (new phone, reset, other browser) asks here. Approve only after you have seen their student ID card.</p><div id="reqList"></div><div id="reqMsg" class="msg" role="status"></div></div>
+      <div class="card"><h2>Phone changes</h2><div id="reqList"></div><div id="reqMsg" class="msg" role="status"></div></div>
     </section>
 
     <section id="t-flagged" hidden>
-      <div class="card"><h2>Check-ins that need a look</h2>
-        <p class="msg">These students did check in, but something looked unusual (location, or the same phone as another student). Accept if they were really in class, Reject if not. Your decision and note are saved with your name.</p>
+      <div class="card"><h2>Needs review</h2>
         <label class="chk"><input id="flagAll" type="checkbox"> Also show the ones already decided</label>
         <div id="flagMsg" class="msg" role="status"></div><div id="flagList" class="scroll"></div>
         <div class="row" style="margin-top:12px"><button id="flagRefresh">Refresh</button></div></div>
@@ -113,17 +111,17 @@
 
     <section id="t-calib" hidden>
       <div class="card">
-        <h2>Set up a room</h2>
-        <p class="msg">Do this once per lecture hall, on your phone: stand in the middle of the hall and tap Save this room's location. It takes about 15 seconds; keep still. Students are then checked against this spot.</p>
+        <h2>Calibrate room</h2>
+        <p class="hint">Stand in the middle of the hall and keep still for about 15 seconds.</p>
         <label for="calRoom">Room name</label><input id="calRoom" list="roomNames" autocomplete="off"><datalist id="roomNames"></datalist>
-        <div class="row" style="margin-top:12px"><button id="calBtn" class="pri">Save this room's location</button></div>
+        <div class="row" style="margin-top:12px"><button id="calBtn" class="pri">Calibrate</button></div>
         <div id="calMsg" class="msg" role="status"></div>
       </div>
     </section>
 
     <section id="t-history" hidden>
       <div id="hisList" class="card">
-        <h2>Past lectures</h2>
+        <h2>History</h2>
         <div class="row">
           <div><label for="hisCourse">Course</label><input id="hisCourse" list="courses" autocomplete="off" placeholder="All courses"></div>
           <div><label for="hisFrom">From (UTC day)</label><input id="hisFrom" type="date"></div>
@@ -162,7 +160,7 @@
 
     <section id="t-users" hidden>
       <div class="card">
-        <h2>Teacher accounts</h2><p class="msg">Each teacher signs in with their own password and sees only their own lectures and students.</p>
+        <h2>Teacher accounts</h2>
         <div class="row">
           <div><label for="userName">New teacher name</label><input id="userName" autocomplete="off" maxlength="60"></div>
           <div><button id="userCreate" class="pri">Create account</button></div>

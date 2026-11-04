@@ -27,7 +27,7 @@ Run it outside lecture hours: the seed is written in one batch while holding the
 | Phone changes | 2 waiting (one same phone model, one different); 1 approved and 1 denied in the past |
 | Needs review | undecided flagged check-ins with plain reasons; some already accepted / rejected with notes |
 | All students | 30 students x 11 lectures (Dr Hossam) or 3 (Eng. Mariam), attendance from about 45 % to 100 % |
-| Past lectures | 14 lectures over the last 23 days with distances, location problems and decisions |
+| History | 14 lectures over the last 23 days with distances, location problems and decisions |
 | All teachers (admin) | both demo teachers next to the real ones |
 
 Every kind of flag appears, computed by the real rule engine: outside the hall, location blocked, skipped, no location, weak

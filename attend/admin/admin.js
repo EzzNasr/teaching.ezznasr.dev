@@ -11,7 +11,16 @@
 
   function ss(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (e) {} return null; }
   function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
-  function msg(id, text, kind) { var e = $(id); e.textContent = text || ""; e.className = "msg" + (kind ? " " + kind : ""); }
+  // A status line. "Loading..." style text (ending in an ellipsis, no kind) gets a small spinner.
+  function msg(id, text, kind) {
+    var e = $(id); e.textContent = text || "";
+    e.className = "msg" + (kind ? " " + kind : (/(…|\.\.\.)$/.test(text || "") ? " loading" : ""));
+  }
+  // A button waiting for the server: disabled, with a spinner in place of its label.
+  function wait(b, on) { b.disabled = !!on; if (on) b.setAttribute("aria-busy", "true"); else if (b.removeAttribute) b.removeAttribute("aria-busy"); else b.setAttribute("aria-busy", "false"); }
+  // Replays a one-shot CSS animation (badge pop, counter bump).
+  function replay(e, cls) { e.classList.remove(cls); void e.offsetWidth; e.classList.add(cls); }
+  function setBadge(e, n) { var was = e.textContent; e.hidden = !n; e.textContent = n; if (n && String(n) !== was) replay(e, "pop"); }
   function srvNow() { return Date.now() + S.offset; }
   function mmss(ms) { var s = Math.max(0, Math.ceil(ms / 1000)); return ("0" + Math.floor(s / 60)).slice(-2) + ":" + ("0" + (s % 60)).slice(-2); }
   function clear(e) { while (e.firstChild) e.removeChild(e.firstChild); }
@@ -29,17 +38,17 @@
   // ---------- login ----------
   // One box: a teacher password OR the admin token. We ask att_me first (it never counts as a failed login), and only if the
   // server says the value is not a valid token do we try it as a password (att_login: wrong ones count toward the global lock-out).
-  function showLogin(text) { $("panel").hidden = true; $("proj").hidden = true; $("login").hidden = false; $("loginBtn").disabled = false; msg("loginMsg", text, text ? "err" : ""); }
+  function showLogin(text) { $("panel").hidden = true; $("proj").hidden = true; $("login").hidden = false; wait($("loginBtn"), false); msg("loginMsg", text, text ? "err" : ""); }
   function enter(user, tok) {
     S.tok = tok; S.user = user; S.role = user.role === "admin" ? "admin" : "teacher";
-    ss("att_admin", tok); $("tok").value = ""; $("loginBtn").disabled = false; msg("loginMsg", "");
+    ss("att_admin", tok); $("tok").value = ""; wait($("loginBtn"), false); msg("loginMsg", "");
     $("login").hidden = true; $("panel").hidden = false;
     initPanel();
   }
   function login(saved) {
     var t = saved || $("tok").value.trim();
     if (!t) return msg("loginMsg", "Enter your password or the admin token.", "err");
-    msg("loginMsg", "Checking\u2026"); $("loginBtn").disabled = true;
+    msg("loginMsg", "Checking\u2026"); wait($("loginBtn"), true);
     function fail(text) { S.tok = null; if (saved) ss("att_admin", null); showLogin(text); }
     api.call("att_me", { token: t }).then(function (r) {
       if (r.ok) return enter(r.user, t);
@@ -83,7 +92,7 @@
     var cs = JSON.parse(ls("att_courses") || "[]");
     if (!$("course").value && cs[0]) $("course").value = cs[0];
     var adm = S.role === "admin";
-    $("who").textContent = adm ? "Signed in as Admin \u00b7 sees every teacher" : (S.user && S.user.name ? S.user.name : "") + " \u00b7 Teacher \u00b7 sees only your own lectures";
+    var who = $("who"); clear(who); who.appendChild(mk("span", adm ? "Admin" : (S.user && S.user.name ? S.user.name : ""))); who.appendChild(mk("span", adm ? "Admin" : "Teacher", "role"));
     $("tabOverview").hidden = !adm; $("tabUsers").hidden = !adm; $("hisUserWrap").hidden = !adm;
     loadRooms(); tab("session");
     A("att_flagged", {}).then(function (r) { if (r.ok) setFlagBadge(r.rows.filter(function (x) { return !x.review_status; }).length); });
@@ -113,10 +122,10 @@
   function startSession() {
     var course = $("course").value.trim(), roomId = $("room").value, room = $("room").selectedOptions[0] ? $("room").selectedOptions[0].textContent : "";
     if (!course || !roomId) return msg("startMsg", "Type the course and pick a room. No rooms in the list? Set one up first in Rooms.", "err");
-    $("startBtn").disabled = true; msg("startMsg", "Starting…");
+    wait($("startBtn"), true); msg("startMsg", "Starting…");
     var t0 = Date.now();
     A("att_start_session", { course: course, room_id: roomId }).then(function (r) {
-      $("startBtn").disabled = false;
+      wait($("startBtn"), false);
       if (!r.ok) return msg("startMsg", "Could not start: " + (r.code || "error"), "err");
       var t1 = Date.now();
       S.sess = r.session_id; S.key = r.session_key; S.closed = false; S.course = course; S.room = room; S.roomId = roomId;
@@ -185,26 +194,33 @@
     if (!S.sess) return;
     A("att_live", { session_id: S.sess }).then(function (r) {
       if (!r.ok) return;
-      $("pcount").textContent = "Present " + r.present + " · Need a look " + r.flagged + " · Students known " + r.registered;
+      var line = "Present " + r.present + " · Need a look " + r.flagged + " · Students known " + r.registered;
+      if ($("pcount").textContent !== line) { $("pcount").textContent = line; replay($("pcount"), "bump"); }
       renderFeed(r.feed || []);
       var p = r.pending | 0;
-      ["pBadge", "pendBadge"].forEach(function (id) { $(id).hidden = !p; $(id).textContent = p; });
+      ["pBadge", "pendBadge"].forEach(function (id) { setBadge($(id), p); });
     });
   }
   // Activity feed: registered = yellow, attended = green, attempted cheating = red (server sends only first letter + last 2 digits).
   var fTimeS = new Intl.DateTimeFormat("en-GB", { timeZone: CFG.TZ, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  function evKey(e) { return [e.t, e.k, e.id || "", e.d || ""].join("|"); }
+  function mark(row, e) { var k = evKey(e); if (seenEv && !seenEv[k] && !mark.first) row.className += " new"; mark.now[k] = 1; }
+  var seenEv = null;   // keys of feed lines already shown; null = first draw (nothing animates)
   function renderFeed(list) {
+    var first = seenEv === null; if (first) seenEv = {};
+    mark.first = first; mark.now = {};
     ["pfeed", "sfeed"].forEach(function (id) {
       var box = $(id); if (!box) return; clear(box);
       if (!list.length) { if (id === "sfeed") box.appendChild(mk("div", "No activity yet.", "msg")); return; }
       list.forEach(function (e) {
         var d = new Date(e.t), when = isNaN(d) ? "" : fTimeS.format(d), row, text;
-        if (e.k === "bad") { row = mk("div", null, "ev ev-bad"); text = "Attempted cheating detected and flagged \u00b7 " + (e.l || "?") + " \u00b7 ID \u2022\u2022" + (e.d || ""); }
-        else if (e.k === "reg") { row = mk("div", null, "ev ev-reg"); text = "Registered \u00b7 " + (e.n || "(no name)") + " \u00b7 " + e.id; }
-        else { row = mk("div", null, "ev ev-att"); text = "Attended \u00b7 " + (e.n || "(no name)") + " \u00b7 " + e.id; }
+        if (e.k === "bad") { row = mk("div", null, "ev ev-bad"); mark(row, e); text = "Attempted cheating detected and flagged \u00b7 " + (e.l || "?") + " \u00b7 ID \u2022\u2022" + (e.d || ""); }
+        else if (e.k === "reg") { row = mk("div", null, "ev ev-reg"); mark(row, e); text = "Registered \u00b7 " + (e.n || "(no name)") + " \u00b7 " + e.id; }
+        else { row = mk("div", null, "ev ev-att"); mark(row, e); text = "Attended \u00b7 " + (e.n || "(no name)") + " \u00b7 " + e.id; }
         row.appendChild(mk("time", when)); row.appendChild(mk("span", text)); box.appendChild(row);
       });
     });
+  Object.keys(mark.now).forEach(function (k) { seenEv[k] = 1; });
   }
   function closeSession() {
     if (!S.sess || S.closed || !confirm("End attendance now? New students can no longer check in (anyone already saving gets 2 more minutes).")) return;
@@ -266,9 +282,9 @@
     if (!sid) return msg("manMsg", "Pick the lecture first.", "err");
     if (!CFG.ID_REGEX.test(id)) { msg("manMsg", "Enter a valid student ID (4-12 digits).", "err"); try { $("manId").focus(); } catch (e) {} return; }
     if (reason === "OTHER" && !note) { msg("manMsg", "Write the reason in the note.", "err"); try { $("manNote").focus(); } catch (e) {} return; }
-    $("manSave").disabled = true; msg("manMsg", "Saving…");
+    wait($("manSave"), true); msg("manMsg", "Saving…");
     A("att_manual_checkin", { session_id: sid, student_id: id, reason: reason, note: note, name: name }).then(function (r) {
-      $("manSave").disabled = false;
+      wait($("manSave"), false);
       if (!r.ok) {
         if (r.code === "NAME_REQUIRED") { msg("manMsg", "ID " + id + " is not registered yet. Type the student's name, then Mark present again.", "err"); try { $("manName").focus(); } catch (e) {} return; }
         return msg("manMsg", "Not saved: " + (r.error || r.code || "error"), "err");
@@ -319,7 +335,7 @@
     GEO_SKIPPED: "Skipped the location step", GEO_WEAK: "Weak location signal", SAME_PHONE_MULTI_ID: "Same phone as another student",
     IDENTICAL_COORDS: "Exactly the same location as other students", REPEATED: "Flagged 3 or more times before", MANUAL: "Entered by hand" };
   function flagText(c) { return FLAG_TEXT[c] || c; }
-  function setFlagBadge(n) { $("flagBadge").hidden = !n; $("flagBadge").textContent = n; }
+  function setFlagBadge(n) { setBadge($("flagBadge"), n); }
   var F = { lect: {} };
   function loadFlagged() {
     msg("flagMsg", "Loading…");
@@ -458,7 +474,7 @@
     if (!room) return msg("calMsg", "Type the room name first (for example Hall B).", "err");
     if (!navigator.geolocation) return msg("calMsg", "Location is not available on this device.", "err");
     var N = 10, got = [], tries = 0;
-    $("calBtn").disabled = true;
+    wait($("calBtn"), true);
     (function next() {
       if (got.length >= N || tries >= N + 6) return finish();
       tries++; msg("calMsg", "Reading " + (got.length + 1) + " of " + N + "…");
@@ -466,15 +482,15 @@
         got.push({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, ts: p.timestamp });
         setTimeout(next, 1000);
       }, function (e) {
-        if (e && e.code === 1) { $("calBtn").disabled = false; return msg("calMsg", "Location permission denied.", "err"); }
+        if (e && e.code === 1) { wait($("calBtn"), false); return msg("calMsg", "Location permission denied.", "err"); }
         setTimeout(next, 1000);
       }, { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 });
     })();
     function finish() {
-      if (got.length < 5) { $("calBtn").disabled = false; return msg("calMsg", "Only " + got.length + " usable readings. Try again outdoors/near a window.", "err"); }
+      if (got.length < 5) { wait($("calBtn"), false); return msg("calMsg", "Only " + got.length + " usable readings. Try again outdoors/near a window.", "err"); }
       var accs = got.map(function (g) { return g.acc; }).sort(function (a, b) { return a - b; }), med = accs[Math.floor(accs.length / 2)];
       A("att_calibrate_room", { name: room, samples: got.map(function (g) { return { lat: g.lat, lng: g.lng, acc: g.acc }; }) }).then(function (r) {
-        $("calBtn").disabled = false;
+        wait($("calBtn"), false);
         if (!r.ok) return msg("calMsg", "Save failed: " + (r.code || "error"), "err");
         loadRooms();
         msg("calMsg", "Saved " + got.length + " readings for " + room + ". Median accuracy " + Math.round(med) + " m" + (med > CFG.GEO_WEAK_ACC_M ? " (weak: retry in a better spot)" : "") + ".", med > CFG.GEO_WEAK_ACC_M ? "err" : "ok");
@@ -656,9 +672,9 @@
   function createUser() {
     var n = $("userName").value.trim();
     if (n.length < 2) return msg("userMsg", "Enter the teacher's name.", "err");
-    $("userCreate").disabled = true;
+    wait($("userCreate"), true);
     A("att_user_create", { name: n }).then(function (r) {
-      $("userCreate").disabled = false;
+      wait($("userCreate"), false);
       if (!r.ok) return msg("userMsg", "Failed: " + (r.error || r.code || "error"), "err");
       $("userName").value = ""; showSecret(r.user.name, r.password, "Account created"); loadUsers();
     });

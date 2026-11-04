@@ -87,3 +87,35 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #done{background:#052e16;border:2px solid var(--ok);border-radius:20px;padding:24px 16px}
 #doneTitleAr{font-size:24px;font-weight:700;color:var(--fg)!important;margin-top:-6px!important}
 #doneClose{color:#bbf7d0!important;font-size:17px;font-weight:600}
+
+/* ---- polish (2026-11-04): gentle motion that matches the meaning (amber waits, green lands) ---- */
+:root{--ease:cubic-bezier(.2,.7,.2,1)}
+html,body{-webkit-font-smoothing:antialiased}
+#gate:not([hidden]),#form:not([hidden]){animation:att-rise .35s var(--ease) both}
+#msg:not(:empty),#msgAr:not(:empty){animation:att-rise .25s var(--ease) both}
+button{transition:transform .08s var(--ease),box-shadow .2s var(--ease),background .2s var(--ease),opacity .2s}
+button:active:not(:disabled){transform:scale(.98)}
+#save{box-shadow:0 10px 30px rgba(37,99,235,.35);background:linear-gradient(180deg,#3b82f6,#2563eb)}
+#save:disabled{box-shadow:none}
+#gateBtn{box-shadow:0 8px 24px rgba(37,99,235,.3)}
+input{transition:border-color .15s var(--ease),box-shadow .15s var(--ease)}
+input:focus{outline:none;border-color:#60a5fa;box-shadow:0 0 0 4px rgba(96,165,250,.2)}
+#gatePin{animation:att-float 2.6s ease-in-out infinite}
+/* saving overlay fades in, its card rises */
+#busy:not([hidden]){animation:att-fade .2s ease-out both}
+#busy:not([hidden]) #busyCard{animation:att-rise .3s var(--ease) both}
+#busy.waiting #busyAlert{animation:att-nudge 1.8s ease-in-out infinite}
+#busyWarn,#busyWarnAr{box-shadow:0 6px 20px rgba(250,204,21,.18)}
+/* recorded: the green panel lands and the check draws itself */
+#done:not([hidden]){animation:att-land .45s var(--ease) both;box-shadow:0 0 0 0 rgba(22,163,74,.5);}
+#done:not([hidden]) svg circle{stroke-dasharray:66;stroke-dashoffset:66;animation:att-draw .5s .1s var(--ease) forwards}
+#done:not([hidden]) svg path{stroke-dasharray:16;stroke-dashoffset:16;animation:att-draw .35s .5s var(--ease) forwards}
+#done:not([hidden]) #doneTime,#done:not([hidden]) #doneClose{animation:att-rise .4s .35s var(--ease) both}
+@keyframes att-fade{from{opacity:0}to{opacity:1}}
+@keyframes att-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes att-land{0%{opacity:0;transform:scale(.96)}60%{opacity:1;transform:scale(1.01)}100%{transform:none}}
+@keyframes att-draw{to{stroke-dashoffset:0}}
+@keyframes att-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes att-nudge{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  #done svg circle,#done svg path{stroke-dashoffset:0!important}}
