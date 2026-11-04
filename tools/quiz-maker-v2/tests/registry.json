@@ -765,6 +765,16 @@
       "owner": "att-prod"
     },
     {
+      "id": "R-A12",
+      "title": "Attendance demo data in the live sheet: att_seedDemo fills every screen (real flag engine), att_demoLive live lecture, no Telegram for demo, att_clearDemo leaves real rows unchanged, re-seed safe",
+      "cmd": [
+        "node",
+        "../../tests/attendance/demo_data.test.js"
+      ],
+      "status": "active",
+      "owner": "att-prod"
+    },
+    {
       "id": "R-P3-F1",
       "title": "S1 follow-up core: contacted state, week/month boundaries, filter sort order, flag notices, Phase3_Flags.gs against the real router",
       "status": "active",

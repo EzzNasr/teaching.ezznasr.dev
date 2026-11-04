@@ -1,5 +1,5 @@
 # Captures the attendance page's save states at phone size. The Apps Script API is faked with page.route (nothing reaches the live backend).
-# usage (from the repo root): python docs/attendance-screenshots/capture.py docs/attendance-screenshots
+# usage (from the repo root): python docs/attendance/screenshots/capture.py docs/attendance/screenshots
 import json, sys, threading, time, functools, http.server, os
 from playwright.sync_api import sync_playwright
 

@@ -83,9 +83,10 @@
     var cs = JSON.parse(ls("att_courses") || "[]");
     if (!$("course").value && cs[0]) $("course").value = cs[0];
     var adm = S.role === "admin";
-    $("who").textContent = adm ? "Signed in as Admin \u00b7 sees every teacher" : (S.user && S.user.name ? S.user.name : "") + " \u00b7 Teacher \u00b7 sees only your own sessions";
+    $("who").textContent = adm ? "Signed in as Admin \u00b7 sees every teacher" : (S.user && S.user.name ? S.user.name : "") + " \u00b7 Teacher \u00b7 sees only your own lectures";
     $("tabOverview").hidden = !adm; $("tabUsers").hidden = !adm; $("hisUserWrap").hidden = !adm;
     loadRooms(); tab("session");
+    A("att_flagged", {}).then(function (r) { if (r.ok) setFlagBadge(r.rows.filter(function (x) { return !x.review_status; }).length); });
   }
   function tab(name) {
     if ((name === "users" || name === "overview") && S.role !== "admin") name = "session";   // the server refuses these anyway
@@ -111,7 +112,7 @@
   // ---------- session + projector ----------
   function startSession() {
     var course = $("course").value.trim(), roomId = $("room").value, room = $("room").selectedOptions[0] ? $("room").selectedOptions[0].textContent : "";
-    if (!course || !roomId) return msg("startMsg", "Enter course and pick a room (calibrate one first if the list is empty).", "err");
+    if (!course || !roomId) return msg("startMsg", "Type the course and pick a room. No rooms in the list? Set one up first in Rooms.", "err");
     $("startBtn").disabled = true; msg("startMsg", "Starting…");
     var t0 = Date.now();
     A("att_start_session", { course: course, room_id: roomId }).then(function (r) {
@@ -158,7 +159,7 @@
       var into = (now / 1000) % CFG.WINDOW_SEC;
       $("protbar").style.transform = "scaleX(" + (1 - into / CFG.WINDOW_SEC).toFixed(3) + ")";
     } else {
-      blankQR(S.closed ? "Session closed" : "Attendance closed");
+      blankQR(S.closed ? "Attendance ended" : "Time is up");
     }
   }
   function drawFor(win) {
@@ -184,7 +185,7 @@
     if (!S.sess) return;
     A("att_live", { session_id: S.sess }).then(function (r) {
       if (!r.ok) return;
-      $("pcount").textContent = "Registered " + r.registered + " / Present " + r.present + " | Flagged " + r.flagged;
+      $("pcount").textContent = "Present " + r.present + " · Need a look " + r.flagged + " · Students known " + r.registered;
       renderFeed(r.feed || []);
       var p = r.pending | 0;
       ["pBadge", "pendBadge"].forEach(function (id) { $(id).hidden = !p; $(id).textContent = p; });
@@ -206,14 +207,14 @@
     });
   }
   function closeSession() {
-    if (!S.sess || S.closed || !confirm("Close this session now? Students will no longer be able to check in.")) return;
+    if (!S.sess || S.closed || !confirm("End attendance now? New students can no longer check in (anyone already saving gets 2 more minutes).")) return;
     A("att_close_session", { session_id: S.sess }).then(function (r) {
       if (!r.ok) return alert("Could not close: " + (r.code || "error"));
       S.closed = true; $("closeBtn").disabled = true; tick(); poll();
       var s = r.summary || {};
       hideProjector("session");
       $("summary").hidden = false;
-      $("sumText").textContent = S.course + " / " + S.room + ": Present " + (s.present | 0) + ", Flagged " + (s.flagged | 0) + ", Pending requests " + (s.pending | 0);
+      $("sumText").textContent = S.course + " / " + S.room + ": " + (s.present | 0) + " present, " + (s.flagged | 0) + " need a look, " + (s.pending | 0) + " phone-change request" + ((s.pending | 0) === 1 ? "" : "s") + " waiting.";
       msg("csvMsg", "");
     });
   }
@@ -288,11 +289,11 @@
       var box = $("reqList"); clear(box);
       if (!r.ok) return msg("reqMsg", "Could not load: " + (r.code || "error"), "err");
       var list = r.requests.filter(function (q) { return !q.status || q.status === "pending"; });
-      msg("reqMsg", list.length ? "" : "No pending requests.");
+      msg("reqMsg", list.length ? "" : "Nobody is waiting for a phone change.");
       list.forEach(function (q) {
         var row = mk("div", null, "card"), top = mk("div", "ID " + q.student_id);
         top.style.fontWeight = "700";
-        var hint = mk("div", q.fp_match ? "Fingerprint matches the registered device" : "Fingerprint differs from registered device", q.fp_match ? "hint-ok" : "hint-bad");
+        var hint = mk("div", q.fp_match ? "Looks like the same phone model as before" : "A different phone from the one registered: check their student ID card", q.fp_match ? "hint-ok" : "hint-bad");
         var when = mk("div", q.created_at ? new Date(q.created_at).toLocaleTimeString("en-GB", { timeZone: CFG.TZ }) : "", "msg");
         var btns = mk("div", null, "row");
         var ok = mk("button", "Approve", "ok"), no = mk("button", "Deny", "bad");
@@ -312,29 +313,50 @@
     });
   }
 
-  // ---------- flagged ----------
+  // ---------- needs review: every flagged check-in, decided right here (Accept / Reject + note) ----------
+  // Plain words for the flag codes (the codes stay in the CSV export).
+  var FLAG_TEXT = { GEO_FAR: "Outside the hall", GEO_DENIED: "Location was blocked on the phone", GEO_UNAVAILABLE: "The phone gave no location",
+    GEO_SKIPPED: "Skipped the location step", GEO_WEAK: "Weak location signal", SAME_PHONE_MULTI_ID: "Same phone as another student",
+    IDENTICAL_COORDS: "Exactly the same location as other students", REPEATED: "Flagged 3 or more times before", MANUAL: "Entered by hand" };
+  function flagText(c) { return FLAG_TEXT[c] || c; }
+  function setFlagBadge(n) { $("flagBadge").hidden = !n; $("flagBadge").textContent = n; }
+  var F = { lect: {} };
   function loadFlagged() {
-    msg("flagMsg", "Loading...");
-    A("att_flagged", S.sess ? { session_id: S.sess } : {}).then(function (r) {
-      var box = $("flagList"); clear(box);
-      if (!r.ok) return msg("flagMsg", "Could not load: " + (r.code || "error"), "err");
-      // ASSUMPTION: rows are AttFlagLog rows {student_id, code,...} or AttCheckins rows {student_id, flags}. Aggregate per student.
-      var by = {}, order = [];
-      r.rows.forEach(function (x) {
-        var id = String(x.student_id), o = by[id];
-        if (!o) { o = by[id] = { n: 0, codes: {} }; order.push(id); }
-        o.n++;
-        (x.code ? [x.code] : String(x.flags || "").split(/[\s,;|]+/).filter(Boolean)).forEach(function (c) { o.codes[c] = (o.codes[c] || 0) + 1; });
-      });
-      msg("flagMsg", order.length ? "" : "Nothing flagged.");
-      if (!order.length) return;
-      var t = mk("table"), h = mk("tr");
-      ["Student", "Flags", "Reasons"].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
-      order.sort(function (a, b) { return by[b].n - by[a].n; }).forEach(function (id) {
-        var tr = mk("tr"); tr.appendChild(mk("td", id)); tr.appendChild(mk("td", String(by[id].n)));
-        var td = mk("td"); Object.keys(by[id].codes).forEach(function (c) { td.appendChild(mk("span", c + (by[id].codes[c] > 1 ? " x" + by[id].codes[c] : ""), "tag")); }); tr.appendChild(td); t.appendChild(tr);
+    msg("flagMsg", "Loading…");
+    return Promise.all([A("att_flagged", {}), A("att_sessions", { limit: 200 })]).then(function (rs) {
+      var r = rs[0], box = $("flagList"); clear(box);
+      if (!r.ok) return msg("flagMsg", "Could not load: " + (r.error || r.code || "error"), "err");
+      if (rs[1].ok) (rs[1].sessions || []).forEach(function (x) { F.lect[x.session_id] = x; });
+      var open = r.rows.filter(function (x) { return !x.review_status; }), list = $("flagAll").checked ? r.rows : open;
+      setFlagBadge(open.length);
+      msg("flagMsg", open.length ? open.length + " check-in" + (open.length === 1 ? "" : "s") + " waiting for your decision." : "Nothing is waiting for a decision.", open.length ? "" : "ok");
+      if (!list.length) return;
+      var t = mk("table", null, "his"), h = mk("tr");
+      ["Lecture", "Student", "What looked unusual", "Decision"].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
+      list.forEach(function (x) {
+        var tr = mk("tr", null, x.review_status === "rejected" ? "rej" : ""), L = F.lect[x.session_id];
+        var lt = mk("td"); lt.appendChild(mk("b", L ? (L.course || "") : "")); lt.appendChild(mk("div", when(x.server_utc), "msg")); tr.appendChild(lt);
+        var st = mk("td"); st.appendChild(mk("b", x.name || "(no name)")); st.appendChild(mk("div", String(x.student_id), "msg")); tr.appendChild(st);
+        var why = mk("td", null, "dec");
+        String(x.flags || "").split(/[\s,;|]+/).filter(Boolean).forEach(function (c) { why.appendChild(mk("span", flagText(c), "tag " + (WARN[c] ? "warn" : "bad"))); });
+        if (x.dist_m !== "" && x.dist_m != null) why.appendChild(mk("div", Math.round(Number(x.dist_m)) + " m from the hall", "msg"));
+        tr.appendChild(why);
+        var d = mk("td", null, "dec");
+        if (x.review_status) d.appendChild(mk("div", (x.review_status === "accepted" ? "Accepted" : "Rejected") + (x.review_note ? ": " + x.review_note : ""), "tag " + (x.review_status === "accepted" ? "good" : "bad")));
+        var note = mk("input", null, "note"); note.setAttribute("placeholder", "note (optional)"); note.value = x.review_note || "";
+        var ok = mk("button", "Accept", "ok"), no = mk("button", "Reject", "bad");
+        ok.onclick = function () { decideFlag(x, "accepted", note, [ok, no]); }; no.onclick = function () { decideFlag(x, "rejected", note, [ok, no]); };
+        d.appendChild(note); d.appendChild(ok); d.appendChild(no); tr.appendChild(d);
+        t.appendChild(tr);
       });
       box.appendChild(t);
+    });
+  }
+  function decideFlag(x, decision, noteEl, btns) {
+    btns.forEach(function (b) { b.disabled = true; });
+    A("att_review", { checkin_id: x.checkin_id, decision: decision, note: noteEl.value }).then(function (r) {
+      if (!r.ok) { btns.forEach(function (b) { b.disabled = false; }); return msg("flagMsg", "Could not save: " + (r.error || r.code || "error"), "err"); }
+      loadFlagged().then(function () { msg("flagMsg", (x.name || x.student_id) + ": " + (decision === "accepted" ? "accepted" : "rejected") + ". " + $("flagMsg").textContent, "ok"); });
     });
   }
 
@@ -380,10 +402,10 @@
   function renderRoster() {
     var box = $("rosTable"); clear(box);
     var m = rosterModel();
-    msg("rosMsg", m.rows.length + " student" + (m.rows.length === 1 ? "" : "s") + " \u00b7 " + m.sessions.length + " lecture" + (m.sessions.length === 1 ? "" : "s"));
+    msg("rosMsg", m.rows.length + " student" + (m.rows.length === 1 ? "" : "s") + " · " + m.sessions.length + " lecture" + (m.sessions.length === 1 ? "" : "s") + " · ✓ = present");
     if (!m.rows.length) return;
     var t = mk("table", null, "ros"), h = mk("tr");
-    h.appendChild(mk("th", "Student", "l")); h.appendChild(mk("th", "Present")); h.appendChild(mk("th", "%"));
+    h.appendChild(mk("th", "Student", "l")); h.appendChild(mk("th", "Attended")); h.appendChild(mk("th", "%"));
     m.sessions.forEach(function (x) {
       var th = mk("th", fDay.format(new Date(x.start_utc))); th.appendChild(mk("small", x.course || "")); h.appendChild(th);
     });
@@ -414,7 +436,7 @@
     var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
     a.download = "roster_" + fDate.format(new Date()) + ".csv"; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
-    msg("rosMsg", "Roster exported.", "ok");
+    msg("rosMsg", "Downloaded.", "ok");
   }
 
   // ---------- CSV ----------
@@ -426,14 +448,14 @@
       var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
       a.download = "attendance_" + (sid || "session") + ".csv"; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
-      msg(msgId, "CSV exported.", "ok");
+      msg(msgId, "Downloaded.", "ok");
     });
   }
 
   // ---------- calibration ----------
   function calibrate() {
     var room = $("calRoom").value.trim();
-    if (!room) return msg("calMsg", "Enter the room name.", "err");
+    if (!room) return msg("calMsg", "Type the room name first (for example Hall B).", "err");
     if (!navigator.geolocation) return msg("calMsg", "Location is not available on this device.", "err");
     var N = 10, got = [], tries = 0;
     $("calBtn").disabled = true;
@@ -465,7 +487,7 @@
   var fWhen = new Intl.DateTimeFormat("en-GB", { timeZone: CFG.TZ, day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
   function when(iso) { var d = new Date(iso); return isNaN(d) ? "" : fWhen.format(d); }
   var WARN = { GEO_UNAVAILABLE: 1, GEO_SKIPPED: 1, GEO_WEAK: 1, GEO_UPGRADED: 1 };
-  function tagFor(code) { return code === "MANUAL" ? mk("span", "Manual entry", "tag good") : mk("span", code, "tag " + (WARN[code] ? "warn" : "bad")); }
+  function tagFor(code) { return code === "MANUAL" ? mk("span", "Entered by hand", "tag good") : mk("span", flagText(code), "tag " + (WARN[code] ? "warn" : "bad")); }
   function isFlagged(r) { return String(r.flags || "").split(",").some(function (c) { return c && c !== "MANUAL"; }); }
   function geoTags(g) { var td = mk("td"); Object.keys(g || {}).forEach(function (k) { if (g[k]) td.appendChild(mk("span", k.replace("GEO_", "") + " " + g[k], "tag " + (WARN[k] ? "warn" : "bad"))); }); return td; }
   function showHisList() { $("hisList").hidden = false; $("hisDetail").hidden = true; H.sel = null; }
@@ -492,7 +514,7 @@
       if (!r.ok) return msg("hisMsg", "Could not load: " + (r.error || r.code || "error"), "err");
       H.items = H.items.concat(r.sessions || []); H.cursor = r.next_cursor || null;
       $("hisMore").hidden = !H.cursor;
-      msg("hisMsg", H.items.length ? H.items.length + " session" + (H.items.length === 1 ? "" : "s") + (H.cursor ? " shown (more available)" : "") : "No sessions match.");
+      msg("hisMsg", H.items.length ? H.items.length + " lecture" + (H.items.length === 1 ? "" : "s") + (H.cursor ? " shown (more below)" : "") : "No lectures match.");
       renderHistory();
     });
   }
@@ -500,7 +522,7 @@
     var box = $("hisTable"); clear(box);
     if (!H.items.length) return;
     var adm = S.role === "admin", t = mk("table", null, "his"), h = mk("tr");
-    ["When", "Course", "Room"].concat(adm ? ["Teacher"] : []).concat(["Present", "Flagged", "To review", "Location problems", ""]).forEach(function (x) { h.appendChild(mk("th", x)); });
+    ["When", "Course", "Room"].concat(adm ? ["Teacher"] : []).concat(["Present", "Unusual", "Still to decide", "Location problems", ""]).forEach(function (x) { h.appendChild(mk("th", x)); });
     t.appendChild(h);
     H.items.forEach(function (x) {
       var tr = mk("tr");
@@ -521,17 +543,17 @@
       var s = r.session, t = r.summary || {};
       H.rows = r.checkins || [];
       $("detTitle").textContent = (s.course || "") + " · " + (s.room_name || "") + " · " + when(s.start_utc) + (S.role === "admin" ? " · " + (s.owner_name || s.owner_user_id || "") : "");
-      $("detSummary").textContent = "Present " + (t.present | 0) + " · Flagged " + (t.flagged | 0) + " · Still to review " + (t.unreviewed | 0);
+      $("detSummary").textContent = (t.present | 0) + " present · " + (t.flagged | 0) + " looked unusual · " + (t.unreviewed | 0) + " still to decide";
       renderDetail();
     });
   }
   function renderDetail() {
     var box = $("detTable"); clear(box);
     var only = $("detFlagOnly").checked, list = H.rows.filter(function (r) { return !only || isFlagged(r); });
-    if (!list.length) return msg("detMsg", H.rows.length ? "No flagged check-ins." : "No check-ins in this session.");
+    if (!list.length) return msg("detMsg", H.rows.length ? "Nothing unusual in this lecture." : "Nobody checked in to this lecture.");
     msg("detMsg", list.length + " check-in" + (list.length === 1 ? "" : "s"));
     var t = mk("table", null, "his"), h = mk("tr");
-    ["Time", "Student", "Flags", "Distance", "Accuracy", "Location", "Review", "Decision"].forEach(function (x) { h.appendChild(mk("th", x)); });
+    ["Time", "Student", "Unusual", "Distance", "Accuracy", "Location", "Review", "Decision"].forEach(function (x) { h.appendChild(mk("th", x)); });
     t.appendChild(h);
     list.forEach(function (r) {
       var tr = mk("tr", null, r.review_status === "rejected" ? "rej" : "");
@@ -570,7 +592,7 @@
       if (!r.ok) return msg("ovMsg", "Could not load: " + (r.error || r.code || "error"), "err");
       msg("ovMsg", "");
       var tot = r.totals || {}, box = $("ovTotals"); clear(box);
-      [["Sessions", tot.sessions], ["Present", tot.present], ["Flagged", tot.flagged], ["To review", tot.unreviewed]].forEach(function (x) {
+      [["Lectures", tot.sessions], ["Present", tot.present], ["Unusual", tot.flagged], ["Still to decide", tot.unreviewed]].forEach(function (x) {
         var c = mk("div", null, "stat"); c.appendChild(mk("b", String(x[1] | 0))); c.appendChild(mk("span", x[0])); box.appendChild(c);
       });
       var gl = geoLine(tot.geo); if (gl) box.appendChild(mk("div", "Location problems: " + gl, "msg"));
@@ -582,12 +604,12 @@
     clear(box);
     if (!rows.length) return box.appendChild(mk("div", "Nothing in this range.", "msg"));
     var t = mk("table", null, "his"), h = mk("tr");
-    [first, "Sessions", "Present", "Flagged", "To review", "Location problems", ""].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
+    [first, "Lectures", "Present", "Unusual", "Still to decide", "Location problems", ""].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
     rows.forEach(function (b) {
       var tr = mk("tr"); tr.appendChild(mk("td", label(b)));
       [b.sessions, b.present, b.flagged, b.unreviewed].forEach(function (n) { tr.appendChild(mk("td", String(n | 0), "n")); });
       tr.appendChild(geoTags(b.geo));
-      var td = mk("td"), btn = mk("button", "Sessions"); btn.onclick = function () { open(b); }; td.appendChild(btn); tr.appendChild(td); t.appendChild(tr);
+      var td = mk("td"), btn = mk("button", "Lectures"); btn.onclick = function () { open(b); }; td.appendChild(btn); tr.appendChild(td); t.appendChild(tr);
     });
     box.appendChild(t);
   }
@@ -674,6 +696,7 @@
     ["manId", "manName", "manNote"].forEach(function (i) { $(i).addEventListener("keydown", function (e) { if (e.key === "Enter") saveManual(); }); });
     $("manId").addEventListener("input", function () { $("manId").value = $("manId").value.replace(/\D/g, ""); });
     $("flagRefresh").onclick = loadFlagged;
+    $("flagAll").addEventListener("change", loadFlagged);
     $("rosRefresh").onclick = loadRoster;
     $("rosCsv").onclick = exportRoster;
     $("rosCourse").onchange = loadRoster;

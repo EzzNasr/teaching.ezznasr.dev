@@ -1,7 +1,7 @@
 # Attendance page: what students see when they save
 
 Phone size (390 x 844), captured 2026-11-04 from the real `attend/` page with a faked server (nothing reaches the live backend).
-Decision: D8 in [../attendance-decisions.md](../attendance-decisions.md).
+Decisions: D8 and D9 in [../decisions.md](../decisions.md).
 
 Amber means **not saved yet, stay on the page**. Green means **saved, you can close it**.
 
@@ -25,5 +25,5 @@ Captured from the real `attend/admin/` page against the real backend code (emula
 To redo them after a change to the page (needs Python Playwright):
 
 ```bash
-python docs/attendance-screenshots/capture.py docs/attendance-screenshots
+python docs/attendance/screenshots/capture.py docs/attendance/screenshots
 ```

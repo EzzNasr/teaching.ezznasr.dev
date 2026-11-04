@@ -119,10 +119,10 @@ const btn = (row, label) => all(row, e => e.tag === "button" && e.textContent ==
   btn(hrows[0], "Open").click(); await t1.wait(() => rowsOf(t1.byId.detTable).length);
   ok(!t1.byId.hisDetail.hidden && t1.byId.hisList.hidden, "Open switches to the session detail");
   let drows = rowsOf(t1.byId.detTable);
-  ok(drows.length === 3 && /Alpha Course/.test(t1.byId.detTitle.textContent) && /Present 3/.test(t1.byId.detSummary.textContent), "detail lists all 3 check-ins with the summary");
+  ok(drows.length === 3 && /Alpha Course/.test(t1.byId.detTitle.textContent) && /3 present/.test(t1.byId.detSummary.textContent), "detail lists all 3 check-ins with the summary");
   const omar = drows.find(r => /Omar/.test(r.textContent));
-  ok(/GEO_UNAVAILABLE/.test(omar.textContent) && /TIMEOUT/.test(omar.textContent), "Omar's row shows flag GEO_UNAVAILABLE and the reason TIMEOUT");
-  ok(/GEO_SKIPPED/.test(drows.find(r => /Nour/.test(r.textContent)).textContent), "Nour's row shows GEO_SKIPPED");
+  ok(/gave no location/.test(omar.textContent) && /TIMEOUT/.test(omar.textContent), "Omar's row shows flag GEO_UNAVAILABLE and the reason TIMEOUT");
+  ok(/Skipped the location step/.test(drows.find(r => /Nour/.test(r.textContent)).textContent), "Nour's row shows GEO_SKIPPED");
   t1.byId.detFlagOnly.checked = true; t1.byId.detFlagOnly._l.change();
   ok(rowsOf(t1.byId.detTable).length === 2, "'Flagged only' hides the clean check-in");
   t1.byId.detFlagOnly.checked = false; t1.byId.detFlagOnly._l.change();
@@ -145,7 +145,7 @@ const btn = (row, label) => all(row, e => e.tag === "button" && e.textContent ==
   const foreign = D({ action: "att_session_detail", token: T1.token, session_id: sidB });
   ok(foreign.ok === false && foreign.code === "UNAUTHORIZED", "(server) teacher A cannot open teacher B's session");
   t1.ctx.document.getElementById("hisCourse").value = "Beta Course"; t1.byId.hisGo.click(); await sleep(150);
-  ok(/No sessions match/.test(t1.byId.hisMsg.textContent) && !t1.byId.panel.hidden, "filtering for another teacher's course shows nothing and keeps the teacher signed in");
+  ok(/No lectures match/.test(t1.byId.hisMsg.textContent) && !t1.byId.panel.hidden, "filtering for another teacher's course shows nothing and keeps the teacher signed in");
   t1.byId.hisCourse.value = "";
   // logout
   t1.byId.logout.click();
@@ -176,11 +176,11 @@ const btn = (row, label) => all(row, e => e.tag === "button" && e.textContent ==
   const alpha = urows.find(r => /Dr Alpha/.test(r.textContent)), beta = urows.find(r => /Dr Beta/.test(r.textContent));
   ok(urows.length >= 3 && cells(alpha)[1] === "1" && cells(alpha)[2] === "3" && cells(beta)[2] === "2", "per-teacher rows (sessions / present): Alpha 1/3, Beta 1/2");
   ok(/DENIED 1/.test(beta.textContent) && /UNAVAILABLE 1/.test(alpha.textContent), "per-teacher location-problem counts");
-  btn(beta, "Sessions").click(); await ad.wait(() => !ad.byId["t-history"].hidden && rowsOf(ad.byId.hisTable).length === 1);
+  btn(beta, "Lectures").click(); await ad.wait(() => !ad.byId["t-history"].hidden && rowsOf(ad.byId.hisTable).length === 1);
   ok(ad.byId.hisUser.value === T2.id && rowsOf(ad.byId.hisTable).length === 1 && /Beta Course/.test(rowsOf(ad.byId.hisTable)[0].textContent), "'Sessions' on a teacher drills into History filtered to that teacher");
   ad.tab("overview"); await ad.wait(() => rowsOf(ad.byId.ovDays).length);
   const day = rowsOf(ad.byId.ovDays)[0]; const dayStr = cells(day)[0];
-  btn(day, "Sessions").click(); await ad.wait(() => ad.byId.hisFrom.value === dayStr && rowsOf(ad.byId.hisTable).length === 3);
+  btn(day, "Lectures").click(); await ad.wait(() => ad.byId.hisFrom.value === dayStr && rowsOf(ad.byId.hisTable).length === 3);
   ok(ad.byId.hisFrom.value === dayStr && ad.byId.hisTo.value === dayStr && ad.byId.hisUser.value === "" && rowsOf(ad.byId.hisTable).length === 3, "'Sessions' on a day drills into History for that day (all 3 sessions ran today)");
   ad.byId.ovFrom.value = "2020-01-01"; ad.byId.ovTo.value = "2020-01-02"; ad.tab("overview"); ad.byId.ovGo.click();
   await ad.wait(() => ad.byId.ovTotals.children.length && ad.byId.ovTotals.children[0].children[0].textContent === "0");
@@ -261,10 +261,29 @@ const btn = (row, label) => all(row, e => e.tag === "button" && e.textContent ==
     // History detail: shown as 'Manual entry', not in 'Flagged only'
     u.tab("history"); await u.wait(() => rowsOf(u.byId.hisTable).length);
     btn(rowsOf(u.byId.hisTable)[0], "Open").click(); await u.wait(() => rowsOf(u.byId.detTable).length === 4);
-    ok(/Manual entry/.test(rowsOf(u.byId.detTable).find(r => /Hand Student/.test(r.textContent)).textContent), "History shows the row tagged 'Manual entry'");
+    ok(/Entered by hand/.test(rowsOf(u.byId.detTable).find(r => /Hand Student/.test(r.textContent)).textContent), "History shows the row tagged 'Manual entry'");
     u.byId.detFlagOnly.checked = true; u.byId.detFlagOnly._l.change();
     ok(!/Hand Student/.test(u.byId.detTable.textContent), "'Flagged only' leaves manual entries out");
     u.byId.detFlagOnly.checked = false;
+  }
+
+  /* ───────── needs review tab: decide flagged check-ins in place ───────── */
+  console.log("needs review tab");
+  {
+    const u = t1b;
+    const open0 = D({ action: "att_flagged", token: T1.token }).rows.filter(x => !x.review_status);
+    u.tab("flagged"); await u.wait(() => /waiting|Nothing/.test(u.byId.flagMsg.textContent));
+    ok(open0.length === 1 && rowsOf(u.byId.flagList).length === 1 && /Nour Samir/.test(u.byId.flagList.textContent), "only the undecided flagged check-in is listed (Omar was decided in History): " + open0.map(x => x.student_id));
+    ok(/Skipped the location step/.test(u.byId.flagList.textContent) && /Alpha Course/.test(u.byId.flagList.textContent) && !/GEO_SKIPPED/.test(u.byId.flagList.textContent), "the reason is in plain words, with the lecture name");
+    ok(!u.byId.flagBadge.hidden && u.byId.flagBadge.textContent === "1", "the tab shows a badge with the number still to decide");
+    const row = rowsOf(u.byId.flagList)[0]; all(row, e => e.tag === "input")[0].value = "was in the front row";
+    btn(row, "Accept").click(); await u.wait(() => /accepted/.test(u.byId.flagMsg.textContent));
+    const srv = D({ action: "att_session_detail", token: T1.token, session_id: sidA }).checkins.find(c => c.student_id === "20003");
+    ok(srv.review_status === "accepted" && srv.review_note === "was in the front row" && srv.reviewed_by === T1.id, "(server) Accept from this tab is stored with the note and the teacher");
+    ok(rowsOf(u.byId.flagList).length === 0 && /Nothing is waiting/.test(u.byId.flagMsg.textContent) && u.byId.flagBadge.hidden, "the list empties and the badge goes away");
+    u.byId.flagAll.checked = true; u.byId.flagAll._l.change(); await u.wait(() => rowsOf(u.byId.flagList).length === 2);
+    ok(/Accepted: was in the front row/.test(u.byId.flagList.textContent), "'Also show the ones already decided' lists them with the decision and note");
+    u.byId.flagAll.checked = false;
   }
 
   // XSS: every string is rendered with textContent

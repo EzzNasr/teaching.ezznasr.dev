@@ -125,7 +125,7 @@ try:
         da.click("#hisTable button"); da.wait_for_selector("#detTable table")
         dt = da.inner_text("#detTable")
         ok(all(x in dt for x in ("Mona Ali", "Omar Hassan", "Late Fix")) and "Far Away" not in dt, "...and A's three students, not B's")
-        ok("GEO_SKIPPED" in dt and "USER_SKIPPED" in dt, "...with the skipped check-in visible and its reason")
+        ok("Skipped the location step" in dt and "USER_SKIPPED" in dt, "...with the skipped check-in visible (in plain words) and its reason")
         da.fill("#detTable tr:has-text('Omar') input", "I saw him in class"); da.click("#detTable tr:has-text('Omar') button:has-text('Accept')")
         da.wait_for_selector("#detTable tr:has-text('Omar'):has-text('accepted')")
         r = [x for x in api("att_session_detail", token=TA["token"], session_id=TA["sid"])["checkins"] if x["student_id"] == "30002"][0]

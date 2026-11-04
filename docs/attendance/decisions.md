@@ -2,8 +2,9 @@
 
 Started 2026-11-04. Attendance goes into production about a week later (around 2026-11-11).
 This file records what we decided, what changed for launch, how to check it, and what was deliberately left for later.
-The plans this answers are in `D:\projects\teaching-site-new\Docs\02-plans\` (outside the repo):
-`3-Attendance-College\Attendance System Pricing Plan.pdf` and `WhatsappAutomation\WhatsApp Follow-up Automation Plan.pdf`.
+The plans this answers are in the `Docs/` folder outside the repo: `02-plans/active/attendance-college/Attendance System Pricing Plan.pdf`
+and `02-plans/active/whatsapp-automation/WhatsApp Follow-up Automation Plan.pdf`. Related pages: [load-testing.md](load-testing.md) (load test
+status report), [live-testing-plan.md](live-testing-plan.md) (what is left before and during live testing), [demo-data.md](demo-data.md) (sample data).
 
 ## 1. Decisions (2026-11-04)
 
@@ -16,8 +17,11 @@ The plans this answers are in `D:\projects\teaching-site-new\Docs\02-plans\` (ou
 | D5 | **The student page retries by itself** (no tap needed) and **resumes after a reload**: the pending check-in is kept on the phone and re-sent when the same link is opened again, while the grace lasts. | Students must not lose attendance because the server was busy or the phone locked. | - |
 | D6 | **Load test: written here, run by the owner** after deploying (section 4). It writes test rows to the live sheet and removes them with `att_cleanupTest()`. | Only the real Apps Script shows Google's lock and concurrency behaviour; the emulator can't. | Re-run after any change to the check-in path, and before quoting a capacity to a customer. |
 | D7 | Decisions and follow-ups are documented in this repo file. | Kept next to the code it describes. | - |
-| D8 | **The save screens explain themselves, in English and Arabic, by colour** (2026-11-04, site only, no Apps Script change). Under the button: "Tap, then wait for the green screen". While saving: a spinner and a yellow "Don't close this page. Wait for the green screen." While NOT saved (retrying): the whole screen turns amber with a warning sign, "NOT saved yet", "Stay on this page. It keeps trying by itself.", the reason, the countdown and "Try now". Saved: a green panel, "Attendance recorded / تم تسجيل الحضور", "You can close this page now." The give-up, closed and QR-expired messages and the tab title also have Arabic. | The instructor should not have to explain any of this in class: amber means wait, green means done. Screenshots: [attendance-screenshots/](attendance-screenshots/README.md). | Other messages (location help, device errors) are still English only. |
+| D8 | **The save screens explain themselves, in English and Arabic, by colour** (2026-11-04, site only, no Apps Script change). Under the button: "Tap, then wait for the green screen". While saving: a spinner and a yellow "Don't close this page. Wait for the green screen." While NOT saved (retrying): the whole screen turns amber with a warning sign, "NOT saved yet", "Stay on this page. It keeps trying by itself.", the reason, the countdown and "Try now". Saved: a green panel, "Attendance recorded / تم تسجيل الحضور", "You can close this page now." The give-up, closed and QR-expired messages and the tab title also have Arabic. | The instructor should not have to explain any of this in class: amber means wait, green means done. Screenshots: [screenshots/](screenshots/README.md). | Other messages (location help, device errors) are still English only. |
 | D9 | **Manual entry tab on the dashboard** (2026-11-04, needs an Apps Script redeploy). The instructor picks the lecture, types the student ID, picks a reason (No phone / Check-in page failed / Other + note) and taps Mark present. Works for any lecture the instructor owns, open or already closed. Stored as a normal `AttCheckins` row (no new columns, no `att_migrate`): `device_id` MANUAL, `flags` MANUAL, `status` ok, no location, and the review columns hold who entered it, when and why. Counts as present, never as flagged, never in the cheating feed or the flag log. Already present (by phone or by hand) = nothing written. An ID that never registered needs a name and gets a student row with no device; the first phone that signs up with that ID is bound to it (`att_signup_`), after that it is ID_TAKEN as usual. If the student also checks in by phone, the manual row is kept as it is. | Students without a working phone, or whose page failed, must still be counted, without the instructor editing the sheet. | A manual entry cannot be deleted from the dashboard yet: a mistake is marked Rejected in History (the row still counts as present). Anyone could bind the first phone to a hand-entered ID, the same as signing up any unregistered ID today. |
+| D10 | **Plain names on the dashboard, and decisions where the problem is shown** (2026-11-04, site only). Tabs: Take attendance, Mark present by hand, Phone changes, Needs review (with a count badge), All students (was Roster), Rooms (was Calibrate room), Past lectures (was History), All teachers, Teacher accounts. Flag codes are shown in plain words ("Outside the hall", "Same phone as another student"); the codes stay in the CSV. **Needs review** lists every flagged check-in still undecided, with Accept / Reject and a note right there (before, it only counted flags per student and the decision was in History). **Phone changes stay approval-only**, as before. | A teacher should not need a manual to read the dashboard, and should decide a flagged check-in where it is shown. | - |
+| D11 | **Demo data in the live sheet, from the Apps Script editor** ([demo-data.md](demo-data.md)). `att_seedDemo()` writes three weeks of sample data (2 demo teachers whose passwords it logs, 14 lectures, 30 students, every flag and state), `att_demoLive()` runs a live lecture (sample students check in through the real code while the projector is open), `att_clearDemo()` removes all of it. Markers: names and courses start with "DEMO ", student IDs 9997xxxx. Demo lectures never send Telegram (`att_safeNotify_`). An in-browser demo (the backend running on fake data in the page) was tried and dropped as too much to maintain. | See and train on every feature in the real dashboard, then remove it cleanly. | Run `att_clearDemo()` before the real semester data grows, so the admin views stay clean. |
+| D12 | **Docs live next to what they describe** ([docs/README.md](../README.md)). Inside the repo (public): anything that must change with the code: architecture, contracts, decisions, runbooks, specs, test docs. Outside the repo (`Docs/`, private): plans, pricing, status reports, known security gaps, archives and large binaries. | One place to look, reviewed with the code, nothing private published. | - |
 
 ## 2. What changed for launch
 
@@ -69,6 +73,11 @@ The project files were brought to the repo exactly (checked by fingerprint): `At
 PASS, test rows cleaned up. The live URL answers `att_status`, `report_photos` and `check_session`. **Rollback:** Manage
 deployments > Edit > Version 59.
 
+**2026-11-04: Version 61** (deployed by the owner): `AttendanceAll.gs` = commit `3a459e2`, manual entry (D9). **Rollback:** Version 60.
+Since then the repo file differs from Version 61 in comments only (doc paths, D12).
+
+Every later deploy: the checklist at the top of [deploy.md](deploy.md), and a line here.
+
 1. Apps Script: paste `AttendanceAll.gs`, then **Deploy > Manage deployments > Edit > New version**, never "New deployment".
    The `/exec` URL in `contract/att_config.js` must not change.
 2. Run `att_selfTest()`; expect `ALL PASS`.
@@ -79,53 +88,13 @@ deployments > Edit > Version 59.
 5. Run the load test (section 4) **outside lecture and quiz hours**, then `att_cleanupTest()`.
 6. Do a real run on a few phones with mobile data, including one with the phone locked mid-save and reopened.
 
-## 4. Load test (run by the owner)
-In the Apps Script editor, after step 1 of section 3:
+## 4. Load test
 
-| Run | What it simulates |
-|---|---|
-| `att_loadTest()` | 70 registered students tap Save at the same moment (a normal lecture) |
-| `att_loadTestFirstDay()` | 70 new students sign up and check in at once (the first lecture, the heaviest case) |
-| `att_loadTest(100)` | a bigger hall |
+Moved to its own page: **[load-testing.md](load-testing.md)** (status report, every run, what is not tested yet, how to run it).
 
-Each run sends every request at once, re-sends any that got BUSY, a server error or a non-JSON answer (Google's concurrency limit),
-the way the page does, and logs each round. It ends with *recorded N/N*, *median / 90 % / slowest time until recorded* and PASS/FAIL.
-It stops at the session close + grace, or before Apps Script's 6-minute limit for the run. Afterwards always run `att_cleanupTest()`.
+## 5. Capacity
 
-Fill in after running:
-
-| Date | Run | Recorded | Needed a retry | Median | 90 % | Slowest | Notes |
-|---|---|---|---|---|---|---|---|
-| 2026-11-04 | `att_loadTest()` | 0/70 | 70 | - | - | - | **Invalid run**: every request got HTTP 401. The test used `ScriptApp.getService().getUrl()`, which from the editor is the `/dev` URL (editors only), so nothing reached the server. Fixed: it now uses the students' `/exec` URL and checks it first. Re-run. |
-| 2026-11-04 04:09 | `att_loadTest()` (70, all at once) | **70/70**, 70 rows, 70 unique | 20 (BUSY once) | 37.5 s | 59.1 s | 59.1 s | **PASS.** Round 1: 50 recorded, 20 BUSY (each request waited up to ~28 s for the lock); round 2: the 20 recorded. About 0.5 s per check-in inside the lock. Nothing else was running. |
-| 2026-11-04 04:14 | `att_loadTestFirstDay()` (70, identical coordinates) | 49 signed up, 19 checked in when the run was cut off | - | - | - | - | **Inconclusive.** One of the 70 requests hung for 6 minutes (Google killed it at 360 s). `UrlFetchApp.fetchAll` waited for it, so the test never reached its next round and hit its own 6-minute limit before logging. All 70 fake students also had identical coordinates, so every check-in was flagged and also queued for the project lock in the flag code (fixed, F5). |
-| 2026-11-04 04:35 | `att_loadTestFirstDay()` (70, realistic spots), Version 60 | **70/70**, 70 rows, 70 unique, 70 students + 70 devices | 49 | 254 s * | 278 s * | 289 s * | **PASS.** Rounds: 34 s (30 signed up, 32 BUSY, 8 over Google's concurrency limit), 32 s (21 recorded, 19 signed up), 174 s * (15 + 26, 8 BUSY), 20 s, 7 s. *Round 3 waited on one hung request again (see F11), which inflates every time after it: without it the whole class was through in about 2 minutes. A real phone stuck like that re-sends after its 30 s watchdog. 0 flags. |
-
-The test checks its URL with one request before starting and stops at once (writing nothing) if the answer is not the attendance
-JSON. It uses Script Property `ATT_LOADTEST_URL`, else `ATT_WEBAPP_URL`, else the built-in students' URL (the same as
-`contract/att_config.js`).
-
-How to read it: everything recorded with the slowest under ~2 minutes means launch is fine. If the slowest gets close to
-5 + 2 minutes, or anything fails, do F1 before more students are added.
-
-### What the runs showed (2026-11-04)
-- About **0.5 s per check-in inside the lock**: a class of 70 tapping at the same second is through in about 1 minute, a first
-  lecture (sign-up + check-in) in about 2. The 5-minute session plus the 120 s grace leaves a wide margin.
-- With 70 at once, some requests get BUSY (the 25 s lock wait ran out) and some get Google's "too many at once" page (`NOT_JSON_200`,
-  about 30 run at a time). Both are retried by the page; nothing was lost or doubled in any run.
-- **One request in a burst of 70 can hang for minutes** (seen in both first-day runs). The other requests kept getting the lock
-  while it hung, so it does not block the class: only that one student waits for the page's 30 s watchdog and re-send. See F11.
-- Real lectures are gentler than these tests: phones scan over a minute or two, not all in the same second.
-
-## 5. Capacity: what is known
-- One check-in holds the project-wide lock only for the dedupe check and the append. Everything else happens outside the lock:
-  ticket check, device lookup (cached 60 s), history read, flag rules, flag log, and Telegram.
-- That lock is **shared with Code.gs** (quiz and homework submissions wait up to 20 to 30 s for it). A quiz deadline during a
-  lecture's check-in window slows both.
-- Apps Script runs at most about 30 requests of one project at the same time. Requests beyond that fail fast. The page treats
-  that as "no connection / server error" and retries, so it costs time, not attendance.
-- The history read before the lock reads the whole `AttCheckins` tab on every check-in. It grows all semester, so the time
-  per check-in grows too (see F6).
+See [load-testing.md](load-testing.md#capacity-limits-that-matter).
 
 ## 6. Follow-ups (deliberately not done now)
 

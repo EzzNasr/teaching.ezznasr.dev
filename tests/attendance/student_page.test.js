@@ -240,7 +240,7 @@ const timers = []; const origSI = global.setInterval;
   p.els.gateSkip.click(); p.els.sid.value = "20240001"; p.els.name.value = "Ali"; p.els.save.click(); await until(() => p.shown().join() === "done", "done");
   ok(/could not be verified/.test(p.els.doneNote.textContent), "done screen tells a skipped student it was recorded for review");
 
-  // ---------- Nov 2026: automatic retry, "not saved yet", late grace, resume after reload (docs/attendance-decisions.md) ----------
+  // ---------- Nov 2026: automatic retry, "not saved yet", late grace, resume after reload (docs/attendance/decisions.md) ----------
   const ME = { att_secret: "a".repeat(64), att_id: "20240001" }, FAST = { RETRY_DELAYS_MS: [20, 20] };
   const nAtt = pg => pg.apiCalls.filter(c => c.action === "att_attend").length;
   console.log("automatic retry (no tap needed)");

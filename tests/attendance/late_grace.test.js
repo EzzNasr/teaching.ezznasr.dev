@@ -1,4 +1,4 @@
-// node tests/attendance/late_grace.test.js : Nov 2026 production hardening (docs/attendance-decisions.md), on the emulated backend.
+// node tests/attendance/late_grace.test.js : Nov 2026 production hardening (docs/attendance/decisions.md), on the emulated backend.
 //  - late grace: a check-in from a ticket issued while the session was open still counts LATE_GRACE_SEC (120 s) after the ticket
 //    expires / the session closes (by time or by the teacher); no NEW ticket after close; device requests get no grace
 //  - the short critical section: inside the lock only rows added since the history read are checked, and duplicates are still caught

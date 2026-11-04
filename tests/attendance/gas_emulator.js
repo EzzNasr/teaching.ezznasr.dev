@@ -15,7 +15,7 @@ function build() {
     getMaxRows() { return Math.max(1000, this._g.length); }
     setFrozenRows() {}
     appendRow(a) { this._g.push(a.slice()); }
-    deleteRow(n) { this._g.splice(n - 1, 1); }
+    deleteRow(n) { this._g.splice(n - 1, 1); } deleteRows(n, k) { this._g.splice(n - 1, k); }
     getRange(r, c, nr = 1, nc = 1) {
       const g = this._g;
       return {
@@ -37,7 +37,7 @@ function build() {
       base64EncodeWebSafe: s => Buffer.from(s, "utf8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_"),
       base64DecodeWebSafe: s => signed(Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64")),
       newBlob: arr => ({ getDataAsString: () => unsigned(arr).toString("utf8") }),
-      getUuid: () => crypto.randomUUID(),
+      getUuid: () => crypto.randomUUID(), sleep() {},
       formatDate: (d, tz, f) => new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d),
     },
     PropertiesService: { getScriptProperties: () => ({ getProperty: k => (k in props ? props[k] : null), setProperty: (k, v) => { props[k] = String(v); } }) },

@@ -30,40 +30,40 @@
     <nav>
       <h1>Dashboard</h1>
       <div id="who" class="who"></div>
-      <button data-tab="session" class="on">Session</button>
-      <button data-tab="manual">Manual entry</button>
-      <button data-tab="requests">Requests<span id="pendBadge" class="badge" hidden>0</span></button>
-      <button data-tab="flagged">Flagged</button>
-      <button data-tab="roster">Roster</button>
-      <button data-tab="calib">Calibrate room</button>
-      <button data-tab="history">History</button>
-      <button id="tabOverview" data-tab="overview" hidden>All sessions</button>
-      <button id="tabUsers" data-tab="users" hidden>Users</button>
+      <button data-tab="session" class="on">Take attendance</button>
+      <button data-tab="manual">Mark present by hand</button>
+      <button data-tab="requests">Phone changes<span id="pendBadge" class="badge" hidden>0</span></button>
+      <button data-tab="flagged">Needs review<span id="flagBadge" class="badge" hidden>0</span></button>
+      <button data-tab="roster">All students</button>
+      <button data-tab="calib">Rooms</button>
+      <button data-tab="history">Past lectures</button>
+      <button id="tabOverview" data-tab="overview" hidden>All teachers</button>
+      <button id="tabUsers" data-tab="users" hidden>Teacher accounts</button>
       <button id="logout">Log out</button>
     </nav>
 
     <section id="t-session">
       <div class="card">
-        <h2>Start session</h2>
+        <h2>Start a lecture</h2>
         <div class="row">
           <div><label for="course">Course</label><input id="course" list="courses" autocomplete="off"><datalist id="courses"></datalist></div>
           <div><label for="room">Room</label><select id="room"></select></div>
         </div>
-        <div class="row" style="margin-top:12px"><button id="startBtn" class="pri">Start &amp; show QR</button><button id="resumeBtn" hidden>Back to projector</button></div>
+        <div class="row" style="margin-top:12px"><button id="startBtn" class="pri">Start and show the QR code</button><button id="resumeBtn" hidden>Back to the QR screen</button></div>
         <div id="startMsg" class="msg" role="status"></div>
       </div>
-      <div class="card"><h2>Live activity</h2><div id="sfeed" class="feed"><div class="msg">Start a session to see activity.</div></div></div>
+      <div class="card"><h2>Live activity</h2><div id="sfeed" class="feed"><div class="msg">Start a lecture to see who checks in.</div></div></div>
       <div id="summary" class="card" hidden>
-        <h2>Session summary</h2>
+        <h2>Lecture summary</h2>
         <div id="sumText"></div>
-        <div class="row" style="margin-top:12px"><button id="csvBtn" class="pri">Export CSV</button></div>
+        <div class="row" style="margin-top:12px"><button id="csvBtn" class="pri">Download as Excel (CSV)</button></div>
         <div id="csvMsg" class="msg"></div>
       </div>
     </section>
 
     <section id="t-manual" hidden>
       <div class="card">
-        <h2>Manual entry</h2>
+        <h2>Mark a student present by hand</h2>
         <p class="msg">Mark a student present from this laptop: a student without a working phone, or one whose check-in page showed an error. It is saved with your name, the time and the reason, and counts like any other check-in.</p>
         <label for="manSession">Lecture</label><select id="manSession"></select>
         <div class="row">
@@ -86,23 +86,26 @@
     </section>
 
     <section id="t-requests" hidden>
-      <div class="card"><h2>Device-change requests</h2><div id="reqList"></div><div id="reqMsg" class="msg" role="status"></div></div>
+      <div class="card"><h2>Students asking to use a new phone</h2><p class="msg">A student whose phone changed (new phone, reset, other browser) asks here. Approve only after you have seen their student ID card.</p><div id="reqList"></div><div id="reqMsg" class="msg" role="status"></div></div>
     </section>
 
     <section id="t-flagged" hidden>
-      <div class="card"><h2>Flagged check-ins</h2><div id="flagList"></div><div id="flagMsg" class="msg" role="status"></div>
+      <div class="card"><h2>Check-ins that need a look</h2>
+        <p class="msg">These students did check in, but something looked unusual (location, or the same phone as another student). Accept if they were really in class, Reject if not. Your decision and note are saved with your name.</p>
+        <label class="chk"><input id="flagAll" type="checkbox"> Also show the ones already decided</label>
+        <div id="flagMsg" class="msg" role="status"></div><div id="flagList" class="scroll"></div>
         <div class="row" style="margin-top:12px"><button id="flagRefresh">Refresh</button></div></div>
     </section>
 
     <section id="t-roster" hidden>
       <div class="card">
-        <h2>Roster</h2>
+        <h2>All students</h2>
         <div class="row">
           <div><label for="rosCourse">Course</label><select id="rosCourse"><option value="">All courses</option></select></div>
-          <div><label for="rosLimit">Show most recent</label><select id="rosLimit" title="How many recent lectures to show as columns"><option value="5">5 lectures</option><option value="10">10 lectures</option><option value="30" selected>30 lectures</option><option value="60">60 lectures</option><option value="100">100 lectures</option></select></div>
+          <div><label for="rosLimit">Lectures to show</label><select id="rosLimit" title="How many recent lectures to show as columns"><option value="5">Last 5</option><option value="10">Last 10</option><option value="30" selected>Last 30</option><option value="60">Last 60</option><option value="100">Last 100</option></select></div>
           <div><label for="rosSearch">Search name or ID</label><input id="rosSearch" type="search" autocomplete="off"></div>
         </div>
-        <div class="row" style="margin-top:12px"><button id="rosRefresh">Refresh</button><button id="rosCsv" class="pri">Export CSV</button></div>
+        <div class="row" style="margin-top:12px"><button id="rosRefresh">Refresh</button><button id="rosCsv" class="pri">Download as Excel (CSV)</button></div>
         <div id="rosMsg" class="msg" role="status"></div>
         <div id="rosTable"></div>
       </div>
@@ -110,17 +113,17 @@
 
     <section id="t-calib" hidden>
       <div class="card">
-        <h2>Room calibration</h2>
-        <p class="msg">Stand in the middle of the hall, then tap Calibrate. About 10 readings are collected (about 15 s). Keep still.</p>
-        <label for="calRoom">Room</label><input id="calRoom" list="roomNames" autocomplete="off"><datalist id="roomNames"></datalist>
-        <div class="row" style="margin-top:12px"><button id="calBtn" class="pri">Calibrate</button></div>
+        <h2>Set up a room</h2>
+        <p class="msg">Do this once per lecture hall, on your phone: stand in the middle of the hall and tap Save this room's location. It takes about 15 seconds; keep still. Students are then checked against this spot.</p>
+        <label for="calRoom">Room name</label><input id="calRoom" list="roomNames" autocomplete="off"><datalist id="roomNames"></datalist>
+        <div class="row" style="margin-top:12px"><button id="calBtn" class="pri">Save this room's location</button></div>
         <div id="calMsg" class="msg" role="status"></div>
       </div>
     </section>
 
     <section id="t-history" hidden>
       <div id="hisList" class="card">
-        <h2>Session history</h2>
+        <h2>Past lectures</h2>
         <div class="row">
           <div><label for="hisCourse">Course</label><input id="hisCourse" list="courses" autocomplete="off" placeholder="All courses"></div>
           <div><label for="hisFrom">From (UTC day)</label><input id="hisFrom" type="date"></div>
@@ -133,10 +136,10 @@
         <div class="row" style="margin-top:12px"><button id="hisMore" hidden>Load more</button></div>
       </div>
       <div id="hisDetail" class="card" hidden>
-        <div class="row" style="margin-bottom:8px"><button id="hisBack">&larr; Back to sessions</button><button id="detCsv" class="pri">Export CSV</button></div>
-        <h2 id="detTitle">Session</h2>
+        <div class="row" style="margin-bottom:8px"><button id="hisBack">&larr; Back to the list</button><button id="detCsv" class="pri">Download as Excel (CSV)</button></div>
+        <h2 id="detTitle">Lecture</h2>
         <div id="detSummary" class="msg"></div>
-        <label class="chk"><input id="detFlagOnly" type="checkbox"> Flagged check-ins only</label>
+        <label class="chk"><input id="detFlagOnly" type="checkbox"> Only the ones that need a look</label>
         <div id="detMsg" class="msg" role="status"></div>
         <div id="detTable" class="scroll"></div>
       </div>
@@ -144,7 +147,7 @@
 
     <section id="t-overview" hidden>
       <div class="card">
-        <h2>All sessions, all teachers</h2>
+        <h2>All teachers</h2>
         <div class="row">
           <div><label for="ovFrom">From (UTC day)</label><input id="ovFrom" type="date"></div>
           <div><label for="ovTo">To (UTC day)</label><input id="ovTo" type="date"></div>
@@ -159,7 +162,7 @@
 
     <section id="t-users" hidden>
       <div class="card">
-        <h2>Teacher accounts</h2>
+        <h2>Teacher accounts</h2><p class="msg">Each teacher signs in with their own password and sees only their own lectures and students.</p>
         <div class="row">
           <div><label for="userName">New teacher name</label><input id="userName" autocomplete="off" maxlength="60"></div>
           <div><button id="userCreate" class="pri">Create account</button></div>
@@ -191,9 +194,9 @@
   <div id="pfeed" class="feed" aria-live="polite"></div>
   <div id="pctl">
     <button id="fsBtn">Fullscreen</button>
-    <button id="reqBtn">Requests<span id="pBadge" class="badge" hidden>0</span></button>
-    <button id="hideBtn">Admin panel</button>
-    <button id="closeBtn" class="bad">Close session</button>
+    <button id="reqBtn">Phone changes<span id="pBadge" class="badge" hidden>0</span></button>
+    <button id="hideBtn">Dashboard</button>
+    <button id="closeBtn" class="bad">End attendance</button>
   </div>
 </section>
 

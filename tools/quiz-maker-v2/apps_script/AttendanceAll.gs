@@ -26,7 +26,7 @@ var ATT_C = {
   WINDOW_SEC: 10, GRACE_SEC: 3, TICKET_SEC: 240, SESSION_MIN: 5,   // TICKET_SEC is FROZEN: change it in contract/att_config.js, here, the emulator and the test vectors together
   GEO_RADIUS_M: 100, GEO_WEAK_ACC_M: 150, ID_REGEX: /^[0-9]{4,12}$/,
   NAME_MAX: 60, TOKEN_LEN: 16, CACHE_SEC: 60, LOCK_MS: 25000, DUP_START_MS: 20000,
-  // Late grace (decision 2026-11-04, docs/attendance-decisions.md): a check-in whose QR was scanned while the session was open is still
+  // Late grace (decision 2026-11-04, docs/attendance/decisions.md): a check-in whose QR was scanned while the session was open is still
   // accepted up to this long after its ticket expires / the session closes, so a student stuck in a busy-server retry loop is not lost.
   // NEW tickets are never issued after close. The student page uses the same value for how long it keeps retrying.
   LATE_GRACE_SEC: 120,
@@ -64,7 +64,7 @@ function att_requireAdmin_(p) {
 }
 function att_iso_(d) { return (d || new Date()).toISOString(); }
 function att_num_(v) { return (v === "" || v == null || isNaN(Number(v))) ? null : Number(v); }
-function att_safeNotify_(event, data) { try { att_notify_(event, data); } catch (e) { console.error("notify " + event + ": " + e); } }
+function att_safeNotify_(event, data) { try { if (att_isDemoEvent_(data)) return; att_notify_(event, data); } catch (e) { console.error("notify " + event + ": " + e); } }   // demo lectures never notify (att_seedDemo)
 
 /* ───────── crypto (§2) ───────── */
 function att_sessionKey_(sessionId, master) { return att_hmacHex_(master || att_masterSecret_(), "key:" + sessionId); }
@@ -819,7 +819,7 @@ function att_review_(p, u) {
   });
 }
 
-/* ───────── manual entry (2026-11-04, docs/attendance-decisions.md D9) ───────── */
+/* ───────── manual entry (2026-11-04, docs/attendance/decisions.md D9) ───────── */
 var ATT_MANUAL_REASONS_ = { NO_PHONE: "No phone / phone not working", PAGE_ERROR: "Check-in page failed", OTHER: "Other" };
 /** att_manual_checkin {session_id, student_id, reason: NO_PHONE|PAGE_ERROR|OTHER, note?, name?}: the instructor marks a student present
  *  by hand, from the dashboard. Any session the caller owns, open or already closed (it can be done after the lecture).
@@ -1108,6 +1108,242 @@ function att_cleanupTest() {
     return true;
   });
   Logger.log("cleanup: " + JSON.stringify(counts));
+  return counts;
+}
+
+/* ═════════ demo data (2026-11-04, docs/attendance/demo-data.md) ═════════
+ * att_seedDemo()   fills the LIVE sheet with three weeks of sample data so every screen of the dashboard has something to show:
+ *                  2 demo teachers (passwords in the log), 3 rooms, 14 past lectures, 30 students, every location flag, same phone
+ *                  for two students, identical locations, REPEATED, a cheating attempt, a fixed first attempt, accepted / rejected /
+ *                  undecided reviews, hand entries, phone-change requests (2 pending, 1 approved, 1 denied).
+ * att_demoLive()   a live lecture: uses the newest OPEN demo lecture (start one on the dashboard as the demo teacher) or opens one,
+ *                  then 13 sample students check in over about 40 s through the real check-in code (one far away, one new,
+ *                  one cheating attempt). Watch the projector screen while it runs.
+ * att_clearDemo()  removes every demo row (and nothing else). att_seedDemo() calls it first, so it can be re-run.
+ * Markers: teachers and courses start with "DEMO ", rooms with "DEMO ", student IDs are 9997xxxx. Demo lectures never send Telegram.
+ * Run outside lecture hours; the whole seed is written in one locked batch. */
+var ATT_DEMO_P_ = "DEMO ";
+function att_isDemoId_(id) { return /^9997\d{4}$/.test(String(id)); }
+function att_isDemoText_(s) { return String(s || "").indexOf(ATT_DEMO_P_) === 0; }
+/** True when a notification belongs to a demo lecture (att_safeNotify_ drops those). */
+function att_isDemoEvent_(data) {
+  if (!data) return false;
+  if (att_isDemoText_(data.course) || att_isDemoText_(data.owner_name) || att_isDemoId_(data.student_id)) return true;
+  var s = data.session_id ? att_getSession_(data.session_id) : null;
+  return !!s && (att_isDemoText_(s.course) || att_isDemoText_(s.owner_name));
+}
+var ATT_DEMO_NAMES_ = ["Mona Ali", "Omar Hassan", "Nour Samir", "Youssef Adel", "Salma Kamal", "Karim Fathy", "Hana Mostafa", "Ahmed Tarek",
+  "Laila Ibrahim", "Mostafa Nabil", "Farida Sherif", "Ziad Ehab", "Malak Hossam", "Seif Ashraf", "Jana Wael", "Hamza Magdy",
+  "Rana Yasser", "Adham Sameh", "Nada Emad", "Marwan Gamal", "Habiba Reda", "Khaled Osama", "Yara Mahmoud", "Ali Fawzy",
+  "Mariam Saad", "Tarek Hany", "Dina Khalil", "Bassel Amr", "Sara Medhat", "Omar Zaki"];
+function att_demoId_(i) { return String(99970101 + i); }
+function att_demoSecret_(id) { return "demo-phone-secret-" + id; }   // demo only: lets att_demoLive check in as the seeded students
+
+function att_seedDemo() {
+  var A = att_adminToken_(); if (!A) throw new Error("ADMIN_TOKEN missing");
+  att_clearDemo();
+  var x = 20261104; function rnd() { x = (x * 1103515245 + 12345) % 2147483648; return x / 2147483648; }
+  function iso(ms) { return new Date(ms).toISOString(); }
+  var now = Date.now(), DAY = 86400000;
+  // teachers go through the real account code (hashed passwords); everything else is built here and written in one batch
+  var c1 = att_dispatch_({ action: "att_user_create", token: A, name: ATT_DEMO_P_ + "Dr Hossam Eldein" });
+  var c2 = att_dispatch_({ action: "att_user_create", token: A, name: ATT_DEMO_P_ + "Eng. Mariam Fouad" });
+  if (!c1.ok || !c2.ok) throw new Error("could not create the demo teachers: " + (c1.code || c2.code));
+  var T = [c1.user, c2.user];
+  var out = { AttRooms: [], AttSessions: [], AttStudents: [], AttDevices: [], AttCheckins: [], AttFlagLog: [], AttRequests: [] };
+  function room(owner, name, lat, lng) {
+    var r = { room_id: "RM-D" + att_hex_(att_randBytes_(3)).toUpperCase(), name: ATT_DEMO_P_ + name, lat: lat, lng: lng, samples: 10,
+      calibrated_at: iso(now - 30 * DAY), owner_user_id: owner.user_id };
+    out.AttRooms.push(r); return r;
+  }
+  var hallB = room(T[0], "Hall B", 31.20695, 29.92440), lab3 = room(T[0], "Lab 3", 31.20652, 29.92502), hallA = room(T[1], "Hall A", 31.20730, 29.92390);
+  var S = ATT_DEMO_NAMES_.map(function (n, i) {
+    var id = att_demoId_(i), h = att_sha256Hex_(att_demoSecret_(id));
+    return { id: id, name: n, hash: h, dev: "D-" + h.slice(0, 16), fp: "demo-fp-" + i, rate: i % 7 === 3 ? 0.45 : i % 5 === 1 ? 0.7 : 0.93, joined: false };
+  });
+  var byId = {}; S.forEach(function (s) { byId[s.id] = s; });
+  function sid(i) { return att_demoId_(i); }
+  var PLAN = [   // owner, course, room, days ago, Cairo hour, cohort first..last
+    [0, "Web Programming", hallB, 23, 9, 0, 23], [0, "Computer Networks", lab3, 22, 11, 8, 27], [1, "Data Structures", hallA, 21, 13, 16, 29],
+    [0, "Web Programming", hallB, 20, 9, 0, 23], [0, "Web Programming", hallB, 16, 9, 0, 23], [0, "Computer Networks", lab3, 15, 11, 8, 27],
+    [1, "Data Structures", hallA, 14, 13, 16, 29], [0, "Web Programming", hallB, 13, 9, 0, 23], [0, "Web Programming", hallB, 9, 9, 0, 23],
+    [0, "Computer Networks", lab3, 8, 11, 8, 27], [1, "Data Structures", hallA, 7, 13, 16, 29], [0, "Web Programming", hallB, 6, 9, 0, 23],
+    [0, "Computer Networks", lab3, 1, 11, 8, 27], [0, "Web Programming", hallB, 2, 9, 0, 23]];
+  // lecture -> student index -> what happens instead of a normal check-in
+  var SPECIAL = { 3: { 2: "far", 9: "far" }, 4: { 2: "far", 9: "present" }, 5: { 9: "present" }, 6: { 17: "present" },
+    7: { 5: "denied", 8: "skipped", 2: "far" }, 9: { 11: "unavailable", 14: "weak" }, 10: { 19: "upgrade" }, 11: { 1: "far", 2: "far" },
+    12: { 13: "same3", 16: "same3", 18: "same3", 25: "absent", 10: "present" },
+    13: { 0: "present", 4: "samephone", 7: "cheat", 22: "absent", 2: "present" } };
+  var sessions = [];
+  PLAN.forEach(function (L, li) {
+    var owner = T[L[0]], rm = L[2], start = new Date(now - L[3] * DAY); start.setUTCHours(L[4] - 2, 0, 0, 0); start = start.getTime();
+    var ses = { session_id: "S-D" + start.toString(36).toUpperCase() + att_hex_(att_randBytes_(2)).toUpperCase(), course: ATT_DEMO_P_ + L[1], room_id: rm.room_id,
+      start_utc: iso(start), close_utc: iso(start + ATT_C.SESSION_MIN * 60000), status: "closed", hall_lat: rm.lat, hall_lng: rm.lng,
+      owner_user_id: owner.user_id, owner_name: owner.name };
+    out.AttSessions.push(ses); sessions.push(ses);
+    var sp = SPECIAL[li] || {}, k = 0, hall = { lat: rm.lat, lng: rm.lng }, ident = { lat: rm.lat + 0.00004, lng: rm.lng - 0.00003, acc: 10 };
+    for (var i = L[5]; i <= L[6]; i++) {
+      var s = S[i], what = sp[i];
+      if (what === "absent" || (!what && rnd() > s.rate)) continue;
+      var t = start + 20000 + (k++) * 7000 + Math.round(rnd() * 4000);
+      if (what === "cheat") {   // the phone of student 4 used to check in student 7: refused, logged, red in the live feed
+        out.AttFlagLog.push({ ts_utc: iso(t), session_id: ses.session_id, student_id: s.id, code: "DEVICE_ID_CONFLICT", detail: "device " + S[4].dev + ";owner=" + S[4].id });
+        continue;
+      }
+      if (!s.joined) {
+        out.AttStudents.push({ student_id: s.id, name: s.name, device_id: s.dev, created_at: iso(t - 4000), status: "active" });
+        out.AttDevices.push({ device_id: s.dev, student_id: s.id, secret_hash: s.hash, fp_hash: s.fp, bound_at: iso(t - 4000), status: "active" });
+        s.joined = true;
+      }
+      var g = { lat: rm.lat + (rnd() - 0.5) * 0.00018, lng: rm.lng + (rnd() - 0.5) * 0.00018, acc: 6 + Math.round(rnd() * 18) }, fp = s.fp;
+      if (what === "far") g = { lat: rm.lat + 0.0042, lng: rm.lng + 0.0011, acc: 15 };
+      else if (what === "denied") g = { denied: true, reason: "PERMISSION_DENIED" };
+      else if (what === "skipped") g = { denied: true, reason: "USER_SKIPPED" };
+      else if (what === "unavailable") g = { denied: true, reason: "TIMEOUT" };
+      else if (what === "weak") g = { lat: rm.lat + 0.0003, lng: rm.lng, acc: 320 };
+      else if (what === "same3") g = ident;
+      else if (what === "samephone") { fp = S[0].fp; g = { lat: rm.lat + 0.00001, lng: rm.lng + 0.00001, acc: 9 }; t = Date.parse(out.AttCheckins.filter(function (c) { return c.session_id === ses.session_id && c.student_id === S[0].id; })[0].server_utc) + 9000; }
+      if (li === 13 && i === 0) g = { lat: rm.lat, lng: rm.lng, acc: 9 };
+      var geo = att_normGeo_(g), dist = geo.denied ? null : att_haversine_(geo.lat, geo.lng, hall.lat, hall.lng);
+      var priors = out.AttCheckins.filter(function (c) { return c.session_id === ses.session_id || c.student_id === s.id; }).map(function (c) {
+        return { session_id: c.session_id, student_id: c.student_id, server_utc: c.server_utc, lat: att_num_(c.lat), lng: att_num_(c.lng), acc: att_num_(c.acc), fp_hash: c.fp_hash, flags: c.flags ? c.flags.split(",") : [], status: c.status };
+      });
+      var flags = att_runFlags_({ session: ses, student_id: s.id, device_id: s.dev, fp: fp, geo: geo, serverUtc: iso(t), hall: hall, priorCheckins: priors }) || [];
+      var row = { checkin_id: Utilities.getUuid(), session_id: ses.session_id, student_id: s.id, device_id: s.dev, server_utc: iso(t),
+        lat: geo.denied ? "" : geo.lat, lng: geo.denied ? "" : geo.lng, acc: geo.denied ? "" : geo.acc, dist_m: dist == null ? "" : Math.round(dist * 10) / 10,
+        fp_hash: fp, flags: flags.join(","), status: att_flagsToStatus_(flags), geo_reason: geo.denied ? geo.reason : "", review_status: "", review_note: "", reviewed_by: "", reviewed_at: "" };
+      if (what === "upgrade") {   // first attempt without a location, fixed a few seconds later by a second attempt with one (plan section 4.3)
+        out.AttFlagLog.push({ ts_utc: iso(t + 8000), session_id: ses.session_id, student_id: s.id, code: "GEO_UPGRADED", detail: "was=TIMEOUT;dist_m=" + Math.round(dist) + ";acc=" + Math.round(geo.acc) });
+      }
+      out.AttCheckins.push(row);
+      flags.forEach(function (f) { out.AttFlagLog.push({ ts_utc: iso(t), session_id: ses.session_id, student_id: s.id, code: f, detail: att_flagDetail_(f, dist, geo, null) }); });
+    }
+  });
+  function lect(li) { return sessions[li]; }
+  function rowOf(li, i) { return out.AttCheckins.filter(function (c) { return c.session_id === lect(li).session_id && c.student_id === sid(i); })[0]; }
+  function decide(li, i, dec, note) {
+    var r = rowOf(li, i); if (!r) return;
+    r.review_status = dec; r.review_note = note; r.reviewed_by = lect(li).owner_user_id; r.reviewed_at = iso(Date.parse(r.server_utc) + 3 * 3600000);
+  }
+  decide(7, 5, "accepted", "Location blocked in phone settings; I saw her in class");
+  decide(7, 8, "rejected", "Not in the hall");
+  decide(4, 2, "accepted", "Was in the lab next door, came over");
+  // hand entries (same shape as att_manualCheckin_)
+  function manual(li, id, name, reason, note) {
+    var ses = lect(li), t = Date.parse(ses.start_utc) + 4 * 60000 + Math.round(rnd() * 30000), owner = ses.owner_user_id;
+    if (name) out.AttStudents.push({ student_id: id, name: name, device_id: "", created_at: iso(t), status: "active" });
+    out.AttCheckins.push({ checkin_id: Utilities.getUuid(), session_id: ses.session_id, student_id: id, device_id: "MANUAL", server_utc: iso(t), lat: "", lng: "", acc: "", dist_m: "",
+      fp_hash: "", flags: "MANUAL", status: "ok", geo_reason: "", review_status: "accepted", review_note: "Manual entry: " + ATT_MANUAL_REASONS_[reason] + (note ? " - " + note : ""), reviewed_by: owner, reviewed_at: iso(t) });
+  }
+  manual(13, sid(22), S[22].joined ? "" : S[22].name, "NO_PHONE", "");
+  manual(13, "99970199", "Nourhan Adel", "PAGE_ERROR", "page froze on her phone");
+  manual(12, sid(25), S[25].joined ? "" : S[25].name, "OTHER", "came in late with the TA, saw him");
+  // phone-change requests: approved (lecture 5), denied (lecture 6), two pending (newest lectures)
+  function request(li, i, newSecret, fp, status) {
+    var ses = lect(li), s = S[i], h = att_sha256Hex_(newSecret), t = Date.parse(ses.start_utc) + 3 * 60000;
+    out.AttRequests.push({ req_id: "R-D" + att_hex_(att_randBytes_(4)), student_id: s.id, new_device_id: "D-" + h.slice(0, 16), new_secret_hash: h, new_fp_hash: fp,
+      fp_match: fp === s.fp ? "true" : "false", status: status, created_at: iso(t), decided_at: status === "pending" ? "" : iso(t + 600000), session_id: ses.session_id, owner_user_id: ses.owner_user_id });
+    if (status === "approved") {
+      out.AttDevices.forEach(function (d) { if (d.student_id === s.id) d.status = "revoked"; });
+      out.AttDevices.push({ device_id: "D-" + h.slice(0, 16), student_id: s.id, secret_hash: h, fp_hash: fp, bound_at: iso(t + 600000), status: "active" });
+      out.AttStudents.forEach(function (x) { if (x.student_id === s.id) x.device_id = "D-" + h.slice(0, 16); });
+      s.hash = h; s.dev = "D-" + h.slice(0, 16);
+    }
+  }
+  request(5, 9, att_demoSecret_(sid(9)) + "-new", S[9].fp, "approved");
+  request(6, 17, "demo-newphone-18", "demo-fp-other-phone", "denied");
+  request(12, 10, "demo-newphone-11", "demo-fp-unknown-model", "pending");
+  request(13, 2, "demo-newphone-03", S[2].fp, "pending");
+  // one batch per tab, inside the project lock
+  var counts = {};
+  var res = att_withLock_(function () {
+    Object.keys(out).forEach(function (tab) {
+      var rows = out[tab]; counts[tab] = rows.length; if (!rows.length) return;
+      var h = ATT_HEADERS[tab], sh = att_sheet_(tab);
+      sh.getRange(sh.getLastRow() + 1, 1, rows.length, h.length).setValues(rows.map(function (o) { return h.map(function (k) { return o[k] == null ? "" : o[k]; }); }));
+    });
+    return att_ok_({});
+  });
+  if (!res.ok) throw new Error("demo seed: " + res.code + " (the sheet is busy; try again outside lecture hours)");
+  var teachers = [{ name: c1.user.name, password: c1.password }, { name: c2.user.name, password: c2.password }];
+  Logger.log("Demo data written: " + JSON.stringify(counts) + "\nSign in to /attend/admin/ as a demo teacher:\n" +
+    teachers.map(function (t) { return "  " + t.name + ": " + t.password; }).join("\n") +
+    "\n(or with the admin token to see both). A live lecture: start one as " + c1.user.name + ", then run att_demoLive().\nRemove everything with att_clearDemo().");
+  return { teachers: teachers, counts: counts };
+}
+
+/** att_demoLive(): 13 sample students check in to the newest open demo lecture (opens one for the first demo teacher if none is open). */
+function att_demoLive() {
+  var users = att_rows_("AttUsers").filter(function (u) { return att_isDemoText_(u.name) && u.status === "active"; });
+  if (!users.length) throw new Error("No demo data: run att_seedDemo() first");
+  var now = Date.now(), open = att_rows_("AttSessions").filter(function (r) { return att_isDemoText_(r.course) && att_isOpen_({ status: r.status, start_utc: r.start_utc }, now); }).pop();
+  var sesId = open ? open.session_id : null;
+  if (!sesId) {
+    var u = { user_id: users[0].user_id, name: users[0].name, role: "teacher" };
+    var rm = att_rows_("AttRooms").filter(function (r) { return r.owner_user_id === u.user_id; })[0];
+    var st = att_startSession_({ course: ATT_DEMO_P_ + "Web Programming", room_id: rm ? rm.room_id : "" }, u);
+    if (!st.ok) throw new Error("could not open a demo lecture: " + st.code);
+    sesId = st.session_id;
+  }
+  var s = att_getSession_(sesId), hall = { lat: s.hall_lat, lng: s.hall_lng };
+  var devs = {}; att_rows_("AttDevices").forEach(function (d) { if (att_isDemoId_(d.student_id) && d.status === "active") devs[d.student_id] = d; });
+  function ready(i) { var id = att_demoId_(i); return devs[id] && devs[id].secret_hash === att_sha256Hex_(att_demoSecret_(id)); }
+  function as(i) { return { id: att_demoId_(i), secret: att_demoSecret_(att_demoId_(i)), fp: "demo-fp-" + i }; }
+  var plan = [];
+  for (var i = 0; i < ATT_DEMO_NAMES_.length && plan.length < 10; i++) if (i !== 23 && i !== 26 && ready(i)) plan.push(as(i));
+  plan.push({ id: "99970161", name: "Ola Sobhy", signup: true, secret: att_demoSecret_("99970161"), fp: "demo-fp-live" });   // a new student
+  if (ready(26)) { var f = as(26); f.far = true; plan.push(f); }                                                             // outside the hall
+  var c = as(plan[2] ? Number(plan[2].id) - 99970101 : 0); c.id = att_demoId_(23); plan.push(c);                             // someone else's phone
+  var log = [];
+  plan.forEach(function (p) {
+    Utilities.sleep(2000 + Math.round(Math.random() * 2000));
+    var tk = att_makeTicket_(sesId, "", Math.floor(Date.now() / 1000) + 60);
+    var g = p.far ? { lat: hall.lat + 0.0042, lng: hall.lng, acc: 15 } : { lat: hall.lat + (Math.random() - 0.5) * 0.00018, lng: hall.lng + (Math.random() - 0.5) * 0.00018, acc: 8 + Math.round(Math.random() * 15) };
+    if (p.signup) att_dispatch_({ action: "att_signup", ticket: tk, student_id: p.id, name: p.name, secret: p.secret, fp: p.fp, geo: g });
+    var r = att_dispatch_({ action: "att_attend", ticket: tk, student_id: p.id, secret: p.secret, fp: p.fp, geo: g, diag: { perm: "granted", attempts: 1, online: true, inapp: false } });
+    log.push(p.id + " " + (r.ok ? r.status : r.code));
+  });
+  Logger.log("att_demoLive on " + sesId + ":\n" + log.join("\n"));
+  return { session_id: sesId, results: log };
+}
+
+/** Removes every demo row: demo teachers (and their rooms, lectures and requests), students 9997xxxx with their devices,
+ *  check-ins and flag-log lines. Real data is never touched. Returns the number of rows removed per tab. */
+function att_clearDemo() {
+  var users = {}; att_rows_("AttUsers").forEach(function (u) { if (att_isDemoText_(u.name)) users[u.user_id] = 1; });
+  var sess = {}; att_rows_("AttSessions").forEach(function (s) { if (users[att_ownerOf_(s)] || att_isDemoText_(s.course)) sess[s.session_id] = 1; });
+  var spec = {
+    AttCheckins: function (r) { return sess[r.session_id] || att_isDemoId_(r.student_id); },
+    AttFlagLog: function (r) { return sess[r.session_id] || att_isDemoId_(r.student_id); },
+    AttRequests: function (r) { return att_isDemoId_(r.student_id) || users[att_ownerOf_(r)]; },
+    AttDevices: function (r) { return att_isDemoId_(r.student_id); },
+    AttStudents: function (r) { return att_isDemoId_(r.student_id); },
+    AttSessions: function (r) { return sess[r.session_id]; },
+    AttRooms: function (r) { return users[att_ownerOf_(r)] || att_isDemoText_(r.name); },
+    AttUsers: function (r) { return users[r.user_id]; } };
+  var counts = {}, drop = [];
+  var res = att_withLock_(function () {
+    Object.keys(spec).forEach(function (tab) {
+      var rows = att_rows_(tab).filter(spec[tab]).map(function (r) {
+        if (tab === "AttDevices") drop.push("att:d:" + r.secret_hash);
+        if (tab === "AttStudents") drop.push("att:n:" + r.student_id);
+        if (tab === "AttSessions") drop.push("att:s:" + r.session_id);
+        if (tab === "AttUsers") drop.push("att:u:" + r.user_id);
+        return r._row;
+      }).sort(function (a, b) { return b - a; });
+      counts[tab] = rows.length;
+      // delete runs of neighbouring rows in one call (the seed writes them together), from the bottom up
+      var sh = att_sheet_(tab);
+      for (var i = 0; i < rows.length;) {
+        var j = i; while (j + 1 < rows.length && rows[j + 1] === rows[j] - 1) j++;
+        sh.deleteRows(rows[j], j - i + 1); i = j + 1;
+      }
+    });
+    return att_ok_({});
+  });
+  if (!res.ok) throw new Error("demo clear: " + res.code + " (the sheet is busy; try again)");
+  drop.forEach(att_cdel_);
+  Logger.log("Demo data removed: " + JSON.stringify(counts));
   return counts;
 }
 
@@ -1532,7 +1768,7 @@ function attt_fmtDigest_(d) {
 
 // ---------- flag queue (CacheService) ----------
 
-// The flag queue uses the USER lock, not the script lock (2026-11-04, docs/attendance-decisions.md F5). The web app executes as the
+// The flag queue uses the USER lock, not the script lock (2026-11-04, docs/attendance/decisions.md F5). The web app executes as the
 // owner, so every request shares this one user lock, but it is a different lock from the script lock that check-ins and every
 // Code.gs quiz/homework submission queue on. Before, each flagged check-in queued for the script lock a second time (up to 3 s), so a
 // burst of flagged check-ins halved check-in throughput. Still best effort: if the lock is not had in time the queue is updated anyway.

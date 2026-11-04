@@ -1,4 +1,4 @@
-// node tests/attendance/manual_entry.test.js : manual entry from the instructor's dashboard (docs/attendance-decisions.md D9), on the emulated backend.
+// node tests/attendance/manual_entry.test.js : manual entry from the instructor's dashboard (docs/attendance/decisions.md D9), on the emulated backend.
 //  - att_manual_checkin marks a student present: stored as a normal check-in (device MANUAL, flags MANUAL, status ok, accepted by the teacher, reason)
 //  - already present (by phone or by hand) -> nothing written; unregistered ID needs a name and creates a student without a device
 //  - that student can later sign up on their own phone (first phone binds), and their own check-in does not overwrite the manual row
