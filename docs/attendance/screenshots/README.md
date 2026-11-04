@@ -2,7 +2,7 @@
 
 Captured 2026-11-04 (after the polish pass, D13) from the real pages: the student page with a faked server, the dashboard
 against the real `AttendanceAll.gs` on the emulated backend. Nothing reaches the live system; all names are sample data.
-Decisions: D8, D9, D10 and D13 in [../decisions.md](../decisions.md).
+Decisions: D8, D9, D10, D13 and D14 in [../decisions.md](../decisions.md).
 
 ## Student page (phone, 390 x 844)
 
@@ -24,7 +24,9 @@ Tabs: Take attendance, Mark present by hand, Phone changes, Needs review, All st
 | # | Screen | Screenshot |
 |---|---|---|
 | 8 | Take attendance (the name and role chip at the top, Log out in the corner) | ![](8-dashboard-take-attendance.png) |
-| 14 | The QR screen on the projector, with the live feed (new lines slide in, the counter bumps when it changes) | ![](14-qr-screen.png) |
+| 14 | The QR screen on a projector while students arrive: counters counting up, a card per arrival (red for cheating, with a red edge flash) | ![](14-qr-screen.png) |
+| 15 | The same on a phone: counters in a 2 x 2 grid, cards under them, controls in a bar at the bottom | ![](15-qr-screen-phone.png) |
+| 16 | The dashboard on a phone | ![](16-dashboard-phone.png) |
 | 6 | Mark present by hand: an ID that is not registered yet asks for the name | ![](6-manual-entry-needs-name.png) |
 | 7 | Mark present by hand: saved (green status pill) and listed with who, why and who entered it | ![](7-manual-entry-saved.png) |
 | 9 | Needs review: unusual check-ins in plain words, Accept (green) / Reject (red) with a note | ![](9-needs-review.png) |

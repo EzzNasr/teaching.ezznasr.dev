@@ -188,7 +188,14 @@
   <canvas id="qr" width="10" height="10" aria-label="Attendance QR code"></canvas>
   <div id="prot"><div id="protbar"></div></div>
   <div id="pclock">--:--</div>
-  <div id="pcount">Registered 0 / Present 0 | Flagged 0</div>
+  <div id="pcount" class="sr-only" aria-live="polite">Present 0</div>
+  <div id="pstats" aria-hidden="true">
+    <div class="pstat att"><b id="pAtt">0</b><span>Attended</span></div>
+    <div class="pstat reg"><b id="pReg">0</b><span>New sign-ups</span></div>
+    <div class="pstat bad"><b id="pBad">0</b><span>Cheating caught</span></div>
+    <div class="pstat look"><b id="pLook">0</b><span>Need a look</span></div>
+  </div>
+  <div id="parrive" aria-hidden="true"></div>
   <div id="pfeed" class="feed" aria-live="polite"></div>
   <div id="pctl">
     <button id="fsBtn">Fullscreen</button>

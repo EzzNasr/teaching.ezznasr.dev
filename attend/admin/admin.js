@@ -128,7 +128,8 @@
       wait($("startBtn"), false);
       if (!r.ok) return msg("startMsg", "Could not start: " + (r.code || "error"), "err");
       var t1 = Date.now();
-      S.sess = r.session_id; S.key = r.session_key; S.closed = false; S.course = course; S.room = room; S.roomId = roomId;
+      S.sess = r.session_id; S.key = r.session_key; seenEv = null; arriveQ = [];
+      ["pAtt", "pReg", "pBad", "pLook"].forEach(function (id) { $(id)._v = 0; $(id).textContent = "0"; }); clear($("parrive")); S.closed = false; S.course = course; S.room = room; S.roomId = roomId;
       S.offset = Date.parse(r.start_utc) - (t0 + t1) / 2;
       S.closeMs = Date.parse(r.close_utc); S.win = -1;
       remember("att_courses", course); ls("att_room_id", roomId);
@@ -180,7 +181,7 @@
   function drawQR(text) {
     var q = window.qrcode(0, "M"); q.addData(text); q.make();
     var n = q.getModuleCount(), quiet = 4, total = n + quiet * 2;
-    var px = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.44);
+    var px = Math.min(window.innerWidth * 0.9, window.innerHeight * (window.innerWidth > window.innerHeight ? 0.38 : 0.44));   // landscape: leave room for the counters
     var scale = Math.max(2, Math.floor(px / total)), size = total * scale;
     var c = $("qr"); c.width = size; c.height = size; c.style.width = size + "px"; c.style.height = size + "px";
     var g = c.getContext("2d"); if (!g) return;
@@ -194,8 +195,11 @@
     if (!S.sess) return;
     A("att_live", { session_id: S.sess }).then(function (r) {
       if (!r.ok) return;
-      var line = "Present " + r.present + " · Need a look " + r.flagged + " · Students known " + r.registered;
-      if ($("pcount").textContent !== line) { $("pcount").textContent = line; replay($("pcount"), "bump"); }
+      var feed = r.feed || [], nReg = 0, nBad = 0;
+      feed.forEach(function (e) { if (e.k === "reg") nReg++; else if (e.k === "bad") nBad++; });
+      var line = "Present " + r.present + " · New sign-ups " + nReg + " · Cheating caught " + nBad + " · Need a look " + r.flagged;
+      if ($("pcount").textContent !== line) $("pcount").textContent = line;
+      countTo($("pAtt"), r.present); countTo($("pReg"), nReg); countTo($("pBad"), nBad); countTo($("pLook"), r.flagged);
       renderFeed(r.feed || []);
       var p = r.pending | 0;
       ["pBadge", "pendBadge"].forEach(function (id) { setBadge($(id), p); });
@@ -203,12 +207,51 @@
   }
   // Activity feed: registered = yellow, attended = green, attempted cheating = red (server sends only first letter + last 2 digits).
   var fTimeS = new Intl.DateTimeFormat("en-GB", { timeZone: CFG.TZ, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  // ---------- QR screen: numbers that count up, a card for every arrival ----------
+  var RAF = window.requestAnimationFrame || function (f) { return setTimeout(function () { f(Date.now()); }, 16); };
+  /** Shows n in a counter tile. On the QR screen a rise counts up, the tile glows and "+k" floats off it. */
+  function countTo(el, n) {
+    n = n | 0; var from = el._v == null ? n : el._v; el._v = n;
+    el.textContent = String(n);   // the final value is always there at once (animation is only decoration)
+    if (n <= from || $("proj").hidden) return;
+    var tile = el.parentNode, t0 = Date.now(), dur = Math.min(900, 250 + 120 * (n - from));
+    replay(tile, "hit");
+    var plus = mk("i", "+" + (n - from), "plus"); tile.appendChild(plus); setTimeout(function () { if (plus.parentNode) plus.parentNode.removeChild(plus); }, 1300);
+    (function step() {
+      var k = Math.min(1, (Date.now() - t0) / dur), v = Math.round(from + (n - from) * (1 - Math.pow(1 - k, 3)));
+      if (el._v !== n) return;            // a newer value took over
+      el.textContent = String(k < 1 ? v : n);
+      if (k < 1) RAF(step);
+    })();
+  }
+  var arriveQ = [], arriveBusy = false;
+  /** New feed events become big cards on the QR screen, one after another (oldest first). */
+  function arrive(list) {
+    if ($("proj").hidden) return;
+    list.forEach(function (e) { arriveQ.push(e); });
+    if (!arriveBusy) nextArrival();
+  }
+  function nextArrival() {
+    var e = arriveQ.shift(); if (!e) { arriveBusy = false; return; }
+    arriveBusy = true;
+    var box = $("parrive"), kind = e.k === "bad" ? "bad" : e.k === "reg" ? "reg" : "att";
+    var card = mk("div", null, "arr " + kind), ic = mk("div", kind === "bad" ? "!" : kind === "reg" ? "★" : "✓", "ic"), tx = mk("div", null, "tx");
+    tx.appendChild(mk("b", kind === "bad" ? "Cheating attempt caught" : (e.n || "Student")));
+    tx.appendChild(mk("span", kind === "bad" ? "Flagged · " + (e.l || "?") + " · ID ••" + (e.d || "") : kind === "reg" ? "New student registered · " + e.id : "Checked in · " + e.id));
+    card.appendChild(ic); card.appendChild(tx);
+    box.insertBefore(card, box.firstChild);
+    while (box.children.length > 4) box.removeChild(box.lastChild);
+    if (kind === "bad") replay($("proj"), "alarm"); else replay($("qr"), "ripple");
+    setTimeout(function () { card.className += " out"; setTimeout(function () { if (card.parentNode) card.parentNode.removeChild(card); }, 450); }, kind === "bad" ? 5000 : 3600);
+    setTimeout(nextArrival, arriveQ.length > 6 ? 180 : 420);   // a burst of check-ins plays faster
+  }
   function evKey(e) { return [e.t, e.k, e.id || "", e.d || ""].join("|"); }
   function mark(row, e) { var k = evKey(e); if (seenEv && !seenEv[k] && !mark.first) row.className += " new"; mark.now[k] = 1; }
   var seenEv = null;   // keys of feed lines already shown; null = first draw (nothing animates)
   function renderFeed(list) {
     var first = seenEv === null; if (first) seenEv = {};
     mark.first = first; mark.now = {};
+    var fresh = first ? [] : list.filter(function (e) { return !seenEv[evKey(e)]; });
     ["pfeed", "sfeed"].forEach(function (id) {
       var box = $(id); if (!box) return; clear(box);
       if (!list.length) { if (id === "sfeed") box.appendChild(mk("div", "No activity yet.", "msg")); return; }
@@ -221,6 +264,7 @@
       });
     });
   Object.keys(mark.now).forEach(function (k) { seenEv[k] = 1; });
+    if (fresh.length) arrive(fresh.slice().reverse());
   }
   function closeSession() {
     if (!S.sess || S.closed || !confirm("End attendance now? New students can no longer check in (anyone already saving gets 2 more minutes).")) return;

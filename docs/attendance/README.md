@@ -13,7 +13,7 @@ unusual on a dashboard.
 
 | Doc | What it answers |
 |---|---|
-| [decisions.md](decisions.md) | What was decided and why (D1 to D13), the deploy record, open follow-ups (F#) |
+| [decisions.md](decisions.md) | What was decided and why (D1 to D14), the deploy record, open follow-ups (F#) |
 | [deploy.md](deploy.md) | How to deploy (every time, and first-time setup), real-device checklist |
 | [load-testing.md](load-testing.md) | Load test status report: results, limits, what is not tested yet |
 | [live-testing-plan.md](live-testing-plan.md) | What to change before real students rely on it, and the pilot plan |

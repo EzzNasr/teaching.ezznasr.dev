@@ -22,6 +22,22 @@ def open_page(b, width, height=860):
     page.wait_for_timeout(700)
     return page
 
+def sim(sid, kind):   # one sample student arrives (dashboard_backend.js /sim)
+    urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:8767/sim?s=%s&k=%s" % (sid, kind), data=b"", method="POST")).read()
+
+def newest_session():
+    body = json.dumps({"action": "att_sessions", "token": TOK, "limit": 1}).encode()
+    return json.loads(urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:8767/api", data=body, method="POST")).read())["sessions"][0]["session_id"]
+
+def live_qr(page, course, shot):
+    """Start a lecture, let students arrive, capture the QR screen while the cards and counters animate."""
+    tab(page, "session"); page.fill("#course", course); page.click("#startBtn")
+    page.wait_for_selector("#proj:not([hidden])"); page.wait_for_timeout(4500)
+    sid = newest_session()
+    for k in ["att", "att", "reg", "att", "bad"]: sim(sid, k)
+    page.wait_for_function("document.querySelectorAll('#parrive .arr').length >= 3", timeout=10000)
+    page.wait_for_timeout(1700); page.screenshot(path=os.path.join(OUT, shot))
+
 def tab(page, name):
     page.click("nav [data-tab=%s]" % name); page.wait_for_timeout(900)   # after the slide-in
 
@@ -42,13 +58,17 @@ try:
         page.wait_for_function("/Marked present/.test(document.getElementById('manMsg').textContent)")
         page.wait_for_function("document.querySelectorAll('#manList tr').length > 2"); page.wait_for_timeout(400)
         page.screenshot(path=os.path.join(OUT, "7-manual-entry-saved.png"), full_page=True)
-        # the QR screen with the live feed
-        tab(page, "session"); page.fill("#course", "Web Programming"); page.click("#startBtn")
-        page.wait_for_selector("#proj:not([hidden])"); page.wait_for_timeout(2500)
-        page.screenshot(path=os.path.join(OUT, "14-qr-screen.png"))
         page.close()
-        phone = open_page(b, 390)
+        proj = open_page(b, 1366, 768)
+        live_qr(proj, "Web Programming", "14-qr-screen.png")   # projector size
+        proj.close()
+        phone = b.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1.25, is_mobile=True, has_touch=True)
+        phone.route("https://script.google.com/**", api)
+        phone.add_init_script("sessionStorage.setItem('att_admin', %r)" % TOK)
+        phone.goto("http://127.0.0.1:8767/attend/admin/index.html"); phone.wait_for_selector("#panel:not([hidden])"); phone.wait_for_timeout(700)
         tab(phone, "flagged"); phone.screenshot(path=os.path.join(OUT, "10-needs-review-phone.png"), full_page=True)
+        tab(phone, "session"); phone.screenshot(path=os.path.join(OUT, "16-dashboard-phone.png"), full_page=True)
+        live_qr(phone, "Computer Networks", "15-qr-screen-phone.png")
         b.close()
     print("saved dashboard screenshots to", OUT)
 finally:

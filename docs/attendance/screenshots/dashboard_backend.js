@@ -17,8 +17,19 @@ const tk = () => gas.ctx.att_makeTicket_(s.session_id, "", Math.floor(Date.now()
 });
 D({ action: "att_signup", ticket: tk(), student_id: "20210105", name: "Salma Kamal", secret: "z".repeat(16), fp: "fz", geo: HERE });
 D({ action: "att_manual_checkin", token: tok, session_id: s.session_id, student_id: "20210105", reason: "PAGE_ERROR", note: "page froze on her phone" });
+const sim = {};
 const TYPES = { ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".png": "image/png" };
 http.createServer((req, res) => {
+  if (req.method === "POST" && req.url.indexOf("/sim") === 0) {   // POST /sim?s=<session>&k=att|reg|bad : one sample student arrives
+    const q = new URL(req.url, "http://x").searchParams, sid = q.get("s"), k = q.get("k"), n = (sim.n = (sim.n || 0) + 1);
+    const t = gas.ctx.att_makeTicket_(sid, "", Math.floor(Date.now() / 1000) + 60), id = String(20219000 + n), sec = "sim-" + n + "-".repeat(10);
+    const names = ["Hana Mostafa", "Ahmed Tarek", "Laila Ibrahim", "Mostafa Nabil", "Farida Sherif", "Ziad Ehab", "Malak Hossam", "Seif Ashraf", "Jana Wael", "Hamza Magdy"];
+    let r;
+    if (k === "bad") r = D({ action: "att_attend", ticket: t, student_id: id, secret: "a".repeat(16), fp: "f0", geo: HERE });   // Mona's phone for someone else
+    else { D({ action: "att_signup", ticket: t, student_id: id, name: names[n % names.length], secret: sec, fp: "fs" + n, geo: HERE });
+      r = k === "reg" ? { ok: true } : D({ action: "att_attend", ticket: t, student_id: id, secret: sec, fp: "fs" + n, geo: HERE }); }
+    res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(r)); return;
+  }
   if (req.method === "POST") { let b = ""; req.on("data", c => b += c); req.on("end", () => { res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" }); res.end(JSON.stringify(D(JSON.parse(b || "{}")))); }); return; }
   const f = path.join(ROOT, decodeURIComponent(req.url.split("?")[0]));
   fs.readFile(f, (e, d) => { if (e) { res.writeHead(404); return res.end(); } res.writeHead(200, { "content-type": TYPES[path.extname(f)] || "application/octet-stream" }); res.end(d); });

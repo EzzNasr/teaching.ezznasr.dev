@@ -775,6 +775,17 @@
       "owner": "att-prod"
     },
     {
+      "id": "R-A13",
+      "title": "Attendance QR screen + phone fit in real Chromium: counters count up, a card per arrival (red for cheating), ripple / red flash, reduce motion, no sideways scroll and 44 px buttons at 360/390/430 px",
+      "cmd": [
+        "python",
+        "../../tests/attendance/e2e_qr_screen.py"
+      ],
+      "status": "active",
+      "needs": "playwright",
+      "owner": "att-prod"
+    },
+    {
       "id": "R-P3-F1",
       "title": "S1 follow-up core: contacted state, week/month boundaries, filter sort order, flag notices, Phase3_Flags.gs against the real router",
       "status": "active",
