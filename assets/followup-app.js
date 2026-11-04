@@ -178,7 +178,7 @@
 
   // ===========================================================================================
   // ADAPTERS — the only place that knows how the libraries' loosely-specified shapes look.
-  //   groupDeadlines(settings, now) -> {session|next, watch, hw}  each a Date / ISO string (the deadline instant)
+  //   groupDeadlines(settings, now, app, overview) -> {session|next, watch, hw}  each a Date / ISO string (the deadline instant)
   //   deadlineState(now, deadline)  -> "upcoming" | "today" | "overdue"
   //   deadlineWhen(now, deadline)   -> Arabic phrase (النهارده / بكرة / يوم …)
   //   studentSummary(student, group, overview) -> {verdicts, issues, praises, needsAttendance, microChips, primaryAction}
@@ -198,7 +198,7 @@
   }
   function deadlinesFor(g) {
     var raw = null;
-    try { if (L().groupDeadlines && g.settings && g.settings.weekday !== null && g.settings.weekday !== undefined) raw = L().groupDeadlines(g.settings, nowD()); } catch (e) { raw = null; }
+    try { if (L().groupDeadlines && g.settings && g.settings.weekday !== null && g.settings.weekday !== undefined) raw = L().groupDeadlines(g.settings, nowD(), STATE.data && STATE.data.settings, STATE.data); } catch (e) { raw = null; }
     var o = {
       raw: raw,
       next: toDate(pick(raw, ["session", "next", "nextSession", "next_session"])),
@@ -1933,7 +1933,7 @@
       var a = $("fu-role-a"); if (a) { a.scrollIntoView({ block: "start", behavior: "smooth" }); var b = a.querySelector("button,select"); if (b) b.focus({ preventScroll: true }); }
     } }, ["✏️ تعديل"]);
     card.appendChild(el("div", { class: "fu-btns two fu-hero-btns" }, [confirm, edit]));
-    var dl = null; try { dl = L().groupDeadlines(s, nowD(), STATE.data.settings); } catch (x) { dl = null; }
+    var dl = null; try { dl = L().groupDeadlines(s, nowD(), STATE.data.settings, STATE.data); } catch (x) { dl = null; }
     function dlTxt(d) { return d && d.date ? DAYS_AR[weekdayOfYmd(d.date)] + " " + fmtTime12("23:59", "ar") : "—"; }
     if (dl && (dl.watch || dl.hw)) card.appendChild(el("div", { class: "fu-hero-next", id: "fu-adv-deadlines" }, ["الميعاد الجديد للمشاهدة: " + dlTxt(dl.watch) + " · للواجب: " + dlTxt(dl.hw)]));
     // what is already done for the session that just ended

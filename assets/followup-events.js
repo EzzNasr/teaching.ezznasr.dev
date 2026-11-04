@@ -258,7 +258,7 @@
     var Pdate = addDays(Sdate, -7), Pat = cairoInstant(Pdate, hh, mm);
     res.next = { date: Sdate, at_iso: isoAlex(Sat) };
     res.prev = { date: Pdate, at_iso: isoAlex(Pat) };
-    var dl = L.groupDeadlines(gs, now, overview && overview.settings);
+    var dl = L.groupDeadlines(gs, now, overview && overview.settings, overview);
 
     // attendance: P+1h .. P+3d
     var aFire = new Date(Pat.getTime() + HOUR_MS), aExp = cairoInstant(addDays(Pdate, 3), hh, mm);

@@ -186,8 +186,10 @@
    * → { nextSession, watch:{date,end,overridden,state}|null, hw:{…}|null }
    * watch = 3 days before the next session (applies to the CURRENT lesson),
    * hw = 1 day before (applies to the homework & quiz lessons). A valid yyyy-MM-dd override replaces it.
+   * With `overview` (optional) and no group hw override, a homework/quiz lesson's own due date
+   * (lessons[path].due_override) counts too: hw is the earliest of those lessons' dates.
    */
-  function groupDeadlines(settings, now, app) {
+  function groupDeadlines(settings, now, app, overview) {
     settings = settings || {};
     now = toDate(now);
     var cfg = mergeSettings(app), ns = nextSession(now, settings.weekday, settings.time);
@@ -200,7 +202,18 @@
       o.state = deadlineState(now, o);
       return o;
     }
-    return { nextSession: ns, watch: mk(settings.watch_deadline_override, cfg.watch_days_before), hw: mk(settings.hw_deadline_override, cfg.hw_days_before) };
+    var hw = mk(settings.hw_deadline_override, cfg.hw_days_before);
+    if (overview && !(hw && hw.overridden)) {
+      var dates = [];
+      pathList(hwList(settings).concat(quizList(settings))).forEach(function (p) {
+        var m = lessonMeta(overview, p), ov = String((m && m.due_override) || '').trim();
+        dates.push(ov && parseYmd(ov) ? ov : (hw ? hw.date : ''));
+      });
+      var own = dates.filter(function (d) { return d && (!hw || d !== hw.date); }).length > 0;
+      var first = own ? dates.filter(Boolean).sort()[0] : '';
+      if (first && (!hw || first !== hw.date)) hw = mk(first, 0);
+    }
+    return { nextSession: ns, watch: mk(settings.watch_deadline_override, cfg.watch_days_before), hw: hw };
   }
 
   /** Arabic phrase: النهارده / بكرة / يوم {weekday} {d/m}. */
@@ -440,7 +453,7 @@
       total: members.length, unmarked: 0, unwatched: 0, locked: 0, unfinished: 0, hwMissing: 0, quizAbsent: 0,
       noParent: 0, late: 0, noWatchData: false,
       unmarkedStudents: [], unwatchedStudents: [], hwMissingStudents: [], quizAbsentStudents: [],
-      deadlines: groupDeadlines(group && group.settings, now, overview && overview.settings), rows: []
+      deadlines: groupDeadlines(group && group.settings, now, overview && overview.settings, overview), rows: []
     };
     var anyTracking = false;
     members.forEach(function (m) {

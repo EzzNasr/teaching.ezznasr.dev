@@ -61,6 +61,13 @@ SUBMIT_MODES = [
     ("both", "Link or file upload"),
     ("graded", "Graded questions (auto-marked)"),
 ]
+# A new assignment starts as graded questions; the teacher can still pick "Paste text" etc.
+DEFAULT_SUBMIT_MODE = "graded"
+
+
+def submit_mode_label(slug):
+    return next((label for s, label in SUBMIT_MODES if s == slug), SUBMIT_MODES[0][1])
+
 
 # --------------------------------------------------------------------------
 # Shared "media-slot" video embed helpers.

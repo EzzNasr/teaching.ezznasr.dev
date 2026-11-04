@@ -3,8 +3,8 @@
 //
 //  Built by:  python scripts/build_server_logic.py        (CI / pre-deploy:  --check)
 //  Sources (sha256, line endings normalised):
-//    assets/followup-logic.js    b690961eaac278fc9916a12b71cc62151c35a071ccfc8633571479dcc824b764
-//    assets/followup-events.js   3160f6a894232dcd12080f572ecfb5cfc7eefcdccfcc9b4d5ca4b05cb3842013
+//    assets/followup-logic.js    43565edc38ea34c93b3b065055c892015404710f555b950ea99928094d2fbbbb
+//    assets/followup-events.js   98db77ff8dcabf44016c9aaaa1cd2e99c56853f2ea0188bf0337711475547b42
 //
 //  What it is: the browser modules FollowupLogic and FollowupEvents, copied unchanged and wrapped so
 //  that the Telegram tick and the follow-up page decide "what is due" with the SAME code.
@@ -18,7 +18,7 @@
 //  reads says "Alex".
 // =============================================================================================
 
-var FU2_LOGIC_VERSION = "1.0.0+ba6e5dfe42c5";
+var FU2_LOGIC_VERSION = "1.0.0+a080412b8b59";
 
 // Intl stand-in (only DateTimeFormat#formatToParts is used by the two modules).
 var FU2_LOGIC_INTL_ = {
@@ -234,8 +234,10 @@ var FU2_LOGIC_LOGIC_ = (function () {
    * → { nextSession, watch:{date,end,overridden,state}|null, hw:{…}|null }
    * watch = 3 days before the next session (applies to the CURRENT lesson),
    * hw = 1 day before (applies to the homework & quiz lessons). A valid yyyy-MM-dd override replaces it.
+   * With `overview` (optional) and no group hw override, a homework/quiz lesson's own due date
+   * (lessons[path].due_override) counts too: hw is the earliest of those lessons' dates.
    */
-  function groupDeadlines(settings, now, app) {
+  function groupDeadlines(settings, now, app, overview) {
     settings = settings || {};
     now = toDate(now);
     var cfg = mergeSettings(app), ns = nextSession(now, settings.weekday, settings.time);
@@ -248,7 +250,18 @@ var FU2_LOGIC_LOGIC_ = (function () {
       o.state = deadlineState(now, o);
       return o;
     }
-    return { nextSession: ns, watch: mk(settings.watch_deadline_override, cfg.watch_days_before), hw: mk(settings.hw_deadline_override, cfg.hw_days_before) };
+    var hw = mk(settings.hw_deadline_override, cfg.hw_days_before);
+    if (overview && !(hw && hw.overridden)) {
+      var dates = [];
+      pathList(hwList(settings).concat(quizList(settings))).forEach(function (p) {
+        var m = lessonMeta(overview, p), ov = String((m && m.due_override) || '').trim();
+        dates.push(ov && parseYmd(ov) ? ov : (hw ? hw.date : ''));
+      });
+      var own = dates.filter(function (d) { return d && (!hw || d !== hw.date); }).length > 0;
+      var first = own ? dates.filter(Boolean).sort()[0] : '';
+      if (first && (!hw || first !== hw.date)) hw = mk(first, 0);
+    }
+    return { nextSession: ns, watch: mk(settings.watch_deadline_override, cfg.watch_days_before), hw: hw };
   }
 
   /** Arabic phrase: النهارده / بكرة / يوم {weekday} {d/m}. */
@@ -488,7 +501,7 @@ var FU2_LOGIC_LOGIC_ = (function () {
       total: members.length, unmarked: 0, unwatched: 0, locked: 0, unfinished: 0, hwMissing: 0, quizAbsent: 0,
       noParent: 0, late: 0, noWatchData: false,
       unmarkedStudents: [], unwatchedStudents: [], hwMissingStudents: [], quizAbsentStudents: [],
-      deadlines: groupDeadlines(group && group.settings, now, overview && overview.settings), rows: []
+      deadlines: groupDeadlines(group && group.settings, now, overview && overview.settings, overview), rows: []
     };
     var anyTracking = false;
     members.forEach(function (m) {
@@ -857,7 +870,7 @@ var FU2_LOGIC_EVENTS_ = (function () {
     var Pdate = addDays(Sdate, -7), Pat = cairoInstant(Pdate, hh, mm);
     res.next = { date: Sdate, at_iso: isoAlex(Sat) };
     res.prev = { date: Pdate, at_iso: isoAlex(Pat) };
-    var dl = L.groupDeadlines(gs, now, overview && overview.settings);
+    var dl = L.groupDeadlines(gs, now, overview && overview.settings, overview);
 
     // attendance: P+1h .. P+3d
     var aFire = new Date(Pat.getTime() + HOUR_MS), aExp = cairoInstant(addDays(Pdate, 3), hh, mm);

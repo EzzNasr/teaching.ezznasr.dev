@@ -1394,6 +1394,26 @@
       ]
     },
     {
+      "id": "R-FU2-HWDUE",
+      "title": "A homework lesson's own due date is the deadline the follow-up page shows and the homework reminder fires on",
+      "status": "active",
+      "owner": "fu2-S1",
+      "cmd": [
+        "node",
+        "tests/test_hw_lesson_due.js"
+      ]
+    },
+    {
+      "id": "R-QM-MODE",
+      "title": "Desktop tool: a new assignment defaults to graded questions; an existing page keeps its mode",
+      "status": "active",
+      "owner": "quiz-maker",
+      "cmd": [
+        "python",
+        "tests/test_default_submit_mode.py"
+      ]
+    },
+    {
       "id": "R-FU2-ONEGROUP",
       "title": "One group per student: in_other_group, move:true, all-or-nothing bulk, audit, atomic under the lock",
       "status": "active",

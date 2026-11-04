@@ -122,7 +122,7 @@ class AssignmentTab(ttk.Frame):
         row3 = tk.Frame(mode_frame)
         row3.pack(fill="x", padx=8, pady=6)
         tk.Label(row3, text="Submission type:", width=14, anchor="w").pack(side="left")
-        self.mode_label_var = tk.StringVar(value=common.SUBMIT_MODES[0][1])
+        self.mode_label_var = tk.StringVar(value=common.submit_mode_label(common.DEFAULT_SUBMIT_MODE))
         mode_combo = ttk.Combobox(row3, textvariable=self.mode_label_var, state="readonly",
                                    values=[label for _, label in common.SUBMIT_MODES])
         mode_combo.pack(side="left", fill="x", expand=True)
@@ -381,7 +381,7 @@ class AssignmentTab(ttk.Frame):
         else:
             self.prompt_text.delete("1.0", "end")
             self.prompt_text.insert("1.0", "Paste your completed assignment below.")
-            self.mode_label_var.set(common.SUBMIT_MODES[0][1])
+            self.mode_label_var.set(common.submit_mode_label(common.DEFAULT_SUBMIT_MODE))
             self.solution_video_url_var.set("")
             self.graded_items = []
             self._refresh_graded_listbox()

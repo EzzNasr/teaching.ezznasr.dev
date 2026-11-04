@@ -921,7 +921,7 @@ class QuizTab(ttk.Frame):
 
         # Determined once, used both when (re)writing assignment.html below
         # and for the lesson-card link's description text further down.
-        submit_mode = "text"
+        submit_mode = common.DEFAULT_SUBMIT_MODE
         # Preserve any graded questions already embedded on assignment.html
         # (set via the Assignment Maker tab) across regeneration here —
         # this tab has no knowledge of graded items, so without this the
@@ -1011,7 +1011,7 @@ class QuizTab(ttk.Frame):
         # ---- assignment.html — preserve an already-configured submission
         #      mode (set via the Assignment Maker tab) instead of resetting
         #      it back to plain text every time the quiz is regenerated.
-        #      Brand-new lessons still default to "text" (submit_mode
+        #      Brand-new lessons default to graded questions (submit_mode
         #      computed above, next to include_assignment).
         if include_assignment:
             # Preserve a solution video already set on this assignment page
@@ -1047,7 +1047,8 @@ class QuizTab(ttk.Frame):
 
         if include_assignment:
             mode_desc = {"text": "Paste your work as text", "url": "Submit a link",
-                         "file": "Upload a file", "both": "Submit a link or file"}.get(
+                         "file": "Upload a file", "both": "Submit a link or file",
+                         "graded": "Answer the questions"}.get(
                 submit_mode, "Paste your work as text")
             assign_link_block = (
                 '      <a class="lesson-link frame" href="/{}/assignment.html">\n'
