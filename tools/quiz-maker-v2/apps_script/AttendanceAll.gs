@@ -252,7 +252,7 @@ function att_dispatch_(p) {
     // Signed-in callers (teacher or admin). Every one of these filters by owner inside (a teacher only ever gets their own rows).
     var SCOPED = { att_me: att_me_, att_start_session: att_startSession_, att_close_session: att_closeSession_, att_live: att_live_, att_rooms: att_rooms_,
       att_calibrate_room: att_calibrateRoom_, att_requests: att_requests_, att_decide_request: att_decideRequest_, att_flagged: att_flagged_, att_export: att_export_, att_roster: att_roster_,
-      att_sessions: att_sessionsList_, att_session_detail: att_sessionDetail_, att_review: att_review_ };
+      att_sessions: att_sessionsList_, att_session_detail: att_sessionDetail_, att_review: att_review_, att_manual_checkin: att_manualCheckin_ };
     var ADMIN_ONLY = { att_user_create: att_userCreate_, att_users: att_users_, att_user_update: att_userUpdate_, att_user_reset: att_userReset_, att_overview: att_overview_ };
     var fn = att_has_(SCOPED, a) ? SCOPED[a] : (att_has_(ADMIN_ONLY, a) ? ADMIN_ONLY[a] : null);
     if (!fn) return att_err_("UNKNOWN_ACTION");
@@ -294,15 +294,22 @@ function att_signup_(p) {
   var devFrom = devs0.length + 2 - 20, studFrom = studs0.length + 2 - 20;   // 20-row margin in case rows were deleted meanwhile
   var res = att_withLock_(function () {
     var devs = devs0.filter(function (x) { return x._row < devFrom; }).concat(att_rowsFrom_("AttDevices", devFrom));
-    var studs = studs0.filter(function (x) { return x._row < studFrom; }).concat(att_rowsFrom_("AttStudents", studFrom, 1));
+    var studs = studs0.filter(function (x) { return x._row < studFrom; }).concat(att_rowsFrom_("AttStudents", studFrom, 3));   // A student_id, B name, C device_id
     var bound = devs.filter(function (x) { return x.secret_hash === hash && x.status === "active"; })[0];
-    var taken = studs.some(function (x) { return x.student_id === sid; });
+    var stRow = studs.filter(function (x) { return x.student_id === sid; })[0], taken = !!stRow;
     // A phone already bound to a DIFFERENT student that tries to register/claim another ID is an attempted cheat (checked before ID_TAKEN, which used to hide it).
     if (bound && bound.student_id !== sid) { var e1 = att_err_("DEVICE_BOUND_OTHER_ID"); e1._owner = bound.student_id; return e1; }
     // The SAME phone signing up the SAME ID again is a retry whose first answer was lost (busy server / dropped connection): already done.
     if (bound && taken) return att_ok_({ status: "registered", dup: true });
-    if (taken) return att_err_("ID_TAKEN");
+    // A student the instructor added by hand (manual entry: a student row with no device, and no active device anywhere) gets their first phone here.
+    var claim = taken && !bound && !stRow.device_id && !devs.some(function (x) { return x.student_id === sid && x.status === "active"; });
+    if (taken && !claim) return att_err_("ID_TAKEN");
     if (bound) return att_err_("DEVICE_BOUND_OTHER_ID");
+    if (claim) {
+      att_update_("AttStudents", stRow._row, { device_id: deviceId });
+      att_append_("AttDevices", { device_id: deviceId, student_id: sid, secret_hash: hash, fp_hash: String(p.fp || ""), bound_at: nowIso, status: "active" });
+      return att_ok_({ status: "registered", name: stRow.name || name, claimed: true });
+    }
     att_append_("AttStudents", { student_id: sid, name: name, device_id: deviceId, created_at: nowIso, status: "active" });
     att_append_("AttDevices", { device_id: deviceId, student_id: sid, secret_hash: hash, fp_hash: String(p.fp || ""), bound_at: nowIso, status: "active" });
     return att_ok_({ status: "registered", name: name });
@@ -406,7 +413,8 @@ function att_attend_(p) {
     if (cur) {
       // Upgrade rule (plan §4.3): a record WITHOUT coordinates is completed by a later attempt WITH valid coordinates, so one bad first
       // attempt can be corrected. A good fix is never downgraded; any other repeat changes nothing. The recorded time stays the first one.
-      if (!geo.denied && att_num_(cur.lat) === null && att_num_(cur.lng) === null) {
+      // A row the instructor entered by hand (device MANUAL) is the instructor's decision and is left as it is.
+      if (!geo.denied && cur.device_id !== "MANUAL" && att_num_(cur.lat) === null && att_num_(cur.lng) === null) {
         var f2 = flagsFor(priors.filter(function (x) { return x.checkin_id !== cur.checkin_id; })), st2 = att_flagsToStatus_(f2);   // the row being repaired must not count as its own "prior"
         att_update_("AttCheckins", cur._row, { lat: geo.lat, lng: geo.lng, acc: geo.acc, dist_m: dist == null ? "" : Math.round(dist * 10) / 10,
           fp_hash: fp, flags: f2.join(","), status: st2, geo_reason: "" });
@@ -811,6 +819,42 @@ function att_review_(p, u) {
   });
 }
 
+/* ───────── manual entry (2026-11-04, docs/attendance-decisions.md D9) ───────── */
+var ATT_MANUAL_REASONS_ = { NO_PHONE: "No phone / phone not working", PAGE_ERROR: "Check-in page failed", OTHER: "Other" };
+/** att_manual_checkin {session_id, student_id, reason: NO_PHONE|PAGE_ERROR|OTHER, note?, name?}: the instructor marks a student present
+ *  by hand, from the dashboard. Any session the caller owns, open or already closed (it can be done after the lecture).
+ *  Stored as a normal AttCheckins row (no new columns): device_id MANUAL, flags MANUAL, status ok, no location, and the review columns
+ *  record who entered it, when and why. Already checked in -> nothing is written (status "already").
+ *  A student who never registered needs a name: a student row WITHOUT a device is created, and their own phone can still be signed up
+ *  later (att_signup_ binds the first phone to such a row). */
+function att_manualCheckin_(p, u) {
+  u = u || att_adminUser_();
+  var sc = att_scopeSession_(u, String(p.session_id || "")); if (sc.err) return sc.err;
+  var s = sc.s, sid = String(p.student_id || "").trim();
+  if (!ATT_C.ID_REGEX.test(sid)) return att_err_("BAD_ID", "Enter a valid student ID (4-12 digits)");
+  var reason = String(p.reason || "").trim().toUpperCase();
+  if (!att_has_(ATT_MANUAL_REASONS_, reason)) return att_err_("BAD_REQUEST", "reason must be NO_PHONE|PAGE_ERROR|OTHER");
+  var note = String(p.note == null ? "" : p.note).replace(/\s+/g, " ").trim().slice(0, 300);
+  if (reason === "OTHER" && !note) return att_err_("NOTE_REQUIRED", "Write the reason");
+  var name = String(p.name == null ? "" : p.name).replace(/\s+/g, " ").trim().slice(0, ATT_C.NAME_MAX);
+  var res = att_withLock_(function () {
+    var cur = att_rows_("AttCheckins").filter(function (r) { return r.session_id === s.session_id && r.student_id === sid; })[0];
+    if (cur) return att_ok_({ status: "already", server_utc: cur.server_utc, manual: cur.device_id === "MANUAL", name: att_studentName_(sid) });
+    var st = att_rows_("AttStudents").filter(function (x) { return x.student_id === sid; })[0], created = false, nowIso = att_iso_();
+    if (!st) {
+      if (name.length < 2) return att_err_("NAME_REQUIRED", "This ID is not registered yet: type the student's name");
+      att_append_("AttStudents", { student_id: sid, name: name, device_id: "", created_at: nowIso, status: "active" });
+      created = true;
+    }
+    att_append_("AttCheckins", { checkin_id: Utilities.getUuid(), session_id: s.session_id, student_id: sid, device_id: "MANUAL", server_utc: nowIso,
+      lat: "", lng: "", acc: "", dist_m: "", fp_hash: "", flags: "MANUAL", status: "ok", geo_reason: "",
+      review_status: "accepted", review_note: "Manual entry: " + ATT_MANUAL_REASONS_[reason] + (note ? " - " + note : ""), reviewed_by: u.user_id, reviewed_at: nowIso });
+    return att_ok_({ status: "recorded", server_utc: nowIso, name: st ? (st.name || "") : name, new_student: created });
+  });
+  if (res.ok && res.new_student) att_cdel_("att:n:" + sid);
+  return res;
+}
+
 /** att_overview {from?,to?} (admin): totals, per user and per UTC day: sessions, present, flagged, GEO_* counts, unreviewed. */
 function att_overview_(p) {
   var rg = att_range_(p); if (rg.err) return rg.err;
@@ -944,6 +988,15 @@ function att_scriptedRun() {
   var lateTk = att_makeTicket_(s.session_id, "", Math.floor(Date.now() / 1000) + 60);
   chk("attend within the late grace after close is still accepted", D({ action: "att_attend", ticket: lateTk, student_id: "99990002", secret: SB, fp: "fpB", geo: near }).status === "recorded");
   chk("...and adds no second row", att_rows_("AttCheckins").filter(function (x) { return x.session_id === s.session_id && x.student_id === "99990002"; }).length === 1);
+  // Manual entry (D9): the teacher marks a student present from the dashboard, also after the close.
+  chk("manual: an unregistered ID needs a name", D({ action: "att_manual_checkin", token: A, session_id: s.session_id, student_id: "99990007", reason: "NO_PHONE" }).code === "NAME_REQUIRED");
+  var mm = D({ action: "att_manual_checkin", token: A, session_id: s.session_id, student_id: "99990007", reason: "NO_PHONE", name: "Test Manual" });
+  chk("manual: recorded after the close, new student created", mm.status === "recorded" && mm.new_student === true);
+  chk("manual: already present by phone = nothing written", D({ action: "att_manual_checkin", token: A, session_id: s.session_id, student_id: "99990002", reason: "PAGE_ERROR" }).status === "already");
+  chk("manual: another teacher is refused", D({ action: "att_manual_checkin", token: l2.token, session_id: ts.session_id, student_id: "99990007", reason: "NO_PHONE" }).code === "UNAUTHORIZED");
+  var mrow = att_rows_("AttCheckins").filter(function (x) { return x.session_id === s.session_id && x.student_id === "99990007"; });
+  chk("manual: one MANUAL row, status ok, accepted", mrow.length === 1 && mrow[0].flags === "MANUAL" && mrow[0].status === "ok" && mrow[0].review_status === "accepted");
+  chk("manual: the student can still sign up on their own phone", D({ action: "att_signup", ticket: lateTk, student_id: "99990007", name: "Test Manual", secret: "secretGGGGGGGG", fp: "fpG" }).claimed === true);
   Logger.log(out.join("\n") + "\n=> " + (allOk ? "ALL PASS" : "SOME FAIL") + "  (clean up with att_cleanupTest())");
   return allOk;
 }

@@ -755,6 +755,16 @@
       "note": "Existed but was never registered; registered Nov 2026 when the sign-up retry rule changed (same phone + same ID again = already registered)."
     },
     {
+      "id": "R-A11",
+      "title": "Attendance manual entry: teacher marks a student present from the dashboard (no phone / page error), stored as a MANUAL check-in, never flagged; an unregistered student can later bind their first phone",
+      "cmd": [
+        "node",
+        "../../tests/attendance/manual_entry.test.js"
+      ],
+      "status": "active",
+      "owner": "att-prod"
+    },
+    {
       "id": "R-P3-F1",
       "title": "S1 follow-up core: contacted state, week/month boundaries, filter sort order, flag notices, Phase3_Flags.gs against the real router",
       "status": "active",

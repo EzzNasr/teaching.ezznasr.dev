@@ -89,8 +89,9 @@
   }
   function tab(name) {
     if ((name === "users" || name === "overview") && S.role !== "admin") name = "session";   // the server refuses these anyway
-    ["session", "requests", "flagged", "roster", "calib", "history", "overview", "users"].forEach(function (n) { $("t-" + n).hidden = n !== name; });
+    ["session", "manual", "requests", "flagged", "roster", "calib", "history", "overview", "users"].forEach(function (n) { $("t-" + n).hidden = n !== name; });
     Array.prototype.forEach.call(document.querySelectorAll("nav [data-tab]"), function (b) { b.classList.toggle("on", b.getAttribute("data-tab") === name); });
+    if (name === "manual") loadManual();
     if (name === "requests") loadRequests();
     if (name === "flagged") loadFlagged();
     if (name === "roster") loadRoster();
@@ -214,6 +215,69 @@
       $("summary").hidden = false;
       $("sumText").textContent = S.course + " / " + S.room + ": Present " + (s.present | 0) + ", Flagged " + (s.flagged | 0) + ", Pending requests " + (s.pending | 0);
       msg("csvMsg", "");
+    });
+  }
+
+  // ---------- manual entry: mark a student present from the laptop (no phone, or the student page failed) ----------
+  var M = { sessions: [] };
+  function loadManual() {
+    msg("manMsg", "Loading lectures…");
+    return A("att_sessions", { limit: 30 }).then(function (r) {
+      var sel = $("manSession"), keep = sel.value; clear(sel);
+      if (!r.ok) return msg("manMsg", "Could not load lectures: " + (r.error || r.code || "error"), "err");
+      M.sessions = r.sessions || [];
+      if (!M.sessions.length) { msg("manMsg", "No lectures yet. Start a session first.", "err"); clear($("manList")); return; }
+      M.sessions.forEach(function (x) {
+        var o = mk("option", when(x.start_utc) + " · " + (x.course || "") + (x.room_name ? " · " + x.room_name : "") + (x.status === "open" ? " · open now" : "")
+          + (S.role === "admin" && x.owner_name ? " · " + x.owner_name : ""));
+        o.value = x.session_id; sel.appendChild(o);
+      });
+      // default: the lecture on the projector, else the one picked before, else the newest
+      var want = [S.sess, keep].filter(function (v) { return v && M.sessions.some(function (x) { return x.session_id === v; }); })[0];
+      sel.value = want || M.sessions[0].session_id;
+      msg("manMsg", "");
+      loadManualList();
+    });
+  }
+  function loadManualList() {
+    var sid = $("manSession").value, box = $("manList"); clear(box);
+    if (!sid) return;
+    A("att_session_detail", { session_id: sid }).then(function (r) {
+      if (sid !== $("manSession").value) return;   // another lecture was picked meanwhile
+      clear(box);
+      if (!r.ok) return box.appendChild(mk("div", "Could not load: " + (r.error || r.code || "error"), "msg err"));
+      var all = r.checkins || [], man = all.filter(function (c) { return /(^|,)MANUAL(,|$)/.test(c.flags || ""); });
+      $("manListTitle").textContent = "Entered by hand in this lecture: " + man.length + " (present in total: " + all.length + ")";
+      if (!man.length) return box.appendChild(mk("div", "Nobody entered by hand yet.", "msg"));
+      var t = mk("table", null, "his"), h = mk("tr");
+      ["Time", "Student", "Reason", "Entered by"].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
+      man.slice().reverse().forEach(function (c) {
+        var tr = mk("tr"); tr.appendChild(mk("td", when(c.server_utc)));
+        var s = mk("td"); s.appendChild(mk("b", c.name || "(no name)")); s.appendChild(mk("div", String(c.student_id), "msg")); tr.appendChild(s);
+        tr.appendChild(mk("td", String(c.review_note || "").replace(/^Manual entry: /, ""), "dec"));
+        tr.appendChild(mk("td", c.reviewed_by_name || c.reviewed_by || "")); t.appendChild(tr);
+      });
+      box.appendChild(t);
+    });
+  }
+  function saveManual() {
+    var sid = $("manSession").value, id = $("manId").value.trim(), reason = $("manReason").value, note = $("manNote").value.trim(), name = $("manName").value.trim();
+    if (!sid) return msg("manMsg", "Pick the lecture first.", "err");
+    if (!CFG.ID_REGEX.test(id)) { msg("manMsg", "Enter a valid student ID (4-12 digits).", "err"); try { $("manId").focus(); } catch (e) {} return; }
+    if (reason === "OTHER" && !note) { msg("manMsg", "Write the reason in the note.", "err"); try { $("manNote").focus(); } catch (e) {} return; }
+    $("manSave").disabled = true; msg("manMsg", "Saving…");
+    A("att_manual_checkin", { session_id: sid, student_id: id, reason: reason, note: note, name: name }).then(function (r) {
+      $("manSave").disabled = false;
+      if (!r.ok) {
+        if (r.code === "NAME_REQUIRED") { msg("manMsg", "ID " + id + " is not registered yet. Type the student's name, then Mark present again.", "err"); try { $("manName").focus(); } catch (e) {} return; }
+        return msg("manMsg", "Not saved: " + (r.error || r.code || "error"), "err");
+      }
+      var who = (r.name ? r.name + " (" + id + ")" : id), at = fTimeS.format(new Date(r.server_utc));
+      if (r.status === "already") msg("manMsg", who + " is already present (" + (r.manual ? "entered by hand" : "checked in by phone") + " at " + at + "). Nothing changed.", "ok");
+      else msg("manMsg", "✓ Marked present: " + who + " at " + at + (r.new_student ? ". New student added to the roster." : "."), "ok");
+      $("manId").value = ""; $("manName").value = ""; $("manNote").value = "";
+      try { $("manId").focus(); } catch (e) {}
+      loadManualList(); poll();
     });
   }
 
@@ -401,7 +465,8 @@
   var fWhen = new Intl.DateTimeFormat("en-GB", { timeZone: CFG.TZ, day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
   function when(iso) { var d = new Date(iso); return isNaN(d) ? "" : fWhen.format(d); }
   var WARN = { GEO_UNAVAILABLE: 1, GEO_SKIPPED: 1, GEO_WEAK: 1, GEO_UPGRADED: 1 };
-  function tagFor(code) { return mk("span", code, "tag " + (WARN[code] ? "warn" : "bad")); }
+  function tagFor(code) { return code === "MANUAL" ? mk("span", "Manual entry", "tag good") : mk("span", code, "tag " + (WARN[code] ? "warn" : "bad")); }
+  function isFlagged(r) { return String(r.flags || "").split(",").some(function (c) { return c && c !== "MANUAL"; }); }
   function geoTags(g) { var td = mk("td"); Object.keys(g || {}).forEach(function (k) { if (g[k]) td.appendChild(mk("span", k.replace("GEO_", "") + " " + g[k], "tag " + (WARN[k] ? "warn" : "bad"))); }); return td; }
   function showHisList() { $("hisList").hidden = false; $("hisDetail").hidden = true; H.sel = null; }
   function fillHisUsers() {
@@ -462,7 +527,7 @@
   }
   function renderDetail() {
     var box = $("detTable"); clear(box);
-    var only = $("detFlagOnly").checked, list = H.rows.filter(function (r) { return !only || r.flags; });
+    var only = $("detFlagOnly").checked, list = H.rows.filter(function (r) { return !only || isFlagged(r); });
     if (!list.length) return msg("detMsg", H.rows.length ? "No flagged check-ins." : "No check-ins in this session.");
     msg("detMsg", list.length + " check-in" + (list.length === 1 ? "" : "s"));
     var t = mk("table", null, "his"), h = mk("tr");
@@ -477,7 +542,7 @@
       tr.appendChild(mk("td", r.geo_reason || ""));
       var rv = mk("td");
       if (r.review_status) { rv.appendChild(mk("span", r.review_status, "tag " + (r.review_status === "accepted" ? "good" : "bad"))); if (r.review_note) rv.appendChild(mk("div", r.review_note, "msg")); if (r.reviewed_by_name || r.reviewed_at) rv.appendChild(mk("div", (r.reviewed_by_name || "") + (r.reviewed_at ? " · " + when(r.reviewed_at) : ""), "msg")); }
-      else rv.appendChild(mk("span", r.flags ? "to review" : "", "msg"));
+      else rv.appendChild(mk("span", isFlagged(r) ? "to review" : "", "msg"));
       tr.appendChild(rv);
       var d = mk("td", null, "dec"), note = mk("input", null, "note"); note.setAttribute("placeholder", "note (optional)"); note.value = r.review_note || "";
       var ok = mk("button", "Accept", "ok"), no = mk("button", "Reject", "bad");
@@ -603,6 +668,11 @@
     $("closeBtn").onclick = closeSession;
     $("csvBtn").onclick = function () { exportCSV(); };
     $("calBtn").onclick = calibrate;
+    $("manSave").onclick = saveManual;
+    $("manRefresh").onclick = loadManual;
+    $("manSession").onchange = loadManualList;
+    ["manId", "manName", "manNote"].forEach(function (i) { $(i).addEventListener("keydown", function (e) { if (e.key === "Enter") saveManual(); }); });
+    $("manId").addEventListener("input", function () { $("manId").value = $("manId").value.replace(/\D/g, ""); });
     $("flagRefresh").onclick = loadFlagged;
     $("rosRefresh").onclick = loadRoster;
     $("rosCsv").onclick = exportRoster;

@@ -13,6 +13,15 @@ Amber means **not saved yet, stay on the page**. Green means **saved, you can cl
 | 4 | Saved: green panel, "You can close this page now" | ![](4-saved.png) |
 | 5 | Could not save in time: show the instructor | ![](5-could-not-save.png) |
 
+## Instructor dashboard: Manual entry tab (D9)
+
+Captured from the real `attend/admin/` page against the real backend code (emulated).
+
+| # | State | Screenshot |
+|---|---|---|
+| 6 | An ID that is not registered yet: asks for the name | ![](6-manual-entry-needs-name.png) |
+| 7 | Marked present: the list shows who, why and who entered it | ![](7-manual-entry-saved.png) |
+
 To redo them after a change to the page (needs Python Playwright):
 
 ```bash

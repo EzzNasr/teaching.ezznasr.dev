@@ -232,6 +232,41 @@ const btn = (row, label) => all(row, e => e.tag === "button" && e.textContent ==
   const t1b = ui(T1.token); await t1b.wait(() => !t1b.byId.panel.hidden);
   ok(!t1b.byId.panel.hidden, "a teacher token saved in sessionStorage restores the session after a reload");
 
+  /* ───────── manual entry tab (D9) ───────── */
+  console.log("manual entry tab");
+  {
+    const u = t1b;
+    u.tab("manual"); await u.wait(() => u.byId.manSession.children.length && u.byId.manList.children.length);
+    ok(!u.byId["t-manual"].hidden && u.byId.manSession.children.length === 1 && u.byId.manSession.value === sidA, "Manual entry lists only this teacher's lecture and picks it");
+    ok(/Nobody entered by hand yet/.test(u.byId.manList.textContent) && /present in total: 3/.test(u.byId.manListTitle.textContent), "empty list, with the lecture's present count");
+    const save = async (id, reason, extra) => { Object.assign(u.byId, {}); u.byId.manId.value = id; u.byId.manReason.value = reason; u.byId.manName.value = (extra && extra.name) || ""; u.byId.manNote.value = (extra && extra.note) || ""; u.byId.manMsg.textContent = ""; u.byId.manSave.click(); await u.wait(() => u.byId.manMsg.textContent && !/Saving/.test(u.byId.manMsg.textContent)); return u.byId.manMsg.textContent; };
+    let m = await save("12", "NO_PHONE");
+    ok(/valid student ID/.test(m) && !u.calls.includes("att_manual_checkin"), "a bad ID is caught on the page (nothing sent)");
+    m = await save("30001", "OTHER");
+    ok(/Write the reason/.test(m) && !u.calls.includes("att_manual_checkin"), "'Other' without a note is caught on the page");
+    m = await save("20001", "NO_PHONE");
+    ok(/already present \(checked in by phone/.test(m), "a student who already checked in by phone: 'already present', nothing changed: " + m);
+    m = await save("30001", "NO_PHONE");
+    ok(/not registered yet/.test(m) && u.byId.manId.value === "30001", "an unregistered ID asks for the name and keeps the ID typed");
+    m = await save("30001", "NO_PHONE", { name: "Hand Student" });
+    ok(/Marked present: Hand Student \(30001\)/.test(m) && /New student added/.test(m) && u.byId.manId.value === "" && u.byId.manName.value === "", "with a name: marked present, new student added, the form is cleared for the next one");
+    await u.wait(() => rowsOf(u.byId.manList).length === 1);
+    ok(/Hand Student/.test(u.byId.manList.textContent) && /No phone/.test(u.byId.manList.textContent) && /Dr Alpha/.test(u.byId.manList.textContent) && /present in total: 4/.test(u.byId.manListTitle.textContent), "the list shows who, why and who entered it; present is now 4");
+    m = await save("20003", "PAGE_ERROR", { note: "page froze" });
+    ok(/Marked present|already present/.test(m), "a second entry: " + m);
+    const det = D({ action: "att_session_detail", token: T1.token, session_id: sidA });
+    const hand = det.checkins.find(c => c.student_id === "30001");
+    ok(hand && hand.flags === "MANUAL" && hand.status === "ok" && hand.review_status === "accepted" && hand.reviewed_by === T1.id && /Manual entry: No phone/.test(hand.review_note) && hand.lat === null, "(server) stored as a check-in: MANUAL, ok, accepted by the teacher, the reason, no location");
+    ok(det.summary.flagged === 2, "(server) manual entries are not counted as flagged");
+    // History detail: shown as 'Manual entry', not in 'Flagged only'
+    u.tab("history"); await u.wait(() => rowsOf(u.byId.hisTable).length);
+    btn(rowsOf(u.byId.hisTable)[0], "Open").click(); await u.wait(() => rowsOf(u.byId.detTable).length === 4);
+    ok(/Manual entry/.test(rowsOf(u.byId.detTable).find(r => /Hand Student/.test(r.textContent)).textContent), "History shows the row tagged 'Manual entry'");
+    u.byId.detFlagOnly.checked = true; u.byId.detFlagOnly._l.change();
+    ok(!/Hand Student/.test(u.byId.detTable.textContent), "'Flagged only' leaves manual entries out");
+    u.byId.detFlagOnly.checked = false;
+  }
+
   // XSS: every string is rendered with textContent
   const evil = teach("<img src=x onerror=alert(1)>");
   ad.tab("users"); await ad.wait(() => /<img/.test(ad.byId.userList.textContent));

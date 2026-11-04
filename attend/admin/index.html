@@ -31,6 +31,7 @@
       <h1>Dashboard</h1>
       <div id="who" class="who"></div>
       <button data-tab="session" class="on">Session</button>
+      <button data-tab="manual">Manual entry</button>
       <button data-tab="requests">Requests<span id="pendBadge" class="badge" hidden>0</span></button>
       <button data-tab="flagged">Flagged</button>
       <button data-tab="roster">Roster</button>
@@ -57,6 +58,30 @@
         <div id="sumText"></div>
         <div class="row" style="margin-top:12px"><button id="csvBtn" class="pri">Export CSV</button></div>
         <div id="csvMsg" class="msg"></div>
+      </div>
+    </section>
+
+    <section id="t-manual" hidden>
+      <div class="card">
+        <h2>Manual entry</h2>
+        <p class="msg">Mark a student present from this laptop: a student without a working phone, or one whose check-in page showed an error. It is saved with your name, the time and the reason, and counts like any other check-in.</p>
+        <label for="manSession">Lecture</label><select id="manSession"></select>
+        <div class="row">
+          <div><label for="manId">Student ID</label><input id="manId" inputmode="numeric" autocomplete="off" maxlength="12"></div>
+          <div><label for="manName">Name (only if not registered yet)</label><input id="manName" autocomplete="off" maxlength="60"></div>
+        </div>
+        <div class="row">
+          <div><label for="manReason">Reason</label><select id="manReason">
+            <option value="NO_PHONE">No phone / phone not working</option>
+            <option value="PAGE_ERROR">Check-in page failed (error on the phone)</option>
+            <option value="OTHER">Other (write it in the note)</option>
+          </select></div>
+          <div><label for="manNote">Note (optional)</label><input id="manNote" maxlength="300" autocomplete="off"></div>
+        </div>
+        <div class="row" style="margin-top:12px"><button id="manSave" class="pri">Mark present</button><button id="manRefresh">Refresh list</button></div>
+        <div id="manMsg" class="msg" role="status"></div>
+        <h3 id="manListTitle">Entered by hand in this lecture</h3>
+        <div id="manList" class="scroll"></div>
       </div>
     </section>
 
