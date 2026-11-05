@@ -45,7 +45,7 @@ follow-up page (your browser)            Apps Script (/exec)                    
 | Server outbox, modes, limits, alerts | `tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs` (routed by `FollowupRouter.gs`; no change to `Code.gs`) |
 | Phone sender | `tools/wa-sender/` (`sender.js`, `pair.js`, `lib/loop.js`, `lib/journal.js`, `lib/api.js`, `lib/wa.js`, `termux/start-wa-sender.sh`) |
 | Page button | `assets/followup-walk.js` (`phone` option), `assets/followup-app.js` (asks the server whether the phone is on) |
-| Tests | R-WA-1 `tests/test_fu2_whatsapp.js` (server, 42), R-WA-2 `tests/wa/sender.test.js` (phone loop + end to end with the real server code, 30), R-WA-3 `tests/e2e_followup_wa_phone.py` (the button in Chromium, 18) |
+| Tests | R-WA-1 `tests/test_fu2_whatsapp.js` (server, 44), R-WA-2 `tests/wa/sender.test.js` (phone loop + end to end with the real server code, 30), R-WA-3 `tests/e2e_followup_wa_phone.py` (the button in Chromium, 18) |
 
 **Not tested yet:** `lib/wa.js`, the thin adapter over Baileys, against real WhatsApp (it cannot run in CI). Test mode is how it gets
 tested the first time (section 4, step 4).

@@ -87,6 +87,9 @@ const enqueue = (env, items, o) => env.admin(Object.assign({ action: 'admin_fu2_
   t('test mode: the message goes to WA_TEST_TO with a [TEST] header naming the real recipient', c.items[0].to === '201099999999' && /^\[TEST\] → Student 1 · 20110000001\n\nالسلام عليكم 1$/.test(c.items[0].text), j(c.items[0]));
   env.phone({ action: 'admin_fu2_wa_report', results: [{ id: c.items[0].id, ok: true }] });
   t('a test success is NOT written to the contact log', env.notifs().length === 0 && env.outbox()[0].status === 'sent');
+  t('test mode: a double tap while one is waiting queues nothing', (enqueue(env, [item(2)]), enqueue(env, [item(2)])).queued === 0);
+  t('test mode: the same student can be sent again once the test was sent', enqueue(env, [item(1)]).queued === 1);
+  env.ctx.fu2_wa_cancel_({ all: true });
   env.props.WA_MODE = 'live';
   t('test items are never handed out in live mode, and a live enqueue of the same student is allowed', enqueue(env, [item(1)]).queued === 1 && env.phone({ action: 'admin_fu2_wa_claim' }).items.every(i => i.to === '20110000001'));
 }

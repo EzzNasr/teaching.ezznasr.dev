@@ -14,7 +14,8 @@
 //      silent mid-send, the item becomes "unknown" (never re-queued automatically) and the owner is told on Telegram.
 //      The phone itself journals every attempt before sending (tools/wa-sender/lib/journal.js).
 //   3. Enqueue is idempotent: the same student + the same contact items while one is queued / sending / sent in the last
-//      7 days is skipped, and so is anything already in the contact log.
+//      7 days is skipped, and so is anything already in the contact log. (Test mode: only queued / sending / unknown block,
+//      so the owner can send the same test again.)
 //   4. Pace and limits are the server's: sending hours (WA_HOURS, default 9-21 Alex time), a daily cap (WA_DAILY_CAP,
 //      default 60), and a random 25-75 s gap between messages that the phone must respect.
 //   5. The phone has its OWN token (WA_SENDER_TOKEN, field wa_token), never the admin token: it can only claim, report and
@@ -129,7 +130,9 @@ function fu2_wa_enqueue_(payload) {
     var sh = fu2_wa_sheet_(), rows = fu2_wa_rows_(sh), now = new Date(), nowStr = fu2_wa_nowStr_(), since = _fmt(new Date(now.getTime() - FU2_WA_DEDUPE_DAYS * 86400000), TZ, true);
     var recent = {};
     rows.forEach(function (r) {
-      if ((r.status === "queued" || r.status === "sending" || r.status === "unknown" || (r.status === "sent" && r.sent_at >= since)) && r.mode === cfg.mode)
+      // test mode: an already-SENT test does not block sending the same student again (the owner re-tests freely);
+      // one still waiting or in flight does, so a double tap never queues two
+      if ((r.status === "queued" || r.status === "sending" || r.status === "unknown" || (r.status === "sent" && r.sent_at >= since && cfg.mode === "live")) && r.mode === cfg.mode)
         recent[r.student_key + "#" + fu2_wa_itemsKey_(fu2_wa_items_(r))] = r.status;
     });
     var queued = 0, skipped = [];
