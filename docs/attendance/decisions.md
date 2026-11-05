@@ -78,6 +78,8 @@ deployments > Edit > Version 59.
 **2026-11-04: Version 61** (deployed by the owner): `AttendanceAll.gs` = commit `3a459e2`, manual entry (D9). **Rollback:** Version 60.
 Since then the repo file differs from Version 61 in comments only (doc paths, D12).
 
+**2026-11-05 02:46: Version 62** (commit `dc2844b`). A check found that Version 61 had been deployed with **older** `Code.gs` and `FollowupLogic.gs` (the Nov 3 copies, `9877ddf`): `report_photos` and `check_session` answered "Unknown action", and the Telegram score lines, written answers kept out of the submit-time score and a homework lesson's own due date were missing. All three changed files (`Code.gs`, `FollowupLogic.gs`, `AttendanceAll.gs`) were replaced with the exact repo files (fingerprint-checked against the editor copy and the GitHub download, then re-read after saving: all 6 files = repo). `att_selfTest` ALL PASS, `att_scriptedRun` 50/50 ALL PASS (incl. manual entry), `att_cleanupTest` done. Live checks: `report_photos`, `check_session`, `att_status`, `att_manual_checkin`, `att_review` answer correctly. Adds the demo-data functions (D11). **Rollback:** Version 61 (but that brings the old `Code.gs` back; Version 60 is the last fully-synced one before this).
+
 Every later deploy: the checklist at the top of [deploy.md](deploy.md), and a line here.
 
 1. Apps Script: paste `AttendanceAll.gs`, then **Deploy > Manage deployments > Edit > New version**, never "New deployment".

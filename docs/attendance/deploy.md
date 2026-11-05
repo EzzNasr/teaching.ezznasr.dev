@@ -1,9 +1,10 @@
 # Attendance: deploy checklist (Apps Script + site)
 
-> **Live now (2026-11-04):** Apps Script **Version 61** of the one existing deployment (same `/exec` URL as `contract/att_config.js`),
-> with `AttendanceAll.gs` = repo commit `3a459e2` (manual entry, D9). Rollback: Deploy > Manage deployments > Edit > **Version 60**.
-> Every deploy is recorded in [decisions.md](decisions.md) section 3. Since `3a459e2` the repo copy of `AttendanceAll.gs` differs
-> from Version 61 **in comments only** (doc paths); it goes live with the next deploy.
+> **Live now (2026-11-05):** Apps Script **Version 62** of the one existing deployment (same `/exec` URL as `contract/att_config.js`),
+> all six project files = repo commit `dc2844b`. Rollback: Deploy > Manage deployments > Edit > **Version 60** (Version 61 had old copies
+> of `Code.gs` / `FollowupLogic.gs`). Every deploy is recorded in [decisions.md](decisions.md) section 3.
+> **Before every deploy, check that EVERY project file matches the repo**, not only the one you changed: Version 61 silently brought old
+> files back. Fingerprint each editor file against the repo (as in decisions.md section 3) and paste only exact repo files.
 >
 > **Every attendance deploy, in this order** (the backend first: a new page calling an old backend gets `UNKNOWN_ACTION`):
 > 1. Gate green: `bash scripts/test_all.sh --strict --e2e --require-all`.
