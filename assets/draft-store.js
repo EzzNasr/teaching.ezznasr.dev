@@ -157,7 +157,7 @@
 
   function stage(op) {
     if (!op || !op.id || !op.action) throw new Error("Draft.stage needs {id, action, payload}");
-    var rec = { id: String(op.id), label: String(op.label || op.action), action: op.action, payload: op.payload || {},
+    var rec = { id: String(op.id), label: String(op.label || "An unsaved change"), action: op.action, payload: op.payload || {},
       onSaved: op.onSaved || null, onFailed: op.onFailed || null, restored: false };
     var i = indexOf(rec.id);
     if (i >= 0) ops[i] = rec; else ops.push(rec);
@@ -181,7 +181,7 @@
   function restore() {
     if (!offered) return list();
     offered.forEach(function (o) {
-      if (indexOf(o.id) < 0) ops.push({ id: String(o.id), label: String(o.label || o.action), action: o.action, payload: o.payload, onSaved: null, onFailed: null, restored: true });
+      if (indexOf(o.id) < 0) ops.push({ id: String(o.id), label: String(o.label || "An unsaved change"), action: o.action, payload: o.payload, onSaved: null, onFailed: null, restored: true });
     });
     offered = null;
     changed("restore");

@@ -2338,21 +2338,47 @@ html[data-theme] .ac-cq { margin-left: 22px; padding: 5px 12px; border-left: 2px
     if (yearSel) yearSel.addEventListener("change", applyFilter);
     var all = el("button", { class: "ac-btn", type: "button" }, ["Select all shown"]);
     var none = el("button", { class: "ac-btn", type: "button" }, ["Clear"]);
+    var doneBtn = el("button", { class: "ac-btn primary", type: "button", "data-pick-done": "" }, ["Done"]);
     all.addEventListener("click", function () { shown().forEach(function (r) { r.box.checked = true; chosen[r.phone] = 1; }); refresh(); });
     none.addEventListener("click", function () { rows.forEach(function (r) { r.box.checked = false; }); chosen = {}; refresh(); });
     var list = el("div", { class: "ac-picklist" }, rows.length ? rows.map(function (r) { return r.row; })
       : [el("p", { class: "ac-hint" }, [opts.empty || "No students to show."])]);
-    var panel = el("div", { class: "ac-pickpanel" }, [search, yearSel, el("div", { class: "ac-picktools" }, [all, none, counter]), list]);
+    var panel = el("div", { class: "ac-pickpanel" }, [search, yearSel, el("div", { class: "ac-picktools" }, [all, none, counter, doneBtn]), list]);
     var box = el("details", { class: "ac-pick" }, [summary, panel]);
+    doneBtn.addEventListener("click", function () { box.open = false; try { summary.focus(); } catch (e) { /* ignore */ } });
     box.addEventListener("toggle", function () {
       var sec = box.closest ? box.closest(".dash-section") : null;
       if (sec) sec.classList.toggle("has-open-pick", box.open);
+      if (box.open) closeOpenPickers(box);   // only one picker open at a time
     });
+    watchPickers();
     return {
       node: box,
       selected: function () { return Object.keys(chosen); },
       reset: function () { rows.forEach(function (r) { r.box.checked = false; }); chosen = {}; refresh(); },
     };
+  }
+
+  // The pickers are <details> dropdowns: close them on a click outside, on Escape, and when another one opens.
+  // One set of document listeners for every picker on the page (pickers are rebuilt on each render).
+  function closeOpenPickers(except) {
+    Array.prototype.forEach.call(document.querySelectorAll("details.ac-pick[open]"), function (d) { if (d !== except) d.open = false; });
+  }
+  var pickersWatched = false;
+  function watchPickers() {
+    if (pickersWatched) return;
+    pickersWatched = true;
+    document.addEventListener("click", function (e) {
+      var inside = e.target && e.target.closest ? e.target.closest("details.ac-pick") : null;
+      closeOpenPickers(inside);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      var open = document.querySelector("details.ac-pick[open]");
+      if (!open) return;
+      open.open = false;
+      var sm = open.querySelector("summary"); if (sm) try { sm.focus(); } catch (err) { /* ignore */ }
+    });
   }
 
   function rosterEmptyText(d, fallback) {

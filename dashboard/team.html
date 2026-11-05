@@ -21,6 +21,7 @@
   .t-card h2{ margin:0 0 4px; font-size:17px; }
   .t-hint{ margin:0 0 12px; font-size:13.5px; color:var(--ink-dim); line-height:1.7; }
   .t-add{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .t-add select{ font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:9px; background:var(--panel); color:var(--ink); }
   .t-add input{ flex:1 1 200px; min-width:0; font:15px var(--mono); direction:ltr; text-align:start; padding:9px 10px; border:1px solid var(--line); border-radius:9px; background:var(--panel); color:var(--ink); }
   .t-btn{ font:600 13.5px "Cairo",var(--mono),sans-serif; padding:9px 14px; border-radius:9px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; }
   .t-btn.primary{ background:var(--ink); color:var(--bg,#fff); border-color:var(--ink); }
@@ -43,6 +44,7 @@
   .t-warn{ font-size:13px; color:var(--ink-dim); border-inline-start:3px solid var(--line); padding:2px 10px; margin-top:12px; line-height:1.7; }
   @media (max-width:560px){ .t-cols{ grid-template-columns:1fr; } }
 </style>
+<script src="/assets/theme.js" defer></script>
 </head>
 <body>
 <header>
@@ -56,6 +58,7 @@
       <a href="grading.html">Grading</a>
       <a href="team.html" aria-current="page">Team</a>
     </nav>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true"></span><span class="theme-label"></span></button>
   </div>
 </header>
 
@@ -93,7 +96,7 @@
   }
   function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); return n; }
 
-  // What each allow-listed action means, in plain Arabic. Anything not listed here is shown by its raw name.
+  // What each allow-listed action means, in plain Arabic. Anything not listed here gets a readable fallback, never its code name.
   var LABEL = {
     admin_followup_overview: "شاشة المتابعة (الحضور والواجبات والكويزات)",
     admin_followup_set_attendance: "تسجيل الحضور",
@@ -107,13 +110,19 @@
     admin_grading_queue: "صفحة تصحيح الحلول المكتوبة",
     admin_grade_written: "وضع درجات الحلول المكتوبة",
     admin_get_written_models: "الإجابات النموذجية للمكتوب",
-    get_written_image: "صور حلول الطلاب"
+    get_written_image: "صور حلول الطلاب",
+    admin_fu2_mark_done: "تعليم خطوة المتابعة إنها خلصت (التذكير اتبعت / الدرس اتنقل)",
+    admin_list_groups: "قايمة الجروبات",
+    admin_list_payments: "قايمة المدفوعات",
+    admin_decide_payment: "قبول أو رفض الدفع",
+    admin_access_overview: "صفحة الوصول للفيديوهات"
   };
+  function labelOf(a) { return LABEL[a] || "صلاحية تانية (" + String(a || "").replace(/^(admin_|p[0-9]_|fu2_)+/, "").replace(/_/g, " ") + ")"; }
   var CANNOT = ["الدفع والاشتراكات وفتح/قفل الوصول للدروس والكويزات", "الفيديوهات وأقفال الدروس", "إنشاء الجروبات أو إضافة طلاب ليها", "نتائج كل الطلاب (الصفحة الرئيسية) والأسئلة الغلط", "إدارة الفريق"];
 
   // ---------- API (real: AuthEngine.adminCall; mock: in-memory) ----------
   var MOCK_STAFF = [{ phone: "01000000001", name: "Teacher", role: "admin", year: "" }, { phone: "01000000002", name: "Sara Mahmoud", role: "assistant", year: "Senior 2" }];
-  var MOCK_ALLOW = Object.keys(LABEL);
+  var MOCK_ALLOW = Object.keys(LABEL).filter(function (a) { return !/payment|access_overview|list_groups/.test(a); });
   function api(payload) {
     var call;
     if (MOCK) call = mockApi(payload);
@@ -127,7 +136,7 @@
   function friendly(m) {
     m = String(m || "");
     if (m === "Not authorized.") return "الحساب ده مش أدمن. إدارة الفريق للأدمن بس.";
-    if (m === "Unknown action: p3_admin_list_staff" || /Not implemented yet/.test(m)) return "السيرفر لسه ما اتحدّثش بصلاحيات المساعد (Phase3_Roles.gs).";
+    if (/Unknown action/.test(m) || /Not implemented yet/.test(m)) return "السيرفر لسه ما اتحدّثش بصلاحيات المساعد (Phase3_Roles.gs).";
     if (/No student account/.test(m)) return "مفيش حساب طالب بالرقم ده. لازم المساعد يسجّل حساب الأول.";
     if (/admin/i.test(m) && /can't be changed|by hand/.test(m)) return "الحساب ده أدمن. بيتعدّل من شيت Students بس.";
     if (/Missing phone/.test(m)) return "اكتب رقم الموبايل.";
@@ -152,7 +161,7 @@
         if (p.action === "p4_admin_list_teachers") return res({ ok: true, teachers: [{ phone: "01000000009", name: "Mona (math)", scope: "math", telegram: true, assistants: [{ phone: "01000000010", name: "Omar" }] }], tokens: [{ name: "mona-laptop", scope: "math", created: "2026-10-30" }] });
         if (p.action === "p4_admin_set_teacher") return res({ ok: true, phone: p.phone, role: p.scope ? "teacher" : "student", scope: p.scope || "" });
         if (p.action === "p4_admin_tg_unlink") return res({ ok: true });
-        if (p.action === "p4_admin_list_edit_log") return res({ ok: true, rows: [{ ts: "2026-10-30 10:00:00", actor_kind: "teacher", actor_id: "01000000009", student_old: "01000000002", student_new: "01000000002", field: "name", old_value: "Sara", new_value: "Sara M." }] });
+        if (p.action === "p4_admin_list_edit_log") return res({ ok: true, rows: [{ ts: "2026-10-31 09:15:00", actor_kind: "assistant", actor_id: "01000000010", actor_name: "Omar", student_old: "01000000002", student_new: "01000000002", field: "attendance_center", old_value: '{"lesson":"math/l1","phone":"01000000002","mode":""}', new_value: '{"lesson":"math/l1","mode":"center"}', source: "audit" }, { ts: "2026-10-30 10:00:00", actor_kind: "teacher", actor_id: "01000000009", actor_name: "Mona (math)", student_old: "01000000002", student_new: "01000000002", field: "name", old_value: "Sara", new_value: "Sara M." }] });
         rej(new Error("mock: unknown action"));
       }, 30);
     });
@@ -220,21 +229,69 @@
       el("h3", { text: "Quiz Maker tokens (names only)" }), tokensList
     ]);
   }
+  // What each logged change means, in plain words (the log stores the server's internal step names).
+  var LOG_WHAT = {
+    name: "Changed the student's name", phone: "Changed the student's phone", parent_phone: "Changed the parent's phone",
+    attendance_center: "Marked attendance: at the center", attendance_online: "Marked attendance: online", attendance_absent: "Marked attendance: absent", attendance_clear: "Cleared an attendance mark",
+    grade_written: "Graded a written answer", set_requirement: "Changed a lesson's requirements",
+    log_parent_notification: "Logged a parent contact", parent_notification: "Logged a parent contact", monthly_review: "Marked the monthly report",
+    save_group: "Changed group settings", followup_save_group: "Changed group settings", save_templates: "Edited the parent messages",
+    req_save_global: "Changed a requirement for everyone", req_save_group: "Changed a requirement for one group", req_check: "Ticked a monthly checklist item",
+    fu2_notify_settings: "Changed the reminder settings", p4_teacher_set_assistant: "Added an assistant", p4_teacher_revoke_assistant: "Removed an assistant",
+    group_move: "Moved a student to another group", fu2_mark_done: "Marked a follow-up step done", mark_done: "Marked a follow-up step done",
+    admin_set_video: "Changed a video", admin_grant_access: "Gave a student access", admin_revoke_access: "Took a student's access away",
+    admin_set_quiz_lock: "Locked or unlocked a quiz", admin_group_grant_access: "Gave a group access", admin_group_revoke_access: "Took a group's access away",
+    admin_grant_quiz_access: "Opened a quiz for a student", admin_revoke_quiz_access: "Closed a quiz for a student",
+    admin_group_grant_quiz_access: "Opened a quiz for a group", admin_group_revoke_quiz_access: "Closed a quiz for a group"
+  };
+  function logWhat(f) {
+    f = String(f || "");
+    if (LOG_WHAT[f]) return LOG_WHAT[f];
+    var k = f.replace(/^(admin_|p[0-9]_|fu2_|req_|followup_)+/, "");
+    if (LOG_WHAT[k]) return LOG_WHAT[k];
+    if (LOG_WHAT["admin_" + k]) return LOG_WHAT["admin_" + k];
+    k = k.replace(/_/g, " ");
+    return k.charAt(0).toUpperCase() + k.slice(1);
+  }
+  // A logged value can be a JSON object (AuditLog): show it as "key: value, ..." instead of raw JSON.
+  function logValue(v) {
+    v = String(v == null ? "" : v);
+    if (!/^[\[{]/.test(v)) return v;
+    try {
+      var o = JSON.parse(v);
+      if (Array.isArray(o)) return o.join(", ");
+      return Object.keys(o).filter(function (k) { return o[k] !== "" && o[k] != null && o[k] !== false; }).map(function (k) { return k.replace(/_/g, " ") + ": " + (typeof o[k] === "object" ? JSON.stringify(o[k]) : o[k]); }).join(", ");
+    } catch (e) { return v; }
+  }
+  var KIND_WORD = { teacher: "Teacher", assistant: "Assistant", owner: "You (owner)" };
   function editLogCard() {
     var out = el("div", { class: "t-msg", role: "status" }), table = el("table", { class: "t-table" });
     var btn = el("button", { class: "t-btn", type: "button", text: "Show the latest 200 edits" });
+    var who = el("select", { "aria-label": "Show changes by" }, [["", "Teachers and assistants"], ["teacher", "Teachers only"], ["assistant", "Assistants only"]].map(function (o) { return el("option", { value: o[0], text: o[1] }); }));
+    var rows = null;
+    function paint() {
+      clear(table);
+      var list = (rows || []).filter(function (x) { return !who.value || x.actor_kind === who.value; });
+      if (!rows) return;
+      if (!list.length) { note(out, rows.length ? "No changes by that kind of person yet." : "No changes yet."); return; }
+      note(out, "");
+      table.appendChild(el("tr", {}, ["When", "Who", "What", "Student or item", "Before", "After"].map(function (h) { return el("th", { text: h }); })));
+      list.forEach(function (x) {
+        var by = (KIND_WORD[x.actor_kind] || x.actor_kind || "") + " · " + (x.actor_name ? x.actor_name + " (" + x.actor_id + ")" : x.actor_id);
+        var stu = x.student_old === x.student_new ? x.student_old : x.student_old + " → " + x.student_new;
+        table.appendChild(el("tr", { "data-kind": x.actor_kind || "" }, [x.ts, by, logWhat(x.field), logValue(stu), logValue(x.old_value), logValue(x.new_value)].map(function (v) { return el("td", { text: String(v == null ? "" : v) }); })));
+      });
+    }
+    who.addEventListener("change", paint);
     btn.addEventListener("click", function () {
-      btn.disabled = true; note(out, "Loading\u2026");
+      btn.disabled = true; note(out, "Loading…");
       api({ action: "p4_admin_list_edit_log", limit: 200 }).then(function (r) {
-        btn.disabled = false; note(out, ""); clear(table);
-        table.appendChild(el("tr", {}, ["When", "By", "Student", "Field", "From", "To"].map(function (h) { return el("th", { text: h }); })));
-        (r.rows || []).forEach(function (x) {
-          table.appendChild(el("tr", {}, [x.ts, x.actor_kind + " " + x.actor_id, x.student_old === x.student_new ? x.student_old : x.student_old + " \u2192 " + x.student_new, x.field, x.old_value, x.new_value].map(function (v) { return el("td", { text: String(v == null ? "" : v) }); })));
-        });
-        if (!(r.rows || []).length) note(out, "No edits yet.");
+        btn.disabled = false; rows = r.rows || []; paint();
       }, function (e) { btn.disabled = false; note(out, e.message, "err"); });
     });
-    return el("section", { class: "t-card" }, [el("h2", { text: "Student edit log" }), el("p", { class: "t-hint", text: "Read only: every change a teacher made to a student's name or phone numbers." }), btn, out, el("div", { style: "overflow-x:auto" }, [table])]);
+    return el("section", { class: "t-card" }, [el("h2", { text: "Staff activity log" }),
+      el("p", { class: "t-hint", text: "Read only: changes made by teachers and by assistants, newest first. It covers student name and phone edits, attendance marks, grades, lesson requirements and follow-up steps marked done. Your own changes are not listed." }),
+      el("div", { class: "t-add" }, [btn, who]), out, el("div", { style: "overflow-x:auto" }, [table])]);
   }
   function startOwner() {
     if (!ownerRoot) return;
@@ -302,7 +359,7 @@
 
   function powersCard() {
     var can = el("ul"), cannot = el("ul");
-    S.allow.forEach(function (a) { can.appendChild(el("li", { text: LABEL[a] || a })); });
+    S.allow.forEach(function (a) { can.appendChild(el("li", { text: labelOf(a) })); });
     CANNOT.forEach(function (c) { cannot.appendChild(el("li", { text: c })); });
     return el("section", { class: "t-card" }, [
       el("h2", { text: "المساعد يقدر يعمل إيه؟" }),

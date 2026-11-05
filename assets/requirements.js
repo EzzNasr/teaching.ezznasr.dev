@@ -18,6 +18,13 @@
 
   var AR = {
     modes: { inherit: "زي العام", on: "مفعّل", off: "متوقف", custom: "مخصّص" },
+    // One line under the choices: what the picked mode does for this group.
+    modeHelp: {
+      inherit: "زي العام: المجموعة دي بتمشي على الإعداد العام زي ما هو.",
+      on: "مفعّل: المطلوب ده شغّال للمجموعة دي حتى لو متقفل في العام، بنفس أرقام العام.",
+      off: "متوقف: المجموعة دي مش بتتحاسب على المطلوب ده خالص (مش بيدخل في الالتزام ولا التقرير).",
+      custom: "مخصّص: شغّال للمجموعة دي بأرقام خاصة بيها (النسبة أو الدرجة أو التقرير) بدل أرقام العام."
+    },
     measure: {
       watch: "بنحسب نسبة مشاهدة الطالب للفيديو. بيعتبر خلّص لما يوصل للنسبة المطلوبة.",
       homework: "بنشوف هل الطالب سلّم واجب الدرس قبل الموعد النهائي.",
@@ -187,7 +194,7 @@
   function errText(err) {
     var m = (err && err.message) || "حصل خطأ، جرّب تاني.";
     if (m === "Not authorized.") m = "الحساب ده مش مسموح له بالصفحة دي. لو إنت مساعد، اطلب من الأدمن يفعّل صلاحية المطلوبات.";
-    if (/Unknown action/.test(m)) m = "السيرفر لسه ما اتحدّثش بنسخة المطلوبات. انشر Code.gs والملفات الجديدة كنسخة جديدة من نفس الـ deployment.";
+    if (/Unknown action/.test(m)) m = "السيرفر لسه مش متحدّث بنسخة المطلوبات. الأدمن محتاج ينشر آخر نسخة من Apps Script (Code.gs والملفات الجديدة).";
     return m;
   }
 
@@ -255,7 +262,12 @@
     parts.push(e.in_monthly_report ? "داخل تقرير الشهر" : "خارج تقرير الشهر");
     return parts.join(" · ");
   }
-  function sourceChip(s) { return s === "group" ? chip("🎯 من المجموعة", "teal") : s === "global" ? chip("🌐 من العام") : chip("⚙️ الافتراضي"); }
+  // Where the setting comes from; the title says it in a full sentence.
+  function sourceChip(s) {
+    var c = s === "group" ? chip("🎯 من المجموعة", "teal") : s === "global" ? chip("🌐 من العام") : chip("⚙️ الافتراضي");
+    c.title = s === "group" ? "المجموعة دي ليها استثناء خاص بيها" : s === "global" ? "جاي من الإعدادات العامة اللي إنت عدّلتها" : "إعداد البداية، محدش عدّله لسه";
+    return c;
+  }
 
   function swRow(id, title, hint, checked, onChange, disabled) {
     var input = el("input", { type: "checkbox", id: id, role: "switch", checked: checked, disabled: disabled, onchange: function (e) { onChange(e.target.checked, e.target); } });
@@ -278,7 +290,7 @@
     var card = el("section", { class: "rq-card" + (c.enabled ? "" : " off"), id: "rq-card-" + k }, [
       el("div", { class: "rq-row rq-between" }, [
         el("h3", {}, [labelOf(c)]),
-        el("div", { class: "rq-row" }, [chip(manual ? "✍️ يدوي" : "🤖 تلقائي", manual ? "warn" : "teal"), el("span", { class: "rq-key" }, [k])])
+        el("div", { class: "rq-row" }, [Object.assign(chip(manual ? "✍️ يدوي" : "🤖 تلقائي", manual ? "warn" : "teal"), { title: manual ? "يدوي: إنت بتسجّله بنفسك لكل طالب كل شهر" : "تلقائي: الموقع بيحسبه لوحده من نشاط الطالب" }), (c.label_en && c.label_en !== labelOf(c) ? el("span", { class: "rq-key", lang: "en", dir: "ltr" }, [c.label_en]) : null)])
       ]),
       el("p", { class: "rq-measure" }, [AR.measure[manual ? "manual" : k] || ""])
     ]);
@@ -401,7 +413,8 @@
         seg.appendChild(el("label", { for: id, class: (m === mode ? "sel" : "") + (m === "off" && m === mode ? " offsel" : "") }, [inp, AR.modes[m]]));
       });
       card.appendChild(seg);
-      card.appendChild(el("p", { class: "rq-eff", id: "rq-eff-" + k }, ["الفعلي: " + effText(c, e)]));
+      card.appendChild(el("p", { class: "rq-measure rq-modehelp", id: "rq-modehelp-" + k, style: "margin:8px 0 0" }, [AR.modeHelp[mode] || ""]));
+      card.appendChild(el("p", { class: "rq-eff", id: "rq-eff-" + k }, ["اللي بيتطبّق فعلًا: " + effText(c, e)]));
       if (mode === "custom") {
         var rule = o.rule || {};
         if (k === "watch") card.appendChild(numField("rq-grule-" + k, "نسبة المشاهدة لهذه المجموعة", rule.pct !== undefined ? rule.pct : c.rule.pct, 1, 100, 1, false,

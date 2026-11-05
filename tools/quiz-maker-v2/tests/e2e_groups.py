@@ -92,6 +92,24 @@ def run(browser):
     pg.wait_for_timeout(150)
     wide = pg.evaluate("document.documentElement.scrollWidth - window.innerWidth")
     check("phone width: the open picker does not scroll the page sideways", wide <= 1, wide)
+
+    # ---- the dropdown closes: outside click, Escape, Done, and opening another one ---------------------------------------
+    opened = lambda: pg.locator(".ac-pick[open]").count()
+    pg.mouse.click(8, pg.viewport_size["height"] - 8)   # empty page margin, below the sticky bar
+    check("a click outside closes the picker", opened() == 0, opened())
+    pg.locator(".ac-pick > summary").first.click()
+    pg.locator(".ac-pick[open] .ac-pickitem input").first.check()
+    check("ticking a student keeps it open (several can be picked)", opened() == 1, opened())
+    pg.keyboard.press("Escape")
+    check("Escape closes the picker", opened() == 0, opened())
+    pg.locator(".ac-pick > summary").first.click()
+    pg.locator(".ac-pick[open] [data-pick-done]").click()
+    check("Done closes the picker", opened() == 0, opened())
+    if pg.locator(".ac-pick > summary").count() > 1:
+        pg.locator(".ac-pick > summary").nth(0).click()
+        pg.evaluate("document.querySelectorAll('.ac-pick')[1].open = true")   # the open panel covers the second one, so open it directly
+        pg.wait_for_timeout(100)
+        check("opening another picker closes the first", opened() == 1, opened())
     s.ctx.close()
 
 

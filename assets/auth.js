@@ -1539,6 +1539,19 @@
     }
   }
 
+  // Server errors name the internal step ("Unknown action: admin_fu2_mark_done"). People should
+  // never see those names: keep the English key words (pages still test for "Unknown action")
+  // but say what it means instead of the code name.
+  function plainServerError(err) {
+    var m = String((err && err.message) || "");
+    var out = m;
+    if (/^Unknown action\b/i.test(m)) out = "Unknown action: the server doesn't have this step yet. The owner needs to deploy the newest Apps Script.";
+    else if (/^Not implemented yet\b/i.test(m)) out = "Not implemented yet on the server. The owner needs to deploy the newest Apps Script.";
+    else out = m.replace(/\b(?:admin|fu2|p[0-9]|att)_[a-z0-9_]+\b/g, "this step");
+    if (out === m) return err;
+    var e2 = new Error(out); e2.raw = m; return e2;
+  }
+
   window.AuthEngine = {
     mount: mount,
     getSession: getSession,
@@ -1563,7 +1576,9 @@
     adminCall: function (session, payload) {
       var missing = requireSession(session);
       if (missing) return missing;
-      return postToDrive(Object.assign({}, payload, { student_id: session.student_id, session_token: session.session_token }));
+      return postToDrive(Object.assign({}, payload, { student_id: session.student_id, session_token: session.session_token }))
+        .catch(function (err) { throw plainServerError(err); });
     },
+    plainServerError: plainServerError,
   };
 })();

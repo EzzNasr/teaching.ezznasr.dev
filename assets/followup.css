@@ -262,6 +262,7 @@ div.fu-contactline{cursor:default}
 html[data-theme="dark"] .fu-dot.amber{background:var(--fu-warn)}
 .fu-tab[aria-selected="true"] .fu-dot{box-shadow:0 0 0 2px #fff}
 .fu-badge{min-width:26px;height:26px;border-radius:999px;background:var(--fu-bad);color:#fff;font-size:14px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+html[data-theme="dark"] .fu-badge{color:#2a0d0a}
 .fu-hero{border:2px solid var(--fu-teal);padding:18px}
 .fu-hero.clear{border-color:var(--fu-line)}
 .fu-eyebrow{color:var(--fu-teal);font-weight:800;font-size:14px;margin-bottom:2px}

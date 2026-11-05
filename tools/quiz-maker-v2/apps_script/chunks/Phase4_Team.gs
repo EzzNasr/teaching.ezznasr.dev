@@ -333,21 +333,68 @@ function p4_admin_list_teachers(payload) {
 }
 
 // {limit?} newest first, default 200.
+// Rows from StudentEditLog (teachers editing a student's name/phones) plus the AuditLog rows written by a teacher or
+// an assistant (attendance, grades, parent contacts, group settings...). Each row says who: actor_kind
+// "teacher" | "assistant", actor_id (phone) and actor_name. The owner's own AuditLog rows are left out.
 function p4_admin_list_edit_log(payload) {
   if (!p4t_isOwner_(payload)) return p4t_denied_();
   var limit = parseInt(payload && payload.limit, 10);
   if (isNaN(limit) || limit < 1) limit = 200;
   limit = Math.min(limit, 1000);
+  var rows = [];
   var sh = _ss().getSheetByName("StudentEditLog");
-  if (!sh || sh.getLastRow() < 2) return { ok: true, rows: [] };
-  var hs = p4t_headers_(sh);
-  var vals = sh.getRange(2, 1, sh.getLastRow() - 1, hs.length).getValues(), rows = [];
-  for (var r = vals.length - 1; r >= 0 && rows.length < limit; r--) {
-    var o = {};
-    hs.forEach(function (h, j) { if (h !== "") o[h] = String(vals[r][j] == null ? "" : vals[r][j]); });
-    rows.push(o);
+  if (sh && sh.getLastRow() >= 2) {
+    var hs = p4t_headers_(sh);
+    var vals = sh.getRange(2, 1, sh.getLastRow() - 1, hs.length).getValues();
+    for (var r = vals.length - 1; r >= 0 && rows.length < limit; r--) {
+      var o = {};
+      hs.forEach(function (h, j) { if (h !== "") o[h] = String(vals[r][j] == null ? "" : vals[r][j]); });
+      o.source = "edit";
+      rows.push(o);
+    }
   }
-  return { ok: true, rows: rows };
+  var staff = {};
+  try { staff = p4t_staffByPhone_(); } catch (e) { staff = {}; }
+  rows.forEach(function (o) { var who = staff[_normalizePhone(o.actor_id)]; if (who && !o.actor_name) o.actor_name = who.name; });
+  try { rows = rows.concat(p4t_staffAudit_(staff, limit)); } catch (e2) { Logger.log("staff audit read failed: " + (e2 && e2.message)); }
+  rows.sort(function (a, b) { return a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0; });
+  return { ok: true, rows: rows.slice(0, limit) };
+}
+
+// {normalized phone: {kind: "teacher"|"assistant", name}} for every teacher and assistant row in Students.
+function p4t_staffByPhone_() {
+  var S = p4_readStudents_(), out = {};
+  for (var i = 1; i < S.values.length; i++) {
+    var role = p4_roleOf_(S, i);
+    if (role !== "teacher" && role !== "assistant") continue;
+    if (S.c.is_admin && _isTruthyFlag(p4_cell_(S, i, "is_admin"))) continue;
+    var ph = _normalizePhone(p4_idOf_(S, i));
+    if (!ph) continue;
+    var nm = S.c.display_name ? String(p4_cell_(S, i, "display_name") || "") : "";
+    out[ph] = { kind: role, name: nm };
+  }
+  return out;
+}
+
+// The newest AuditLog rows whose "who" is a teacher or an assistant, shaped like StudentEditLog rows.
+// Reads only the last 3000 AuditLog rows so a long log stays quick.
+function p4t_staffAudit_(staff, limit) {
+  var sh = _dataSs().getSheetByName("AuditLog");
+  if (!sh || sh.getLastRow() < 2 || !Object.keys(staff).length) return [];
+  var last = sh.getLastRow(), n = Math.min(last - 1, 3000);
+  var vals = sh.getRange(last - n + 1, 1, n, 6).getValues(), out = [];
+  var s = function (v) { return v == null ? "" : (v instanceof Date ? _cairoIso(v) : String(v)); };
+  for (var r = vals.length - 1; r >= 0 && out.length < limit; r--) {
+    var who = staff[_normalizePhone(s(vals[r][1]))];
+    if (!who) continue;
+    var target = s(vals[r][3]);
+    if (!target) {   // attendance rows keep the student's phone inside before/after
+      try { var bj = JSON.parse(s(vals[r][5]) || "{}"); target = String(bj.phone || bj.student || ""); } catch (e) { /* not JSON */ }
+    }
+    out.push({ ts: s(vals[r][0]).replace("T", " ").slice(0, 19), actor_kind: who.kind, actor_id: s(vals[r][1]), actor_name: who.name,
+               student_old: target, student_new: target, field: s(vals[r][2]), old_value: s(vals[r][4]), new_value: s(vals[r][5]), source: "audit" });
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------- teacher identity

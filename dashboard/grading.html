@@ -43,8 +43,10 @@
   .g-box{ border:1px solid var(--line); border-radius:11px; background:var(--panel-soft); padding:12px; min-height:200px; }
   .g-box h3{ margin:0 0 8px; font:600 11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink-dim); }
   .g-model{ white-space:pre-wrap; font-size:15px; }
-  .g-photo{ width:100%; max-height:62vh; object-fit:contain; border-radius:8px; cursor:zoom-in; transition:transform .15s; }
-  .g-photo.is-zoom{ max-height:none; cursor:zoom-out; }
+  /* The photo sits in a frame sized by fitPhoto(), so a rotated photo stays inside the box and never covers the buttons. */
+  .g-frame{ position:relative; width:100%; overflow:hidden; border-radius:8px; }
+  .g-photo{ position:absolute; left:50%; top:50%; max-width:none; border-radius:8px; cursor:zoom-in; transform:translate(-50%,-50%); transition:transform .15s; }
+  .g-photo.is-zoom{ cursor:zoom-out; }
   .g-photo-tools{ margin-top:8px; display:flex; gap:6px; }
   .g-mark{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:14px; }
   .g-mark input[type=number]{ width:90px; font:600 18px var(--mono); padding:7px 9px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); }
@@ -58,6 +60,7 @@
   @media (max-width:820px){ .g-layout,.g-pair{ grid-template-columns:1fr; } .g-list{ max-height:200px; } }
   @media (max-width:480px){ .g-kinds{ display:flex; } .g-kind{ flex:1 1 0; justify-content:center; padding:9px 10px; } }
 </style>
+<script src="/assets/theme.js" defer></script>
 </head>
 <body>
 <header>
@@ -73,6 +76,7 @@
       <a href="my-team.html" data-teacher-only>My team</a>
       <a href="team.html" data-owner-only>Team</a>
     </nav>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true"></span><span class="theme-label"></span></button>
   </div>
 </header>
 
@@ -240,7 +244,7 @@
       el("div", { class: "g-pair" }, [
         el("div", { class: "g-box" }, [el("h3", { text: "Model answer" }), el("div", { class: "g-model", dir: "auto", text: it.model_answer || "(no model answer synced — open the quiz in Quiz Maker and sync)" })]),
         el("div", { class: "g-box" }, [el("h3", { text: "Student's answer" }), imgBox,
-          el("div", { class: "g-photo-tools" }, [el("button", { class: "g-btn", type: "button", text: "Rotate", on: { click: function () { S.rot = (S.rot + 90) % 360; var p = document.querySelector(".g-photo"); if (p) p.style.transform = "rotate(" + S.rot + "deg)"; } } })])])
+          el("div", { class: "g-photo-tools" }, [el("button", { class: "g-btn", type: "button", text: "Rotate", on: { click: function () { S.rot = (S.rot + 90) % 360; fitPhoto(); } } })])])
       ]),
       el("div", { class: "g-mark" }, [
         marks, el("span", { text: "/ " + (max == null ? "?" : max) }),
@@ -256,13 +260,30 @@
     var k = key(it), box = document.getElementById("g-img");
     function show(url) {
       if (key(S.items[S.i] || {}) !== k || !box) return;
-      clear(box).appendChild(el("img", { class: "g-photo", src: url, alt: "Student's written answer", on: { click: function (e) { e.target.classList.toggle("is-zoom"); } } }));
+      var img = el("img", { class: "g-photo", src: url, alt: "Student's written answer", on: { click: function (e) { e.target.classList.toggle("is-zoom"); fitPhoto(); }, load: fitPhoto } });
+      clear(box).appendChild(el("div", { class: "g-frame" }, [img]));
+      if (img.complete) fitPhoto();
     }
     if (S.imgCache[k]) return show(S.imgCache[k]);
     api({ action: "get_written_image", submission_id: it.submission_id, question_id: it.question_id }).then(function (r) {
       S.imgCache[k] = "data:" + r.content_type + ";base64," + r.data_base64; show(S.imgCache[k]);
     }).catch(function (e) { if (box && key(S.items[S.i]) === k) clear(box).appendChild(el("div", { class: "g-state g-err", text: "Couldn't load the photo: " + e.message })); });
   }
+
+  // Size the photo and its frame for the current rotation: the turned photo always fits the box width and
+  // (unless zoomed) 62% of the screen height, and the frame is exactly as tall as the turned photo.
+  function fitPhoto() {
+    var img = document.querySelector(".g-photo"), frame = img && img.parentNode;
+    if (!img || !frame || !img.naturalWidth) return;
+    var W = frame.clientWidth || 1, M = img.classList.contains("is-zoom") ? Infinity : window.innerHeight * 0.62;
+    var w = img.naturalWidth, h = img.naturalHeight, side = S.rot === 90 || S.rot === 270;
+    var k = side ? Math.min(W / h, M / w) : Math.min(W / w, M / h);
+    img.style.width = Math.round(w * k) + "px";
+    img.style.height = Math.round(h * k) + "px";
+    frame.style.height = Math.round((side ? w : h) * k) + "px";
+    img.style.transform = "translate(-50%,-50%) rotate(" + S.rot + "deg)";
+  }
+  window.addEventListener("resize", fitPhoto);
 
   // ---------- actions ----------
   function go(i) { if (i < 0 || i >= S.items.length) return; S.i = i; S.rot = 0; render(); }

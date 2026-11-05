@@ -1580,6 +1580,27 @@
         "../../scripts/gen_regression_table.py",
         "--check"
       ]
+    },
+    {
+      "id": "R-TEAM-LOG-1",
+      "title": "Team page activity log lists teachers' and assistants' changes, labelled by who; owner's own left out; grades record the grader",
+      "status": "active",
+      "owner": "polish-2026-11",
+      "cmd": [
+        "node",
+        "tests/test_staff_activity_log.js"
+      ]
+    },
+    {
+      "id": "R-GRADE-ROT-1",
+      "title": "Grading page: a rotated (and zoomed) photo stays inside its frame, desktop light and phone dark",
+      "status": "active",
+      "needs": "playwright",
+      "owner": "polish-2026-11",
+      "cmd": [
+        "python",
+        "tests/e2e_grading_rotate.py"
+      ]
     }
   ]
 }

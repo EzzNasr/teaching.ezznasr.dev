@@ -101,14 +101,14 @@
             // Apps Script occasionally answers with an HTML page instead of JSON
             // (right after a redeploy, under load). One silent retry clears it.
             if (!isRetry) return call(payload, true);
-            throw new Error("الخادم أرسل ردًا غير متوقع. حاول مرة أخرى.");
+            throw new Error("السيرفر رجّع رد غريب. جرّب تاني.");
           }
           if (!data || !data.ok) throw new Error((data && data.error) || "فشل تنفيذ الطلب.");
           return data;
         });
       },
       function () {
-        throw new Error("تعذّر الاتصال بالخادم. تحقق من اتصال الإنترنت وحاول مرة أخرى.");
+        throw new Error("مش قادرين نوصل للسيرفر. اتأكد من النت وجرّب تاني.");
       },
     );
   }
