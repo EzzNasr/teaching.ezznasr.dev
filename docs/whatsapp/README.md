@@ -82,8 +82,17 @@ tested the first time (section 4, step 4).
    Fill in `api_url` (the `/exec` URL from `contract/att_config.js`), `wa_token` (from step A2) and `phone_number` (the spare number, `2010...`).
 5. Link it: `npm run pair`. It prints an 8-character code. On the same phone: **WhatsApp > ⋮ > Linked devices > Link a device >
    Link with phone number instead**, type the code. When Termux says "Linked and connected", press Ctrl+C.
-6. Start at boot: `mkdir -p ~/.termux/boot && cp termux/start-wa-sender.sh ~/.termux/boot/ && chmod +x ~/.termux/boot/start-wa-sender.sh`,
-   then reboot the phone. Check: `tail -f ~/teaching.ezznasr.dev/tools/wa-sender/data/sender.log` shows `WhatsApp connected` and `idle: off`.
+6. Start by itself. EMUI kills the whole of Termux now and then even with the battery settings above (seen on 2026-11-05,
+   ~1 h after start, no reboot), so `termux/wa-up.sh` starts SSH and the sender only if they are not already running, and three
+   things call it: phone boot (Termux:Boot), **opening the Termux app** (`~/.bashrc`), and a 15-minute watchdog.
+   ```bash
+   cp termux/wa-up.sh termux/start-wa-sender.sh ~/.termux/ && chmod +x ~/.termux/*.sh
+   mkdir -p ~/.termux/boot && printf '#!/data/data/com.termux/files/usr/bin/sh\nsh ~/.termux/wa-up.sh boot\n' > ~/.termux/boot/00-wa-up.sh && chmod +x ~/.termux/boot/00-wa-up.sh
+   echo 'sh ~/.termux/wa-up.sh opened >/dev/null 2>&1' >> ~/.bashrc
+   ```
+   Watchdog (needs the **Termux:API** app from the same place Termux came from, then `pkg install termux-api`):
+   `termux-job-scheduler --job-id 1 --period-ms 900000 --persisted true --script ~/.termux/wa-up.sh`.
+   Then reboot the phone. Check: `tail -f ~/teaching.ezznasr.dev/tools/wa-sender/data/sender.log` shows `WhatsApp connected` and `idle: off`.
 
 ### C. Test, then go live
 1. Run **`fu2_wa_modeTest`** (needs the Script Property named exactly **`WA_TEST_TO`**). In test mode the phone looks for work every
