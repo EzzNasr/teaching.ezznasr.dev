@@ -76,6 +76,19 @@ const sleep = ms => { sleeps.push(ms); return Promise.resolve(); };
     for (let i = 0; i < 5; i++) await cycle({ api: a, wa: fakeWa(), journal: j, sleep, ctx: c2 });
     ok(a.beats.length === 1, "fast polling sends the heartbeat once every few minutes, not every round (" + a.beats.length + " in 5 rounds)");
   }
+  console.log("dead Google addresses at home (lib/net.js)");
+  {
+    const net = require("../../tools/wa-sender/lib/net"), m = net._mem();
+    const saved = JSON.stringify(m);
+    m.good = { "script.google.com": ["192.0.2.10"] }; m.bad = { "192.0.2.66": Date.now() };
+    const o = net.order("script.google.com", ["192.0.2.66", "2a00:1450::1", "192.0.2.20", "192.0.2.10"]);
+    ok(o[0] === "192.0.2.10", "an address that connected before is tried first, even if DNS lists it last");
+    ok(!o.some(a => a.includes(":")), "IPv6 is left out (the home network has none)");
+    ok(o[o.length - 1] === "192.0.2.66" && o.indexOf("192.0.2.20") < o.indexOf("192.0.2.66"), "an address that just failed goes to the back");
+    m.bad = { "192.0.2.66": Date.now() - 2 * 3600000 };
+    ok(net.order("x", ["192.0.2.66", "192.0.2.20"])[0] === "192.0.2.66", "after an hour a failed address gets a fair chance again");
+    Object.assign(m, JSON.parse(saved));
+  }
   console.log("not connected / server down");
   {
     const wa = fakeWa({ state: "logged_out" }), api = fakeApi([{ id: "A", to: "201100000001", text: "x" }]), j = new Journal(tmp());
