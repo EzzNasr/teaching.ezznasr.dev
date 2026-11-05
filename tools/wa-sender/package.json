@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node sender.js",
     "pair": "node pair.js",
+    "selftest": "node selftest.js",
     "test": "node ../../tests/wa/sender.test.js"
   },
   "engines": { "node": ">=20" },

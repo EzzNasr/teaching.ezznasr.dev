@@ -109,6 +109,8 @@ tested the first time (section 4, step 4).
 - Telegram alerts (W8). The follow-up page's contact state updates as messages are actually sent.
 - `admin_fu2_wa_status` (the page asks it): mode, sent today, the cap, the phone's last sign of life, the last 30 messages.
 - On the phone: `data/sender.log` (every send and error), `data/journal.json` (what it tried).
+  The log has a line for every change ("idle: off", "idle: queue empty", "idle: outside sending hours"), so the last idle line is the current state.
+- `npm run selftest` (sender stopped first) sends one message to the phone's own WhatsApp: it checks the WhatsApp side without the server or any parent.
 - The `WaOutbox` sheet: one row per message with its status (`queued`, `sending`, `sent`, `failed`, `unknown`, `cancelled`) and the error.
 
 ## 7. Phase 2: zero taps (not built)

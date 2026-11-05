@@ -24,6 +24,13 @@ function lookupAll(host, opts, cb) {
   resolver.resolve4(host, (e, a) => { if (e) err = err || e; else pub = a || []; done(); });
 }
 
+// Trying every address ends, when all of them fail, in an AggregateError with an EMPTY message: name the addresses instead.
+function explain(e) {
+  if (e && e.message) return e;
+  const parts = ((e && e.errors) || []).map(x => (x.code || x.message || "?") + (x.address ? " " + x.address : ""));
+  return new Error("could not connect" + (parts.length ? ": " + parts.join(", ") : (e && e.code ? ": " + e.code : "")));
+}
+
 function once(url, opts) {
   return new Promise((resolve, reject) => {
     const req = https.request(url, {
@@ -36,7 +43,7 @@ function once(url, opts) {
       res.on("error", reject);
     });
     req.on("timeout", () => req.destroy(new Error("timed out")));
-    req.on("error", reject);
+    req.on("error", e => reject(explain(e)));
     if (opts.signal) opts.signal.addEventListener("abort", () => req.destroy(new Error("aborted")), { once: true });
     if (opts.body) req.write(opts.body);
     req.end();

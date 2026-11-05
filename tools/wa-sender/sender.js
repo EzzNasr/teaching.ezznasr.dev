@@ -23,13 +23,16 @@ async function main() {
   const journal = new Journal(path.join(__dirname, "data", "journal.json"));
   const wa = await require("./lib/wa").connect(cfg, log);
   if (!wa.registered()) log("This phone is not linked yet: stop this and run `npm run pair` first.");
-  let rounds = 0;
+  // the first round waits (up to 60 s) for the socket instead of reporting "connecting" and sleeping
+  for (let i = 0; i < 30 && wa.registered() && wa.state() !== "connected"; i++) await new Promise(res => setTimeout(res, 2000));
+  let rounds = 0, lastWhy = null;
   process.on("SIGTERM", () => { log("stopping"); wa.stop(); process.exit(0); });
   for (;;) {
     let r;
     try { r = await cycle({ api, wa, journal, log }); } catch (e) { log("round failed: " + (e && e.stack || e)); r = { wait_sec: 60 }; }
     if (r.sent || r.failed) log("round: " + r.sent + " sent, " + r.failed + " not sent");
-    else if (rounds % 12 === 0) log("idle: " + (r.why || "nothing to do"));
+    else if ((r.why || "") !== lastWhy || rounds % 12 === 0) log("idle: " + (r.why || "nothing to do"));   // every change, plus now and then
+    lastWhy = r.why || "";
     if (++rounds % 500 === 0) journal.prune(30);
     const wait = Math.max(5, Math.min(1800, r.wait_sec || 60));
     await new Promise(res => setTimeout(res, wait * 1000));
