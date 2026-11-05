@@ -74,9 +74,11 @@ tested the first time (section 4, step 4).
    ```bash
    pkg update && pkg install -y nodejs-lts git
    git clone https://github.com/EzzNasr/teaching.ezznasr.dev.git ~/teaching.ezznasr.dev
-   cd ~/teaching.ezznasr.dev/tools/wa-sender && npm install --omit=optional
+   cd ~/teaching.ezznasr.dev/tools/wa-sender && npm install --omit=optional --allow-git=all
    cp config.example.json config.json && nano config.json
    ```
+   (`--allow-git=all`: Baileys pulls one part, `libsignal`, from GitHub, and newer npm (Node 24) refuses git downloads
+   unless told to, with `EALLOWGIT`.)
    Fill in `api_url` (the `/exec` URL from `contract/att_config.js`), `wa_token` (from step A2) and `phone_number` (the spare number, `2010...`).
 5. Link it: `npm run pair`. It prints an 8-character code. On the same phone: **WhatsApp > ⋮ > Linked devices > Link a device >
    Link with phone number instead**, type the code. When Termux says "Linked and connected", press Ctrl+C.
