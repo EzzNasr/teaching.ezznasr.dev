@@ -3,7 +3,7 @@
 "use strict";
 
 function makeApi(cfg, fetchImpl) {
-  const f = fetchImpl || globalThis.fetch;
+  const f = fetchImpl || require("./net").phoneFetch;   // not plain fetch: see lib/net.js (dead Google addresses at home)
   async function call(action, extra) {
     const body = JSON.stringify(Object.assign({ action, wa_token: cfg.wa_token }, extra || {}));
     const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 60000);
