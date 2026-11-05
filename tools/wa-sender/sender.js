@@ -26,10 +26,11 @@ async function main() {
   // the first round waits (up to 60 s) for the socket instead of reporting "connecting" and sleeping
   for (let i = 0; i < 30 && wa.registered() && wa.state() !== "connected"; i++) await new Promise(res => setTimeout(res, 2000));
   let rounds = 0, lastWhy = null;
+  const ctx = {};   // loop.js keeps the heartbeat timing here
   process.on("SIGTERM", () => { log("stopping"); wa.stop(); process.exit(0); });
   for (;;) {
     let r;
-    try { r = await cycle({ api, wa, journal, log }); } catch (e) { log("round failed: " + (e && e.stack || e)); r = { wait_sec: 60 }; }
+    try { r = await cycle({ api, wa, journal, log, ctx }); } catch (e) { log("round failed: " + (e && e.stack || e)); r = { wait_sec: 60 }; }
     if (r.sent || r.failed) log("round: " + r.sent + " sent, " + r.failed + " not sent");
     else if ((r.why || "") !== lastWhy || rounds % 12 === 0) log("idle: " + (r.why || "nothing to do"));   // every change, plus now and then
     lastWhy = r.why || "";

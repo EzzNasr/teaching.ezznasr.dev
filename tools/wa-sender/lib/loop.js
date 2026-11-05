@@ -9,6 +9,7 @@
 "use strict";
 
 function rand(a, b) { return a + Math.random() * (b - a); }
+const TEST_POLL_SEC = 10;
 
 /** api: {claim(max), report(results), heartbeat(state)} ; wa: {state(), exists(to), send(to, text), typing(to, ms)} ; journal: Journal */
 async function cycle(o) {
@@ -31,16 +32,26 @@ async function cycle(o) {
   }
 
   // 2. alive?
-  const state = wa.state();
-  try { await api.heartbeat(state); } catch (e) { log("heartbeat failed: " + e.message); }
+  // (the heartbeat goes at most every 4 minutes, or when the state changes, so fast test-mode polling stays one call a round)
+  const state = wa.state(), ctx = o.ctx || {}, now = Date.now();
+  if (!o.ctx || state !== ctx.lastState || !(now - (ctx.lastBeat || 0) < 240000)) {
+    try { await api.heartbeat(state); ctx.lastBeat = now; ctx.lastState = state; } catch (e) { log("heartbeat failed: " + e.message); }
+  }
   if (state !== "connected") { out.why = "WhatsApp " + state; out.wait_sec = 30; return out; }
 
   // 3. work
   let claim;
   try { claim = await api.claim(5); } catch (e) { log("claim failed: " + e.message); out.why = "server unreachable"; out.wait_sec = 120; return out; }
   if (!claim || claim.ok === false) { out.why = (claim && claim.error) || "claim refused"; out.wait_sec = 600; return out; }
-  const items = claim.items || [], gap = claim.gap || { min: 25, max: 75 };
+  const items = claim.items || [];
+  let gap = claim.gap || { min: 25, max: 75 };
   out.wait_sec = items.length ? 5 : (claim.wait_sec || 300); out.why = claim.why || "";
+  // TEST mode: everything goes to the owner's own test number, so react at once: look again every TEST_POLL_SEC and
+  // send 5-10 s apart. LIVE keeps the server's pace (5-minute checks, 25-75 s gaps) because real parents get those.
+  if (claim.mode === "test") {
+    if (!items.length) out.wait_sec = o.testPollSec || TEST_POLL_SEC;
+    gap = { min: Math.min(gap.min, 5), max: Math.min(gap.max, 10) };
+  }
 
   for (let i = 0; i < items.length; i++) {
     const it = items[i];

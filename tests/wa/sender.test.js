@@ -57,6 +57,25 @@ const sleep = ms => { sleeps.push(ms); return Promise.resolve(); };
     const B = api.reports.find(x => x.id === "B");
     ok(wa.sent.length === 0 && B && B.ok === false && B.retryable === true && /not attempted/.test(B.error) && !j.get("B"), "the socket drops mid-batch: the untouched rest goes straight back to the queue (never attempted)");
   }
+  console.log("test mode reacts at once, live keeps the pace");
+  {
+    const mk = (mode, items, gap) => ({ beats: [], async claim() { return { ok: true, mode, items: items.splice(0), gap, wait_sec: 300 }; },
+      async report() { return { ok: true }; }, async heartbeat(s) { this.beats.push(s); return { ok: true }; } });
+    const j = new Journal(tmp()), ctx = {};
+    const tEmpty = await cycle({ api: mk("test", [], { min: 25, max: 75 }), wa: fakeWa(), journal: j, sleep, ctx });
+    ok(tEmpty.wait_sec === 10, "test mode, queue empty: looks again in 10 s, not the server's 5 minutes (" + tEmpty.wait_sec + ")");
+    sleeps.length = 0;
+    await cycle({ api: mk("test", [{ id: "T1", to: "201100000001", text: "a" }, { id: "T2", to: "201100000001", text: "b" }], { min: 25, max: 75 }), wa: fakeWa(), journal: j, sleep, ctx });
+    ok(sleeps.length === 1 && sleeps[0] >= 5000 && sleeps[0] <= 10000, "test mode: messages 5-10 s apart (" + Math.round(sleeps[0]) + " ms)");
+    const lEmpty = await cycle({ api: mk("live", [], { min: 25, max: 75 }), wa: fakeWa(), journal: j, sleep, ctx: {} });
+    ok(lEmpty.wait_sec === 300, "live mode keeps the server's 5-minute check");
+    sleeps.length = 0;
+    await cycle({ api: mk("live", [{ id: "L1", to: "201100000001", text: "a" }, { id: "L2", to: "201100000002", text: "b" }], { min: 25, max: 75 }), wa: fakeWa(), journal: j, sleep, ctx: {} });
+    ok(sleeps.length === 1 && sleeps[0] >= 25000 && sleeps[0] <= 75000, "live mode keeps the server's 25-75 s gap");
+    const a = mk("test", [], { min: 25, max: 75 }), c2 = {};
+    for (let i = 0; i < 5; i++) await cycle({ api: a, wa: fakeWa(), journal: j, sleep, ctx: c2 });
+    ok(a.beats.length === 1, "fast polling sends the heartbeat once every few minutes, not every round (" + a.beats.length + " in 5 rounds)");
+  }
   console.log("not connected / server down");
   {
     const wa = fakeWa({ state: "logged_out" }), api = fakeApi([{ id: "A", to: "201100000001", text: "x" }]), j = new Journal(tmp());

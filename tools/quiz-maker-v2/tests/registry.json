@@ -797,7 +797,7 @@
     },
     {
       "id": "R-WA-2",
-      "title": "WhatsApp phone sender loop (tools/wa-sender): sends + reports, server gap, journal before sending, crash-safe (never resends, late reports delivered), retryable vs final failures, end to end with the real server code",
+      "title": "WhatsApp phone sender loop (tools/wa-sender): sends + reports, server gap, journal before sending, crash-safe (never resends, late reports delivered), retryable vs final failures, end to end with the real server code; test mode polls every 10 s and sends 5-10 s apart, live keeps the server pace",
       "cmd": [
         "node",
         "../../tests/wa/sender.test.js"

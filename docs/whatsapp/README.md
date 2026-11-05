@@ -45,7 +45,7 @@ follow-up page (your browser)            Apps Script (/exec)                    
 | Server outbox, modes, limits, alerts | `tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs` (routed by `FollowupRouter.gs`; no change to `Code.gs`) |
 | Phone sender | `tools/wa-sender/` (`sender.js`, `pair.js`, `lib/loop.js`, `lib/journal.js`, `lib/api.js`, `lib/wa.js`, `termux/start-wa-sender.sh`) |
 | Page button | `assets/followup-walk.js` (`phone` option), `assets/followup-app.js` (asks the server whether the phone is on) |
-| Tests | R-WA-1 `tests/test_fu2_whatsapp.js` (server, 42), R-WA-2 `tests/wa/sender.test.js` (phone loop + end to end with the real server code, 21), R-WA-3 `tests/e2e_followup_wa_phone.py` (the button in Chromium, 18) |
+| Tests | R-WA-1 `tests/test_fu2_whatsapp.js` (server, 42), R-WA-2 `tests/wa/sender.test.js` (phone loop + end to end with the real server code, 26), R-WA-3 `tests/e2e_followup_wa_phone.py` (the button in Chromium, 18) |
 
 **Not tested yet:** `lib/wa.js`, the thin adapter over Baileys, against real WhatsApp (it cannot run in CI). Test mode is how it gets
 tested the first time (section 4, step 4).
@@ -86,7 +86,8 @@ tested the first time (section 4, step 4).
    then reboot the phone. Check: `tail -f ~/teaching.ezznasr.dev/tools/wa-sender/data/sender.log` shows `WhatsApp connected` and `idle: off`.
 
 ### C. Test, then go live
-1. Run **`fu2_wa_modeTest`**. On the follow-up page open a parent-message step: the phone button appears. Send a batch.
+1. Run **`fu2_wa_modeTest`** (needs the Script Property named exactly **`WA_TEST_TO`**). In test mode the phone looks for work every
+   **10 seconds** and sends 5-10 s apart, so a batch starts within seconds; live keeps 5-minute checks and 25-75 s gaps. On the follow-up page open a parent-message step: the phone button appears. Send a batch.
    Every message arrives on **your** number with `[TEST] → name · number`. Check the text, the numbers and the pace.
 2. Try the failure paths once: turn the phone's Wi-Fi off for 2 hours with something queued (Telegram: "phone is silent"), and
    queue a message to a number that has no WhatsApp (Telegram: "not sent").
