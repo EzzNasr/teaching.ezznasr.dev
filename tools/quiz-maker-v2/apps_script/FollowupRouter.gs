@@ -11,6 +11,7 @@
 //
 // Optional, found by name at call time (a missing one changes nothing):
 //   fu2_notify_routes_()  S2, FollowupNotify.gs        req_routes_()  S4, Requirements.gs
+//   fu2_wa_routes_()      FollowupWhatsApp.gs (WhatsApp sender, docs/whatsapp/README.md)
 //   req_effective_(groupKey)  req_catalog_()  req_checks_for_(phoneKey, month)   S4
 // Nothing here is reachable except through the actions listed in fu2_core_routes_() and the merged route maps.
 // =====================================================================================
@@ -27,7 +28,7 @@ function fu2_callGlobal_(name, args) {
 // {action: function(payload)}. Later maps win; core last so nothing can shadow its two actions.
 function fu2_routes_() {
   var out = {};
-  ["fu2_notify_routes_", "req_routes_", "fu2_core_routes_"].forEach(function (name) {
+  ["fu2_notify_routes_", "req_routes_", "fu2_wa_routes_", "fu2_core_routes_"].forEach(function (name) {
     try {
       var r = fu2_callGlobal_(name);
       if (r.found && r.value) Object.keys(r.value).forEach(function (a) { if (typeof r.value[a] === "function") out[a] = r.value[a]; });

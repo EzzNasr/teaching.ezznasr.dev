@@ -1,0 +1,6 @@
+{
+  "api_url": "https://script.google.com/macros/s/PASTE-THE-EXEC-ID/exec",
+  "wa_token": "PASTE-THE-TOKEN-FROM-fu2_wa_setup",
+  "phone_number": "2010XXXXXXXX",
+  "auth_dir": "auth"
+}

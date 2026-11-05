@@ -412,6 +412,12 @@
         var sk = pkOf(payload.student), st2 = d.students[sk]; if (!st2) return { ok: false, error: "Student not found." };
         return mockSummary(st2, 0, payload.from || d.today.slice(0, 8) + "01", payload.to || d.today);
       }
+      // ---- WhatsApp phone (FollowupWhatsApp.gs), faked only with &wa=1 in the address ----
+      if (a === "admin_fu2_wa_status") return /[?&]wa=1(&|$)/.test(location.search) ? { ok: true, mode: "test", configured: true } : { ok: false, error: "Unknown action: " + a };
+      if (a === "admin_fu2_wa_enqueue") {
+        if (!/[?&]wa=1(&|$)/.test(location.search)) return { ok: false, error: "Unknown action: " + a };
+        return { ok: true, mode: "test", queued: (payload.items || []).length, skipped: [] };
+      }
       // ---- v2 (S2's actions, faked in memory) ----
       if (a === "admin_fu2_mark_done") {
         var gd = d.groups.filter(function (x) { return x.key === payload.group || x.group === payload.group; })[0];
@@ -1947,6 +1953,15 @@
     return frag;
   }
 
+  // ---- the WhatsApp phone (FollowupWhatsApp.gs, docs/whatsapp/README.md): is it switched on? ----
+  var WA = { at: 0, st: null, p: null };
+  function waStatus() {
+    if (WA.p) return WA.p;
+    if (Date.now() - WA.at < 600000) return Promise.resolve(WA.st);
+    return (WA.p = api({ action: "admin_fu2_wa_status" }).then(function (r) { WA.p = null; WA.st = r && r.mode && r.mode !== "off" && r.configured ? r : null; WA.at = Date.now(); return WA.st; },
+      function () { WA.p = null; WA.st = null; WA.at = Date.now(); return null; }));   // an older server (Unknown action) or "off": no phone option
+  }
+
   // ---- parent-message walk-through (S3's FollowupWalk; falls back to the single-message flow) ----
   function walkAction(r, kind, cur) {
     var pool = r.ac.neg.filter(function (a) { return !a.blocked && !a.stub && (kind === "parents_watch" ? a.session : !a.session); });
@@ -1989,8 +2004,18 @@
       return;
     }
     var byPk = {}; built.forEach(function (b) { byPk[b.r.st.key] = b; });
+    waStatus().then(function (wa) { openWalkSheet(g, e, built, byPk, V, cur, wa); });
+  }
+  function openWalkSheet(g, e, built, byPk, V, cur, wa) {
+    var phone = wa ? { mode: wa.mode, sendAll: function (list) {
+      var items = list.map(function (x) {
+        var b = byPk[x.row.key]; if (!b) return null;
+        return { student_key: b.r.st.key, student_phone: b.r.st.phone, name: b.r.st.name, to: L().waDigits(b.r.st.parent_phone || ""), text: x.text, log_items: logItems(b.a) };
+      }).filter(Boolean);
+      return api({ action: "admin_fu2_wa_enqueue", group: g.group, group_key: g.key, event: e.key, items: items });
+    } } : null;
     window.FollowupWalk.open({
-      group: g, kind: e.key, templates: STATE.data.templates || {},
+      group: g, kind: e.key, templates: STATE.data.templates || {}, phone: phone,
       rows: built.map(function (b) {
         return { key: b.r.st.key, name: b.r.st.name, parent_phone: b.r.st.parent_phone || "",
           issues: (b.a.issues || [b.a]).map(function (i) { return { kind: i.kind, lesson: i.lesson, label: String(i.label || "").replace(/^[^\s]+\s/, "") }; }),
@@ -2224,7 +2249,7 @@
     STATE.loading = true; $("fu-refresh").style.opacity = ".6";
     return api({ action: "admin_followup_overview" }).then(function (data) {
       STATE.loading = false; $("fu-refresh").style.opacity = "";
-      STATE.data = data; STATE.fetchedAt = Date.now();
+      STATE.data = data; STATE.fetchedAt = Date.now(); WA.at = 0; waStatus();   // the phone state, ready before a walk-through opens
       reapplyStaged();
       applyPendingDone();   // v2: an advance staged but not saved yet stays "done" on screen
       var m = /student=(\d+)/.exec(location.hash), stepLink = false;

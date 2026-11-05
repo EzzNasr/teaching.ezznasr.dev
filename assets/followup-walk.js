@@ -10,6 +10,10 @@
  *     // optional additions (never needed by the contract):
  *     compose(row) -> string,     // your own message for a row (wins over row.message and the built-in composer)
  *     context: {lessons, facts(key), deadlines, now, settings}   // extra input for the built-in composer
+ *     phone: {mode:"test"|"live", sendAll(list) -> Promise<{queued, skipped:[{name, reason}]}>}
+ *                                 // the WhatsApp phone (docs/whatsapp/README.md): offers "send all from the phone" on the first
+ *                                 // screen. list = [{row, text}] for the rows whose parent number passes the check, with the text
+ *                                 // exactly as shown (edits included). Nothing is logged here: the server logs each one when sent.
  *   }) -> { close() }
  *
  * What it does: a full-screen sheet, one student per step: the name, why (chips), the parent's number with the
@@ -163,6 +167,7 @@
     opts = opts || {};
     if (typeof document === 'undefined') throw new Error('FollowupWalk.open needs a browser');
     var flow = createFlow(opts.rows), edits = {}, closed = false, doneCalled = false, confirming = false;
+    var phone = opts.phone && typeof opts.phone.sendAll === 'function' ? opts.phone : null, phoneView = null;   // null | 'ask' | 'busy' | {result} | {error}
     var opener = document.activeElement, prevOverflow = document.body.style.overflow;
     var groupName = (opts.group && (opts.group.group || opts.group.name)) || '';
     var title = KIND_TITLE[opts.kind] || 'رسائل أولياء الأمور';
@@ -244,12 +249,76 @@
       ])];
     }
 
+    // ---- the WhatsApp phone: queue every message at once (the phone sends them slowly and logs each contact) ----
+    function phoneBatch() {
+      var ok = [], held = [];
+      (opts.rows || []).forEach(function (row) {
+        if (!row || !row.key || flow.status(row.key) === 'sent') return;
+        var m = msgCache[row.key] || (msgCache[row.key] = messageFor(opts, row));
+        var text = edits[row.key] !== undefined ? edits[row.key] : m.text, ck = phoneCheck(row);
+        if (ck.level === 'ok' && ck.wa && text && !m.error) ok.push({ row: row, text: text }); else held.push(row);
+      });
+      return { ok: ok, held: held };
+    }
+    function phoneBanner() {
+      if (!phone || flow.index() !== 0 || result().sent.length) return null;
+      var b = phoneBatch(); if (!b.ok.length) return null;
+      return h('div', { class: 'fw-phone-banner', 'data-fw': 'phone-banner' }, [
+        h('button', { class: 'fw-btn wa', type: 'button', 'data-fw': 'phone-all', onclick: function () { phoneView = 'ask'; paint(); } },
+          ['📱 ابعت الكل من موبايل الواتساب (' + b.ok.length + ')']),
+        h('div', { class: 'fw-dim' }, [phone.mode === 'test' ? 'وضع التجربة: الرسايل هتروح لرقمك انت بس.' : 'الموبايل هيبعتهم واحدة واحدة على مهله، ويسجّل التواصل لوحده.'])
+      ]);
+    }
+    function phoneViewNodes() {
+      var b = phoneBatch();
+      if (phoneView === 'ask') {
+        return [h('main', { class: 'fw-body' }, [h('div', { class: 'fw-summary', 'data-fw': 'phone-ask' }, [
+          h('div', { class: 'fw-big' }, ['📱 ابعت ' + b.ok.length + ' رسالة من موبايل الواتساب؟']),
+          phone.mode === 'test' ? h('p', { class: 'fw-warn' }, ['وضع التجربة: كل الرسايل هتروح لرقمك انت، ومش هيتسجّل تواصل.']) : null,
+          h('p', {}, ['الموبايل هيبعت رسالة كل دقيقة تقريبًا في مواعيد الإرسال، ويسجّل التواصل مع كل ولي أمر بعد ما الرسالة توصل.']),
+          b.held.length ? h('p', { class: 'fw-dim' }, [b.held.length + ' طالب رقم ولي أمرهم محتاج مراجعة: هيفضلوا في القايمة عشان تبعتلهم بإيدك.']) : null
+        ])]), h('footer', { class: 'fw-actions' }, [
+          h('button', { class: 'fw-btn primary', type: 'button', 'data-fw': 'phone-confirm', onclick: phoneSend }, ['✓ ابعت من الموبايل']),
+          h('button', { class: 'fw-btn', type: 'button', 'data-fw': 'phone-back', onclick: function () { phoneView = null; paint(); } }, ['رجوع'])
+        ])];
+      }
+      if (phoneView === 'busy') return [h('main', { class: 'fw-body' }, [h('div', { class: 'fw-summary', 'data-fw': 'phone-busy' }, [h('div', { class: 'fw-big' }, ['… بنحطّهم في الطابور'])])])];
+      if (phoneView && phoneView.error) {
+        return [h('main', { class: 'fw-body' }, [h('div', { class: 'fw-summary', 'data-fw': 'phone-error' }, [
+          h('div', { class: 'fw-big' }, ['⚠️ ماتحطّوش في الطابور']), h('p', { class: 'fw-warn' }, [String(phoneView.error)])])]),
+          h('footer', { class: 'fw-actions' }, [h('button', { class: 'fw-btn', type: 'button', 'data-fw': 'phone-back', onclick: function () { phoneView = null; paint(); } }, ['رجوع'])])];
+      }
+      var r = phoneView.result || {}, sk = r.skipped || [];
+      return [h('main', { class: 'fw-body' }, [h('div', { class: 'fw-summary', 'data-fw': 'phone-done' }, [
+        h('div', { class: 'fw-big' }, ['✓ ' + (r.queued || 0) + ' رسالة في طابور الموبايل']),
+        h('p', {}, [r.mode === 'test' ? 'وضع التجربة: هتوصلك على رقمك.' : 'هتتبعت على مهلها، وكل ولي أمر هيتسجّل إنه اتبلّغ أول ما رسالته توصل.']),
+        sk.length ? h('div', { class: 'fw-dim' }, [h('p', {}, ['ماتحطّوش:'])].concat(sk.slice(0, 8).map(function (x) { return h('div', { dir: 'auto' }, ['• ' + (x.name || '') + ' — ' + (x.reason || '')]); }))) : null,
+        b.held.length ? h('p', { class: 'fw-dim' }, ['فاضل ' + b.held.length + ' تبعتلهم بإيدك.']) : null
+      ])]), h('footer', { class: 'fw-actions' }, [
+        b.held.length ? h('button', { class: 'fw-btn primary', type: 'button', 'data-fw': 'phone-rest', onclick: function () { phoneView = null; phoneDone = true; paint(); } }, ['كمّل الباقي بإيدك']) : null,
+        h('button', { class: b.held.length ? 'fw-btn' : 'fw-btn primary', type: 'button', 'data-fw': 'phone-close', onclick: function () { finish(true); } }, ['إغلاق'])
+      ])];
+    }
+    var phoneDone = false;
+    function phoneSend() {
+      var b = phoneBatch();
+      phoneView = 'busy'; paint();
+      Promise.resolve().then(function () { return phone.sendAll(b.ok); }).then(function (res) {
+        if (!res || res.ok === false) { phoneView = { error: (res && res.error) || 'حصلت مشكلة' }; paint(); return; }
+        b.ok.forEach(function (x) { queuedKeys[x.row.key] = 1; });
+        phoneView = { result: res }; paint();
+      }, function (err) { phoneView = { error: (err && err.message) || String(err) }; paint(); });
+    }
+    var queuedKeys = {};
+
     function studentView() {
       var row = flow.current(), key = row.key, ck = phoneCheck(row);
       var m = msgCache[key] || (msgCache[key] = messageFor(opts, row));
       var text = edits[key] !== undefined ? edits[key] : m.text;
       var digits = ck.wa || '';
       var body = h('main', { class: 'fw-body' });
+      var banner = phoneDone ? null : phoneBanner(); if (banner) body.appendChild(banner);
+      if (queuedKeys[key]) body.appendChild(h('div', { class: 'fw-status', 'data-fw': 'phone-queued' }, ['📱 الرسالة دي في طابور الموبايل — اضغط «تخطّي».']));
       body.appendChild(h('h2', { class: 'fw-name', dir: 'auto', 'data-fw': 'name' }, [row.name || row.key]));
       var chips = h('div', { class: 'fw-chips', 'data-fw': 'chips' });
       (row.issues || []).forEach(function (i) {
@@ -320,6 +389,7 @@
       header().forEach(function (n) { panel.appendChild(n); });
       var focus = null, parts;
       if (confirming) parts = confirmView();
+      else if (phoneView) parts = phoneViewNodes();
       else if (!flow.total()) parts = emptyView();
       else if (flow.finished()) parts = summaryView();
       else { var v = studentView(); parts = v.nodes; focus = v.focus; }

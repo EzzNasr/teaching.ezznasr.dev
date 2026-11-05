@@ -13,6 +13,7 @@ new feature follows.
 | [contract.md](contract.md) | The shared data contract between the site, `Code.gs` and the app (lesson ids, actions, payloads) |
 | [rollout-checklist.md](rollout-checklist.md) | Shipping a site + Apps Script release |
 | [attendance/](attendance/README.md) | The attendance system: decisions, deploy, load testing, live-testing plan, demo data, screenshots |
+| [whatsapp/](whatsapp/README.md) | The WhatsApp sender on the spare phone: decisions, setup on the Y7 Prime, safety, phase 2 |
 | [runbooks/](runbooks/) | How to operate and deploy the other features: follow-up v2, notifications, Phase 3 (roles, flags), upload guard |
 | [specs/](specs/) | Design specs of current features: dashboards data contract, grade subscriptions, follow-up dashboard |
 | [history/](history/) | Integration log and early hand-offs, kept for context |

@@ -58,3 +58,7 @@ html[data-theme="dark"] .fw-btn.wa{color:#04210f}
 .fw-overlay :focus-visible{outline:3px solid var(--w-teal);outline-offset:2px}
 @media (max-width:360px){.fw-row3{grid-template-columns:1fr 1fr}.fw-row3 .primary{grid-column:1 / -1}}
 @media (prefers-reduced-motion:reduce){.fw-panel{animation:none}.fw-bar i{transition:none}}
+
+/* WhatsApp phone (docs/whatsapp/README.md): "send all from the phone" on the first screen */
+.fw-phone-banner{display:flex;flex-direction:column;gap:6px;margin:0 0 14px;padding:10px;border-radius:14px;background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.35)}
+.fw-phone-banner .fw-btn{width:100%;min-height:48px}

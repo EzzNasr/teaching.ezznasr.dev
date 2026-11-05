@@ -786,6 +786,37 @@
       "owner": "att-prod"
     },
     {
+      "id": "R-WA-1",
+      "title": "WhatsApp outbox (FollowupWhatsApp.gs) through the real doPost: off by default, owner-only page actions, phone token, idempotent enqueue, claim once, test mode, cap/hours, retries, live success logs the contact, watchdog (unknown, silent, logged out)",
+      "cmd": [
+        "node",
+        "tests/test_fu2_whatsapp.js"
+      ],
+      "status": "active",
+      "owner": "wa"
+    },
+    {
+      "id": "R-WA-2",
+      "title": "WhatsApp phone sender loop (tools/wa-sender): sends + reports, server gap, journal before sending, crash-safe (never resends, late reports delivered), retryable vs final failures, end to end with the real server code",
+      "cmd": [
+        "node",
+        "../../tests/wa/sender.test.js"
+      ],
+      "status": "active",
+      "owner": "wa"
+    },
+    {
+      "id": "R-WA-3",
+      "title": "Follow-up page 'send all from the WhatsApp phone' in Chromium (390px, mock): hidden when off, one enqueue with the exact composed texts + parent digits + contact items, nothing logged at queue time",
+      "cmd": [
+        "python",
+        "tests/e2e_followup_wa_phone.py"
+      ],
+      "status": "active",
+      "needs": "playwright",
+      "owner": "wa"
+    },
+    {
       "id": "R-P3-F1",
       "title": "S1 follow-up core: contacted state, week/month boundaries, filter sort order, flag notices, Phase3_Flags.gs against the real router",
       "status": "active",
