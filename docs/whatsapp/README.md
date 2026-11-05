@@ -111,7 +111,7 @@ tested the first time (section 4, step 4).
 - Messages are personal (name, lesson, deadline), so no two are identical. Avoid links in the first weeks.
 - If WhatsApp ever shows a warning or the number gets a temporary ban: `fu2_wa_modeOff`, wait a week, and go back to manual sending.
   The spare SIM means the number parents already know is never at risk.
-- Baileys is pinned to 6.7.24 (6.7.16 could not link any more: "couldn't link device", 2026-11-05). When WhatsApp changes something and it breaks (the phone logs "closed" again and again), update
+- Baileys is pinned to 7.0.0-rc14 (2026-11-05: 6.7.16 could not link; 6.7.24 linked and sent, but every message showed "Waiting for this message" on the receiving phones because 6.7.x cannot address LID chats). lib/wa.js also answers resend requests (getMessage, data/sent-messages.json). When WhatsApp changes something and it breaks (the phone logs "closed" again and again), update
   it on purpose: change the version in `package.json`, `npm install`, test mode first.
 
 ## 6. Watching it
