@@ -14,9 +14,10 @@ const MERGED = /^function p3_assistantAllows\b/m.test(fs.readFileSync(CODE, 'utf
 const LISTED = ['admin_followup_overview', 'admin_followup_set_attendance', 'admin_followup_save_group', 'admin_followup_save_templates',
   'admin_student_summary', 'admin_monthly_review', 'admin_set_requirement', 'admin_log_parent_notification', 'admin_list_parent_notifications',
   'admin_grading_queue', 'admin_grade_written', 'admin_get_written_models', 'get_written_image'];
-// Follow-up v2 appends these 8 (admin_fu2_notify_test and admin_fu2_group_duplicates stay admin only). Total 21.
+// Follow-up v2 appends these 10 (admin_fu2_notify_test and admin_fu2_group_duplicates stay admin only). Total 23.
+// (the last two, admin_req_month_get / _save, came in Nov 2026 with the month's required lessons)
 const FU2_STAFF = ['admin_fu2_mark_done', 'admin_fu2_notify_settings_get', 'admin_fu2_notify_settings_save', 'admin_req_get', 'admin_req_save_global',
-  'admin_req_save_group', 'admin_req_check', 'admin_req_history'];
+  'admin_req_save_group', 'admin_req_check', 'admin_req_history', 'admin_req_month_get', 'admin_req_month_save'];
 const FU2_ADMIN_ONLY = ['admin_fu2_notify_test', 'admin_fu2_group_duplicates'];
 const ADMIN_ONLY = ['admin_grant_access', 'admin_decide_payment', 'admin_set_lesson_lock', 'admin_group_add', 'admin_migrate_lesson_keys',
   'admin_get_all', 'admin_list_payments', 'admin_access_overview', 'admin_revoke_access', 'admin_set_written_models', 'admin_list_groups', 'admin_set_video', 'admin_set_quiz_lock'];
@@ -36,7 +37,7 @@ function build() {
 // ---- allow-list is exactly the frozen contract
 {
   const api = build();
-  t('P3_STAFF_ALLOW is exactly the 13 Phase 3 actions plus the 8 follow-up v2 ones; the two admin-only fu2 actions are not on it', JSON.stringify(api.env.ctx.P3_STAFF_ALLOW.slice().sort()) === JSON.stringify(LISTED.concat(FU2_STAFF).sort()) && FU2_ADMIN_ONLY.every(a => api.env.ctx.P3_STAFF_ALLOW.indexOf(a) === -1), JSON.stringify(api.env.ctx.P3_STAFF_ALLOW));
+  t('P3_STAFF_ALLOW is exactly the 13 Phase 3 actions plus the 10 follow-up v2 ones; the two admin-only fu2 actions are not on it', JSON.stringify(api.env.ctx.P3_STAFF_ALLOW.slice().sort()) === JSON.stringify(LISTED.concat(FU2_STAFF).sort()) && FU2_ADMIN_ONLY.every(a => api.env.ctx.P3_STAFF_ALLOW.indexOf(a) === -1), JSON.stringify(api.env.ctx.P3_STAFF_ALLOW));
 }
 
 // ---- before any role exists: nobody is an assistant, nothing changes
@@ -109,7 +110,7 @@ function build() {
 
   // staff list
   const ls = api.call('p3_admin_list_staff', Object.assign({ action: 'p3_admin_list_staff' }, api.ADMIN));
-  t('list_staff: admin (read-only) + assistant, and the allow-list', ls.ok && ls.staff.length === 2 && ls.staff.some(s => s.role === 'admin') && ls.staff.some(s => s.role === 'assistant' && s.phone === api.P('sara')) && ls.allow.length === 21, JSON.stringify(ls));
+  t('list_staff: admin (read-only) + assistant, and the allow-list', ls.ok && ls.staff.length === 2 && ls.staff.some(s => s.role === 'admin') && ls.staff.some(s => s.role === 'assistant' && s.phone === api.P('sara')) && ls.allow.length === 23, JSON.stringify(ls));
 
   // revoking takes effect on the very next call
   const rv = api.setRole(api.P('sara'), '');

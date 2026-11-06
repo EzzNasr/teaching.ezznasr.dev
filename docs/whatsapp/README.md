@@ -104,6 +104,13 @@ tested the first time (section 4, step 4).
 4. **Emergency stop: `fu2_wa_modeOff`** (or set `WA_MODE` = off). The phone stops claiming within 10 minutes; queued messages stay
    queued and can be cancelled (`admin_fu2_wa_cancel`).
 
+### D. The monthly report batch (added 2026-11-06)
+The monthly review sheet has **📱 ابعت التقارير من موبايل الواتساب** (one group or all groups, counts first). A batch carries
+`send_to`: **`"test"` is the default for the monthly report**, and a test batch stays test even while `WA_MODE` is live (the phone
+still sends those rows to `WA_TEST_TO` with `[TEST]`, nothing is logged). `"parents"` only takes effect while live. A live monthly
+message that the phone reports as delivered marks the student's month **sent**. Other events (`parents_watch`, `parents_hw`) keep
+the old behaviour (the phone's mode). Details: `docs/specs/month-lessons.md`.
+
 ## 5. Keeping the number safe (ban risk)
 
 - Only parents who know the teacher's team; ask them to **save the number** (a saved contact is the strongest trust signal).

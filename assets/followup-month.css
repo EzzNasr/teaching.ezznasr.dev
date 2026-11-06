@@ -1,0 +1,28 @@
+/* followup-month.css — the month's required lessons + the monthly mass send (assets/followup-app.js, Nov 2026).
+   Uses the follow-up page's own tokens (--fu-*), so light and dark follow followup.css. */
+.fu-mplan-list{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+.fu-mplan-list li{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;padding:6px 0;border-top:1px solid var(--fu-line);font-size:14px}
+.fu-mplan-list li:first-child{border-top:0}
+.fu-mplan-parts{color:var(--fu-dim);font-size:13px;font-weight:700;white-space:nowrap}
+
+.fu-medit-list{margin-top:10px;display:grid;gap:6px;padding-bottom:8px}
+.fu-medit-folder{margin-top:10px;font-size:13px;font-weight:800;color:var(--fu-dim);text-align:start}
+.fu-medit-row{border:1px solid var(--fu-line);border-radius:12px;padding:4px 10px;background:var(--fu-card)}
+.fu-medit-row.on{border-color:var(--fu-teal);box-shadow:inset 0 0 0 1px var(--fu-teal)}
+.fu-medit-row .fu-check{min-width:0}
+.fu-medit-row .fu-lname{overflow-wrap:anywhere}
+.fu-medit-parts{display:flex;flex-wrap:wrap;gap:8px;padding:0 0 8px;margin-inline-start:38px}
+.fu-medit-parts .fu-chip{border:0;cursor:pointer;min-height:var(--fu-tap)}
+.fu-medit-parts .fu-chip[disabled]{cursor:not-allowed;opacity:.6}
+.fu-medit-foot{position:sticky;bottom:0;display:grid;gap:8px;padding:10px 0 4px;background:var(--fu-card);border-top:1px solid var(--fu-line)}
+
+.fu-msend-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.fu-msend-kpi{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:10px 6px;border-radius:12px;background:var(--fu-soft);text-align:center;min-width:0}
+.fu-msend-kpi b{font-size:22px;line-height:1.1}
+.fu-msend-kpi span{font-size:12px;font-weight:700;color:var(--fu-dim)}
+.fu-msend-kpi.green{background:var(--fu-ok-bg)} .fu-msend-kpi.green b{color:var(--fu-ok)}
+.fu-msend-kpi.amber{background:var(--fu-warn-bg)} .fu-msend-kpi.amber b{color:var(--fu-warn)}
+.fu-msend-kpi.red{background:var(--fu-bad-bg)} .fu-msend-kpi.red b{color:var(--fu-bad)}
+.fu-msend-kpi.grey{background:var(--fu-neutral-bg)} .fu-msend-kpi.grey b{color:var(--fu-neutral)}
+#fu-msend-held summary{cursor:pointer;font-weight:800;min-height:var(--fu-tap);display:flex;align-items:center}
+.fu-seg button[disabled]{opacity:.45;cursor:not-allowed}

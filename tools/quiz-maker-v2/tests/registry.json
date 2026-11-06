@@ -1455,6 +1455,27 @@
       ]
     },
     {
+      "id": "R-MONTH-1",
+      "title": "Month's required lessons: general list vs a group's own list (replaces it), homework / quiz switched off, client = server, monthly review counts only the ticked lessons, who may save, monthly WhatsApp batch is TEST unless parents is picked while live, a live success marks the month sent",
+      "status": "active",
+      "owner": "month-lessons-2026-11",
+      "cmd": [
+        "node",
+        "tests/test_month_lessons.js"
+      ]
+    },
+    {
+      "id": "R-MONTH-2",
+      "title": "Monthly review sheet at 390px (?mock=1): required-lessons menu (tick, exclude quiz / homework, general, own group list, back to general), send preview counts, TEST by default, all groups, parents only when live, dark",
+      "status": "active",
+      "needs": "playwright",
+      "owner": "month-lessons-2026-11",
+      "cmd": [
+        "python",
+        "tests/e2e_month_lessons.py"
+      ]
+    },
+    {
       "id": "R-REQ4",
       "title": "Requirements page at 390px in mock mode: toggle, override, copy, manual check, preview, history",
       "status": "active",

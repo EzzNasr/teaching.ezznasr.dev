@@ -272,7 +272,7 @@
   }
 
   // ---- api -------------------------------------------------------------------------------------
-  var MK = { base: null, data: null, baseCan: {}, req: {}, log: {}, month: {}, sum: null };
+  var MK = { base: null, data: null, baseCan: {}, req: {}, log: {}, month: {}, sum: null, mplans: {} };
   function mockLoad() {
     var p = MK.data ? Promise.resolve() : fetch("_fixtures/followup-overview.json", { cache: "no-store" }).then(function (r) {
       if (!r.ok) throw new Error("fixture " + r.status); return r.json();
@@ -405,6 +405,8 @@
         return { ok: true, month: payload.month, range: rng, closed: payload.month !== d.today.slice(0, 7), reviews: members.map(function (m, i) {
           var st = Object.assign({ phone: m.phone, name: m.name }, d.students[pkOf(m.phone)] || {}), sum = mockSummary(st, i, rng.from, rng.to);
           var row = MK.month[pkOf(m.phone) + "|" + payload.month] || { status: "pending", sent_at: "", note: "" };
+          var mpl = MK.mplans[payload.month] || { general: null, groups: {} }, gk0 = grp2 ? grp2.key : "";
+          sum.month_plan = { source: mpl.groups[gk0] ? "group" : mpl.general ? "general" : "none", group: gk0 };
           return { student: sum.student, summary: sum, review: row };
         }) };
       }
@@ -413,10 +415,29 @@
         return mockSummary(st2, 0, payload.from || d.today.slice(0, 8) + "01", payload.to || d.today);
       }
       // ---- WhatsApp phone (FollowupWhatsApp.gs), faked only with &wa=1 in the address ----
-      if (a === "admin_fu2_wa_status") return /[?&]wa=1(&|$)/.test(location.search) ? { ok: true, mode: "test", configured: true } : { ok: false, error: "Unknown action: " + a };
+      // (&wa=live fakes a live phone: the monthly send then offers "to the parents"; a monthly batch still defaults to test)
+      var waQ = /[?&]wa=(1|live)(&|$)/.exec(location.search), waLive = !!(waQ && waQ[1] === "live");
+      if (a === "admin_fu2_wa_status") return waQ ? { ok: true, mode: waLive ? "live" : "test", configured: true } : { ok: false, error: "Unknown action: " + a };
       if (a === "admin_fu2_wa_enqueue") {
-        if (!/[?&]wa=1(&|$)/.test(location.search)) return { ok: false, error: "Unknown action: " + a };
-        return { ok: true, mode: "test", queued: (payload.items || []).length, skipped: [] };
+        if (!waQ) return { ok: false, error: "Unknown action: " + a };
+        var toTest = payload.send_to === "test" || (!payload.send_to && payload.event === "monthly");
+        return { ok: true, mode: waLive && !toTest ? "live" : "test", queued: (payload.items || []).length, skipped: [] };
+      }
+      // ---- the month's required lessons (Requirements.gs req_month_*), in memory ----
+      if (a === "admin_req_month_get" || a === "admin_req_month_save") {
+        if (/[?&]oldserver=1(&|$)/.test(location.search)) return { ok: false, error: "Unknown action: " + a };   // MOCK ONLY: a server without Requirements.gs month lists
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(payload.month || "")) return { ok: false, error: "month must be yyyy-MM." };
+        var mp0 = MK.mplans[payload.month] = MK.mplans[payload.month] || { general: null, groups: {} }, names = {};
+        d.groups.forEach(function (x) { names[x.key] = x.group; });
+        if (a === "admin_req_month_save") {
+          var gk1 = payload.group ? String(payload.group).trim().replace(/\s+/g, " ").toLowerCase() : "";
+          if (gk1 && !names[gk1]) return { ok: false, error: "Unknown group." };
+          var rec = payload.clear === true ? null : { lessons: clone(payload.lessons || []).map(function (l) { return { lesson: String(l.lesson).toLowerCase(), homework: l.homework !== false, quiz: l.quiz !== false }; }), updated_at: d.today, by: "mock" };
+          if (gk1) { if (rec) mp0.groups[gk1] = rec; else delete mp0.groups[gk1]; } else mp0.general = rec;
+        }
+        var eff0 = {};
+        Object.keys(names).forEach(function (k) { eff0[k] = mp0.groups[k] ? { source: "group", lessons: clone(mp0.groups[k].lessons) } : mp0.general ? { source: "general", lessons: clone(mp0.general.lessons) } : { source: "none", lessons: [] }; });
+        return { ok: true, month: payload.month, general: clone(mp0.general), groups: clone(mp0.groups), effective: eff0, group_names: names };
       }
       // ---- v2 (S2's actions, faked in memory) ----
       if (a === "admin_fu2_mark_done") {
@@ -1464,8 +1485,11 @@
     } catch (e) { console.error(e); return { text: "", missing: [], error: e }; }
   }
   var MSTATUS = { pending: ["معلّق", "amber"], ready: ["جاهز", "green"], sent: ["اتبعت", "green"], closed: ["مقفول", "grey"] };
-  function markMonth(rev, month, status, note) {
-    return api({ action: "admin_monthly_review", op: "mark", month: month, student: rev.student.phone, status: status, note: note || "" }).then(function (res) {
+  // group: the group whose list of the month's lessons the snapshot uses (a student in two groups)
+  function markMonth(rev, month, status, note, group) {
+    var p = { action: "admin_monthly_review", op: "mark", month: month, student: rev.student.phone, status: status, note: note || "" };
+    if (group) p.group = group;
+    return api(p).then(function (res) {
       rev.review = Object.assign(rev.review || {}, res.review);
       if (status === "sent") {
         var d = STATE.data; d.parent_log = d.parent_log || {};
@@ -1493,13 +1517,15 @@
     return (r.review || {}).status === "sent" || (L().monthlySent ? L().monthlySent(logOf(pkOf(r.student.phone)), month) : false);
   }
   function openMonthly(g, month0) {
-    var month = month0 || STATE.data.today.slice(0, 7), data = null, loading = true, err = "";
+    var month = month0 || STATE.data.today.slice(0, 7), data = null, mp = null, loading = true, err = "";
     var mf = STATE.contact === "pending" || STATE.contact === "contacted" ? STATE.contact : "all", msort = STATE.sort === "nc";   // same filter / sort as the page, adjustable here
     openSheet(function (sheet) {
       var body = el("div", { id: "fu-monthly-body" }); sheet.appendChild(body);
       function fetchIt() {
         loading = true; err = ""; paint();
-        api({ action: "admin_monthly_review", month: month, group: g.group }).then(function (r) { data = r; loading = false; paint(); }, function (e) { loading = false; err = errText(e); paint(); });
+        // the month's required lessons come with it; an older server (Unknown action) or a teacher without access -> mp = null
+        var plans = api({ action: "admin_req_month_get", month: month }).then(function (r) { return r; }, function () { return null; });
+        Promise.all([api({ action: "admin_monthly_review", month: month, group: g.group }), plans]).then(function (x) { data = x[0]; mp = x[1]; loading = false; paint(); }, function (e) { loading = false; err = errText(e); paint(); });
       }
       function paint() {
         clear(body);
@@ -1512,6 +1538,9 @@
         var revs = data.reviews || [], sentN = revs.filter(function (r) { return monthContacted(r, month); }).length;
         var logOn = flag("FF_PARENT_LOG"), shownRevs = revs;   // copy-all / print / mark-ready keep using the FULL list; the filter only changes what is listed
         body.appendChild(el("div", { class: "fu-hint" }, [data.closed ? "الشهر خلص — الأرقام نهائية." : "الشهر لسه شغال — الأرقام لحد النهارده (" + dmOf(data.range.to) + ")."]));
+        body.appendChild(monthPlanCard(g, month, mp));
+        // only with the new server (it answered admin_req_month_get): an older one ignores send_to, so a live phone would reach parents
+        if (mp && window.FollowupMonth) body.appendChild(el("button", { class: "fu-btn wa", id: "fu-monthly-send", type: "button", style: "margin-top:12px", onclick: function () { openMonthSend(g, month, revs.map(function (r) { return Object.assign({ group: { group: g.group, key: g.key } }, r); })); } }, ["📱 ابعت التقارير من موبايل الواتساب"]));
         body.appendChild(el("div", { class: "fu-stack", style: "margin:12px 0" }, [
           el("button", { class: "fu-btn", id: "fu-monthly-copy-all", type: "button", onclick: function () {
             copy(revs.map(function (r) { return r.student.name + "\n" + monthlyText(r, month).text; }).join("\n\n———\n\n"));
@@ -1520,7 +1549,7 @@
             el("button", { class: "fu-btn", id: "fu-monthly-print", type: "button", onclick: function () { printMonthly(revs, month); } }, ["🖨️ طباعة"]),
             el("button", { class: "fu-btn", id: "fu-monthly-ready", type: "button", onclick: function () {
               var todo = revs.filter(function (r) { return (r.review || {}).status === "pending"; });
-              todo.reduce(function (p, r) { return p.then(function () { return markMonth(r, month, "ready"); }); }, Promise.resolve()).then(function () { paint(); toast("اتعلّم " + todo.length + " كجاهز ✓"); }, function (e) { toast(errText(e), { err: true }); });
+              todo.reduce(function (p, r) { return p.then(function () { return markMonth(r, month, "ready", "", g.group); }); }, Promise.resolve()).then(function () { paint(); toast("اتعلّم " + todo.length + " كجاهز ✓"); }, function (e) { toast(errText(e), { err: true }); });
             } }, ["✓ الكل جاهز"]),
           ]),
         ]));
@@ -1580,8 +1609,8 @@
       var chip = function () { var s2 = MSTATUS[(rev.review || {}).status] || MSTATUS.pending; var c = $("fu-month-status"); if (c) { c.textContent = s2[0]; c.className = "fu-chip " + s2[1]; } };
       sheet.appendChild(el("div", { class: "fu-stack", style: "margin-top:12px" }, [link,
         el("div", { class: "fu-btns two" }, [
-          el("button", { class: "fu-btn", id: "fu-month-sent", type: "button", onclick: function () { markMonth(rev, month, "sent", "").then(function () { chip(); toast("اتسجّل إنها اتبعتت ✓"); }, function (e) { toast(errText(e), { err: true }); }); } }, ["✓ تم الإرسال"]),
-          el("button", { class: "fu-btn", id: "fu-month-ready", type: "button", onclick: function () { markMonth(rev, month, "ready", "").then(function () { chip(); toast("اتعلّمت جاهزة ✓"); }, function (e) { toast(errText(e), { err: true }); }); } }, ["جاهزة"]),
+          el("button", { class: "fu-btn", id: "fu-month-sent", type: "button", onclick: function () { markMonth(rev, month, "sent", "", g.group).then(function () { chip(); toast("اتسجّل إنها اتبعتت ✓"); }, function (e) { toast(errText(e), { err: true }); }); } }, ["✓ تم الإرسال"]),
+          el("button", { class: "fu-btn", id: "fu-month-ready", type: "button", onclick: function () { markMonth(rev, month, "ready", "", g.group).then(function () { chip(); toast("اتعلّمت جاهزة ✓"); }, function (e) { toast(errText(e), { err: true }); }); } }, ["جاهزة"]),
         ]),
         el("div", { class: "fu-btns two" }, [
           el("button", { class: "fu-btn", id: "fu-copy", type: "button", onclick: function () { copy(ta.value); } }, ["📋 نسخ"]),
@@ -1589,6 +1618,245 @@
         ]),
       ]));
     }, { label: "التقرير الشهري" });
+  }
+
+  // ---- the month's required lessons + the mass send (Nov 2026) -----------------------------------
+  // Lists: Requirements.gs req_month_* (general list + one list per group that replaces it). Pure helpers: assets/followup-month.js.
+  function FM() { return window.FollowupMonth; }
+  function lessonMeta(p) { return (STATE.data.lessons || {})[p] || {}; }
+  function allLessonRows() {
+    var seen = {}, rows = [];
+    (STATE.data.all_lessons || []).concat(Object.keys(STATE.data.lessons || {}).map(function (p) { return { path: p }; })).forEach(function (r) {
+      var p = String((r && r.path) || "").toLowerCase(); if (p && !seen[p]) { seen[p] = 1; rows.push({ path: p }); }
+    });
+    return rows;
+  }
+  function folderLabel(f) {   // "programming/baccalaureate/grade-2-secondary" -> "Programming · Grade 2 Secondary"
+    var parts = String(f || "").split("/"), last = parts[parts.length - 1] || "";
+    return titleCase(((parts[0] || "") + (last && last !== parts[0] ? " · " + last : "")).replace(/-/g, " "));
+  }
+  // {source, lessons} for this group, from admin_req_month_get (same rule as the server: own list, else general, else none)
+  function planFor(mp, g) {
+    if (!mp) return null;
+    var e = (mp.effective || {})[g.key];
+    if (e) return e;
+    if (mp.groups && mp.groups[g.key]) return { source: "group", lessons: mp.groups[g.key].lessons };
+    if (mp.general) return { source: "general", lessons: mp.general.lessons };
+    return { source: "none", lessons: [] };
+  }
+  function planCounts(lessons) {
+    var h = 0, q = 0; (lessons || []).forEach(function (l) { if (l.homework) h++; if (l.quiz) q++; });
+    return (lessons || []).length + " درس · " + h + " واجب · " + q + " كويز";
+  }
+  var PLAN_SRC = { group: ["👥 قائمة خاصة بالمجموعة", "amber"], general: ["🌐 ماشية على القائمة العامة", "green"], none: ["لسه ما اتحددش", "grey"] };
+  function monthPlanCard(g, month, mp) {
+    var sec = el("div", { class: "fu-sec fu-mplan", id: "fu-mplan", style: "margin-top:12px" });
+    sec.appendChild(el("h4", {}, [el("span", {}, ["📚 المطلوب في " + monthLabelOf(month)])]));
+    if (!mp) { sec.appendChild(el("div", { class: "fu-dim", id: "fu-mplan-off" }, ["اختيار دروس الشهر محتاج تحديث Apps Script (Requirements.gs) — لحد كده بنحسب دروس المراجعة الأسبوعية للمجموعة."])); return sec; }
+    var pl = planFor(mp, g), src = PLAN_SRC[pl.source] || PLAN_SRC.none;
+    sec.appendChild(el("div", { class: "fu-chips" }, [el("span", { class: "fu-chip " + src[1], id: "fu-mplan-source", "data-source": pl.source }, [src[0]]),
+      pl.source !== "none" ? el("span", { class: "fu-chip grey", id: "fu-mplan-counts" }, [planCounts(pl.lessons)]) : null]));
+    if (pl.source === "none") sec.appendChild(el("p", { class: "fu-dim", style: "margin:8px 0 0" }, ["مفيش دروس متحددة للشهر ده، فالتقرير بيحسب دروس المراجعة الأسبوعية بتاعة المجموعة. اختار دروس الشهر عشان التقرير يتحسب عليها."]));
+    else {
+      var ul = el("ul", { class: "fu-mplan-list", id: "fu-mplan-list" });
+      pl.lessons.forEach(function (l) {
+        ul.appendChild(el("li", {}, [lessonChip(l.lesson), el("span", { class: "fu-mplan-parts" }, [(l.homework ? "✓" : "✗") + " واجب", " · ", (l.quiz ? "✓" : "✗") + " كويز"])]));
+      });
+      if (!pl.lessons.length) ul.appendChild(el("li", { class: "fu-dim" }, ["القائمة فاضية: مفيش واجب ولا كويز مطلوب الشهر ده."]));
+      sec.appendChild(ul);
+    }
+    if (window.FollowupMonth) sec.appendChild(el("button", { class: "fu-btn", id: "fu-mplan-edit", type: "button", style: "margin-top:10px", onclick: function () { openMonthEditor(g, month, mp, pl.source === "group" ? "group" : "general"); } }, ["✏️ اختار الدروس المطلوبة"]));
+    return sec;
+  }
+
+  function openMonthEditor(g, month, mp, scope0) {
+    var scope = scope0 || "general", q = "", busy = false, fork = false;
+    var general = mp.general ? mp.general.lessons : [], own = mp.groups && mp.groups[g.key] ? mp.groups[g.key].lessons : null;
+    function base() { return scope === "general" ? general : (own || (fork ? general : null)); }
+    var draft = FM().draftFrom(base() || []);
+    function dirty() { if (scope === "group" && fork && !own) return true; return !FM().sameLessons(draft, base() || []); }
+    function editable() { return scope === "general" || !!own || fork; }
+    openSheet(function (sheet) {
+      var body = el("div", { id: "fu-medit" }); sheet.appendChild(body);
+      function setScope(s) {
+        if (s === scope) return;
+        var go = function () { scope = s; fork = false; draft = FM().draftFrom(base() || []); paint(); };
+        if (dirty()) confirmDialog("فيه تعديلات ما اتحفظتش. تسيبها؟", "أيوه، سيبها").then(function (ok) { if (ok) go(); }); else go();
+      }
+      function save() {
+        if (busy) return; busy = true; paint();
+        api({ action: "admin_req_month_save", month: month, group: scope === "group" ? g.group : "", lessons: draft }).then(function () {
+          busy = false; toast("اتحفظت دروس " + monthLabelOf(month) + " ✓"); openMonthly(g, month);
+        }, function (e) { busy = false; paint(); toast(errText(e), { err: true }); });
+      }
+      function backToGeneral() {
+        confirmDialog("ترجّع " + g.group + " للقائمة العامة؟ القائمة الخاصة بيها هتتمسح.", "↩ رجّعها للعام").then(function (ok) {
+          if (!ok) return; busy = true; paint();
+          api({ action: "admin_req_month_save", month: month, group: g.group, clear: true }).then(function () { busy = false; toast(g.group + " رجعت للقائمة العامة ✓"); openMonthly(g, month); },
+            function (e) { busy = false; paint(); toast(errText(e), { err: true }); });
+        });
+      }
+      function paint() {
+        var keepFocus = document.activeElement && document.activeElement.id === "fu-medit-q";
+        clear(body);
+        body.appendChild(el("div", { class: "fu-row fu-between" }, [el("h2", {}, ["الدروس المطلوبة · " + monthLabelOf(month)]), el("button", { class: "fu-ibtn", id: "fu-close", type: "button", "aria-label": "إغلاق", onclick: closeSheet }, ["✕"])]));
+        var seg = el("div", { class: "fu-seg", role: "radiogroup", "aria-label": "لمين القائمة", style: "margin-top:10px" });
+        [["general", "🌐 العام (كل المجموعات)"], ["group", "👥 " + g.group]].forEach(function (x) {
+          seg.appendChild(el("button", { type: "button", role: "radio", "aria-checked": String(scope === x[0]), "data-scope": x[0], onclick: function () { setScope(x[0]); } }, [x[1]]));
+        });
+        body.appendChild(seg);
+        // where this list applies, said plainly
+        if (scope === "general") {
+          var owners = Object.keys(mp.groups || {}).map(function (k) { return (mp.group_names || {})[k] || k; });
+          body.appendChild(el("div", { class: "fu-hint", id: "fu-medit-where" }, ["القائمة دي لكل المجموعات اللي ملهاش قائمة خاصة." + (owners.length ? " ليهم قائمة خاصة (مش بيتأثروا): " + owners.join("، ") + "." : "")]));
+        } else if (own) {
+          body.appendChild(el("div", { class: "fu-hint", id: "fu-medit-where", "data-own": "1" }, ["👥 " + g.group + " ليها قائمة خاصة بدل العام — تعديل العام مش بيأثر عليها."]));
+          body.appendChild(el("button", { class: "fu-btn warn", id: "fu-medit-inherit", type: "button", disabled: busy, onclick: backToGeneral }, ["↩ رجّعها للقائمة العامة"]));
+        } else if (!fork) {
+          body.appendChild(el("div", { class: "fu-hint", id: "fu-medit-where", "data-own": "0" }, ["👥 " + g.group + " ماشية على القائمة العامة (" + planCounts(general) + "). أي تعديل في العام بيمشي عليها."]));
+          body.appendChild(el("button", { class: "fu-btn primary", id: "fu-medit-fork", type: "button", onclick: function () { fork = true; draft = FM().draftFrom(general); paint(); } }, ["اعمل قائمة خاصة بـ " + g.group + " (بتبدأ من العام)"]));
+        } else {
+          body.appendChild(el("div", { class: "fu-hint", id: "fu-medit-where", "data-own": "new" }, ["قائمة جديدة خاصة بـ " + g.group + " — بعد الحفظ هتبقى بدل العام للمجموعة دي بس."]));
+        }
+        var on = editable();
+        var qIn = el("input", { class: "fu-field", id: "fu-medit-q", type: "search", placeholder: "🔎 دوّر على درس", "aria-label": "دوّر على درس", value: q, style: "margin-top:12px" });
+        qIn.addEventListener("input", function () { q = qIn.value; paint(); });
+        body.appendChild(qIn);
+        var shown = on ? draft : (base() || general);
+        var list = el("div", { class: "fu-medit-list", id: "fu-medit-list" });
+        var folders = FM().byFolder(allLessonRows(), q, lessonLabel);
+        folders.forEach(function (f) {
+          list.appendChild(el("div", { class: "fu-medit-folder", dir: "ltr" }, [folderLabel(f.folder)]));
+          f.lessons.forEach(function (p) {
+            var e = FM().entry(shown, p), meta = lessonMeta(p);
+            var cb = el("input", { type: "checkbox", "data-lesson": p, disabled: !on || busy });
+            cb.checked = !!e;
+            cb.addEventListener("change", function () { draft = FM().toggle(draft, p, cb.checked, meta); paint(); });
+            var row = el("div", { class: "fu-medit-row" + (e ? " on" : ""), "data-row": p }, [el("label", { class: "fu-check" }, [cb, lessonChip(p)])]);
+            if (e) {
+              var parts = el("div", { class: "fu-medit-parts" });
+              [["homework", "واجب"], ["quiz", "كويز"]].forEach(function (x) {
+                parts.appendChild(el("button", { type: "button", class: "fu-chip " + (e[x[0]] ? "green" : "grey"), "aria-pressed": String(!!e[x[0]]), "data-part": x[0], disabled: !on || busy,
+                  onclick: function () { draft = FM().setPart(draft, p, x[0], !e[x[0]]); paint(); } }, [(e[x[0]] ? "✓ " : "✗ ") + x[1] + (e[x[0]] ? " مطلوب" : " مش مطلوب")]));
+              });
+              row.appendChild(parts);
+            }
+            list.appendChild(row);
+          });
+        });
+        // ticked lessons that are not in the lesson list any more (renamed / hidden): still shown so they can be removed
+        if (!q) shown.filter(function (l) { return !folders.some(function (f) { return f.lessons.indexOf(l.lesson) >= 0; }); }).forEach(function (l) {
+          var cb = el("input", { type: "checkbox", "data-lesson": l.lesson, disabled: !on || busy }); cb.checked = true;
+          cb.addEventListener("change", function () { draft = FM().toggle(draft, l.lesson, false); paint(); });
+          list.appendChild(el("div", { class: "fu-medit-row on", "data-row": l.lesson }, [el("label", { class: "fu-check" }, [cb, lessonChip(l.lesson), el("span", { class: "fu-dim" }, [" (مش في قائمة الدروس)"])])]));
+        });
+        if (!list.childNodes.length) list.appendChild(el("div", { class: "fu-empty" }, [q ? "مفيش درس بالاسم ده" : "مفيش دروس"]));
+        body.appendChild(list);
+        body.appendChild(el("div", { class: "fu-medit-foot" }, [
+          el("div", { class: "fu-dim", id: "fu-medit-count" }, [planCounts(shown)]),
+          on ? el("button", { class: "fu-btn primary", id: "fu-medit-save", type: "button", disabled: busy || !dirty(), onclick: save }, [busy ? "… بنحفظ" : "💾 حفظ"]) : null,
+          el("button", { class: "fu-btn", id: "fu-medit-back", type: "button", onclick: function () {
+            if (dirty()) confirmDialog("فيه تعديلات ما اتحفظتش. ترجع من غير حفظ؟", "رجوع من غير حفظ").then(function (ok) { if (ok) openMonthly(g, month); }); else openMonthly(g, month);
+          } }, ["رجوع للتقرير الشهري"]),
+        ]));
+        if (keepFocus) { var n = $("fu-medit-q"); if (n) { n.focus(); try { n.setSelectionRange(n.value.length, n.value.length); } catch (e) {} } }
+      }
+      paint();
+    }, { full: true, label: "الدروس المطلوبة" });
+  }
+
+  // revs0 = this group's reviews (each with .group). "All groups" loads every group's review, one request each.
+  function openMonthSend(g, month, revs0) {
+    var scope = "group", revsAll = null, loadingAll = false, loadMsg = "", allErr = "", sendTo = "test", wa, view = null, busy = false, paintIt = function () {};
+    function revs() { return scope === "group" ? revs0 : (revsAll || []); }
+    function plan() {
+      return FM().sendPlan(revs(), { contacted: function (r) { return monthContacted(r, month); },
+        check: function (r) { return parentCheck({ phone: r.student.phone, parent_phone: r.student.parent_phone }); },
+        text: function (r) { return monthlyText(r, month).text; } });
+    }
+    function loadAll() {
+      var groups = (STATE.data.groups || []).slice(), out = [], i = 0;
+      loadingAll = true; allErr = ""; paintIt();
+      return groups.reduce(function (p, gg) {
+        return p.then(function () {
+          i++; loadMsg = "بنجهّز " + gg.group + " (" + i + " من " + groups.length + ")"; paintIt();
+          if (gg.key === g.key) { out = out.concat(revs0); return; }
+          return api({ action: "admin_monthly_review", month: month, group: gg.group }).then(function (r) {
+            out = out.concat((r.reviews || []).map(function (x) { return Object.assign({ group: { group: gg.group, key: gg.key } }, x); }));
+          });
+        });
+      }, Promise.resolve()).then(function () { revsAll = out; loadingAll = false; paintIt(); }, function (e) { loadingAll = false; allErr = errText(e); paintIt(); });
+    }
+    openSheet(function (sheet) {
+      var body = el("div", { id: "fu-msend" }); sheet.appendChild(body);
+      function send() {
+        var P = plan(), payloads = FM().enqueuePayloads(P.ready, month, sendTo), res = { queued: 0, skipped: [], mode: "" };
+        busy = true; paint();
+        payloads.reduce(function (p, pl) {
+          return p.then(function () { return api(pl).then(function (r) { res.queued += r.queued || 0; res.mode = r.mode || res.mode; res.skipped = res.skipped.concat(r.skipped || []); }); });
+        }, Promise.resolve()).then(function () { busy = false; view = { result: res }; paint(); }, function (e) { busy = false; view = { error: errText(e), partial: res }; paint(); });
+      }
+      function paint() {
+        clear(body);
+        body.appendChild(el("div", { class: "fu-row fu-between" }, [el("h2", {}, ["إرسال تقرير " + monthLabelOf(month)]), el("button", { class: "fu-ibtn", id: "fu-close", type: "button", "aria-label": "إغلاق", onclick: closeSheet }, ["✕"])]));
+        if (view && view.result) {
+          var r = view.result, test = r.mode !== "live";
+          body.appendChild(el("div", { class: "fu-sec", id: "fu-msend-done", "data-mode": r.mode || "", style: "margin-top:12px" }, [
+            el("div", { class: "fu-big" }, ["✓ اتحطّ " + r.queued + " رسالة في الطابور"]),
+            el("p", { class: test ? "fu-warnbox" : "fu-dim" }, [test ? "وضع التجربة: كل الرسايل هتروح لرقمك انت، ومش هيتسجّل تواصل." : "الموبايل هيبعتهم واحدة واحدة على مهله، وكل تقرير يتعلّم «اتبعت» لوحده لما يوصل."]),
+            r.skipped.length ? el("ul", { class: "fu-mplan-list", id: "fu-msend-skipped" }, r.skipped.map(function (s) { return el("li", {}, [s.name + ": " + s.reason]); })) : null,
+          ]));
+          body.appendChild(el("button", { class: "fu-btn", id: "fu-msend-back", type: "button", style: "margin-top:12px", onclick: function () { openMonthly(g, month); } }, ["رجوع للتقرير الشهري"]));
+          return;
+        }
+        if (view && view.error) body.appendChild(el("div", { class: "fu-err", id: "fu-msend-error", role: "alert" }, ["ماتحطّوش كلهم في الطابور: " + view.error + (view.partial && view.partial.queued ? " (اتحط " + view.partial.queued + " قبل الخطأ)" : "")]));
+        var seg = el("div", { class: "fu-seg", role: "radiogroup", "aria-label": "مين", style: "margin-top:10px" });
+        [["group", "👥 " + g.group], ["all", "🌐 كل المجموعات"]].forEach(function (x) {
+          seg.appendChild(el("button", { type: "button", role: "radio", "aria-checked": String(scope === x[0]), "data-sscope": x[0], disabled: busy || loadingAll, onclick: function () {
+            if (scope === x[0]) return; scope = x[0]; view = null; if (scope === "all" && !revsAll) loadAll(); else paint();
+          } }, [x[1]]));
+        });
+        body.appendChild(seg);
+        if (scope === "all" && loadingAll) { body.appendChild(el("div", { class: "fu-hint", id: "fu-msend-loading" }, ["… " + loadMsg])); body.appendChild(el("div", { class: "fu-skel" })); return; }
+        if (scope === "all" && allErr) { body.appendChild(el("div", { class: "fu-err", role: "alert" }, [allErr])); return; }
+        var P = plan(), c = P.counts;
+        body.appendChild(el("p", { class: "fu-dim", style: "margin:10px 0 4px" }, ["كل طالب بيتحسب على الدروس المطلوبة من مجموعته (قائمتها الخاصة، أو العامة لو ملهاش)."]));
+        var tiles = el("div", { class: "fu-msend-kpis", id: "fu-msend-counts" });
+        [["students", "طالب", ""], ["ready", "هيتبعتلهم", "green"], ["complete", "مكمّلين كل المطلوب", "green"], ["missing", "عندهم ناقص", "amber"], ["held", "محتاجين مراجعة رقم", "red"], ["already", "اتبعتلهم قبل كده", "grey"]].forEach(function (x) {
+          tiles.appendChild(el("div", { class: "fu-msend-kpi " + x[2], "data-count": x[0] }, [el("b", {}, [String(c[x[0]])]), el("span", {}, [x[1]])]));
+        });
+        body.appendChild(tiles);
+        if (scope === "all") {
+          var byG = {}, order = [];
+          revs().forEach(function (r) { var k = r.group.key; if (!byG[k]) { byG[k] = { name: r.group.group, n: 0, src: (r.summary && r.summary.month_plan || {}).source || "" }; order.push(k); } byG[k].n++; });
+          body.appendChild(el("ul", { class: "fu-mplan-list", id: "fu-msend-groups" }, order.map(function (k) { var x = byG[k], s0 = PLAN_SRC[x.src]; return el("li", {}, [x.name + " · " + x.n + " طالب" + (s0 ? " · " + s0[0] : "")]); })));
+        }
+        if (P.held.length) {
+          body.appendChild(el("details", { class: "fu-sec", id: "fu-msend-held", style: "margin-top:10px" }, [el("summary", {}, ["مش هيتبعتلهم من الموبايل (" + P.held.length + ") — ابعتلهم بإيدك"]),
+            el("ul", { class: "fu-mplan-list" }, P.held.map(function (h) { return el("li", {}, [h.r.student.name + ": " + h.reason]); }))]));
+        }
+        if (wa === undefined) { body.appendChild(el("div", { class: "fu-skel" })); return; }
+        if (!wa) { body.appendChild(el("div", { class: "fu-warnbox", id: "fu-msend-nophone", style: "margin-top:12px" }, ["موبايل الواتساب مش شغّال (WA_MODE = off أو مش متجهّز) — تقدر تنسخ الرسايل أو تبعت كل واحدة من «معاينة وإرسال»."])); return; }
+        // where the messages go: TEST (your own number) unless you pick parents; parents only when the phone is live
+        var live = wa.mode === "live"; if (!live) sendTo = "test";
+        var dest = el("div", { class: "fu-seg", role: "radiogroup", "aria-label": "الرسايل تروح لمين", style: "margin-top:12px" });
+        [["test", "📵 لرقمي أنا (تجربة)"], ["parents", "👪 لأولياء الأمور"]].forEach(function (x) {
+          dest.appendChild(el("button", { type: "button", role: "radio", "aria-checked": String(sendTo === x[0]), "data-dest": x[0], disabled: busy || (x[0] === "parents" && !live), onclick: function () { sendTo = x[0]; paint(); } }, [x[1]]));
+        });
+        body.appendChild(dest);
+        body.appendChild(el("p", { class: sendTo === "test" ? "fu-warnbox" : "fu-dim", id: "fu-msend-mode" }, [!live ? "الموبايل في وضع التجربة: كل الرسايل هتروح لرقمك انت بعنوان [TEST]، ومش هيتسجّل تواصل. (لأولياء الأمور: شغّل fu2_wa_modeLive في Apps Script.)"
+          : sendTo === "test" ? "تجربة: الرسايل هتروح لرقمك انت بعنوان [TEST] باسم ورقم كل ولي أمر، ومش هيتسجّل تواصل." : "هتروح لأولياء الأمور فعلًا. كل تقرير يتعلّم «اتبعت» لما الموبايل يأكد إنه وصل."]));
+        body.appendChild(el("button", { class: "fu-btn " + (sendTo === "parents" ? "wa" : "primary"), id: "fu-msend-go", type: "button", disabled: busy || !c.ready, style: "margin-top:10px", onclick: function () {
+          var msg = sendTo === "parents" ? "هتتبعت " + c.ready + " رسالة لأولياء الأمور من موبايل الواتساب. متأكد؟" : "هتتبعت " + c.ready + " رسالة تجربة لرقمك انت. تمام؟";
+          confirmDialog(msg, sendTo === "parents" ? "✓ ابعت لأولياء الأمور" : "✓ ابعت التجربة").then(function (ok) { if (ok) send(); });
+        } }, [busy ? "… بنحطّهم في الطابور" : "📱 ابعت " + c.ready + " رسالة" + (sendTo === "test" ? " (تجربة)" : "")]));
+        body.appendChild(el("button", { class: "fu-btn", id: "fu-msend-back", type: "button", style: "margin-top:10px", onclick: function () { openMonthly(g, month); } }, ["رجوع"]));
+      }
+      paintIt = paint;
+      paint();
+      WA.at = 0;   // ask the server again: the mode may have been switched since the page loaded
+      waStatus().then(function (w) { wa = w; paint(); });
+    }, { full: true, label: "إرسال التقرير الشهري" });
   }
 
   // v2 (remind_watch): the watch part of the group reminder. Built from the same placeholders as template 4; when the
