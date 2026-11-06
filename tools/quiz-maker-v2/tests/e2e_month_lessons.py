@@ -79,7 +79,7 @@ def main():
         page.wait_for_selector("#fu-medit")
         check("menu opens on the GENERAL list", page.get_attribute("[data-scope='general']", "aria-checked") == "true")
         check("menu lists the lessons by folder, none ticked", page.locator("#fu-medit-list input[type=checkbox]").count() >= 3 and page.locator("#fu-medit-list input:checked").count() == 0)
-        check("save is off until something changes", page.is_disabled("#fu-medit-save"))
+        check("no Save button to forget, nothing sent before a change", page.locator("#fu-medit-save").count() == 0 and not calls(page, "admin_req_month_save"))
         page.check("input[data-lesson='%s']" % VARS)
         page.check("input[data-lesson='%s']" % LOOPS)
         row = "[data-row='%s']" % LOOPS
@@ -92,12 +92,16 @@ def main():
         page.fill("#fu-medit-q", "")
         check("menu: no sideways scroll, tap targets ok", E.no_hscroll(page) and not small(page, "#fu-medit"), small(page, "#fu-medit"))
         shot(page, "month-1-menu.png")
-        page.click("#fu-medit-save")
-        page.wait_for_selector("#fu-mplan-source[data-source='general']")
+        page.wait_for_selector("#fu-medit-status[data-state='saved']")
         sv = calls(page, "admin_req_month_save")
         les = (sv[-1].get("lessons") if sv else None) or []
-        check("save: ONE call for the general list (group empty) with the two lessons and the quiz off",
-              len(sv) == 1 and sv[0].get("group") == "" and sorted((l["lesson"], l["homework"], l["quiz"]) for l in les) == sorted([(VARS, True, True), (LOOPS, True, False)]), sv)
+        check("every change is saved by itself: the last save is the general list with the two lessons and the quiz off",
+              len(sv) >= 1 and all(x.get("group") == "" for x in sv) and sorted((l["lesson"], l["homework"], l["quiz"]) for l in les) == sorted([(VARS, True, True), (LOOPS, True, False)]), sv)
+        check("the menu says it is saved", "اتحفظ" in page.inner_text("#fu-medit-status"))
+        # the reported bug: ticks made, menu closed with X (no button pressed), list must still be there
+        page.click("#fu-close")
+        page.click("#fu-monthly")
+        page.wait_for_selector("#fu-mplan-source[data-source='general']")
         check("card: Sat 6pm now follows the general list, 2 lessons · 2 homework · 1 quiz", "2 درس · 2 واجب · 1 كويز" in page.inner_text("#fu-mplan-counts"), page.inner_text("#fu-mplan"))
         shot(page, "month-2-card.png")
 
@@ -108,11 +112,12 @@ def main():
         page.wait_for_selector("#fu-medit-where[data-own='0']")
         check("group: says it follows the general list, lessons shown read-only", "ماشية على القائمة العامة" in page.inner_text("#fu-medit-where") and page.is_disabled("input[data-lesson='%s']" % VARS) and page.is_checked("input[data-lesson='%s']" % VARS))
         page.click("#fu-medit-fork")
-        page.wait_for_selector("#fu-medit-where[data-own='new']")
+        page.wait_for_selector("#fu-medit-where[data-own='new'], #fu-medit-where[data-own='1']")
         check("make own list: starts from the general list, editable", page.is_checked("input[data-lesson='%s']" % LOOPS) and not page.is_disabled("input[data-lesson='%s']" % LOOPS))
         page.uncheck("input[data-lesson='%s']" % LOOPS)
         page.click("[data-row='%s'] [data-part='homework']" % VARS)
-        page.click("#fu-medit-save")
+        page.wait_for_selector("#fu-medit-status[data-state='saved']")
+        page.click("#fu-medit-back")
         page.wait_for_selector("#fu-mplan-source[data-source='group']")
         sv = calls(page, "admin_req_month_save")[-1]
         check("save: the group's own list (Sat 6pm), one lesson with the homework off", sv.get("group") == "Sat 6pm" and [(l["lesson"], l["homework"], l["quiz"]) for l in sv.get("lessons", [])] == [(VARS, False, True)], sv)

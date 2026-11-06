@@ -166,10 +166,16 @@ function req_rows_(name) {
 function req_rowArray_(name, rec) {
   return REQ_HEADERS[name].map(function (h) { return rec[h] === undefined || rec[h] === null ? "" : rec[h]; });
 }
+// The text-only columns (a month like 2026-11, a key) are set to Plain Text on EVERY write, not only when the tab is made:
+// Sheets turns "2026-11" into a date otherwise (a trimmed grid or a hand-made tab has no format on the new row).
 function req_writeRow_(sh, name, row, rec) {
-  var arr = req_rowArray_(name, rec);
-  if (row) sh.getRange(row, 1, 1, arr.length).setValues([arr]);
-  else sh.appendRow(arr);
+  var arr = req_rowArray_(name, rec), r = row || sh.getLastRow() + 1;
+  if (r > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), Math.max(20, r - sh.getMaxRows()));
+  try {
+    var idx = _headerIndex(sh);
+    (REQ_TEXT_COLS[name] || []).forEach(function (h) { if (idx[h]) sh.getRange(r, idx[h]).setNumberFormat("@"); });
+  } catch (e) { /* cosmetic: the read side copes with a date */ }
+  sh.getRange(r, 1, 1, arr.length).setValues([arr]);
 }
 
 function req_globalRow_(r) {
@@ -491,6 +497,11 @@ function req_actionHistory_(payload) {
 var REQ_MAX_MONTH_LESSONS = 60;
 var REQ_MONTH_GENERAL = "*";
 function req_isMonth_(m) { return /^\d{4}-(0[1-9]|1[0-2])$/.test(req_str_(m).trim()); }
+// a month cell -> "yyyy-MM", also when Sheets stored it as a date (then it reads back as 2026-11-01T00:00:00+02:00)
+function req_monthCell_(v) {
+  var s = req_str_(v).trim(), m = /^(\d{4}-\d{2})-\d{2}T/.exec(s);
+  return v instanceof Date && m ? m[1] : s;
+}
 function req_lessonPathKey_(raw) {
   return req_str_(raw).trim().toLowerCase().replace(/\\/g, "/").replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, "");
 }
@@ -527,7 +538,7 @@ function req_month_resolve_(plans, group) {
 function req_month_all_() {
   var out = {};
   req_rows_("MonthLessons").forEach(function (r) {
-    var mo = req_str_(r.month).trim(), gk0 = req_str_(r.group_key).trim();
+    var mo = req_monthCell_(r.month), gk0 = req_str_(r.group_key).trim();
     if (!req_isMonth_(mo) || !gk0) return;
     var arr = null; try { arr = JSON.parse(req_str_(r.lessons_json) || "[]"); } catch (e) { arr = null; }
     var n = req_month_normalize_(arr);
@@ -568,7 +579,7 @@ function req_actionMonthSave_(payload) {
   _withLock(function () {
     var existing = null;
     req_rows_("MonthLessons").forEach(function (r) {
-      if (existing || req_str_(r.month).trim() !== mo) return;
+      if (existing || req_monthCell_(r.month) !== mo) return;
       var g0 = req_str_(r.group_key).trim();
       if ((g0 === REQ_MONTH_GENERAL ? REQ_MONTH_GENERAL : _groupKey(g0)) === cell) existing = r;
     });

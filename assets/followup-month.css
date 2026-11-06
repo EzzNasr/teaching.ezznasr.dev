@@ -26,3 +26,6 @@
 .fu-msend-kpi.grey{background:var(--fu-neutral-bg)} .fu-msend-kpi.grey b{color:var(--fu-neutral)}
 #fu-msend-held summary{cursor:pointer;font-weight:800;min-height:var(--fu-tap);display:flex;align-items:center}
 .fu-seg button[disabled]{opacity:.45;cursor:not-allowed}
+.fu-medit-status{font-size:14px;font-weight:800;color:var(--fu-dim)}
+.fu-medit-status.saved{color:var(--fu-ok)}
+.fu-medit-status.error{color:var(--fu-bad)}

@@ -12,6 +12,9 @@ On the follow-up page, open a group, then **📅 المراجعة الشهرية
    - **لسه ما اتحددش**: nothing was chosen for the month, so the report uses the group's weekly review lessons, as before.
 2. **✏️ اختار الدروس المطلوبة** opens the menu:
    - Two tabs: **العام (كل المجموعات)** and **the group**.
+   - Every tick and every homework / quiz switch is **saved at once** (no Save button), like the Requirements page. The
+     line at the bottom says **… بيتحفظ** / **✓ اتحفظ**, or the error with **جرّب الحفظ تاني**. (2026-11-06: the first version
+     only saved on a Save button, and closing the menu with ✕ dropped the ticks.)
    - Tick a lesson: its homework and its quiz become required. Each one has its own button to switch it off
      (**✓ واجب مطلوب / ✗ واجب مش مطلوب**, same for the quiz). A lesson that has no quiz starts with the quiz off.
    - On the group tab: a group that follows the general list shows it read-only, with
@@ -47,7 +50,7 @@ On the follow-up page, open a group, then **📅 المراجعة الشهرية
 | `send_to` per batch, test rows while live, a live monthly success marks the month sent | `tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs` |
 | Same rules in the browser | `assets/requirements-logic.js` (`normalizeMonthLessons`, `resolveMonthLessons`) |
 | Menu and send screens | `assets/followup-app.js`, `assets/followup-month.js`, `assets/followup-month.css`, `dashboard/followup.html` |
-| Tests | R-MONTH-1 `tests/test_month_lessons.js` (96), R-MONTH-2 `tests/e2e_month_lessons.py` (37, Chromium) |
+| Tests | R-MONTH-1 `tests/test_month_lessons.js` (98), R-MONTH-2 `tests/e2e_month_lessons.py` (38, Chromium) |
 
 Who may use it: the owner and the owner's assistants can choose the lessons (like the other requirement settings).
 Scoped teachers cannot (deny by default). Sending through the phone stays owner only.

@@ -1669,34 +1669,51 @@
     return sec;
   }
 
+  // Every tick / part switch is saved at once (like the Requirements page); there is no Save button to forget.
+  // Saves run one at a time; a change made while one is running is sent right after it (the latest list wins).
   function openMonthEditor(g, month, mp, scope0) {
-    var scope = scope0 || "general", q = "", busy = false, fork = false;
+    var scope = scope0 || "general", q = "", fork = false;
     var general = mp.general ? mp.general.lessons : [], own = mp.groups && mp.groups[g.key] ? mp.groups[g.key].lessons : null;
+    var sv = { busy: false, again: false, err: "", done: false, waiters: [] };
     function base() { return scope === "general" ? general : (own || (fork ? general : null)); }
     var draft = FM().draftFrom(base() || []);
-    function dirty() { if (scope === "group" && fork && !own) return true; return !FM().sameLessons(draft, base() || []); }
     function editable() { return scope === "general" || !!own || fork; }
+    function idle() { return new Promise(function (res) { if (!sv.busy) res(); else sv.waiters.push(res); }); }
+    var paint = function () {};
+    function saveNow() {
+      if (sv.busy) { sv.again = true; return; }
+      var forScope = scope, list = FM().draftFrom(draft);
+      sv.busy = true; sv.err = ""; paint();
+      api({ action: "admin_req_month_save", month: month, group: forScope === "group" ? g.group : "", lessons: list }).then(function () {
+        if (forScope === "general") { general = list; mp.general = { lessons: list }; }
+        else { own = list; mp.groups = mp.groups || {}; mp.groups[g.key] = { lessons: list }; fork = false; }
+        sv.done = true;
+      }, function (e) { sv.err = errText(e); toast("ما اتحفظش: " + sv.err, { err: true }); }).then(function () {
+        sv.busy = false;
+        if (sv.again && !sv.err) { sv.again = false; saveNow(); return; }
+        sv.again = false; paint();
+        var w = sv.waiters; sv.waiters = []; w.forEach(function (f) { f(); });
+      });
+    }
+    function change(next) { draft = next; paint(); saveNow(); }
     openSheet(function (sheet) {
       var body = el("div", { id: "fu-medit" }); sheet.appendChild(body);
+      function back() { idle().then(function () { openMonthly(g, month); }); if (sv.busy) paint(); }
       function setScope(s) {
         if (s === scope) return;
-        var go = function () { scope = s; fork = false; draft = FM().draftFrom(base() || []); paint(); };
-        if (dirty()) confirmDialog("فيه تعديلات ما اتحفظتش. تسيبها؟", "أيوه، سيبها").then(function (ok) { if (ok) go(); }); else go();
-      }
-      function save() {
-        if (busy) return; busy = true; paint();
-        api({ action: "admin_req_month_save", month: month, group: scope === "group" ? g.group : "", lessons: draft }).then(function () {
-          busy = false; toast("اتحفظت دروس " + monthLabelOf(month) + " ✓"); openMonthly(g, month);
-        }, function (e) { busy = false; paint(); toast(errText(e), { err: true }); });
+        idle().then(function () { scope = s; fork = false; draft = FM().draftFrom(base() || []); paint(); });
       }
       function backToGeneral() {
         confirmDialog("ترجّع " + g.group + " للقائمة العامة؟ القائمة الخاصة بيها هتتمسح.", "↩ رجّعها للعام").then(function (ok) {
-          if (!ok) return; busy = true; paint();
-          api({ action: "admin_req_month_save", month: month, group: g.group, clear: true }).then(function () { busy = false; toast(g.group + " رجعت للقائمة العامة ✓"); openMonthly(g, month); },
-            function (e) { busy = false; paint(); toast(errText(e), { err: true }); });
+          if (!ok) return;
+          idle().then(function () {
+            sv.busy = true; paint();
+            api({ action: "admin_req_month_save", month: month, group: g.group, clear: true }).then(function () { sv.busy = false; toast(g.group + " رجعت للقائمة العامة ✓"); openMonthly(g, month); },
+              function (e) { sv.busy = false; paint(); toast(errText(e), { err: true }); });
+          });
         });
       }
-      function paint() {
+      paint = function () {
         var keepFocus = document.activeElement && document.activeElement.id === "fu-medit-q";
         clear(body);
         body.appendChild(el("div", { class: "fu-row fu-between" }, [el("h2", {}, ["الدروس المطلوبة · " + monthLabelOf(month)]), el("button", { class: "fu-ibtn", id: "fu-close", type: "button", "aria-label": "إغلاق", onclick: closeSheet }, ["✕"])]));
@@ -1711,12 +1728,12 @@
           body.appendChild(el("div", { class: "fu-hint", id: "fu-medit-where" }, ["القائمة دي لكل المجموعات اللي ملهاش قائمة خاصة." + (owners.length ? " ليهم قائمة خاصة (مش بيتأثروا): " + owners.join("، ") + "." : "")]));
         } else if (own) {
           body.appendChild(el("div", { class: "fu-hint", id: "fu-medit-where", "data-own": "1" }, ["👥 " + g.group + " ليها قائمة خاصة بدل العام — تعديل العام مش بيأثر عليها."]));
-          body.appendChild(el("button", { class: "fu-btn warn", id: "fu-medit-inherit", type: "button", disabled: busy, onclick: backToGeneral }, ["↩ رجّعها للقائمة العامة"]));
+          body.appendChild(el("button", { class: "fu-btn warn", id: "fu-medit-inherit", type: "button", disabled: sv.busy, onclick: backToGeneral }, ["↩ رجّعها للقائمة العامة"]));
         } else if (!fork) {
           body.appendChild(el("div", { class: "fu-hint", id: "fu-medit-where", "data-own": "0" }, ["👥 " + g.group + " ماشية على القائمة العامة (" + planCounts(general) + "). أي تعديل في العام بيمشي عليها."]));
-          body.appendChild(el("button", { class: "fu-btn primary", id: "fu-medit-fork", type: "button", onclick: function () { fork = true; draft = FM().draftFrom(general); paint(); } }, ["اعمل قائمة خاصة بـ " + g.group + " (بتبدأ من العام)"]));
+          body.appendChild(el("button", { class: "fu-btn primary", id: "fu-medit-fork", type: "button", disabled: sv.busy, onclick: function () { fork = true; change(FM().draftFrom(general)); } }, ["اعمل قائمة خاصة بـ " + g.group + " (بتبدأ من العام)"]));
         } else {
-          body.appendChild(el("div", { class: "fu-hint", id: "fu-medit-where", "data-own": "new" }, ["قائمة جديدة خاصة بـ " + g.group + " — بعد الحفظ هتبقى بدل العام للمجموعة دي بس."]));
+          body.appendChild(el("div", { class: "fu-hint", id: "fu-medit-where", "data-own": "new" }, ["قائمة جديدة خاصة بـ " + g.group + " — بدل العام للمجموعة دي بس."]));
         }
         var on = editable();
         var qIn = el("input", { class: "fu-field", id: "fu-medit-q", type: "search", placeholder: "🔎 دوّر على درس", "aria-label": "دوّر على درس", value: q, style: "margin-top:12px" });
@@ -1729,15 +1746,15 @@
           list.appendChild(el("div", { class: "fu-medit-folder", dir: "ltr" }, [folderLabel(f.folder)]));
           f.lessons.forEach(function (p) {
             var e = FM().entry(shown, p), meta = lessonMeta(p);
-            var cb = el("input", { type: "checkbox", "data-lesson": p, disabled: !on || busy });
+            var cb = el("input", { type: "checkbox", "data-lesson": p, disabled: !on });
             cb.checked = !!e;
-            cb.addEventListener("change", function () { draft = FM().toggle(draft, p, cb.checked, meta); paint(); });
+            cb.addEventListener("change", function () { change(FM().toggle(draft, p, cb.checked, meta)); });
             var row = el("div", { class: "fu-medit-row" + (e ? " on" : ""), "data-row": p }, [el("label", { class: "fu-check" }, [cb, lessonChip(p)])]);
             if (e) {
               var parts = el("div", { class: "fu-medit-parts" });
               [["homework", "واجب"], ["quiz", "كويز"]].forEach(function (x) {
-                parts.appendChild(el("button", { type: "button", class: "fu-chip " + (e[x[0]] ? "green" : "grey"), "aria-pressed": String(!!e[x[0]]), "data-part": x[0], disabled: !on || busy,
-                  onclick: function () { draft = FM().setPart(draft, p, x[0], !e[x[0]]); paint(); } }, [(e[x[0]] ? "✓ " : "✗ ") + x[1] + (e[x[0]] ? " مطلوب" : " مش مطلوب")]));
+                parts.appendChild(el("button", { type: "button", class: "fu-chip " + (e[x[0]] ? "green" : "grey"), "aria-pressed": String(!!e[x[0]]), "data-part": x[0], disabled: !on,
+                  onclick: function () { change(FM().setPart(draft, p, x[0], !e[x[0]])); } }, [(e[x[0]] ? "✓ " : "✗ ") + x[1] + (e[x[0]] ? " مطلوب" : " مش مطلوب")]));
               });
               row.appendChild(parts);
             }
@@ -1746,21 +1763,21 @@
         });
         // ticked lessons that are not in the lesson list any more (renamed / hidden): still shown so they can be removed
         if (!q) shown.filter(function (l) { return !folders.some(function (f) { return f.lessons.indexOf(l.lesson) >= 0; }); }).forEach(function (l) {
-          var cb = el("input", { type: "checkbox", "data-lesson": l.lesson, disabled: !on || busy }); cb.checked = true;
-          cb.addEventListener("change", function () { draft = FM().toggle(draft, l.lesson, false); paint(); });
+          var cb = el("input", { type: "checkbox", "data-lesson": l.lesson, disabled: !on }); cb.checked = true;
+          cb.addEventListener("change", function () { change(FM().toggle(draft, l.lesson, false)); });
           list.appendChild(el("div", { class: "fu-medit-row on", "data-row": l.lesson }, [el("label", { class: "fu-check" }, [cb, lessonChip(l.lesson), el("span", { class: "fu-dim" }, [" (مش في قائمة الدروس)"])])]));
         });
         if (!list.childNodes.length) list.appendChild(el("div", { class: "fu-empty" }, [q ? "مفيش درس بالاسم ده" : "مفيش دروس"]));
         body.appendChild(list);
+        var st = sv.busy ? ["saving", "… بيتحفظ"] : sv.err ? ["error", "⚠️ ما اتحفظش: " + sv.err] : sv.done ? ["saved", "✓ اتحفظ"] : ["idle", on ? "أي علامة بتتحفظ على طول." : ""];
         body.appendChild(el("div", { class: "fu-medit-foot" }, [
-          el("div", { class: "fu-dim", id: "fu-medit-count" }, [planCounts(shown)]),
-          on ? el("button", { class: "fu-btn primary", id: "fu-medit-save", type: "button", disabled: busy || !dirty(), onclick: save }, [busy ? "… بنحفظ" : "💾 حفظ"]) : null,
-          el("button", { class: "fu-btn", id: "fu-medit-back", type: "button", onclick: function () {
-            if (dirty()) confirmDialog("فيه تعديلات ما اتحفظتش. ترجع من غير حفظ؟", "رجوع من غير حفظ").then(function (ok) { if (ok) openMonthly(g, month); }); else openMonthly(g, month);
-          } }, ["رجوع للتقرير الشهري"]),
+          el("div", { class: "fu-row fu-between" }, [el("span", { class: "fu-dim", id: "fu-medit-count" }, [planCounts(shown)]),
+            el("span", { class: "fu-medit-status " + st[0], id: "fu-medit-status", "data-state": st[0], role: "status" }, [st[1]])]),
+          sv.err ? el("button", { class: "fu-btn primary", id: "fu-medit-retry", type: "button", onclick: function () { sv.err = ""; saveNow(); } }, ["جرّب الحفظ تاني"]) : null,
+          el("button", { class: "fu-btn", id: "fu-medit-back", type: "button", onclick: back }, [sv.busy ? "… بيتحفظ، استنى ثانية" : "رجوع للتقرير الشهري"]),
         ]));
         if (keepFocus) { var n = $("fu-medit-q"); if (n) { n.focus(); try { n.setSelectionRange(n.value.length, n.value.length); } catch (e) {} } }
-      }
+      };
       paint();
     }, { full: true, label: "الدروس المطلوبة" });
   }

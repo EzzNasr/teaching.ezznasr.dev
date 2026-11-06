@@ -151,6 +151,17 @@ function boot(extraFiles, props, now) {
   t('Omar (nothing done) misses 2 homework + 1 quiz', omar.totals.homework_missed === 2 && omar.totals.quiz_missed === 1, omar.totals);
   const nour = of(review('Mon 5pm'), 'nour');
   t('Mon 5pm also follows the general list', nour.month_plan.source === 'general' && JSON.stringify(exp(nour)) === JSON.stringify({ [REV1]: '1110', [CUR]: '1010' }), exp(nour));
+  // Sheets may store "2026-11" as a DATE cell (seen live: a saved list vanished on refresh). It must still be found, and a
+  // save must update that row, not add a second one.
+  {
+    const sh = getSS('DATA').getSheetByName('MonthLessons'), y = +month.slice(0, 4), m = +month.slice(5, 7);
+    sh.set(2, 1, vm.runInContext('new Date(Date.UTC(' + y + ', ' + (m - 1) + ', 1, 0, 0, 0) - 2 * 3600 * 1000)', E.ctx));   // midnight Cairo, as Sheets stores it
+    const g0 = get();
+    t('a month stored as a date cell still reads back (general list found)', g0.ok && g0.general && g0.general.lessons.length === 2, g0);
+    const rows0 = sh.getLastRow();
+    save({ lessons: [{ lesson: REV1 }, { lesson: CUR, quiz: false }] });
+    t('...and saving again updates that row instead of adding another', sh.getLastRow() === rows0, rows0 + ' -> ' + sh.getLastRow());
+  }
   t('summary.requirements uses the same lessons (homework 2 expected for Sara, 2 met)', (() => { const h = s.requirements.items.filter(i => i.key === 'homework')[0]; return h.expected === 2 && h.met === 2; })(), s.requirements);
 
   // Sat 6pm gets its own list: REV2 quiz only
