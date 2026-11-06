@@ -80,6 +80,14 @@ Since then the repo file differs from Version 61 in comments only (doc paths, D1
 
 **2026-11-05 02:46: Version 62** (commit `dc2844b`). A check found that Version 61 had been deployed with **older** `Code.gs` and `FollowupLogic.gs` (the Nov 3 copies, `9877ddf`): `report_photos` and `check_session` answered "Unknown action", and the Telegram score lines, written answers kept out of the submit-time score and a homework lesson's own due date were missing. All three changed files (`Code.gs`, `FollowupLogic.gs`, `AttendanceAll.gs`) were replaced with the exact repo files (fingerprint-checked against the editor copy and the GitHub download, then re-read after saving: all 6 files = repo). `att_selfTest` ALL PASS, `att_scriptedRun` 50/50 ALL PASS (incl. manual entry), `att_cleanupTest` done. Live checks: `report_photos`, `check_session`, `att_status`, `att_manual_checkin`, `att_review` answer correctly. Adds the demo-data functions (D11). **Rollback:** Version 61 (but that brings the old `Code.gs` back; Version 60 is the last fully-synced one before this).
 
+**2026-11-07 00:07: Version 67** (commit `3b21e9d`, by Claude in the owner's signed-in editor). Versions 63-66 (Nov 5-6) were the
+owner's own deploys; Version 66 had `Code.gs` and `Requirements.gs` from `429c7b8` (without the dashboard polish `3f9d557` and the
+month-lessons save fix). Both replaced with the exact repo files; after a reload all 7 project files (`Code.gs`, `AttendanceAll.gs`,
+`FollowupRouter.gs`, `FollowupNotify.gs`, `Requirements.gs`, `FollowupLogic.gs`, `FollowupWhatsApp.gs`) = `3b21e9d` by full-text
+comparison with the GitHub download. Live checks: `admin_req_month_get` / `admin_req_month_save` / `admin_fu2_wa_status` answer
+"Missing session." (known actions), `att_status`, `check_session`, `report_photos` answer as before, an unknown `admin_req_*` says
+"Unknown action". `AttendanceAll.gs` unchanged, so the attendance self-tests were not re-run. **Rollback:** Version 66.
+
 Every later deploy: the checklist at the top of [deploy.md](deploy.md), and a line here.
 
 1. Apps Script: paste `AttendanceAll.gs`, then **Deploy > Manage deployments > Edit > New version**, never "New deployment".
