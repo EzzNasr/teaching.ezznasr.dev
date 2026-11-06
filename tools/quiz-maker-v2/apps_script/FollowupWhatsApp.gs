@@ -18,6 +18,8 @@
 //      so the owner can send the same test again.)
 //   4. Pace and limits are the server's: sending hours (WA_HOURS, default 9-21 Alex time), a daily cap (WA_DAILY_CAP,
 //      default 60), and a random 25-75 s gap between messages that the phone must respect.
+//   4b. Per batch "send_to" (Nov 2026): "test" queues the batch as TEST rows even while WA_MODE is live (they go to
+//      WA_TEST_TO, nothing is logged). The monthly report batch defaults to "test"; "parents" only takes effect in live.
 //   5. The phone has its OWN token (WA_SENDER_TOKEN, field wa_token), never the admin token: it can only claim, report and
 //      say "I am alive". A stolen phone cannot read or change anything else.
 //
@@ -113,14 +115,23 @@ function fu2_wa_status_(payload) {
     recent: rows.slice(-30).reverse().map(fu2_wa_public_) };
 }
 
-/** {group, group_key, event, items:[{student_key, student_phone, name, to, text, log_items:[{kind, ref}]}]} -> {queued, skipped[]} */
+// The mode one batch is queued in: WA_MODE, except that "send_to":"test" (the monthly batch's default) keeps it in test.
+function fu2_wa_batchMode_(cfg, payload, event) {
+  var to = String(payload.send_to || "").trim().toLowerCase();
+  if (!to) to = event === "monthly" ? "test" : "";
+  if (to && to !== "test" && to !== "parents") throw new Error('send_to must be "test" or "parents".');
+  return cfg.mode === "live" && to !== "test" ? "live" : "test";
+}
+
+/** {group, group_key, event, send_to?, items:[{student_key, student_phone, name, to, text, log_items:[{kind, ref}]}]} -> {mode, queued, skipped[]} */
 function fu2_wa_enqueue_(payload) {
   var cfg = fu2_wa_cfg_();
   if (cfg.mode === "off") throw new Error("WhatsApp sending is switched off (WA_MODE).");
   if (!cfg.configured) throw new Error("The WhatsApp phone is not set up yet (run fu2_wa_setup).");
-  if (cfg.mode === "test" && cfg.testTo.length < 11) throw new Error("Test mode needs WA_TEST_TO (your own number with the country code).");
   var event = String(payload.event || "").trim();
   if (!FU2_WA_EVENTS.hasOwnProperty(event)) throw new Error("Unknown event: " + event);
+  var mode = fu2_wa_batchMode_(cfg, payload, event);
+  if (mode === "test" && cfg.testTo.length < 11) throw new Error("Test mode needs WA_TEST_TO (your own number with the country code).");
   var list = Array.isArray(payload.items) ? payload.items : [];
   if (!list.length) throw new Error("Nothing to send.");
   if (list.length > 200) throw new Error("Too many messages at once.");
@@ -132,7 +143,7 @@ function fu2_wa_enqueue_(payload) {
     rows.forEach(function (r) {
       // test mode: an already-SENT test does not block sending the same student again (the owner re-tests freely);
       // one still waiting or in flight does, so a double tap never queues two
-      if ((r.status === "queued" || r.status === "sending" || r.status === "unknown" || (r.status === "sent" && r.sent_at >= since && cfg.mode === "live")) && r.mode === cfg.mode)
+      if ((r.status === "queued" || r.status === "sending" || r.status === "unknown" || (r.status === "sent" && r.sent_at >= since && mode === "live")) && r.mode === mode)
         recent[r.student_key + "#" + fu2_wa_itemsKey_(fu2_wa_items_(r))] = r.status;
     });
     var queued = 0, skipped = [];
@@ -148,14 +159,14 @@ function fu2_wa_enqueue_(payload) {
       else if (text.length > FU2_WA_TEXT_MAX) why = "message too long";
       else if (!items.length) why = "nothing to log";
       else if (recent[key + "#" + fu2_wa_itemsKey_(items)]) why = "already " + recent[key + "#" + fu2_wa_itemsKey_(items)];
-      else if (cfg.mode === "live" && items.every(function (x) { return logged[key + "|" + x.kind + "|" + x.ref]; })) why = "already contacted";
+      else if (mode === "live" && items.every(function (x) { return logged[key + "|" + x.kind + "|" + x.ref]; })) why = "already contacted";
       if (why) { skipped.push({ name: name, reason: why }); return; }
-      var row = { id: "WA-" + String(Utilities.getUuid()).replace(/-/g, "").slice(0, 12), created_at: nowStr, created_by: who, mode: cfg.mode,
+      var row = { id: "WA-" + String(Utilities.getUuid()).replace(/-/g, "").slice(0, 12), created_at: nowStr, created_by: who, mode: mode,
         group_key: groupKey, group: group, event: event, student_key: key, student_phone: _normalizePhone(it.student_phone || ""), student_name: name,
         to: to, text: text, log_items: JSON.stringify(items), status: "queued", attempts: 0, lease_until: "", sent_at: "", result: "", error: "", updated_at: nowStr };
       fu2_wa_append_(sh, row); recent[key + "#" + fu2_wa_itemsKey_(items)] = "queued"; queued++;
     });
-    return { ok: true, mode: cfg.mode, queued: queued, skipped: skipped };
+    return { ok: true, mode: mode, queued: queued, skipped: skipped };
   });
 }
 function fu2_wa_who_(payload) { try { return payload.token ? "admin" : String(_normalizePhone(payload.student_id || "") || "admin"); } catch (e) { return "admin"; } }
@@ -201,11 +212,13 @@ function fu2_wa_claim_(payload) {
     var left = cfg.cap - fu2_wa_sentToday_(rows) - rows.filter(function (r) { return r.status === "sending"; }).length;
     if (left <= 0) return Object.assign(base, { why: "daily cap " + cfg.cap + " reached", wait_sec: 1800 });
     var out = [];
-    rows.filter(function (r) { return r.status === "queued" && r.mode === cfg.mode; }).slice(0, Math.min(want, left)).forEach(function (r) {
+    // live also hands out TEST rows (a batch queued with send_to "test"); they still go to WA_TEST_TO only
+    var testOk = cfg.testTo.length >= 11;
+    rows.filter(function (r) { return r.status === "queued" && (r.mode === cfg.mode || (cfg.mode === "live" && r.mode === "test" && testOk)); }).slice(0, Math.min(want, left)).forEach(function (r) {
       r.status = "sending"; r.attempts = (+r.attempts || 0) + 1; r.lease_until = String(nowMs + FU2_WA_LEASE_MS); r.updated_at = nowStr;
       fu2_wa_write_(sh, r._row, r);
       var to = r.to, text = r.text;
-      if (cfg.mode === "test") { to = cfg.testTo; text = "[TEST] → " + (r.student_name || "?") + " · " + r.to + "\n\n" + text; }
+      if (r.mode !== "live") { to = cfg.testTo; text = "[TEST] → " + (r.student_name || "?") + " · " + r.to + "\n\n" + text; }
       out.push({ id: r.id, to: to, text: text });
     });
     return Object.assign(base, { items: out, wait_sec: out.length ? 0 : 300, why: out.length ? "" : "queue empty" });
@@ -239,6 +252,11 @@ function fu2_wa_report_(payload) {
   var admin = _props().getProperty("ADMIN_TOKEN"), logErr = 0;
   toLog.forEach(function (r) {
     fu2_wa_items_(r).forEach(function (it) {
+      // a monthly report: mark the month "sent" (saves the requirements snapshot and writes the same contact-log entry)
+      if (it.kind === "monthly" && typeof p2_admin_monthly_review === "function") {
+        try { p2_admin_monthly_review({ token: admin, op: "mark", month: it.ref, student: r.student_phone || r.student_key, group: r.group_key || "", status: "sent", note: "WhatsApp (phone) " + r.id }); return; }
+        catch (e) { console.error("wa monthly mark " + r.id + ": " + e); }   // falls through to the plain contact log
+      }
       try { p2_admin_log_parent_notification({ token: admin, student: r.student_phone || r.student_key, kind: it.kind, ref: it.ref, note: "WhatsApp (phone) " + r.id }); }
       catch (e) { logErr++; console.error("wa log " + r.id + ": " + e); }
     });

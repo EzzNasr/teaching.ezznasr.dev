@@ -9,7 +9,8 @@ const APPS = path.join(__dirname, '..', 'apps_script');
 let pass = 0, fail = 0;
 const t = (n, c, x) => { (c ? pass++ : fail++); console.log((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : '  -> ' + (x === undefined ? '' : (typeof x === 'string' ? x : JSON.stringify(x)).slice(0, 300)))); };
 const H = s => crypto.createHash('sha256').update(s).digest('hex');
-const ACTIONS = ['admin_req_get', 'admin_req_save_global', 'admin_req_save_group', 'admin_req_check', 'admin_req_history'];
+const ACTIONS = ['admin_req_get', 'admin_req_save_global', 'admin_req_save_group', 'admin_req_check', 'admin_req_history',
+  'admin_req_month_get', 'admin_req_month_save'];   // Nov 2026: the month's required lessons
 
 function boot() {
   const env = load([path.join(APPS, 'Code.gs'), path.join(APPS, 'Requirements.gs')]);
@@ -230,7 +231,7 @@ const TODAY = {
 {
   const E = boot();
   const names = Object.keys(E.ctx.req_routes_()).sort();
-  t('req_routes_() has exactly the five frozen action names', JSON.stringify(names) === JSON.stringify(ACTIONS.slice().sort()), names);
+  t('req_routes_() has exactly the five frozen action names + the two month-lessons ones', JSON.stringify(names) === JSON.stringify(ACTIONS.slice().sort()), names);
   t('every route is a function', Object.values(E.ctx.req_routes_()).every(f => typeof f === 'function'));
   t('a route never throws: garbage payload comes back {ok:false,error}', (() => { const r = E.ctx.req_routes_().admin_req_get(null); return r.ok === false && !!r.error; })());
 }

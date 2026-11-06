@@ -122,9 +122,59 @@
       .map(function (c) { var e = effective[c.key]; return { key: c.key, label_ar: c.label_ar, label_en: c.label_en, kind: c.kind, weight: e.weight, rule: e.rule, source: e.source }; });
   }
 
+  // ---- lessons required in a month (Nov 2026) ------------------------------------------------------
+  // For each month there is a GENERAL list (every group) and, optionally, a list for ONE group that replaces the
+  // general list for that group (whole list, not lesson by lesson). Each entry is a ticked lesson; ticking makes its
+  // homework and its quiz required, and either can be switched off on its own:
+  //   {lesson: "programming/.../chapter-1-lesson-2-how-ai-works", homework: true, quiz: false}
+  // Server copy: req_month_* in Requirements.gs (tests/test_req_parity.js keeps them equal).
+  var MAX_MONTH_LESSONS = 60;
+  function isMonth(m) { return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(m == null ? "" : m).trim()); }
+  function lessonPathKey(raw) {
+    return String(raw == null ? "" : raw).trim().toLowerCase().replace(/\\/g, "/").replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, "");
+  }
+  // {ok:true, lessons} (cleaned: lower-case paths, one entry per lesson, the first one wins) | {ok:false, error}
+  function normalizeMonthLessons(list) {
+    if (list === undefined || list === null) list = [];
+    if (!Array.isArray(list)) return { ok: false, error: "lessons must be a list" };
+    var out = [], seen = {};
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      if (typeof it === "string") it = { lesson: it };
+      if (!it || typeof it !== "object") return { ok: false, error: "lesson #" + (i + 1) + " is not valid" };
+      var p = lessonPathKey(it.lesson);
+      if (!p || p.length > 200 || !/^[a-z0-9][a-z0-9._\/-]*$/.test(p)) return { ok: false, error: "lesson #" + (i + 1) + " has no valid lesson path" };
+      if (it.homework !== undefined && typeof it.homework !== "boolean") return { ok: false, error: "homework must be true or false" };
+      if (it.quiz !== undefined && typeof it.quiz !== "boolean") return { ok: false, error: "quiz must be true or false" };
+      if (seen[p]) continue;
+      seen[p] = true;
+      out.push({ lesson: p, homework: it.homework !== false, quiz: it.quiz !== false });
+    }
+    if (out.length > MAX_MONTH_LESSONS) return { ok: false, error: "At most " + MAX_MONTH_LESSONS + " lessons in a month." };
+    return { ok: true, lessons: out };
+  }
+  // plans = one month: {general: {lessons} | null, groups: {group_key: {lessons}}}
+  // -> {source: "group" | "general" | "none", lessons: [...]}; "none" = nothing chosen for the month (the report then
+  //    falls back to each group's weekly lesson lists, as before).
+  function resolveMonthLessons(plans, group) {
+    var gk = groupKey(group), p = plans || {};
+    var g = gk && p.groups && Object.prototype.hasOwnProperty.call(p.groups, gk) ? p.groups[gk] : null;
+    if (g && Array.isArray(g.lessons)) return { source: "group", lessons: clone(g.lessons) };
+    if (p.general && Array.isArray(p.general.lessons)) return { source: "general", lessons: clone(p.general.lessons) };
+    return { source: "none", lessons: [] };
+  }
+  // {homework, quiz}: how many lessons ask for each, for the "what is required" line
+  function monthLessonCounts(lessons) {
+    var c = { lessons: 0, homework: 0, quiz: 0 };
+    (lessons || []).forEach(function (l) { c.lessons++; if (l.homework) c.homework++; if (l.quiz) c.quiz++; });
+    return c;
+  }
+
   return {
-    BUILTIN_KEYS: BUILTIN_KEYS, MAX_CUSTOM: MAX_CUSTOM, MODES: MODES, DEFAULTS: DEFAULTS,
+    BUILTIN_KEYS: BUILTIN_KEYS, MAX_CUSTOM: MAX_CUSTOM, MODES: MODES, DEFAULTS: DEFAULTS, MAX_MONTH_LESSONS: MAX_MONTH_LESSONS,
     groupKey: groupKey, phoneKey: phoneKey, isCustomKey: isCustomKey, isKnownKeyShape: isKnownKeyShape, slugFor: slugFor,
     validateRule: validateRule, validWeight: validWeight, normalizeCatalog: normalizeCatalog, resolve: resolve, differs: differs, monthlyList: monthlyList,
+    isMonth: isMonth, lessonPathKey: lessonPathKey, normalizeMonthLessons: normalizeMonthLessons, resolveMonthLessons: resolveMonthLessons,
+    monthLessonCounts: monthLessonCounts,
   };
 });

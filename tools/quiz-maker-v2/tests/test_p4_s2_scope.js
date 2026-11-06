@@ -210,10 +210,11 @@ const A = ctx => ctx.P4_ACTIONS;
   // integration (follow-up v2): P3_STAFF_ALLOW gained 8 actions for the OWNER's assistants. Only admin_fu2_mark_done has a
   // P4 row (same scope as admin_followup_save_group); the other 7 have none, so p4_gate denies them to teachers and scoped
   // assistants (deny by default). FU2_OWNER_ONLY states that contract.
-  const FU2_OWNER_ONLY = ['admin_fu2_notify_settings_get', 'admin_fu2_notify_settings_save', 'admin_req_get', 'admin_req_save_global', 'admin_req_save_group', 'admin_req_check', 'admin_req_history'];
+  const FU2_OWNER_ONLY = ['admin_fu2_notify_settings_get', 'admin_fu2_notify_settings_save', 'admin_req_get', 'admin_req_save_global', 'admin_req_save_group', 'admin_req_check', 'admin_req_history',
+    'admin_req_month_get', 'admin_req_month_save'];   // Nov 2026: the month's required lessons, owner + owner-assistant only
   const stillAllowed = c.P3_STAFF_ALLOW.filter(a => c.P4_ACTIONS[a] && !c.P4_ASSISTANT_DENY.includes(a) && !['O', 'T'].includes(c.P4_ACTIONS[a].rule) && c.P4_ACTIONS[a].ses);
   console.log('INFO scoped assistant allowed (' + stillAllowed.length + '): ' + stillAllowed.join(','));
-  t('scoped assistant ends up allowed for 13 of the 21 P3_STAFF_ALLOW actions (12 + admin_fu2_mark_done)', stillAllowed.length === 13 && c.P3_STAFF_ALLOW.length === 21 && !stillAllowed.includes('admin_followup_save_templates') && stillAllowed.includes('admin_fu2_mark_done'), stillAllowed.length + '/' + c.P3_STAFF_ALLOW.length);
+  t('scoped assistant ends up allowed for 13 of the 23 P3_STAFF_ALLOW actions (12 + admin_fu2_mark_done)', stillAllowed.length === 13 && c.P3_STAFF_ALLOW.length === 23 && !stillAllowed.includes('admin_followup_save_templates') && stillAllowed.includes('admin_fu2_mark_done'), stillAllowed.length + '/' + c.P3_STAFF_ALLOW.length);
   t('P3_STAFF_ALLOW rows all exist, except the follow-up v2 owner-only actions (which must NOT have one)', c.P3_STAFF_ALLOW.every(a => c.P4_ACTIONS[a] ? !FU2_OWNER_ONLY.includes(a) : FU2_OWNER_ONLY.includes(a)), c.P3_STAFF_ALLOW.filter(a => !c.P4_ACTIONS[a] && !FU2_OWNER_ONLY.includes(a)).join(','));
 }
 

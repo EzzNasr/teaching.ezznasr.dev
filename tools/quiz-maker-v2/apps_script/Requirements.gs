@@ -14,6 +14,9 @@
                         weight | rule_json | sort | edited | updated_at | updated_by
      GroupRequirements  group_key | req_key | mode | in_monthly_report | rule_json | note | updated_at | updated_by
      RequirementChecks  student_key | req_key | month | met | note | updated_at | updated_by
+     MonthLessons       month | group_key | lessons_json | updated_at | updated_by          (Nov 2026, see below)
+                        group_key "*" = the GENERAL list for that month; any other key = that group's own list,
+                        which REPLACES the general one for that group. lessons_json = [{lesson, homework, quiz}].
 
    Until the owner edits anything the sheets may not exist, and every function answers from the built-in
    defaults below, which reproduce today's behaviour exactly.
@@ -31,11 +34,13 @@ var REQ_HEADERS = {
   Requirements: ["key", "label_ar", "label_en", "kind", "scope", "enabled", "in_monthly_report", "parent_message",
                  "weight", "rule_json", "sort", "edited", "updated_at", "updated_by"],
   GroupRequirements: ["group_key", "req_key", "mode", "in_monthly_report", "rule_json", "note", "updated_at", "updated_by"],
-  RequirementChecks: ["student_key", "req_key", "month", "met", "note", "updated_at", "updated_by"]
+  RequirementChecks: ["student_key", "req_key", "month", "met", "note", "updated_at", "updated_by"],
+  MonthLessons: ["month", "group_key", "lessons_json", "updated_at", "updated_by"]
 };
 // columns that must stay plain text (a month like 2026-11 or a phone key must not turn into a date / number)
 var REQ_TEXT_COLS = {
-  Requirements: ["key"], GroupRequirements: ["group_key", "req_key"], RequirementChecks: ["student_key", "req_key", "month"]
+  Requirements: ["key"], GroupRequirements: ["group_key", "req_key"], RequirementChecks: ["student_key", "req_key", "month"],
+  MonthLessons: ["month", "group_key"]
 };
 
 function req_defaults_() {
@@ -244,7 +249,11 @@ function req_audit_(caller, action, target, before, after) {
 // short human sentence for the History tab, from an AuditLog row
 function req_what_(action, target, beforeS, afterS) {
   var b = req_parseJson_(beforeS), a = req_parseJson_(afterS);
-  var label = { req_save_global: "global", req_save_group: "group", req_check: "check" }[action] || action;
+  var label = { req_save_global: "global", req_save_group: "group", req_check: "check", req_month_save: "month lessons" }[action] || action;
+  if (action === "req_month_save") {   // "month lessons 2026-11|general: 2 -> 3 lessons"
+    var cnt = function (o) { return o && Array.isArray(o.lessons) ? o.lessons.length + " lessons" : "none"; };
+    return label + " " + target + ": " + (b ? cnt(b) + " -> " : "") + (a && a.lessons === null ? "removed" : cnt(a));
+  }
   if (!a) return label + " " + target;
   if (!b) return label + " " + target + ": created " + req_brief_(a);
   var ch = [];
@@ -473,6 +482,114 @@ function req_actionHistory_(payload) {
   return { ok: true, items: items };
 }
 
+// ---- lessons required in a month (Nov 2026) ----------------------------------------------------------
+// The monthly report asks "which lessons should this student have done this month?". Before this, the answer was each
+// group's weekly lists (review / homework / quiz lessons in GroupSettings). Now the owner can tick the lessons of a month:
+// one GENERAL list for every group, and optionally a list for one group that REPLACES the general one for that group.
+// Ticking a lesson makes its homework and its quiz required; each can be switched off on its own.
+// Nothing chosen for a month = the old behaviour (weekly lists). Client copy: RequirementsLogic.*MonthLessons.
+var REQ_MAX_MONTH_LESSONS = 60;
+var REQ_MONTH_GENERAL = "*";
+function req_isMonth_(m) { return /^\d{4}-(0[1-9]|1[0-2])$/.test(req_str_(m).trim()); }
+function req_lessonPathKey_(raw) {
+  return req_str_(raw).trim().toLowerCase().replace(/\\/g, "/").replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, "");
+}
+// {ok:true, lessons} | {ok:false, error}. Mirrors RequirementsLogic.normalizeMonthLessons.
+function req_month_normalize_(list) {
+  if (list === undefined || list === null) list = [];
+  if (!Array.isArray(list)) return { ok: false, error: "lessons must be a list" };
+  var out = [], seen = {};
+  for (var i = 0; i < list.length; i++) {
+    var it = list[i];
+    if (typeof it === "string") it = { lesson: it };
+    if (!it || typeof it !== "object") return { ok: false, error: "lesson #" + (i + 1) + " is not valid" };
+    var p = req_lessonPathKey_(it.lesson);
+    if (!p || p.length > 200 || !/^[a-z0-9][a-z0-9._\/-]*$/.test(p)) return { ok: false, error: "lesson #" + (i + 1) + " has no valid lesson path" };
+    if (it.homework !== undefined && typeof it.homework !== "boolean") return { ok: false, error: "homework must be true or false" };
+    if (it.quiz !== undefined && typeof it.quiz !== "boolean") return { ok: false, error: "quiz must be true or false" };
+    if (seen[p]) continue;
+    seen[p] = true;
+    out.push({ lesson: p, homework: it.homework !== false, quiz: it.quiz !== false });
+  }
+  if (out.length > REQ_MAX_MONTH_LESSONS) return { ok: false, error: "At most " + REQ_MAX_MONTH_LESSONS + " lessons in a month." };
+  return { ok: true, lessons: out };
+}
+// plans (one month) {general:{lessons}|null, groups:{gk:{lessons}}} -> {source:"group"|"general"|"none", lessons}.
+// Mirrors RequirementsLogic.resolveMonthLessons.
+function req_month_resolve_(plans, group) {
+  var gk = _groupKey(group), p = plans || {};
+  var g = gk && p.groups && Object.prototype.hasOwnProperty.call(p.groups, gk) ? p.groups[gk] : null;
+  if (g && Array.isArray(g.lessons)) return { source: "group", lessons: req_clone_(g.lessons) };
+  if (p.general && Array.isArray(p.general.lessons)) return { source: "general", lessons: req_clone_(p.general.lessons) };
+  return { source: "none", lessons: [] };
+}
+// Every month's lists, one read: {"2026-11": {general:{lessons,updated_at,by}|null, groups:{gk:{...}}}}. Never creates the tab.
+function req_month_all_() {
+  var out = {};
+  req_rows_("MonthLessons").forEach(function (r) {
+    var mo = req_str_(r.month).trim(), gk0 = req_str_(r.group_key).trim();
+    if (!req_isMonth_(mo) || !gk0) return;
+    var arr = null; try { arr = JSON.parse(req_str_(r.lessons_json) || "[]"); } catch (e) { arr = null; }
+    var n = req_month_normalize_(arr);
+    if (!n.ok) return;   // a hand-damaged cell: ignored (the month falls back), never a crash
+    var rec = { lessons: n.lessons, updated_at: req_str_(r.updated_at), by: req_str_(r.updated_by) };
+    var m = out[mo] = out[mo] || { general: null, groups: {} };
+    if (gk0 === REQ_MONTH_GENERAL) { if (!m.general) m.general = rec; }
+    else { var gk = _groupKey(gk0); if (gk && !m.groups.hasOwnProperty(gk)) m.groups[gk] = rec; }
+  });
+  return out;
+}
+function req_month_for_(month) { return req_month_all_()[req_str_(month).trim()] || { general: null, groups: {} }; }
+
+// admin_req_month_get {month} -> {ok, month, general, groups, effective:{gk:{source, lessons}}, group_names}
+function req_actionMonthGet_(payload) {
+  var mo = req_str_(payload.month).trim();
+  if (!req_isMonth_(mo)) req_fail_("month must be yyyy-MM.");
+  var plans = req_month_for_(mo), names = req_knownGroups_(), effective = {};
+  Object.keys(names).forEach(function (gk) { effective[gk] = req_month_resolve_(plans, gk); });
+  return { ok: true, month: mo, general: plans.general, groups: plans.groups, effective: effective, group_names: names };
+}
+
+// admin_req_month_save {month, group?:"" = general, lessons:[{lesson, homework?, quiz?}]}  -> {ok, month, general, groups}
+//                      {month, group?, clear:true}  removes that list (a group then follows the general list again)
+function req_actionMonthSave_(payload) {
+  var caller = req_caller_(payload);
+  var mo = req_str_(payload.month).trim();
+  if (!req_isMonth_(mo)) req_fail_("month must be yyyy-MM.");
+  var rawGroup = req_str_(payload.group).trim(), gk = rawGroup ? _groupKey(rawGroup) : "";
+  if (gk && !req_knownGroups_().hasOwnProperty(gk)) req_fail_("Unknown group.");
+  var clear = payload.clear === true, lessons = null;
+  if (!clear) {
+    var n = req_month_normalize_(payload.lessons);
+    if (!n.ok) req_fail_(n.error);
+    lessons = n.lessons;
+  }
+  var cell = gk || REQ_MONTH_GENERAL, target = mo + "|" + (gk || "general");
+  _withLock(function () {
+    var existing = null;
+    req_rows_("MonthLessons").forEach(function (r) {
+      if (existing || req_str_(r.month).trim() !== mo) return;
+      var g0 = req_str_(r.group_key).trim();
+      if ((g0 === REQ_MONTH_GENERAL ? REQ_MONTH_GENERAL : _groupKey(g0)) === cell) existing = r;
+    });
+    var before = null;
+    if (existing) { var b = null; try { b = JSON.parse(req_str_(existing.lessons_json) || "[]"); } catch (e) { b = null; } before = { lessons: b }; }
+    if (clear) {
+      if (existing) {
+        _dataSs().getSheetByName("MonthLessons").deleteRows(existing._row, 1);
+        req_audit_(caller, "req_month_save", target, before, { lessons: null });
+      }
+      return;
+    }
+    var sh = req_sheet_("MonthLessons");
+    req_writeRow_(sh, "MonthLessons", existing ? existing._row : 0,
+      { month: mo, group_key: cell, lessons_json: JSON.stringify(lessons), updated_at: req_now_(), updated_by: req_who_(caller) });
+    if (!before || JSON.stringify(before.lessons) !== JSON.stringify(lessons)) req_audit_(caller, "req_month_save", target, before || "", { lessons: lessons });
+  });
+  var plans = req_month_for_(mo);
+  return { ok: true, month: mo, general: plans.general, groups: plans.groups };
+}
+
 // {actionName: function(payload)} for Session 5's router (contract 3.5)
 function req_routes_() {
   return {
@@ -480,6 +597,8 @@ function req_routes_() {
     admin_req_save_global: req_wrap_(req_actionSaveGlobal_),
     admin_req_save_group: req_wrap_(req_actionSaveGroup_),
     admin_req_check: req_wrap_(req_actionCheck_),
-    admin_req_history: req_wrap_(req_actionHistory_)
+    admin_req_history: req_wrap_(req_actionHistory_),
+    admin_req_month_get: req_wrap_(req_actionMonthGet_),
+    admin_req_month_save: req_wrap_(req_actionMonthSave_)
   };
 }

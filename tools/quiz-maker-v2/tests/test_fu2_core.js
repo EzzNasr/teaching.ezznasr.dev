@@ -11,7 +11,8 @@ const t = (n, c, x) => { (c ? pass++ : fail++); console.log((c ? 'PASS ' : 'FAIL
 const H = s => crypto.createHash('sha256').update(s).digest('hex');
 const CODE = path.join(dir, 'Code.gs'), ROUTER = path.join(dir, 'FollowupRouter.gs');
 const ADMIN_ONLY_FU2 = ['admin_fu2_notify_test', 'admin_fu2_group_duplicates'];
-const STAFF_FU2 = ['admin_fu2_mark_done', 'admin_fu2_notify_settings_get', 'admin_fu2_notify_settings_save', 'admin_req_get', 'admin_req_save_global', 'admin_req_save_group', 'admin_req_check', 'admin_req_history'];
+const STAFF_FU2 = ['admin_fu2_mark_done', 'admin_fu2_notify_settings_get', 'admin_fu2_notify_settings_save', 'admin_req_get', 'admin_req_save_global', 'admin_req_save_group', 'admin_req_check', 'admin_req_history',
+  'admin_req_month_get', 'admin_req_month_save'];   // Nov 2026: the month's required lessons
 
 function boot(files, props) {
   const env = load(files, { props: Object.assign({ TELEGRAM_BOT_TOKEN: 'BOT', TELEGRAM_ADMIN_CHAT_ID: '111', TELEGRAM_WEBHOOK_SECRET: 'sec' }, props || {}) });
@@ -41,7 +42,9 @@ const STUB_ROUTES = `
     admin_req_save_global: function (p) { _requireAdminAny(p); return { ok: true }; },
     admin_req_save_group: function (p) { _requireAdminAny(p); return { ok: true }; },
     admin_req_check: function (p) { _requireAdminAny(p); return { ok: true }; },
-    admin_req_history: function (p) { _requireAdminAny(p); return { ok: true, items: [] }; } }; }`;
+    admin_req_history: function (p) { _requireAdminAny(p); return { ok: true, items: [] }; },
+    admin_req_month_get: function (p) { _requireAdminAny(p); return { ok: true }; },
+    admin_req_month_save: function (p) { _requireAdminAny(p); return { ok: true }; } }; }`;
 
 // ============ 1. Routing ============
 {
@@ -62,7 +65,7 @@ const STUB_ROUTES = `
   r = e.post(Object.assign({ action: 'admin_fu2_mark_done' }, e.SARA));
   t('...and a plain student', r.ok === false && /Not authorized/.test(r.error), r);
   r = e.run(`JSON.stringify(Object.keys(fu2_routes_()).sort())`);
-  t('merged map = the 4 + 5 + 1 actions', JSON.parse(r).length === 10 && JSON.parse(r).indexOf('admin_fu2_group_duplicates') >= 0, r);
+  t('merged map = the 4 + 7 + 1 actions', JSON.parse(r).length === 12 && JSON.parse(r).indexOf('admin_fu2_group_duplicates') >= 0, r);
   e.run(`function fu2_notify_routes_() { throw new Error('boom'); }`);
   r = e.post(Object.assign({ action: 'admin_req_get' }, e.TOK));
   t('a route map that throws is skipped; the others still work', r.ok && r.from === 'req', r);
@@ -88,9 +91,9 @@ const STUB_ROUTES = `
 {
   const e = boot([CODE, ROUTER]); e.run(STUB_ROUTES);
   const al = e.ctx.P3_STAFF_ALLOW;
-  t('the 8 staff actions are on P3_STAFF_ALLOW', STAFF_FU2.every(a => al.indexOf(a) >= 0), al);
+  t('the 10 staff actions are on P3_STAFF_ALLOW', STAFF_FU2.every(a => al.indexOf(a) >= 0), al);
   t('the 2 admin-only actions are NOT', ADMIN_ONLY_FU2.every(a => al.indexOf(a) < 0), al);
-  t('the Phase 3 actions are still there (13) and nothing else was added', al.length === 21, al.length);
+  t('the Phase 3 actions are still there (13) and nothing else was added', al.length === 23, al.length);
   e.makeAssistant();
   for (const a of STAFF_FU2) {
     const r = e.post(Object.assign({ action: a }, e.SARA));

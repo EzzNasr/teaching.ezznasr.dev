@@ -6503,6 +6503,9 @@ function _p2fuLoad(ss, dataSs) {
   X.notifs = _p2fuNotifications(ss);
   X.monthly = _p2fuRows(ss.getSheetByName("MonthlyReviews"));
   X.written = _p2fuRows(dataSs.getSheetByName("WrittenAnswers"));   // lives next to QuizResults (contract v1.5)
+  // Nov 2026: the lessons ticked for each month (Requirements.gs, MonthLessons tab). Absent / failing = old behaviour.
+  X.monthPlans = null;
+  try { if (typeof req_month_all_ === "function") X.monthPlans = req_month_all_(); } catch (e) { console.error("month lessons failed: " + e); }
 
   // raw results (columns only, like the overview)
   X.quiz = {}; X.hw = {};      // phoneKey -> [{slug, subject, date, time, score, total, idx}]
@@ -6547,7 +6550,22 @@ function _p2fuPathOf(X, subject, slug) {
 function _p2fuInRange(d, from, to) { return d && d >= from && d <= to; }
 function _p2fuRound(n) { return n === null ? null : Math.round(n * 100) / 100; }
 
-function _p2fuSummaryFor(X, key, from, to) {
+// opts (optional): {month: "yyyy-MM", group: group key} -> use the lessons ticked for that month (Requirements.gs
+// MonthLessons: the group's own list, else the general list) instead of the groups' weekly lists. group = the group the
+// report is made for (the monthly review of one group); without it the student's own groups are tried in order.
+function _p2fuMonthPlan(X, key, opts) {
+  if (!opts || !opts.month || !X.monthPlans || typeof req_month_resolve_ !== "function") return null;
+  var plans = X.monthPlans[opts.month];
+  if (!plans) return null;
+  var gks = opts.group ? [_groupKey(opts.group)] : X.groups.filter(function (g) { return g.members.indexOf(key) >= 0; }).map(function (g) { return g.key; });
+  if (!gks.length) gks = [""];
+  for (var i = 0; i < gks.length; i++) {
+    var r = req_month_resolve_(plans, gks[i]);
+    if (r.source !== "none") { r.group = gks[i]; return r; }
+  }
+  return null;
+}
+function _p2fuSummaryFor(X, key, from, to, opts) {
   var st = X.students[key];
   if (!st) throw new Error("Student not found.");
   // quizzes: every attempt in the range, grouped by lesson; the latest attempt counts (same rule as the overview)
@@ -6580,7 +6598,14 @@ function _p2fuSummaryFor(X, key, from, to) {
   // required items that are missing: only lessons the student is EXPECTED to have done
   // = the homework & quiz lessons of the student's groups + any lesson with a due date up to `to`.
   var expected = {};
-  X.groups.forEach(function (g) {
+  var plan = _p2fuMonthPlan(X, key, opts);
+  // Nov 2026: a month with ticked lessons -> exactly those lessons, with their own homework / quiz switches.
+  if (plan) plan.lessons.forEach(function (l) {
+    var c = _p2fuCanon(l.lesson); if (!c) return;
+    var e = expected[c] = expected[c] || { lesson: c, group_due: "", hw: false, quiz: false, month: true };
+    e.hw = e.hw || l.homework; e.quiz = e.quiz || l.quiz;
+  });
+  if (!plan) X.groups.forEach(function (g) {
     if (g.members.indexOf(key) < 0) return;
     var due = _p2fuHwDue(g.settings, X.today, X.hm, X.cfg);
     // Oct 22: homework and quiz lessons are chosen separately (null = follows review_lessons).
@@ -6593,7 +6618,7 @@ function _p2fuSummaryFor(X, key, from, to) {
     hwL.forEach(function (l) { var c = _p2fuCanon(l); if (c && expected[c]) expected[c].hw = true; });
     qzL.forEach(function (l) { var c = _p2fuCanon(l); if (c && expected[c]) expected[c].quiz = true; });
   });
-  Object.keys(X.req).forEach(function (l) {
+  if (!plan) Object.keys(X.req).forEach(function (l) {
     var r = X.req[l]; if (r.due_override && r.due_override <= to && !expected[l]) expected[l] = { lesson: l, group_due: "", hw: true, quiz: true };
   });
   function everDone(rowsByKey, subject, slug) { return !!(rowsByKey || []).some(function (r) { return r.slug === slug && (r.subject === "" || r.subject === subject) && (!r.date || r.date <= to); }); }
@@ -6603,6 +6628,7 @@ function _p2fuSummaryFor(X, key, from, to) {
     var quizDone = everDone(X.quiz[key], subject, slug), hwDone = everDone(X.hw[key], subject, slug);
     var duePassed = !due || X.today > due;
     var needQ = rq.quiz_required && expected[l].quiz !== false, needH = rq.homework_required && expected[l].hw !== false;   // not in that group's list = not expected
+    if (expected[l].month) { needQ = expected[l].quiz; needH = expected[l].hw; }   // the month's ticks are the owner's explicit choice
     return { lesson: l, quiz: { required: needQ, done: quizDone, missed: needQ && !quizDone && duePassed },
              homework: { required: needH, done: hwDone, due: due, missed: needH && !hwDone && duePassed } };
   });
@@ -6646,6 +6672,7 @@ function _p2fuSummaryFor(X, key, from, to) {
   var gOut = X.groups.filter(function (g) { return g.members.indexOf(key) >= 0; }).map(function (g) { return { group: g.group, key: g.key }; });
   var res = { student: { phone: st.phone, name: st.name, year: st.year, parent_phone: st.parent_phone }, groups: gOut, range: { from: from, to: to },
            totals: totals, quizzes: quizzes, homework: homework, expected: exp, attendance: att, watch: watchList, video_access: access, written: w, notifications: notifs };
+  if (opts && opts.month) res.month_plan = plan ? { source: plan.source, group: plan.group || "" } : { source: "none", group: "" };
   // FU2: summary.requirements (FollowupRouter.gs). A failure here must never break the summary itself.
   try { if (typeof fu2_core_requirements_ === "function") res.requirements = fu2_core_requirements_(X, key, res, from.slice(0, 7)); }
   catch (e) { console.error("FU2 requirements failed: " + e); }
@@ -6686,8 +6713,9 @@ function p2_admin_monthly_review(payload) {
     keys = hit.members.slice();
   } else throw new Error("Give a student or a group.");
   if (keys.length > P2_FU_MAX_BATCH) throw new Error("Too many students in one request (max " + P2_FU_MAX_BATCH + ").");
+  var planGroup = payload.group ? _groupKey(payload.group) : "";
   var out = keys.map(function (k) {
-    var s = _p2fuSummaryFor(X, k, r.from, to);
+    var s = _p2fuSummaryFor(X, k, r.from, to, { month: r.month, group: planGroup });
     var row = X.monthly.filter(function (m) { return _phoneKey(m.student) === k && String(m.month).trim() === r.month; })[0];
     var rev = { status: row ? String(row.status || "pending") : "pending", sent_at: row ? String(row.sent_at || "") : "", note: row ? String(row.note || "") : "" };
     // FU2: a month marked sent or closed shows the requirements as they were THEN (saved when it was marked); it is never recomputed.
@@ -6717,7 +6745,7 @@ function _p2fuMonthlyMark(payload, r) {
       if (!(prevDone && fu2_core_snapshotParse_(prev[FU2_REQ_SNAPSHOT_COL_]))) {
         try {
           var today0 = _p2fuToday(), to0 = r.to > today0 ? today0 : r.to;
-          var sum0 = _p2fuSummaryFor(_p2fuLoad(_ss(), _dataSs()), key, r.from, to0);
+          var sum0 = _p2fuSummaryFor(_p2fuLoad(_ss(), _dataSs()), key, r.from, to0, { month: r.month, group: payload.group ? _groupKey(payload.group) : "" });
           if (sum0.requirements) snapJson = JSON.stringify(sum0.requirements);
         } catch (e) { console.error("FU2 snapshot failed: " + e); }
       }
@@ -6928,7 +6956,9 @@ var P3_STAFF_ALLOW = [
   "admin_req_save_global",
   "admin_req_save_group",
   "admin_req_check",
-  "admin_req_history"
+  "admin_req_history",
+  "admin_req_month_get",
+  "admin_req_month_save"
 ];
 
 var P3_ROLE_ASSISTANT = "assistant";
