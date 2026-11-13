@@ -131,7 +131,7 @@ const enqueue = (env, items, o) => env.admin(Object.assign({ action: 'admin_fu2_
   t('an unknown item is not handed out again', env.phone({ action: 'admin_fu2_wa_claim' }).items.every(i => i.id !== c.items[0].id));
   t('a late success report still completes it (and logs it)', env.phone({ action: 'admin_fu2_wa_report', results: [{ id: c.items[0].id, ok: true }] }).updated === 1 && env.notifs().length === 1);
   enqueue(env, [item(3)]);
-  env.props.WA_LAST_SEEN = JSON.stringify({ at: 'x', ms: Date.now() - 3 * 3600000, state: 'connected' });
+  env.props.WA_LAST_SEEN = JSON.stringify({ at: 'x', ms: env.ctx.Date.now() - 3 * 3600000, state: 'connected' });   // the test clock, not the real one (the real one made this fail after Nov 7)
   const before = env.tg.length; env.ctx.fu2_wa_watchdog(); env.ctx.fu2_wa_watchdog();
   t('queued work + phone silent 3 h: ONE "phone is silent" alert per day', env.tg.length === before + 1 && /silent/.test(env.tg[env.tg.length - 1]), j(env.tg.slice(before)));
   const hb = env.phone({ action: 'admin_fu2_wa_heartbeat', state: 'logged_out' }); env.phone({ action: 'admin_fu2_wa_heartbeat', state: 'logged_out' });
