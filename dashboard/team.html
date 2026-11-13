@@ -42,7 +42,25 @@
   .t-cols h3{ margin:0 0 6px; font-size:14px; }
   .t-cols ul{ margin:0; padding-inline-start:18px; font-size:13.5px; line-height:1.9; }
   .t-warn{ font-size:13px; color:var(--ink-dim); border-inline-start:3px solid var(--line); padding:2px 10px; margin-top:12px; line-height:1.7; }
-  @media (max-width:560px){ .t-cols{ grid-template-columns:1fr; } }
+  .t-powers summary{ cursor:pointer; font-weight:700; font-size:15px; padding:4px 0; }
+  .t-powers summary small{ font-weight:500; color:var(--ink-dim); margin-inline-start:6px; }
+  .t-powers[open] summary{ margin-bottom:10px; }
+  .t-jump{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px; }
+  .t-jump a{ font:600 14px "Cairo","Manrope",sans-serif; padding:10px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel); color:var(--ink); text-decoration:none; }
+  .t-table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  .t-table th,.t-table td{ text-align:start; vertical-align:top; padding:8px 8px; border-bottom:1px solid var(--line); }
+  .t-table th{ font-weight:700; color:var(--ink-dim); font-size:12.5px; }
+  .t-table .t-who-ph{ display:block; font:12px var(--mono); color:var(--ink-dim); direction:ltr; unicode-bidi:isolate; }
+  @media (max-width:560px){
+    .t-cols{ grid-template-columns:1fr; }
+    /* Phone: each log entry becomes a small card instead of a six-column table. */
+    .t-table, .t-table tbody, .t-table tr, .t-table td{ display:block; width:auto; }
+    .t-table tr:first-child{ display:none; }
+    .t-table tr{ border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin:0 0 10px; }
+    .t-table td{ border:0; padding:2px 0; }
+    .t-table td[data-label]:not([data-label=""])::before{ content:attr(data-label) ": "; color:var(--ink-dim); font-size:12.5px; }
+    .t-table td:empty{ display:none; }
+  }
 </style>
 <script src="/assets/theme.js" defer></script>
 </head>
@@ -57,6 +75,7 @@
       <a href="requirements.html" lang="ar">المطلوبات</a>
       <a href="grading.html">Grading</a>
       <a href="team.html" aria-current="page">Team</a>
+      <a href="teacher-stats.html">Revenue</a>
     </nav>
     <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true"></span><span class="theme-label"></span></button>
   </div>
@@ -136,9 +155,9 @@
   function friendly(m) {
     m = String(m || "");
     if (m === "Not authorized.") return "الحساب ده مش أدمن. إدارة الفريق للأدمن بس.";
-    if (/Unknown action/.test(m) || /Not implemented yet/.test(m)) return "السيرفر لسه ما اتحدّثش بصلاحيات المساعد (Phase3_Roles.gs).";
+    if (/Unknown action/.test(m) || /Not implemented yet/.test(m)) return "السيرفر لسه ما اتحدّثش بصلاحيات المساعد. محتاج تنزّل نسخة جديدة من السكريبت.";
     if (/No student account/.test(m)) return "مفيش حساب طالب بالرقم ده. لازم المساعد يسجّل حساب الأول.";
-    if (/admin/i.test(m) && /can't be changed|by hand/.test(m)) return "الحساب ده أدمن. بيتعدّل من شيت Students بس.";
+    if (/admin/i.test(m) && /can't be changed|by hand/.test(m)) return "ده حساب صاحب الموقع، وصلاحيته مش بتتغيّر من هنا.";
     if (/Missing phone/.test(m)) return "اكتب رقم الموبايل.";
     return m;
   }
@@ -226,7 +245,7 @@
       el("p", { class: "t-hint", text: "A teacher signs in with their own student account and sees only their subjects and their own students. The person must already have a student account." }),
       el("div", { class: "t-add" }, [phone].concat(boxes.map(function (b) { return el("label", {}, [b[1], " " + b[0]]); })).concat([go])),
       teachersMsg, teachersList,
-      el("h3", { text: "Quiz Maker tokens (names only)" }), tokensList
+      el("h3", { text: "Quiz Maker keys (names only)" }), tokensList
     ]);
   }
   // What each logged change means, in plain words (the log stores the server's internal step names).
@@ -275,11 +294,18 @@
       if (!rows) return;
       if (!list.length) { note(out, rows.length ? "No changes by that kind of person yet." : "No changes yet."); return; }
       note(out, "");
-      table.appendChild(el("tr", {}, ["When", "Who", "What", "Student or item", "Before", "After"].map(function (h) { return el("th", { text: h }); })));
+      var HEAD = ["When", "Who", "What", "Student or item", "Before", "After"];
+      table.appendChild(el("tr", {}, HEAD.map(function (h) { return el("th", { text: h }); })));
       list.forEach(function (x) {
-        var by = (KIND_WORD[x.actor_kind] || x.actor_kind || "") + " · " + (x.actor_name ? x.actor_name + " (" + x.actor_id + ")" : x.actor_id);
+        // Who: the name first, the phone small underneath (the phone alone when there is no name).
+        var who = el("td", { "data-label": "" }, [(KIND_WORD[x.actor_kind] || x.actor_kind || "") + " · " + (x.actor_name || x.actor_id || ""),
+          x.actor_name ? el("span", { class: "t-who-ph", text: String(x.actor_id || "") }) : null]);
         var stu = x.student_old === x.student_new ? x.student_old : x.student_old + " → " + x.student_new;
-        table.appendChild(el("tr", { "data-kind": x.actor_kind || "" }, [x.ts, by, logWhat(x.field), logValue(stu), logValue(x.old_value), logValue(x.new_value)].map(function (v) { return el("td", { text: String(v == null ? "" : v) }); })));
+        var cells = [x.ts, null, logWhat(x.field), logValue(stu), logValue(x.old_value), logValue(x.new_value)].map(function (v, i) {
+          if (i === 1) return who;
+          return el("td", { "data-label": i === 0 || i === 2 ? "" : HEAD[i], text: String(v == null ? "" : v) });
+        });
+        table.appendChild(el("tr", { "data-kind": x.actor_kind || "" }, cells));
       });
     }
     who.addEventListener("change", paint);
@@ -296,7 +322,8 @@
   function startOwner() {
     if (!ownerRoot) return;
     clear(ownerRoot);
-    ownerRoot.appendChild(el("p", {}, [el("a", { href: "teacher-stats.html", text: "Teacher stats \u2192" })]));
+    // The revenue page was only reachable from a small link here: make it a clear button at the top of the owner part.
+    ownerRoot.appendChild(el("div", { class: "t-jump" }, [el("a", { href: "teacher-stats.html", text: "Revenue and teacher stats \u2192" })]));
     ownerRoot.appendChild(teachersCard());
     ownerRoot.appendChild(editLogCard());
     loadTeachers();
@@ -343,7 +370,7 @@
         el("span", { class: "t-phone", text: s.phone }),
         el("span", { class: "t-badge " + s.role, text: isAdmin ? "أدمن" : "مساعد" })
       ]);
-      if (isAdmin) row.appendChild(el("span", { class: "t-hint", style: "margin:0", text: "من شيت Students" }));
+      if (isAdmin) row.appendChild(el("span", { class: "t-hint", style: "margin:0", text: "صاحب الموقع (مش بيتشال)" }));
       else row.appendChild(el("button", { class: "t-btn danger", type: "button", text: "شيل الصلاحية", on: { click: function () {
         if (window.confirm("تشيل صلاحية المساعد من " + (s.name || s.phone) + "؟ هتتقفل عليه من أول طلب.")) setRole(s.phone, "", null).then(function (r) { if (r) say("اتشالت الصلاحية من " + (r.name || r.phone) + ".", "ok"); });
       } } }));
@@ -361,11 +388,14 @@
     var can = el("ul"), cannot = el("ul");
     S.allow.forEach(function (a) { can.appendChild(el("li", { text: labelOf(a) })); });
     CANNOT.forEach(function (c) { cannot.appendChild(el("li", { text: c })); });
+    // The full list is long (about 18 lines): closed by default, the warning stays visible.
     return el("section", { class: "t-card" }, [
-      el("h2", { text: "المساعد يقدر يعمل إيه؟" }),
-      el("div", { class: "t-cols" }, [
-        el("div", {}, [el("h3", { text: "يقدر" }), can]),
-        el("div", {}, [el("h3", { text: "ما يقدرش" }), cannot])
+      el("details", { class: "t-powers", id: "t-powers" }, [
+        el("summary", {}, ["المساعد يقدر يعمل إيه؟", el("small", { text: "اضغط للتفاصيل" })]),
+        el("div", { class: "t-cols" }, [
+          el("div", {}, [el("h3", { text: "يقدر" }), can]),
+          el("div", {}, [el("h3", { text: "ما يقدرش" }), cannot])
+        ])
       ]),
       el("p", { class: "t-warn", text: "تنبيه: المساعد بيشوف أرقام الطلاب وأولياء الأمور في صفحة المتابعة. ضيف بس حد بتثق فيه." })
     ]);

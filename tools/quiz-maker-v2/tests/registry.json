@@ -1622,6 +1622,17 @@
         "python",
         "tests/e2e_grading_rotate.py"
       ]
+    },
+    {
+      "id": "R-TEAM-UX-1",
+      "title": "Team page (?mock=1), desktop and phone light/dark: no code names on screen, permissions list starts closed with the warning visible, revenue button and nav link, staff log as one card per change on a phone, no sideways scroll",
+      "status": "active",
+      "needs": "playwright",
+      "owner": "admin-ux-2026-11",
+      "cmd": [
+        "python",
+        "tests/e2e_team_page.py"
+      ]
     }
   ]
 }
