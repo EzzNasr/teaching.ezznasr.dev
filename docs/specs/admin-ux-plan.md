@@ -63,3 +63,40 @@ which the owner says are fine. Pages checked in `?mock=1` at 390px and 1280px:
 
 Order: P1 first (the owner's main complaint, needs the price decision), then P2, then P3.
 None of this touches attendance code. P1 changes Code.gs (new version needed); P2/P3 are site files only.
+
+## Agreed and built (2026-11-13)
+
+The owner approved P1-P3 with **option C**, and set the rule: *revenue = money paid through the website only*
+(a student subscribed / pressed "I paid", typed the transfer number, and the payment was approved). Access given
+by hand or for center attendance is never counted. That is exactly the Payments tab: hand grants, group grants and
+attendance never write a Payments row.
+
+**P1 - `dashboard/revenue.html` «الإيرادات»** (owner only; `teacher-stats.html` stays, linked at the bottom as
+"أرقام كل مدرّس ومادة"). Main view: this month's approved revenue, last month next to it, payments waiting for you
+(links to the access page), all time. Then «الفلوس جاية منين؟» by lesson / by month / by group, for any month.
+Then the lesson price, and the one-time fill.
+- Server: new file **`Revenue.gs`** with `admin_revenue_report`, `admin_revenue_set_price`, `admin_revenue_fill_old`
+  (owner only, counts and sums only). Code.gs routes them and, in `handleRequestAccess`, writes today's lesson price
+  into a new **`amount`** column of the Payments row (best effort, guarded by `typeof`).
+- Amount of a payment: the `amount` column, else the price in a subscription note, else none ("unpriced").
+  A price a student typed in the note is never trusted. Only `approved` counts; `pending` is shown apart.
+- Option C: "احسبهم بسعر النهارده" writes today's price into every old lesson payment (approved or pending) that
+  has no amount, once. Subscriptions are never touched; a later price change does not move filled rows.
+- The lesson price lives in the Script Property `REV_LESSON_PRICE_EGP`, set from the page.
+- Group = the student's (first) group in the Groups tab today.
+
+**P2 - `dashboard/team.html` «الفريق»**: rebuilt in Arabic, same look as the follow-up page. One list: owner,
+teachers (subjects in words, Telegram status, their assistants under them), your own assistants. One
+"+ ضيف حد للفريق" button (assistant, or teacher with subjects). «آخر التعديلات» loads on open (50, "show older"
+up to 200), as cards in plain words. Folded: what an assistant can do, Quiz Maker devices.
+`my-team.html` «فريقي» translated to Arabic.
+
+**P3**: every admin page's menu now uses the same Arabic words (النتايج · الوصول للدروس · المتابعة · المطلوبات ·
+التصحيح · الفريق · الإيرادات). الفريق and الإيرادات are owner-only on pages teachers can open.
+
+**To deploy (owner):** Apps Script: add the new file `Revenue.gs`, replace `Code.gs`, then New version. Site files:
+`dashboard/{revenue,team,my-team,teacher-stats,master,access,grading,wrong-questions}.html`, `assets/staff-guard.js`.
+Then open الإيرادات, set the lesson price, and press the fill button once.
+
+Tests: R-REV-1 (`tests/test_revenue.js`), R-REV-2 (`tests/e2e_revenue.py`), R-TEAM-UX-1 (`tests/e2e_team_page.py`),
+and the team / my-team sections of `tests/test_p4_s7_pages.js` updated to the Arabic labels.

@@ -1348,6 +1348,14 @@ function doPost(e) {
       case "p4_admin_teacher_stats":
         return _json(p4_admin_teacher_stats(payload));
 
+      // Revenue page (Revenue.gs, owner only). A missing Revenue.gs reads as "not implemented yet".
+      case "admin_revenue_report":
+      case "admin_revenue_set_price":
+      case "admin_revenue_fill_old":
+        if (typeof admin_revenue_report !== "function") throw new Error("Not implemented yet: " + payload.action);
+        return _json(payload.action === "admin_revenue_report" ? admin_revenue_report(payload)
+          : payload.action === "admin_revenue_set_price" ? admin_revenue_set_price(payload) : admin_revenue_fill_old(payload));
+
       case "ping":
         _requireAdmin(payload);
         return _json(_p2Post("p4_pingDecorate", { ok: true, message: "pong" }, payload));
@@ -2605,6 +2613,8 @@ function handleRequestAccess(payload) {
       scope: lesson, reference: reference, note: note, status: "pending",
       created_at: _fmt(new Date(), TZ, true), decided_at: "",
     });
+    // Revenue.gs: write today's lesson price into the row's "amount" column (best effort, never blocks).
+    if (typeof rev_stampLessonPrice_ === "function") rev_stampLessonPrice_(sheet, id);
     return { ok: true, status: "pending", payment_id: id };
   });
   if (res && res.ok && res.status === "pending" && !res.duplicate) {
@@ -7993,6 +8003,8 @@ var P4_ACTIONS = (function () {
   // Not in the contract table, but in the router and under the p3_admin_ prefix: owner only (see handoff).
   add("p3_admin_list_staff p3_admin_diagnose_submissions p3_admin_restore_submissions p3_admin_flag_status", { rule: "O", needs: [] });
   add("p4_admin_set_teacher p4_admin_list_teachers p4_admin_set_group_owner p4_admin_tg_unlink p4_admin_list_edit_log p4_admin_teacher_stats", { rule: "O", needs: [] });
+  // Revenue page (Revenue.gs, Nov 2026): owner only
+  add("admin_revenue_report admin_revenue_set_price admin_revenue_fill_old", { rule: "O", needs: [] });
   // New teacher-side actions
   add("p4_teacher_update_student", { rule: "T", needs: ["SP"], St: ["student"], ses: true });
   add("p4_teacher_set_assistant p4_teacher_list_assistants p4_teacher_revoke_assistant", { rule: "T", needs: [], ses: true });

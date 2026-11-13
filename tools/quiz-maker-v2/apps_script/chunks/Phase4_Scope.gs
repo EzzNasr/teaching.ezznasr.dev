@@ -263,6 +263,8 @@ var P4_ACTIONS = (function () {
   // Not in the contract table, but in the router and under the p3_admin_ prefix: owner only (see handoff).
   add("p3_admin_list_staff p3_admin_diagnose_submissions p3_admin_restore_submissions p3_admin_flag_status", { rule: "O", needs: [] });
   add("p4_admin_set_teacher p4_admin_list_teachers p4_admin_set_group_owner p4_admin_tg_unlink p4_admin_list_edit_log p4_admin_teacher_stats", { rule: "O", needs: [] });
+  // Revenue page (Revenue.gs, Nov 2026): owner only
+  add("admin_revenue_report admin_revenue_set_price admin_revenue_fill_old", { rule: "O", needs: [] });
   // New teacher-side actions
   add("p4_teacher_update_student", { rule: "T", needs: ["SP"], St: ["student"], ses: true });
   add("p4_teacher_set_assistant p4_teacher_list_assistants p4_teacher_revoke_assistant", { rule: "T", needs: [], ses: true });

@@ -200,7 +200,7 @@ const A = ctx => ctx.P4_ACTIONS;
   t('every contract section 5 action has a row', contract.every(a => c.P4_ACTIONS[a]), contract.filter(a => !c.P4_ACTIONS[a]).join(','));
   t('no row for a name that is neither in the router nor the contract', Object.keys(c.P4_ACTIONS).every(a => cases.includes(a) || contract.includes(a)), Object.keys(c.P4_ACTIONS).filter(a => !cases.includes(a) && !contract.includes(a)).join(','));
   const O = Object.keys(c.P4_ACTIONS).filter(a => c.P4_ACTIONS[a].rule === 'O').sort();
-  t('owner-only rows are the contract O list + the 4 extra p3_admin_ actions', O.length === 3 + 3 + 4 + 6, O.join(','));
+  t('owner-only rows are the contract O list + the 4 extra p3_admin_ actions + the 3 revenue actions (Nov 2026)', O.length === 3 + 3 + 4 + 6 + 3, O.join(','));
   t('bulk actions are O (A10)', ['p3_admin_bulk_preview', 'p3_admin_bulk_grant', 'p3_admin_bulk_revoke'].every(a => c.P4_ACTIONS[a].rule === 'O'));
   t('every named filter is p4f_<action>', Object.keys(c.P4_ACTIONS).every(a => !c.P4_ACTIONS[a].filter || c.P4_ACTIONS[a].filter === 'p4f_' + a));
   t('every filter row in the contract table has its filter', ['admin_list_videos', 'admin_list_lesson_tags', 'admin_list_lessons', 'admin_grant_access', 'admin_grant_quiz_access', 'admin_group_add', 'admin_list_groups', 'admin_get_all', 'admin_access_overview', 'admin_list_payments', 'admin_followup_overview', 'admin_student_summary', 'admin_monthly_review', 'admin_list_parent_notifications', 'admin_grading_queue'].every(a => c.P4_ACTIONS[a].filter === 'p4f_' + a));

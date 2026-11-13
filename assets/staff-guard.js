@@ -40,6 +40,7 @@
     "my-team": ["teacher"],
     "team": ["admin"],
     "teacher-stats": ["admin"],
+    "revenue": ["admin"],
     "wrong-questions": ["admin"]
   };
   var SESSION_KEY = "teaching_session";   // same key auth.js uses

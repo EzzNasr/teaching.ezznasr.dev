@@ -707,6 +707,30 @@
       "fields": {}
     },
     {
+      "action": "admin_revenue_report",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "admin_revenue_set_price",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
+      "action": "admin_revenue_fill_old",
+      "rule": "O",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
+    },
+    {
       "action": "ping",
       "rule": "PUB",
       "needs": [],

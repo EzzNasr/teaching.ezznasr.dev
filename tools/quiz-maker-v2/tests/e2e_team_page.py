@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """
-e2e_team_page.py - real-browser (Chromium) test for dashboard/team.html in ?mock=1 mode.
+e2e_team_page.py - real-browser (Chromium) test for dashboard/team.html («الفريق») in ?mock=1 mode.
 
-Checks the small clean-ups from the admin UX pass (2026-11):
-  - no code names on screen (file names, sheet names)
-  - the long "what can an assistant do" list starts closed; the trust warning stays visible
-  - the revenue page has a clear button at the top of the owner part and a nav link
-  - on a phone the staff activity log shows one card per change (no squashed six-column table), no sideways scroll
+The page was rebuilt in Nov 2026 as one Arabic page: everyone with staff access in one list (owner, teachers with
+their assistants under them, your own assistants), one "add someone" button, the recent changes loaded on open,
+and the long details folded at the bottom. Desktop and phone, light and dark.
 
     python tests/e2e_team_page.py        (run from tools/quiz-maker-v2)
 """
@@ -38,53 +36,63 @@ def serve():
     return srv
 
 
-
-
 def run(b, base, width, scheme):
     ctx = b.new_context(viewport={"width": width, "height": 860}, color_scheme=scheme)
     ctx.route("**/*", lambda r: r.continue_() if r.request.url.startswith(base) else r.abort())
     pg = ctx.new_page()
     errors = []
     pg.on("pageerror", lambda e: errors.append(str(e)))
+    pg.on("dialog", lambda d: d.accept())
     pg.goto(base + "/dashboard/team.html?mock=1")
-    pg.wait_for_selector("#t-powers", timeout=10000)
-    pg.wait_for_selector("text=Mona (math)", timeout=10000)
+    pg.wait_for_selector("#t-log li[data-kind]", timeout=10000)
     tag = "%dpx %s: " % (width, scheme)
+    check(tag + "page is Arabic, right to left", pg.evaluate("document.documentElement.dir") == "rtl")
     text = pg.inner_text("body")
-    for bad in ("Phase3_Roles", ".gs", "شيت Students", "tokens"):
-        check(tag + "no code name on screen: " + bad, bad not in text)
+    for bad in ("Phase3_Roles", ".gs", "شيت Students", "token", "admin_", "Telegram linked", "Assistants:", "Make teacher"):
+        check(tag + "no code name or English label on screen: " + bad, bad not in text)
+    # one list of everyone
+    check(tag + "owner, teacher and own assistant in one list", pg.locator("#t-owners li[data-role=owner]").count() == 1
+          and pg.locator("#t-teachers li[data-role=teacher]").count() == 1 and pg.locator("#t-assistants li[data-role=assistant]").count() == 1)
+    check(tag + "the teacher's assistant is listed under the teacher", pg.locator("#t-teachers [data-role=teacher-assistant]").inner_text() == "مساعد: عمر")
+    check(tag + "subject in words, Telegram status as a chip", "رياضة" in pg.inner_text("#t-teachers") and "تليجرام متوصّل" in pg.inner_text("#t-teachers"))
+    check(tag + "the count covers everyone (owner + teacher + 2 assistants)", "(4)" in pg.inner_text("#t-people h3"), pg.inner_text("#t-people h3"))
+    # one add button
+    check(tag + "add panel closed at first", not pg.locator("#t-add").is_visible())
+    pg.locator("#t-add-open").click()
+    check(tag + "add panel opens with assistant chosen", pg.locator("#t-add").is_visible() and pg.locator("#t-add-go").inner_text() == "ضيفه مساعد")
+    pg.locator("#t-add [data-kind=teacher]").click()
+    check(tag + "choosing teacher shows the subjects", pg.locator(".t-subjects input").count() == 3 and pg.locator("#t-add-go").inner_text() == "خلّيه مدرّس")
+    pg.locator("#t-phone").fill("01000000077")
+    pg.locator("#t-add-go").click()
+    pg.wait_for_selector("#t-msg.err", timeout=3000)
+    check(tag + "teacher without a subject: asks to tick one", "علّم مادة" in pg.inner_text("#t-msg"))
+    pg.locator(".t-subjects label", has_text="برمجة").click()
+    pg.locator("#t-add-go").click()
+    pg.wait_for_selector("#t-msg.ok", timeout=3000)
+    check(tag + "teacher added and listed, panel closes", pg.locator("#t-teachers li[data-role=teacher]").count() == 2 and not pg.locator("#t-add").is_visible())
+    pg.locator("#t-add-open").click(); pg.locator("#t-add [data-kind=assistant]").click()
+    pg.locator("#t-phone").fill("9999999999"); pg.locator("#t-add-go").click()
+    pg.wait_for_selector("#t-msg.err", timeout=3000)
+    check(tag + "unknown number: a plain sentence", "لازم الشخص يسجّل حساب" in pg.inner_text("#t-msg"), pg.inner_text("#t-msg"))
+    pg.locator("#t-add-open").click()
+    # recent changes: loaded on open, cards, plain words
+    log = pg.locator("#t-log li[data-kind]")
+    check(tag + "recent changes loaded on open (2 entries)", log.count() == 2, log.count())
+    first = log.first.inner_text()
+    check(tag + "change in plain words, attendance value translated", "سجّل حضور: في السنتر" in first and "center" not in first, first)
+    pg.locator("#t-logwho").select_option("teacher")
+    check(tag + "filter by teachers", pg.locator("#t-log li[data-kind]").count() == 1)
+    if width < 600:
+        box = pg.evaluate("(() => { const l = document.querySelector('#t-log li'), w = document.querySelector('#t-logcard'); return [l.getBoundingClientRect().right, w.getBoundingClientRect().right]; })()")
+        check(tag + "phone: each change card fits the card", box[0] <= box[1] + 1, box)
+    # folded details
     check(tag + "permissions list starts closed", pg.evaluate("!document.getElementById('t-powers').open"))
-    check(tag + "...and its items are hidden", not pg.locator("#t-powers li").first.is_visible())
     check(tag + "trust warning is visible", pg.locator(".t-warn").is_visible())
     pg.locator("#t-powers summary").click()
     check(tag + "permissions list opens on tap", pg.locator("#t-powers li").first.is_visible())
-    jump = pg.locator(".t-jump a[href='teacher-stats.html']")
-    check(tag + "revenue button at the top of the owner part", jump.count() == 1 and jump.is_visible())
-    check(tag + "revenue link in the nav", pg.locator("header nav a[href='teacher-stats.html']").count() == 1)
-    pg.locator("button", has_text="Show the latest 200 edits").click()
-    pg.wait_for_selector(".t-table tr[data-kind]", timeout=5000)
-    rows = pg.locator(".t-table tr[data-kind]")
-    check(tag + "log shows both mock changes", rows.count() == 2, rows.count())
-    info = pg.evaluate("""() => {
-      const t = document.querySelector('.t-table'), head = t.querySelector('tr');
-      const row = t.querySelector('tr[data-kind]');
-      return { headShown: getComputedStyle(head).display !== 'none', rowDisplay: getComputedStyle(row).display,
-               rowW: row.getBoundingClientRect().width, tableW: t.parentNode.getBoundingClientRect().width,
-               phone: (row.querySelector('.t-who-ph') || {}).textContent || '' };
-    }""")
-    check(tag + "who-cell shows the phone on its own line", info["phone"] == "01000000010", info)
-    if width < 600:
-        check(tag + "phone: header row hidden, each change is a card", not info["headShown"] and info["rowDisplay"] == "block", info)
-        check(tag + "phone: card fits the width", info["rowW"] <= info["tableW"] + 1, info)
-        labels = pg.evaluate("""() => [...document.querySelectorAll('.t-table tr[data-kind]')[0].children]
-          .map(td => getComputedStyle(td, '::before').content).filter(c => c && c !== 'none')""")
-        check(tag + "phone: labels on the card", any("Before" in c for c in labels) and any("After" in c for c in labels), labels)
-    else:
-        check(tag + "desktop: still a normal table with a header", info["headShown"] and info["rowDisplay"] == "table-row", info)
+    check(tag + "revenue link in the menu and at the bottom", pg.locator("nav a[href='revenue.html']").count() == 1 and pg.locator(".t-links a[href='revenue.html']").count() == 1)
     wide = pg.evaluate("document.documentElement.scrollWidth - window.innerWidth")
     check(tag + "no sideways scroll", wide <= 1, wide)
-    shots = os.path.join(HERE, "_shots"); os.makedirs(shots, exist_ok=True)
-    pg.screenshot(path=os.path.join(shots, "team_%d_%s.png" % (width, scheme)), full_page=True)
     check(tag + "no page errors", not errors, errors)
     ctx.close()
 

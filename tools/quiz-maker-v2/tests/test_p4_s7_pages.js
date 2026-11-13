@@ -183,21 +183,21 @@ async function myteam() {
   const { doc, calls, win, dom } = r;
   t('my-team: runs for a teacher and reads assistants and Telegram status', !r.err && sentOf(calls, 'p4_teacher_list_assistants').length === 1 && sentOf(calls, 'p4_tg_status').length === 1, r.err && r.err.message);
   t('my-team: student-supplied names are text, never markup', doc.getElementById('mt-root').textContent.indexOf('<img src=x onerror=alert(1)>') >= 0 && doc.querySelectorAll('img').length === 0);
-  const phone = doc.querySelectorAll('input').filter(i => i.getAttribute('aria-label') === 'Assistant phone')[0];
-  phone.value = '01000000099'; btn(doc, 'Appoint assistant').click(); await settle(15);
-  t('my-team: appoint sends one request, re-reads the list, and shows the neutral sentence', sentOf(calls, 'p4_teacher_set_assistant').length === 1 && sentOf(calls, 'p4_teacher_list_assistants').length === 2 && /If that number is registered and eligible, the person now appears in the list\./.test(doc.getElementById('mt-root').textContent));
+  const phone = doc.querySelectorAll('input').filter(i => i.getAttribute('aria-label') === 'رقم موبايل المساعد')[0];
+  phone.value = '01000000099'; btn(doc, 'ضيفه مساعد').click(); await settle(15);
+  t('my-team: appoint sends one request, re-reads the list, and shows the neutral sentence', sentOf(calls, 'p4_teacher_set_assistant').length === 1 && sentOf(calls, 'p4_teacher_list_assistants').length === 2 && /لو الرقم ده متسجّل على الموقع ومسموح له، هتلاقيه في القايمة دلوقتي\./.test(doc.getElementById('mt-root').textContent));
   win.confirmAnswer = false;
-  const rm = () => doc.querySelectorAll('button').filter(b => b.textContent === 'Remove')[0];
+  const rm = () => doc.querySelectorAll('button').filter(b => b.textContent === 'شيل')[0];
   rm().click(); await settle(5);
   t('my-team: a declined confirm sends nothing', sentOf(calls, 'p4_teacher_revoke_assistant').length === 0 && dom.calls.confirms.length === 1);
   win.confirmAnswer = true; rm().click(); await settle(10);
   t('my-team: revoke asks first, sends once, and removes only that row', sentOf(calls, 'p4_teacher_revoke_assistant').length === 1 && sentOf(calls, 'p4_teacher_revoke_assistant')[0].phone === '01000000010' && doc.querySelectorAll('.t-name').every(n => n.textContent !== 'Omar') && doc.querySelectorAll('.t-name').some(n => n.textContent.indexOf('onerror') >= 0));
-  btn(doc, 'Connect Telegram').click(); await settle(10);
+  btn(doc, 'اربط التليجرام').click(); await settle(10);
   t('my-team: Connect opens the returned link', dom.calls.opened.join() === 'https://t.me/bot?start=ABCD2345' && sentOf(calls, 'p4_tg_link_start').length === 1);
-  btn(doc, 'Check status').click(); await settle(10);
-  t('my-team: status then shows Connected', /Connected since 2026-10-30/.test(doc.getElementById('mt-root').textContent));
-  btn(doc, 'Disconnect').click(); await settle(10);
-  t('my-team: Disconnect asks first, sends once, and updates its own card', sentOf(calls, 'p4_tg_unlink').length === 1 && /Not connected/.test(doc.getElementById('mt-root').textContent));
+  btn(doc, 'اتأكد').click(); await settle(10);
+  t('my-team: status then shows Connected', /متوصّل من 2026-10-30/.test(doc.getElementById('mt-root').textContent));
+  btn(doc, 'افصل').click(); await settle(10);
+  t('my-team: Disconnect asks first, sends once, and updates its own card', sentOf(calls, 'p4_tg_unlink').length === 1 && /مش متوصّل/.test(doc.getElementById('mt-root').textContent));
   t('my-team: no reload', dom.calls.reloads === 0);
   for (const who of ['owner', 'sassistant', 'assistant', 'student']) {
     const x = await runPage('my-team.html', { who, answer });
@@ -206,28 +206,38 @@ async function myteam() {
 }
 
 async function team() {
+  // dashboard/team.html, rebuilt Nov 2026 as one Arabic page: everyone with staff access, recent changes, folded details.
   let teachers = [{ phone: '01000000009', name: 'Mona', scope: 'math', telegram: true, assistants: [{ phone: '01000000010', name: 'Omar' }] }];
+  let staff = [{ phone: '01000000001', name: 'Owner', role: 'admin' }];
   const answer = p => {
-    if (p.action === 'p3_admin_list_staff') return { ok: true, staff: [{ phone: '01000000001', name: 'Owner', role: 'admin' }], allow: [] };
+    if (p.action === 'p3_admin_list_staff') return { ok: true, staff: staff.map(x => Object.assign({}, x)), allow: [] };
+    if (p.action === 'p3_admin_set_role') { if (p.role === 'assistant') staff.push({ phone: p.phone, name: 'Sara', role: 'assistant' }); else staff = staff.filter(x => x.phone !== p.phone); return { ok: true, phone: p.phone, name: 'Sara', role: p.role || 'student', changed: true }; }
     if (p.action === 'p4_admin_list_teachers') return { ok: true, teachers: teachers.map(x => Object.assign({}, x)), tokens: [{ name: 'mona-laptop', scope: 'math', created: '2026-10-30' }] };
     if (p.action === 'p4_admin_set_teacher') { if (!p.scope) teachers = teachers.filter(x => x.phone !== p.phone); else teachers.push({ phone: p.phone, name: 'New', scope: p.scope, telegram: false, assistants: [] }); return { ok: true }; }
     if (p.action === 'p4_admin_tg_unlink') { teachers[0].telegram = false; return { ok: true }; }
     if (p.action === 'p4_admin_list_edit_log') return { ok: true, rows: [{ ts: '2026-10-30 10:00', actor_kind: 'teacher', actor_id: '01000000009', student_old: '01000000002', student_new: '01000000003', field: 'phone', old_value: '<b>x</b>', new_value: 'y' }] };
   };
   const r = await runPage('team.html', { who: 'owner', answer });
-  const { doc, calls, dom } = r, root = doc.getElementById('t-owner');
-  t('team: runs for the owner and lists teachers, tokens (names only) and a link to Teacher stats', !r.err && /Mona/.test(root.textContent) && /mona-laptop/.test(root.textContent) && doc.querySelectorAll('a').some(a => a.href === 'teacher-stats.html' || a.getAttribute('href') === 'teacher-stats.html'), r.err && r.err.message);
-  t('team: shows the teacher\'s Telegram status and assistants', /Telegram linked/.test(root.textContent) && /Assistants: Omar/.test(root.textContent));
-  btn(doc, 'Unlink Telegram').click(); await settle(10);
-  t('team: unlink asks first, sends once, and changes only that row', dom.calls.confirms.length === 1 && sentOf(calls, 'p4_admin_tg_unlink').length === 1 && /Telegram not linked/.test(root.textContent) && !btn(doc, 'Unlink Telegram'));
-  const phone = doc.querySelectorAll('input').filter(i => i.getAttribute('aria-label') === 'Teacher phone')[0];
-  phone.value = '01000000077'; doc.querySelectorAll('input').filter(i => i.getAttribute('aria-label') === 'math')[0].checked = true;
-  btn(doc, 'Make teacher').click(); await settle(15);
-  t('team: Make teacher sends phone and the ticked subjects, then re-reads the list', sentOf(calls, 'p4_admin_set_teacher').length === 1 && sentOf(calls, 'p4_admin_set_teacher')[0].scope === 'math' && sentOf(calls, 'p4_admin_list_teachers').length === 2);
-  btn(doc, 'Remove teacher').click(); await settle(10);
-  t('team: Remove teacher asks first and sends scope ""', sentOf(calls, 'p4_admin_set_teacher').length === 2 && sentOf(calls, 'p4_admin_set_teacher')[1].scope === '' && dom.calls.confirms.length === 2);
-  btn(doc, 'Show the latest 200 edits').click(); await settle(10);
-  t('team: the edit log is read-only text (markup shown as characters)', sentOf(calls, 'p4_admin_list_edit_log').length === 1 && /<b>x<\/b>/.test(root.textContent) && doc.querySelectorAll('b').length === 0);
+  const { doc, calls, dom } = r, root = doc.getElementById('t-root');
+  t('team: runs for the owner and lists teachers, Quiz Maker devices (names only) and links to revenue and teacher stats', !r.err && /Mona/.test(root.textContent) && /mona-laptop/.test(root.textContent) && ['teacher-stats.html', 'revenue.html'].every(h => doc.querySelectorAll('a').some(a => a.getAttribute('href') === h)), r.err && r.err.message);
+  t('team: shows the teacher subject in words, Telegram status and assistants under the teacher', /رياضة/.test(root.textContent) && /تليجرام متوصّل/.test(root.textContent) && /مساعد: Omar/.test(root.textContent));
+  t('team: the recent changes load on open (once) and stay text (markup shown as characters)', sentOf(calls, 'p4_admin_list_edit_log').length === 1 && /<b>x<\/b>/.test(root.textContent) && doc.querySelectorAll('b').length === 0 && /غيّر رقم الطالب/.test(root.textContent));
+  btn(doc, 'افصل التليجرام').click(); await settle(10);
+  t('team: unlink asks first, sends once, and the row then says not linked', dom.calls.confirms.length === 1 && sentOf(calls, 'p4_admin_tg_unlink').length === 1 && /تليجرام مش متوصّل/.test(root.textContent) && !btn(doc, 'افصل التليجرام'));
+  const listsBefore = sentOf(calls, 'p4_admin_list_teachers').length;
+  btn(doc, 'ضيف حد للفريق').click(); await settle(2);
+  doc.querySelectorAll('[data-kind=teacher]')[0].click(); await settle(2);
+  doc.getElementById('t-phone').value = '01000000077';
+  doc.querySelectorAll('input').filter(i => i.getAttribute('aria-label') === 'رياضة')[0].checked = true;
+  btn(doc, 'خلّيه مدرّس').click(); await settle(15);
+  t('team: add a teacher sends phone and the ticked subjects, then re-reads the list', sentOf(calls, 'p4_admin_set_teacher').length === 1 && sentOf(calls, 'p4_admin_set_teacher')[0].scope === 'math' && sentOf(calls, 'p4_admin_set_teacher')[0].phone === '01000000077' && sentOf(calls, 'p4_admin_list_teachers').length === listsBefore + 1 && /اتحفظ/.test(doc.getElementById('t-msg').textContent));
+  btn(doc, 'ضيف حد للفريق').click(); await settle(2);
+  doc.querySelectorAll('[data-kind=assistant]')[0].click(); await settle(2);
+  doc.getElementById('t-phone').value = '01000000088';
+  btn(doc, 'ضيفه مساعد').click(); await settle(15);
+  t('team: add an assistant sends role "assistant" and shows them under your assistants', sentOf(calls, 'p3_admin_set_role').length === 1 && sentOf(calls, 'p3_admin_set_role')[0].role === 'assistant' && /Sara/.test(doc.getElementById('t-assistants').textContent));
+  btn(doc, 'شيل المدرّس').click(); await settle(10);
+  t('team: remove teacher asks first and sends scope ""', sentOf(calls, 'p4_admin_set_teacher').length === 2 && sentOf(calls, 'p4_admin_set_teacher')[1].scope === '' && dom.calls.confirms.length === 2);
   t('team: no reload', dom.calls.reloads === 0);
   for (const who of ['teacher', 'sassistant', 'assistant', 'student']) {
     const x = await runPage('team.html', { who, answer });
@@ -392,7 +402,7 @@ function staticChecks() {
   ['dashboard/my-team.html'].forEach(f => t('static: ' + f + ' never writes innerHTML or html:', !/innerHTML\s*=|\bhtml:\s/.test(files[f])));
   const ds = asset('draft-store.js');
   t('static: draft-store.js uses sessionStorage and never localStorage', /sessionStorage/.test(ds) && !/localStorage/.test(ds.replace(/^\s*\/\*[\s\S]*?\*\//, '').replace(/\/\/.*$/gm, '').replace(/"[^"]*never localStorage[^"]*"/g, '')));
-  t('static: grading.html tells owner-only links apart (Team is data-owner-only, My team is data-teacher-only)', /<a href="team\.html" data-owner-only>/.test(files['dashboard/grading.html']) && /<a href="my-team\.html" data-teacher-only>/.test(files['dashboard/grading.html']));
+  t('static: grading.html tells owner-only links apart (Team is data-owner-only, My team is data-teacher-only)', /<a href="team\.html" data-owner-only[ >]/.test(files['dashboard/grading.html']) && /<a href="my-team\.html" data-teacher-only[ >]/.test(files['dashboard/grading.html']));
   t('static: staff-guard.js lists teacher-stats as owner-only', /"teacher-stats": \["admin"\]/.test(asset('staff-guard.js')));
   // assets that are mirrored by the Quiz Maker must stay in sync (none of these are)
   const mirrors = fs.readdirSync(path.join(SITE, 'tools', 'quiz-maker-v2', 'assets_templates'));
