@@ -2,3 +2,4 @@
 # Code.gs) out of the published website — none of it belongs online.
 exclude:
   - tools
+  - README.md
