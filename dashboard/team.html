@@ -14,6 +14,8 @@
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/followup.css">
 <script src="/assets/theme.js" defer></script>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/i18n/team.js"></script>
 <style>
   .t-nav{max-width:720px;margin:6px auto 12px;padding:0 14px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
   .t-nav::-webkit-scrollbar{display:none}
@@ -32,7 +34,7 @@
   .t-chip{font-size:12.5px;font-weight:700;padding:1px 10px;border-radius:999px;background:var(--fu-soft);color:var(--fu-dim)}
   .t-chip.ok{background:var(--fu-ok-bg);color:var(--fu-ok)}
   .t-chip.warn{background:var(--fu-warn-bg);color:var(--fu-warn)}
-  .t-sub{list-style:none;margin:6px 0 0;padding:0 14px 0 0;border-inline-start:3px solid var(--fu-line);width:100%}
+  .t-sub{list-style:none;margin:6px 0 0;padding:0;padding-inline-start:14px;border-inline-start:3px solid var(--fu-line);width:100%}
   .t-sub li{font-size:14.5px;padding:2px 0}
   .t-acts{display:flex;gap:6px;flex-wrap:wrap}
   .t-btn{min-height:40px;padding:4px 12px;border-radius:12px;border:1px solid var(--fu-line);background:var(--fu-card);color:var(--fu-ink);font:700 14px 'Cairo',sans-serif;cursor:pointer}
@@ -100,7 +102,10 @@
   // Owner only (StaffGuard + the server). Every button is a DECISION: it asks first, then re-reads the list.
   var MOCK = /[?&]mock=1\b/.test(location.search);
   var root = document.getElementById("t-root");
-  var S = { session: null, staff: [], allow: [], teachers: [], tokens: [], log: null, logWho: "", logMore: false, adding: false, addKind: "assistant", flash: null };
+  var S = { session: null, staff: [], allow: [], teachers: [], tokens: [], log: null, logWho: "", logMore: false, adding: false, addKind: "assistant", flash: null, draft: { phone: "", subj: {} } };
+  // Arabic / English (assets/i18n.js). Plain text is translated where it is written; text that mixes words and data is built with t().
+  var I = window.I18n || { t: function (s) { return s; }, lang: function () { return "ar"; }, onChange: function () {} };
+  var t = I.t;
 
   // Text only: every value goes through textContent, nothing is parsed as HTML.
   function el(tag, attrs, kids) {
@@ -179,10 +184,10 @@
       var o = JSON.parse(v);
       if (Array.isArray(o)) return o.join("، ");
       return Object.keys(o).filter(function (k) { return o[k] !== "" && o[k] != null; }).map(function (k) {
-        var x = o[k]; if (x === true) x = "أيوه"; else if (x === false) x = "لأ"; else if (typeof x === "object") x = JSON.stringify(x);
-        else if (k === "mode" && MODE_WORD[x]) x = MODE_WORD[x];
-        return (KEY_WORD[k] || k.replace(/_/g, " ")) + ": " + x;
-      }).join("، ");
+        var x = o[k]; if (x === true) x = t("أيوه"); else if (x === false) x = t("لأ"); else if (typeof x === "object") x = JSON.stringify(x);
+        else if (k === "mode" && MODE_WORD[x]) x = t(MODE_WORD[x]);
+        return (KEY_WORD[k] ? t(KEY_WORD[k]) : k.replace(/_/g, " ")) + ": " + x;
+      }).join(I.lang() === "en" ? ", " : "، ");
     } catch (e) { return v; }
   }
 
@@ -249,7 +254,7 @@
       function (e) { if (btn) btn.disabled = false; say(e.message, "err"); });
   }
   function who(name, phone, chips) {
-    return el("div", { class: "t-who" }, [el("span", { class: "t-name", text: name || phone }), el("span", { class: "t-phone", text: phone }),
+    return el("div", { class: "t-who" }, [el("span", { class: "t-name", translate: "no", text: name || phone }), el("span", { class: "t-phone", text: phone }),
       chips && chips.length ? el("div", { class: "t-chips" }, chips) : null]);
   }
   function ownerRow(s) { return el("li", { class: "t-row", "data-role": "owner" }, [who(s.name, s.phone, [el("span", { class: "t-chip", text: "صاحب الموقع" })])]); }
@@ -266,7 +271,7 @@
     } } }));
     var li = el("li", { class: "t-row", "data-role": "teacher" }, [who(name, t.phone, chips), acts]);
     var as = t.assistants || [];
-    li.appendChild(el("ul", { class: "t-sub" }, as.length ? as.map(function (a) { return el("li", { "data-role": "teacher-assistant", text: "مساعد: " + (a.name || a.phone) }); })
+    li.appendChild(el("ul", { class: "t-sub" }, as.length ? as.map(function (a) { return el("li", { "data-role": "teacher-assistant" }, ["مساعد:", " ", el("span", { translate: "no", text: a.name || a.phone })]); })
       : [el("li", { class: "fu-dim", text: "مالوش مساعدين (هو بيضيفهم من صفحة «فريقي»)" })]));
     return li;
   }
@@ -285,12 +290,15 @@
       seg.appendChild(el("button", { type: "button", role: "radio", "data-kind": k[0], "aria-checked": String(S.addKind === k[0]), text: k[1], on: { click: function () { S.addKind = k[0]; render(); var i = document.getElementById("t-phone"); if (i) i.focus(); } } }));
     });
     var phone = el("input", { type: "tel", inputmode: "numeric", autocomplete: "off", placeholder: "01XXXXXXXXX", id: "t-phone", "aria-label": "رقم الموبايل" });
+    // What was typed survives a re-draw (switching kind or language).
+    phone.value = S.draft.phone;
+    phone.addEventListener("input", function () { S.draft.phone = phone.value; });
     box.appendChild(seg);
     box.appendChild(phone);
     var boxes = [];
     if (S.addKind === "teacher") {
       var subs = el("div", { class: "t-subjects", role: "group", "aria-label": "المواد" });
-      Object.keys(SUBJECT).forEach(function (s) { var c = el("input", { type: "checkbox", value: s, "aria-label": SUBJECT[s] }); boxes.push([s, c]); subs.appendChild(el("label", {}, [c, SUBJECT[s]])); });
+      Object.keys(SUBJECT).forEach(function (s) { var c = el("input", { type: "checkbox", value: s, "aria-label": SUBJECT[s] }); c.checked = !!S.draft.subj[s]; c.addEventListener("change", function () { S.draft.subj[s] = c.checked; }); boxes.push([s, c]); subs.appendChild(el("label", {}, [c, SUBJECT[s]])); });
       box.appendChild(subs);
       box.appendChild(el("p", { class: "t-help", text: "المدرّس بيدخل بحسابه كطالب، وبيشوف مواده وطلابه بس. يقدر يضيف لحد 3 مساعدين ليه، ويستلم طلبات الدفع على التليجرام." }));
     } else box.appendChild(el("p", { class: "t-help", text: "المساعد بيدخل بنفس رقمه والباسورد بتوعه، وبيفتح صفحات المتابعة والتصحيح بس. لازم يكون عامل حساب على الموقع." }));
@@ -301,9 +309,9 @@
       if (S.addKind === "teacher") {
         var scope = boxes.filter(function (b) { return b[1].checked; }).map(function (b) { return b[0]; }).join(",");
         if (!scope) { say("علّم مادة واحدة على الأقل.", "err"); return; }
-        act(go, null, { action: "p4_admin_set_teacher", phone: v, scope: scope }, function () { S.adding = false; return "اتحفظ: بقى مدرّس " + subjects(scope).join(" و") + "."; });
+        act(go, null, { action: "p4_admin_set_teacher", phone: v, scope: scope }, function () { S.adding = false; S.draft = { phone: "", subj: {} }; return "اتحفظ: بقى مدرّس " + subjects(scope).join("، ") + "."; });
       } else {
-        act(go, null, { action: "p3_admin_set_role", phone: v, role: "assistant" }, function (r) { S.adding = false; return r.changed ? "اتضاف " + (r.name || r.phone) + " كمساعد." : (r.name || r.phone) + " مساعد بالفعل."; });
+        act(go, null, { action: "p3_admin_set_role", phone: v, role: "assistant" }, function (r) { S.adding = false; S.draft = { phone: "", subj: {} }; return r.changed ? "اتضاف " + (r.name || r.phone) + " كمساعد." : (r.name || r.phone) + " مساعد بالفعل."; });
       }
     });
     box.appendChild(go);
@@ -350,10 +358,10 @@
       var stu = x.student_old === x.student_new ? x.student_old : x.student_old + " ← " + x.student_new;
       var before = logValue(x.old_value), after = logValue(x.new_value);
       ul.appendChild(el("li", { "data-kind": x.actor_kind || "" }, [
-        el("div", { class: "t-when", text: String(x.ts || "") + " · " + (KIND[x.actor_kind] || "") + " " + (x.actor_name || x.actor_id || "") }),
+        el("div", { class: "t-when", translate: "no", text: String(x.ts || "") + " · " + (KIND[x.actor_kind] ? t(KIND[x.actor_kind]) : "") + " " + (x.actor_name || x.actor_id || "") }),
         el("div", { class: "t-what", text: logWhat(x.field) }),
         stu ? el("div", { class: "t-ba" }, ["الطالب: ", el("span", { class: "t-phone", text: logValue(stu) })]) : null,
-        before || after ? el("div", { class: "t-ba", text: (before ? "قبل: " + before : "") + (before && after ? "  ·  " : "") + (after ? "بعد: " + after : "") }) : null
+        before || after ? el("div", { class: "t-ba", translate: "no", text: (before ? t("قبل: {0}", [before]) : "") + (before && after ? "  ·  " : "") + (after ? t("بعد: {0}", [after]) : "") }) : null
       ]));
     });
     card.appendChild(ul);
@@ -371,7 +379,7 @@
     var seen = {};
     S.allow.forEach(function (a) { var l = labelOf(a); if (!seen[l]) { seen[l] = 1; can.appendChild(el("li", { text: l })); } });
     CANNOT.forEach(function (c) { cannot.appendChild(el("li", { text: c })); });
-    var keys = el("ul", {}, S.tokens.length ? S.tokens.map(function (k) { return el("li", { text: k.name + " — " + subjects(k.scope).join("، ") + (k.created ? " — من " + k.created : "") }); }) : [el("li", { text: "مفيش." })]);
+    var keys = el("ul", {}, S.tokens.length ? S.tokens.map(function (k) { return el("li", { translate: "no", text: k.name + " — " + subjects(k.scope).map(function (x) { return t(x); }).join(I.lang() === "en" ? ", " : "، ") + (k.created ? " — " + t("من {0}", [k.created]) : "") }); }) : [el("li", { text: "مفيش." })]);
     return el("div", {}, [
       el("p", { class: "t-warn", text: "تنبيه: المساعد بيشوف أرقام الطلاب وأولياء الأمور في صفحة المتابعة. ضيف بس حد بتثق فيه." }),
       el("details", { class: "t-more", id: "t-powers" }, [el("summary", { text: "المساعد يقدر يعمل إيه؟" }),
@@ -401,7 +409,7 @@
   }
 
   // ---------- boot ----------
-  function start(session) { S.session = session; reload().then(loadLog); }
+  function start(session) { S.session = session; I.onChange(function () { if (S.staff.length || S.log) render(); }); reload().then(loadLog); }
   function loadScript(src) { return new Promise(function (ok, bad) { var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = function () { bad(new Error("ما قدرناش نحمّل " + src)); }; document.head.appendChild(s); }); }
   function boot() {
     if (MOCK) { document.getElementById("t-mock").hidden = false; var g = document.getElementById("authgate"); if (g) g.remove(); start(null); return; }

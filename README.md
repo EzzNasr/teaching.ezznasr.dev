@@ -68,6 +68,17 @@ Every staff page has the same Arabic menu: النتايج · الوصول للد
 Each page also opens in **mock mode** (`?mock=1`) with sample data and saves nothing, which is how the screenshots were taken
 and how the browser tests run.
 
+**Arabic / English.** Staff pages have a language button next to the dark-mode button (`EN` / `ع`). Arabic is the default;
+one tap switches the page to English (left to right) without a reload and without losing anything typed, and the choice is
+remembered on that device for every staff page. Names, group names, lesson titles and messages to parents stay in their own
+language. Done so far: Team, Revenue and the assistant's home page (`staff.html`); the other staff pages follow. How it works:
+`assets/i18n.js` (shared) plus one word list per page in `assets/i18n/`. Test: R-I18N-1.
+
+| Arabic (default) | English |
+|---|---|
+| ![Team in Arabic](docs/specs/i18n-shots/team-after-ar-390.png) | ![Team in English](docs/specs/i18n-shots/team-after-en-390.png) |
+| ![Revenue in Arabic](docs/specs/i18n-shots/revenue-after-ar-390.png) | ![Revenue in English](docs/specs/i18n-shots/revenue-after-en-390.png) |
+
 ### Results (the main dashboard)
 `dashboard/master.html`: every student's quiz and homework results, filters by grade, group and lesson, wrong-question analysis
 (`dashboard/wrong-questions.html`). Teachers see only their own subjects.

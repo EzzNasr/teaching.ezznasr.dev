@@ -15,6 +15,8 @@
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/followup.css">
 <script src="/assets/theme.js" defer></script>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/i18n/staff.js"></script>
 <style>
   .sh-hello{margin:56px 0 4px;font-size:26px;font-weight:800;line-height:1.3}
   .sh-sub{margin:0 0 18px;color:var(--fu-dim)}
@@ -81,7 +83,7 @@
 
   function start(session, role) {
     root.textContent = "";
-    root.appendChild(el("h2", { class: "sh-hello", text: "أهلاً " + firstName(session.student_name) + " 👋" }));
+    root.appendChild(el("h2", { class: "sh-hello" }, ["أهلاً", " ", el("span", { translate: "no", text: firstName(session.student_name) }), " 👋"]));
     root.appendChild(el("p", { class: "sh-sub", text: "اختار اللي عايز تعمله. كل حاجة هنا بتتحفظ لوحدها." }));
 
     var follow = card("followup.html", "📋", "متابعة الطلاب",

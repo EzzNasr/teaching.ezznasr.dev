@@ -14,6 +14,8 @@
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/followup.css">
 <script src="/assets/theme.js" defer></script>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/i18n/revenue.js"></script>
 <style>
   .rv-big{font-size:40px;font-weight:800;line-height:1.15;margin:6px 0 0}
   .rv-big small{font-size:18px;font-weight:700;color:var(--fu-dim)}
@@ -85,7 +87,10 @@
   "use strict";
   var MOCK = /[?&]mock=1\b/.test(location.search);
   var root = document.getElementById("rv-root");
-  var S = { session: null, data: null, view: "item", month: null, titles: {}, busy: false };
+  var S = { session: null, data: null, view: "item", month: null, titles: {}, busy: false, draftPrice: null };
+  // Arabic / English (assets/i18n.js): plain text is translated where it is written; money, counts and months are built with t().
+  var I = window.I18n || { t: function (s, v) { return String(s).replace(/\{(\w+)\}/g, function (m, k) { return v && v[k] != null ? v[k] : m; }); }, lang: function () { return "ar"; }, month: null, onChange: function () {} };
+  var t = I.t;
 
   // Every value goes through textContent. Nothing from the server is ever parsed as HTML.
   function el(tag, attrs, kids) {
@@ -103,20 +108,24 @@
 
   // ---------- words ----------
   var MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
-  function monthName(ym) { var m = /^(\d{4})-(\d{2})$/.exec(ym || ""); return m ? MONTHS[+m[2] - 1] + " " + m[1] : "تاريخ مش معروف"; }
-  function money(n) { return Math.round(n || 0).toLocaleString("en-US") + " جنيه"; }
-  function payments(n) { return n === 1 ? "دفعة واحدة" : n === 2 ? "دفعتين" : n + (n >= 3 && n <= 10 ? " دفعات" : " دفعة"); }
+  function monthName(ym) { var m = /^(\d{4})-(\d{2})$/.exec(ym || ""); return m ? (I.month ? I.month(+m[2] - 1) : MONTHS[+m[2] - 1]) + " " + m[1] : t("تاريخ مش معروف"); }
+  function money(n) { return t("{0} جنيه", [Math.round(n || 0).toLocaleString("en-US")]); }
+  function payments(n) {
+    if (I.lang() === "en") return n === 1 ? "1 payment" : n + " payments";
+    return n === 1 ? "دفعة واحدة" : n === 2 ? "دفعتين" : n + (n >= 3 && n <= 10 ? " دفعات" : " دفعة");
+  }
   var GRADE = { "1": "أولى ثانوي", "2": "تانية ثانوي", "3": "تالتة ثانوي" };
   function itemName(kind, item) {
     var m = /^g(\w+)-(ch|t)(\d+)$/.exec(item || "");
-    if (kind === "chapter" && m) return (GRADE[m[1]] || "سنة " + m[1]) + " · اشتراك الفصل " + m[3];
-    if (kind === "term" && m) return (GRADE[m[1]] || "سنة " + m[1]) + " · اشتراك الترم " + m[3];
+    var year = m ? (GRADE[m[1]] ? t(GRADE[m[1]]) : t("سنة {0}", [m[1]])) : "";
+    if (kind === "chapter" && m) return year + " · " + t("اشتراك الفصل {0}", [m[3]]);
+    if (kind === "term" && m) return year + " · " + t("اشتراك الترم {0}", [m[3]]);
     if (kind === "lesson") {
       if (S.titles[item]) return S.titles[item];
-      var last = String(item || "").split("/").pop() || "درس";
+      var last = String(item || "").split("/").pop() || t("درس");
       return last.replace(/-/g, " ");
     }
-    return String(item || "حاجة تانية");
+    return String(item || t("حاجة تانية"));
   }
 
   // ---------- API (real: AuthEngine.adminCall; mock: window.__REV_MOCK(payload) or the built-in sample) ----------
@@ -161,7 +170,7 @@
     }
     if (S.month) rows = rows.filter(function (r) { return r.month === S.month; });
     var out = S.view === "group"
-      ? groupBy(rows, function (r) { return r.group || ""; }, function (r) { return r.group || "من غير جروب"; })
+      ? groupBy(rows, function (r) { return r.group || ""; }, function (r) { return r.group || t("من غير جروب"); })
       : groupBy(rows, function (r) { return r.kind + "|" + r.item; }, function (r) { return itemName(r.kind, r.item); });
     return out.sort(function (a, b) { return b.amount - a.amount || b.count - a.count; });
   }
@@ -214,7 +223,7 @@
     list.forEach(function (x) {
       var sub = payments(x.count) + (x.unpriced ? " · منهم " + x.unpriced + " من غير مبلغ" : "");
       ul.appendChild(el("li", { class: "rv-row" }, [
-        el("div", { class: "rv-line" }, [el("span", { class: "rv-name", text: x.name }), el("span", { class: "rv-amt", text: money(x.amount) })]),
+        el("div", { class: "rv-line" }, [el("span", { class: "rv-name", translate: "no", text: x.name }), el("span", { class: "rv-amt", text: money(x.amount) })]),
         el("div", { class: "rv-sub", text: sub }),
         el("div", { class: "rv-bar", "aria-hidden": "true" }, [el("i", { style: "width:" + (max ? Math.max(2, Math.round(100 * x.amount / max)) : 0) + "%" })])
       ]));
@@ -229,7 +238,8 @@
   function priceCard(d) {
     var msg = el("div", { class: "rv-msg", role: "status" });
     var input = el("input", { type: "number", inputmode: "decimal", min: "1", step: "1", id: "rv-price", "aria-label": "سعر الدرس بالجنيه", placeholder: "مثلاً 50" });
-    if (d.lesson_price) input.value = String(d.lesson_price);
+    if (S.draftPrice !== null) input.value = S.draftPrice; else if (d.lesson_price) input.value = String(d.lesson_price);
+    input.addEventListener("input", function () { S.draftPrice = input.value; });   // kept when the page is re-drawn (language switch)
     var save = el("button", { class: "fu-btn primary", type: "button", id: "rv-price-save", text: "احفظ السعر" });
     function say(t, k) { msg.textContent = t || ""; msg.className = "rv-msg" + (k ? " " + k : ""); }
     save.addEventListener("click", function () {
@@ -237,7 +247,7 @@
       if (!v) { say("اكتب سعر الدرس.", "err"); input.focus(); return; }
       save.disabled = true; say("");
       api({ action: "admin_revenue_set_price", price: v }).then(function (r) {
-        save.disabled = false; S.flash = "اتحفظ: سعر الدرس " + money(r.price) + ". أي دفعة درس جديدة هتتسجّل بالسعر ده.";
+        save.disabled = false; S.draftPrice = null; S.flash = "اتحفظ: سعر الدرس " + money(r.price) + ". أي دفعة درس جديدة هتتسجّل بالسعر ده.";
         return load();
       }, function (e) { save.disabled = false; say(e.message, "err"); });
     });
@@ -324,7 +334,7 @@
 
   // ---------- boot ----------
   document.getElementById("rv-refresh").addEventListener("click", function () { load(); });
-  function start(session) { S.session = session; loadTitles().then(load); }
+  function start(session) { S.session = session; I.onChange(function () { render(); }); loadTitles().then(load); }
   function loadScript(src) { return new Promise(function (ok, bad) { var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = function () { bad(new Error("ما قدرناش نحمّل " + src)); }; document.head.appendChild(s); }); }
   function boot() {
     if (MOCK) { document.getElementById("rv-mock").hidden = false; var g = document.getElementById("authgate"); if (g) g.remove(); start(null); return; }

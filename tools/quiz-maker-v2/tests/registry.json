@@ -1654,6 +1654,17 @@
         "python",
         "tests/e2e_revenue.py"
       ]
+    },
+    {
+      "id": "R-I18N-1",
+      "title": "Arabic / English button (assets/i18n.js) on the team, revenue and assistant-home staff pages, desktop and phone light/dark: Arabic RTL by default, button next to the dark-mode button, one tap to English LTR with key labels, no Arabic left outside data, typed phone / subjects / price kept, confirms in English, remembered across reloads and staff pages, exact Arabic back, works with storage blocked, no sideways scroll",
+      "status": "active",
+      "needs": "playwright",
+      "owner": "i18n-2026-11",
+      "cmd": [
+        "python",
+        "tests/e2e_i18n_staff.py"
+      ]
     }
   ]
 }
