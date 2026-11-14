@@ -1657,7 +1657,7 @@
     },
     {
       "id": "R-I18N-1",
-      "title": "Arabic / English button (assets/i18n.js) on the team, revenue and assistant-home staff pages, desktop and phone light/dark: Arabic RTL by default, button next to the dark-mode button, one tap to English LTR with key labels, no Arabic left outside data, typed phone / subjects / price kept, confirms in English, remembered across reloads and staff pages, exact Arabic back, works with storage blocked, no sideways scroll",
+      "title": "Arabic / English button (assets/i18n.js) on every Arabic staff page (team, revenue, assistant home, follow-up incl. a group page and the help sheet, requirements incl. the groups tab, student summary, my-team), desktop and phone light/dark: Arabic RTL by default, button next to the dark-mode button, one tap to English LTR with key labels, no Arabic left outside data, typed phone / subjects / price kept, confirms in English, remembered across reloads and staff pages, exact Arabic back, works with storage blocked, no sideways scroll",
       "status": "active",
       "needs": "playwright",
       "owner": "i18n-2026-11",

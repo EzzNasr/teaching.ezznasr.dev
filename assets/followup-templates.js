@@ -843,7 +843,7 @@
     var emojiBox = el("div", { class: "ft-emojis", hidden: "" });
     var chips = el("div", { class: "ft-chips" });
     var previewTitle = el("h3", { class: "ft-h" });
-    var bubble = el("div", { class: "ft-bubble", dir: "auto" });
+    var bubble = el("div", { class: "ft-bubble", translate: "no", dir: "auto" });
     var info = el("div", { class: "ft-info", "aria-live": "polite" });
     var btnSave = el("button", { type: "button", class: "ft-btn primary" }, ["حفظ"]);
     var btnReset = el("button", { type: "button", class: "ft-btn" }, ["رجوع للأصلي"]);

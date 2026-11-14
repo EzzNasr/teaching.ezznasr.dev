@@ -1,5 +1,5 @@
 /* Words of dashboard/staff.html (the assistant's home page «الرئيسية»), Arabic ↔ English. See assets/i18n.js. */
-window.I18n && I18n.add([
+window.I18n && window.I18n.add([
   ["شغل المساعد", "Assistant's work"],
   ["أهلاً", "Hi"],
   ["اختار اللي عايز تعمله. كل حاجة هنا بتتحفظ لوحدها.", "Pick what you want to do. Everything here saves by itself."],

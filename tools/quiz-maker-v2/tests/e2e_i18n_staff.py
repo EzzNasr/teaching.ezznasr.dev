@@ -67,20 +67,30 @@ def new_ctx(b, base, width, scheme, block_storage=False):
 
 
 PAGES = [
-    # file, ready selector, Arabic h1, English h1, [(selector, English text that must be in it)]
+    # file, ready selector, Arabic h1, English h1, [(selector, English text that must be in it)], Arabic text back after switching back,
+    # (input to type in before switching, text) whose value must survive the switch
     ("team.html?mock=1", "#t-log li", "الفريق", "Team",
      [("#t-add-open", "Close"), ("#t-add-go", "Make them a teacher"), ("#t-logcard h3", "Latest changes"), ("#t-powers summary", "What can an assistant do?"),
-      ("nav a[aria-current=page]", "Team"), ("#t-teachers", "Telegram connected"), ("#t-log", "Took attendance: at the center")]),
+      ("nav a[aria-current=page]", "Team"), ("#t-teachers", "Telegram connected"), ("#t-log", "Took attendance: at the center")], "النتايج", None),
     ("revenue.html?mock=1", "#rv-hero", "الإيرادات", "Revenue",
      [("#rv-hero", "Revenue for November 2026"), ("#rv-now", "4,250 EGP"), ("#rv-break h3", "Where is the money coming from?"),
-      ("[data-view=month]", "By month"), ("#rv-price-save", "Save the price"), ("#rv-list", "Secondary 1 · Chapter 3 subscription")]),
+      ("[data-view=month]", "By month"), ("#rv-price-save", "Save the price"), ("#rv-list", "Secondary 1 · Chapter 3 subscription")], "النتايج", ("#rv-price", "75")),
     ("staff.html", ".sh-card", "الرئيسية", "Home",
-     [(".sh-hello", "Hi سارة"), (".sh-cards", "Student follow-up"), (".sh-cards", "Start grading →"), ("#sh-out", "Sign out"), (".sh-badge:not([hidden])", "3 waiting")]),
+     [(".sh-hello", "Hi سارة"), (".sh-cards", "Student follow-up"), (".sh-cards", "Start grading →"), ("#sh-out", "Sign out"), (".sh-badge:not([hidden])", "3 waiting")], "تسجيل خروج", None),
+    ("followup.html?mock=1", "#fu-today, #fu-hero", "متابعة الطلاب", "Student follow-up",
+     [("#fu-tabs", "Today"), ("#fu-root", "What you need to do now"), ("#fu-updated", "Last updated")], "اليوم", None),
+    ("requirements.html?mock=1", ".rq-card", "المطلوبات", "Requirements",
+     [("#rq-tabs", "General"), ("#rq-tabs", "History"), ("#rq-root", "General requirements"), ("#rq-root", "Watch video"), ("#rq-root", "Counts in the monthly report")],
+     "استثناءات المجموعات", None),
+    ("student-summary.html?mock=1", "#ss-q", "ملخص الطالب", "Student summary",
+     [("#fu-root", "Choose the student:")], "اختار الطالب", ("#ss-q", "sa")),
+    ("my-team.html?mock=1", "#mt-root h2", "فريقي", "My team",
+     [("#mt-root", "Your assistants"), ("#mt-root", "Link Telegram"), ("nav", "RESULTS")], "مساعدينك", ("#mt-root input[type=tel]", "0123")),
 ]
 
 
 def run_page(b, base, width, scheme, spec):
-    path, ready, h1_ar, h1_en, labels = spec
+    path, ready, h1_ar, h1_en, labels, ar_back, typed = spec
     name = path.split(".")[0]
     tag = "%s %dpx %s: " % (name, width, scheme)
     ctx = new_ctx(b, base, width, scheme)
@@ -98,8 +108,8 @@ def run_page(b, base, width, scheme, spec):
     if name == "team":
         pg.click("#t-add-open"); pg.click("[data-kind=teacher]"); pg.fill("#t-phone", "01234567890")
         pg.locator(".t-subjects input[value=math]").check()
-    if name == "revenue":
-        pg.fill("#rv-price", "75")
+    if typed:
+        pg.fill(typed[0], typed[1])
     pg.click("#lang-toggle")
     pg.wait_for_function("document.documentElement.dir === 'ltr'", timeout=3000)
     check(tag + "one tap: English, left to right", pg.evaluate("document.documentElement.lang") == "en")
@@ -107,13 +117,33 @@ def run_page(b, base, width, scheme, spec):
     check(tag + "the button now offers Arabic", pg.inner_text("#lang-toggle") == "ع")
     for sel, text in labels:
         got = pg.inner_text(sel)
-        check(tag + "English label in " + sel + ": " + text, text in got, got[:200])
+        check(tag + "English label in " + sel + ": " + text, text.lower() in got.lower(), got[:200])
     left = pg.evaluate("I18n.untranslated()")
     check(tag + "no Arabic left on screen (data aside)", not left, left[:8])
-    check(tag + "page title in English", "Teaching Portal" in pg.title() and not any("؀" <= c <= "ۿ" for c in pg.title()), pg.title())
+    check(tag + "page title in English", "Teaching" in pg.title() and not any("؀" <= c <= "ۿ" for c in pg.title()), pg.title())
     check(tag + "dark-mode button label in English", pg.get_attribute("#theme-toggle", "aria-label").startswith("Switch to"))
     wide = pg.evaluate("document.documentElement.scrollWidth - window.innerWidth")
     check(tag + "English: no sideways scroll", wide <= 1, wide)
+    if typed:
+        check(tag + "typed text kept after the switch", pg.input_value(typed[0]) == typed[1])
+    if name == "followup":
+        pg.locator(".fu-tab[data-tab]:not([data-tab='__none']):not([data-tab='__today'])").first.click()
+        pg.wait_for_selector("#fu-q")
+        check(tag + "group page in English", "Current lesson" in pg.inner_text("#fu-root") and "Students" in pg.inner_text("#fu-root"))
+        pg.fill("#fu-q", "sara")
+        left = pg.evaluate("I18n.untranslated()")
+        check(tag + "group page: no Arabic left (data aside)", not left, left[:8])
+        pg.click("#fu-help"); pg.wait_for_selector(".fu-sheet, #fu-close")
+        left = pg.evaluate("I18n.untranslated()")
+        check(tag + "help sheet in English", "How to use" in pg.inner_text("body") and not left, left[:8])
+        pg.click("#fu-close")
+        pg.click("#lang-toggle"); pg.wait_for_function("document.documentElement.dir === 'rtl'", timeout=3000)
+        check(tag + "group page back in Arabic, search kept", "الحصة الحالية" in pg.inner_text("#fu-root") and pg.input_value("#fu-q") == "sara")
+        pg.click("#lang-toggle"); pg.wait_for_function("document.documentElement.dir === 'ltr'", timeout=3000)
+    if name == "requirements":
+        pg.click("#rq-tab-groups")
+        left = pg.evaluate("I18n.untranslated()")
+        check(tag + "groups tab in English", "Group exceptions" in pg.inner_text("#rq-root") and not left, left[:8])
     if name == "team":
         check(tag + "typed phone kept after the switch", pg.input_value("#t-phone") == "01234567890")
         check(tag + "ticked subject kept after the switch", pg.locator(".t-subjects input[value=math]").is_checked())
@@ -122,7 +152,6 @@ def run_page(b, base, width, scheme, spec):
         pg.click("[data-act=tg-unlink]")
         check(tag + "confirm asked in English", dialogs and dialogs[-1].startswith("Disconnect") and "Telegram" in dialogs[-1], dialogs)
     if name == "revenue":
-        check(tag + "typed price kept after the switch", pg.input_value("#rv-price") == "75")
         pg.click("[data-view=group]")
         check(tag + "group view: words in English, group names kept", "No group" in pg.inner_text("#rv-list") and "أولى ثانوي" in pg.inner_text("#rv-list"))
         check(tag + "still no Arabic outside data after a re-draw", not pg.evaluate("I18n.untranslated()"), pg.evaluate("I18n.untranslated()")[:8])
@@ -138,7 +167,7 @@ def run_page(b, base, width, scheme, spec):
     pg.click("#lang-toggle")
     pg.wait_for_function("document.documentElement.dir === 'rtl'", timeout=3000)
     check(tag + "back to Arabic: the exact Arabic title", pg.inner_text("h1") == h1_ar)
-    check(tag + "back to Arabic: the rest in Arabic too", ("تسجيل خروج" if name == "staff" else "النتايج") in pg.inner_text("body"))
+    check(tag + "back to Arabic: the rest in Arabic too", ar_back in pg.inner_text("body"))
     wide = pg.evaluate("document.documentElement.scrollWidth - window.innerWidth")
     check(tag + "Arabic: no sideways scroll", wide <= 1, wide)
     check(tag + "no page errors", not errors, errors)

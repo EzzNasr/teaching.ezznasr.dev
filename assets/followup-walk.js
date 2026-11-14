@@ -333,7 +333,7 @@
       if (m.error) body.appendChild(h('div', { class: 'fw-warn', role: 'alert', 'data-fw': 'msgerror' }, ['⚠️ ' + m.error]));
       if (m.missing && m.missing.length) body.appendChild(h('div', { class: 'fw-warn', 'data-fw': 'missingvars' }, ['متغيرات غير معروفة في القالب: ' + m.missing.join(' ')]));
 
-      var bubble = h('div', { class: 'fw-bubble', dir: 'auto', 'data-fw': 'bubble' });
+      var bubble = h('div', { class: 'fw-bubble', translate: 'no', dir: 'auto', 'data-fw': 'bubble' });
       var ta = h('textarea', { class: 'fw-edit', dir: 'auto', rows: '6', 'aria-label': 'نص الرسالة', 'data-fw': 'edit', hidden: true });
       ta.value = text;
       var link = h('a', { class: 'fw-btn wa', target: '_blank', rel: 'noopener', 'data-fw': 'wa' }, ['فتح واتساب ↗']);

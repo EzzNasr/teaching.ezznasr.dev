@@ -71,7 +71,8 @@ and how the browser tests run.
 **Arabic / English.** Staff pages have a language button next to the dark-mode button (`EN` / `ع`). Arabic is the default;
 one tap switches the page to English (left to right) without a reload and without losing anything typed, and the choice is
 remembered on that device for every staff page. Names, group names, lesson titles and messages to parents stay in their own
-language. Done so far: Team, Revenue and the assistant's home page (`staff.html`); the other staff pages follow. How it works:
+language. On every Arabic staff page: home (`staff.html`), Follow-up, Requirements, Student summary, Team, Revenue and
+My team. The pages that are in English (Results, Lesson access, Grading, Teacher numbers, Wrong questions) stay English. How it works:
 `assets/i18n.js` (shared) plus one word list per page in `assets/i18n/`. Test: R-I18N-1.
 
 | Arabic (default) | English |

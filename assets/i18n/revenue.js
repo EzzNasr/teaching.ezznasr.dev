@@ -1,5 +1,5 @@
 /* Words of dashboard/revenue.html («الإيرادات»), Arabic ↔ English. See assets/i18n.js. */
-window.I18n && I18n.add([
+window.I18n && window.I18n.add([
   ["{0} جنيه", "{0} EGP"],
   ["أولى ثانوي", "Secondary 1"], ["تانية ثانوي", "Secondary 2"], ["تالتة ثانوي", "Secondary 3"], ["سنة {0}", "Year {0}"],
   ["اشتراك الفصل {0}", "Chapter {0} subscription"], ["اشتراك الترم {0}", "Term {0} subscription"],

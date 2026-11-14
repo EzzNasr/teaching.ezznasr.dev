@@ -123,7 +123,7 @@
     if (opts.snapshot) kids.push(el("div", { class: "fu-dim", id: id + "-snapshot", style: "margin-top:6px" }, ["📌 الأرقام دي زي ما كانت وقت إرسال التقرير (محفوظة ومش بتتغيّر)."]));
     if (!req.items.length) kids.push(el("div", { class: "fu-dim", style: "margin-top:6px" }, ["مفيش متطلبات مفعّلة للتقرير"]));
     req.items.forEach(function (it) {
-      var label = it.label_ar || it.label_en || it.key, right;
+      var label = (window.I18n && I18n.lang() === "en" ? (it.label_en || it.label_ar) : (it.label_ar || it.label_en)) || it.key, right;
       if (it.kind === "manual") {
         right = [it.met === true ? chip("✓ تمّ", "green") : it.met === false ? chip("✗ لم يتم", "amber") : chip("لم يُسجَّل", "grey")];
       } else {
@@ -263,7 +263,7 @@
   function paintMonthly(host, rev) {
     var r = T().composeFull(rev.summary, "monthly_review", { month: ST.month, templates: {} });
     var ck = L().checkParentPhone ? L().checkParentPhone(rev.student.parent_phone, rev.student.phone) : { level: "ok", wa: "" };
-    var bubble = el("div", { class: "fu-bubble", id: "ss-preview", dir: "auto" }), ta = el("textarea", { class: "fu-field fu-msg-edit", id: "ss-msg", dir: "auto", "aria-label": "نص التقرير" }); ta.value = r.text;
+    var bubble = el("div", { class: "fu-bubble", translate: "no", id: "ss-preview", dir: "auto" }), ta = el("textarea", { class: "fu-field fu-msg-edit", id: "ss-msg", dir: "auto", "aria-label": "نص التقرير" }); ta.value = r.text;
     var link = el("a", { class: "fu-btn wa", id: "ss-wa", target: "_blank", rel: "noopener", href: "#" }, ["فتح واتساب ↗"]);
     function sync() { bubble.innerHTML = T().formatPreview(ta.value); if (ck.level !== "missing" && ck.wa) link.href = T().waLink(ck.wa, ta.value); else { link.removeAttribute("href"); link.setAttribute("aria-disabled", "true"); } }
     ta.addEventListener("input", sync); sync();
@@ -340,6 +340,8 @@
   }
   function start(session) {
     ST.session = session; if (MOCK) $("fu-mock").hidden = false;
+    // Language switch: requirement names have an Arabic and an English name, so the summary is drawn again (typed values kept).
+    if (window.I18n) I18n.onChange(function () { if (ST.data && !ST.loading) I18n.redraw(function () { var y = window.scrollY; renderSummary(); window.scrollTo(0, y); }); });
     if (window.Draft) {
       window.Draft.init({ page: "student-summary", user: (session && (session.student_id || session.phone)) || "mock",
         send: function (a, p) { return api(Object.assign({ action: a }, p)); } });

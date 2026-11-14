@@ -40,14 +40,20 @@
   function compile(from, to) {
     var names = [], parts = from.split(HOLE), src = "^";
     for (var i = 0; i < parts.length; i++) {
-      if (i % 2) { names.push(parts[i]); src += "([\\s\\S]+?)"; } else src += esc(parts[i]);
+      // {n}, {n2} … hold a number only ("3", "4,250", "80%", "2/11"); other holes hold any text.
+      if (i % 2) { names.push(parts[i]); src += /^n\d*$/.test(parts[i]) ? "([0-9\\u0660-\\u0669.,:/%+-]+)" : "([\\s\\S]+?)"; } else src += esc(parts[i]);
     }
-    return { re: new RegExp(src + "$"), names: names, out: to, weight: from.replace(HOLE, "").length };
+    return { re: new RegExp(src + "$"), names: names, out: to, weight: from.replace(HOLE, "").length, joins: / [·—] /.test(from) };
   }
   function addPair(ar, en) {
     if (!ar || !en) return;
     ar = String(ar).trim(); en = String(en).trim();
-    if (HOLE.test(ar)) { HOLE.lastIndex = 0; pats.en.push(compile(ar, en)); pats.ar.push(compile(en, ar)); }
+    if (HOLE.test(ar)) {
+      HOLE.lastIndex = 0;
+      // A side that is only holes ("{0}") would match everything: that direction is left out.
+      if (/[^\s{}0-9\w]|[A-Za-z]/.test(ar.replace(HOLE, ""))) pats.en.push(compile(ar, en));
+      if (/[^\s{}0-9]/.test(en.replace(HOLE, ""))) pats.ar.push(compile(en, ar));
+    }
     // exact entries too, so t("… {0} …", [x]) finds its template directly
     { if (!(ar in maps.en)) maps.en[ar] = en; if (!(en in maps.ar)) maps.ar[en] = ar; }
     HOLE.lastIndex = 0;
@@ -58,6 +64,15 @@
     if (started) applyAll();
   }
 
+  // Leading / trailing marks that are not words: emoji, arrows, ✓ ✕ ⚠️ ＋ etc. (letters, digits, quotes and brackets stay in the middle).
+  // (Emoji count as marks even when Unicode calls them letters, e.g. ℹ️.)
+  var AFFIX = /^((?:\p{Extended_Pictographic}|️|[^\p{L}\p{N}«»"'(\[{])*)([\s\S]*?[\p{L}\p{N})\]»"'.؟?!:]|)((?:\p{Extended_Pictographic}|️|[^\p{L}\p{N}«»"')\]}.؟?!:])*)$/u;
+  var JOIN = / [·—] /, JOIN_SPLIT = /( [·—] )/;
+  function flip(s, to) {
+    if (!s) return s;
+    return to === "en" ? s.replace(/←/g, "\u0000").replace(/→/g, "←").replace(/\u0000/g, "→").replace(/؟/g, "?").replace(/،/g, ",")
+                       : s.replace(/→/g, "\u0000").replace(/←/g, "→").replace(/\u0000/g, "←");
+  }
   function fill(out, vals) {
     return out.replace(HOLE, function (m, k) { return vals[k] != null ? vals[k] : m; });
   }
@@ -73,6 +88,8 @@
       for (var i = 0; i < list.length; i++) {
         var m = list[i].re.exec(core);
         if (!m) continue;
+        // A hole never swallows " · " / " — " unless the pattern itself has one: those are separate pieces.
+        if (!list[i].joins && m.slice(1).some(function (x) { return JOIN.test(x); })) continue;
         var vals = {};
         for (var j = 0; j < list[i].names.length; j++) vals[list[i].names[j]] = tr(m[j + 1], to, (depth || 0) + 1);
         hit = fill(list[i].out, vals);
@@ -86,6 +103,23 @@
         var done = items.map(function (x) { var y = tr(x, to, depth + 1); return y === x ? null : y; });
         if (done.every(function (x) { return x !== null; })) hit = done.join(to === "en" ? ", " : "، ");
       }
+    }
+    // Emoji / arrows / marks around a known phrase ("⚠️ لا رقم ولي أمر", "تم الحفظ ✓", "افتح ←").
+    if (hit === undefined && (depth || 0) < 3) {
+      var am = AFFIX.exec(core);
+      if (am && (am[1] || am[3]) && am[2]) {
+        var mid = tr(am[2], to, (depth || 0) + 1);
+        if (mid !== am[2]) hit = flip(am[1], to) + mid + flip(am[3], to);
+      }
+    }
+    // Pieces joined by " · " / " — " ("الطلاب · 12", "رسالة مجمّعة · سارة"): translate the known pieces, keep the rest (data).
+    if (hit === undefined && (depth || 0) < 3 && JOIN.test(core)) {
+      var bits = core.split(JOIN_SPLIT), changed = false;
+      for (var b = 0; b < bits.length; b += 2) {
+        var y = tr(bits[b], to, (depth || 0) + 1);
+        if (y !== bits[b]) { bits[b] = y; changed = true; }
+      }
+      if (changed) hit = bits.join("");
     }
     if (hit === undefined) return s;
     var lead = s.match(/^\s*/)[0], tail = s.match(/\s*$/)[0];
@@ -243,7 +277,12 @@
     ["تاريخ مش معروف", "Unknown date"]
   ];
   MONTHS.ar.forEach(function (m, i) { COMMON.push([m, MONTHS.en[i]], [m + " {0}", MONTHS.en[i] + " {0}"]); });
-  DAYS.ar.forEach(function (d, i) { COMMON.push([d, DAYS.en[i]]); });
+  // Days: both spellings used on the pages, alone and in front of a time or date ("الخميس 4:00 م").
+  [DAYS.ar, ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]].forEach(function (list) {
+    list.forEach(function (d, i) { COMMON.push([d, DAYS.en[i]], [d + " {0}", DAYS.en[i] + " {0}"]); });
+  });
+  COMMON.push(["{0} ص", "{0} AM"], ["{0} م", "{0} PM"], ["ص", "AM"], ["م", "PM"], ["يوم {0}", "{0}"],
+    ["النهارده", "Today"], ["بكرة", "Tomorrow"], ["امبارح", "Yesterday"], ["دلوقتي", "Now"]);
 
   // Tests: visible text that is still in the other language (outside translate="no").
   function untranslated() {
@@ -257,11 +296,28 @@
     return out;
   }
 
+  // Re-draw a page part after a language switch without losing what was typed: every input / select / textarea with an id
+  // gets its value (and tick) back, and the focus stays where it was.
+  function redraw(fn) {
+    var keep = {}, focus = document.activeElement && document.activeElement.id;
+    Array.prototype.forEach.call(document.querySelectorAll("input[id], textarea[id], select[id]"), function (n) {
+      if (n.type === "file" || n.type === "password") return;
+      keep[n.id] = { v: n.value, c: n.checked };
+    });
+    fn();
+    Object.keys(keep).forEach(function (id) {
+      var n = document.getElementById(id); if (!n) return;
+      if (n.type === "checkbox" || n.type === "radio") n.checked = keep[id].c;
+      else if (n.value !== keep[id].v) { n.value = keep[id].v; if (n.value !== keep[id].v && n.nodeName === "SELECT") return; }
+    });
+    if (focus) { var f = document.getElementById(focus); if (f && f.focus) f.focus(); }
+  }
+
   window.I18n = {
     lang: function () { return lang; }, set: function (v) { set(v); }, t: t, add: add,
     onChange: function (fn) { if (typeof fn === "function") listeners.push(fn); },
     month: function (i) { return MONTHS[lang][i]; }, day: function (i) { return DAYS[lang][i]; },
-    num: num, date: date, locale: locale, untranslated: untranslated
+    num: num, date: date, locale: locale, untranslated: untranslated, redraw: redraw
   };
   add(COMMON);
   setDir();

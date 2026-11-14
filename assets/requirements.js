@@ -246,7 +246,8 @@
 
   // ---- shared bits ---------------------------------------------------------------------------------
   function catalog() { return (STATE.data && STATE.data.catalog) || []; }
-  function labelOf(c) { return c.label_ar || c.label_en || c.key; }
+  // English view: the English name first (each requirement has both names).
+  function labelOf(c) { return window.I18n && I18n.lang() === "en" ? (c.label_en || c.label_ar || c.key) : (c.label_ar || c.label_en || c.key); }
   function groupsList() {
     var names = (STATE.data && STATE.data.group_names) || {};
     return Object.keys(names).sort(byName(names)).map(function (k) { return { key: k, name: names[k] }; });
@@ -643,6 +644,8 @@
   }
   function start(session, role) {
     STATE.session = session; STATE.role = role || (session && session.role) || "admin";
+    // Language switch: requirement names have an Arabic and an English name, so the page is drawn again (typed values kept).
+    if (window.I18n) I18n.onChange(function () { if (STATE.data) I18n.redraw(function () { render(true); }); });
     $("rq-refresh").hidden = false;
     if (MOCK) $("rq-mock").hidden = false;
     readHash();

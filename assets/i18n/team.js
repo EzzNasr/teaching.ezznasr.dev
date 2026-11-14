@@ -1,5 +1,5 @@
 /* Words of dashboard/team.html («الفريق»), Arabic ↔ English. See assets/i18n.js. */
-window.I18n && I18n.add([
+window.I18n && window.I18n.add([
   ["كل اللي يقدر يدخل صفحات الإدارة، وآخر التعديلات اللي عملوها.", "Everyone who can open the admin pages, and the latest changes they made."],
   // subjects
   ["رياضة", "Math"], ["إنجليزي", "English"], ["برمجة", "Programming"],

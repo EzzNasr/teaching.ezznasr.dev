@@ -136,10 +136,13 @@
     return ((h % 12) || 12) + ":" + m[2] + " " + ap;
   }
   // Contract 3.12: display is 12-hour, storage stays "HH:MM". lang "ar" -> ص/م, else AM/PM. "" for bad input.
+  // Arabic / English (assets/i18n.js): screen words built here from pieces (day + time) are made in the chosen language.
+  function I18N() { return typeof window !== "undefined" && window.I18n ? window.I18n : null; }
+  function tt(s) { return I18N() ? I18N().t(s) : s; }
   function fmtTime12(t, lang) {
     var m = /^(\d{1,2}):(\d{2})$/.exec(String(t == null ? "" : t).trim()); if (!m) return "";
     var H = +m[1]; if (H > 23 || +m[2] > 59) return "";
-    var ar = lang === "ar";
+    var ar = lang === "ar" && !(typeof window !== "undefined" && window.I18n && window.I18n.lang() === "en");   // self-contained: tests lift this function out
     return ((H % 12) || 12) + ":" + m[2] + " " + (H >= 12 ? (ar ? "م" : "PM") : (ar ? "ص" : "AM"));
   }
   function tzLabel() { return (STATE.data && STATE.data.tz_label) || TZ_LABEL; }
@@ -154,10 +157,10 @@
   function dayWord(ymd) {
     if (!ymd) return "";
     var today = L().cairoToday ? L().cairoToday(nowD()) : "", add = function (n) { var p = today.split("-").map(Number), t = new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)); return t.toISOString().slice(0, 10); };
-    if (today && ymd === today) return "النهارده";
-    if (today && ymd === add(1)) return "بكرة";
-    if (today && ymd === add(-1)) return "امبارح";
-    return DAYS_AR[weekdayOfYmd(ymd)];
+    if (today && ymd === today) return tt("النهارده");
+    if (today && ymd === add(1)) return tt("بكرة");
+    if (today && ymd === add(-1)) return tt("امبارح");
+    return tt(DAYS_AR[weekdayOfYmd(ymd)]);
   }
   // "الخميس 4:00 م Alex"
   function whenText(iso, withTz) {
@@ -1425,7 +1428,7 @@
     var title = a.kind === "combined" ? "رسالة مجمّعة" : a.label.replace(/^[^\s]+\s/, "");
     openSheet(function (sheet) {
       var link = el("a", { class: "fu-btn wa", id: "fu-wa-open", target: "_blank", rel: "noopener", href: "#" }, ["فتح واتساب ↗"]);
-      var bubble = el("div", { class: "fu-bubble", id: "fu-preview", dir: "auto" });
+      var bubble = el("div", { class: "fu-bubble", translate: "no", id: "fu-preview", dir: "auto" });
       var ta = el("textarea", { class: "fu-field fu-msg-edit", id: "fu-msg-text", dir: "auto", "aria-label": "نص الرسالة" }); ta.value = res.text;
       function sync() {
         try { bubble.innerHTML = T().formatPreview(ta.value); } catch (e) { bubble.textContent = ta.value; }
@@ -1505,7 +1508,7 @@
     var host = el("div", { id: "fu-print", dir: "rtl" });
     reviews.forEach(function (r) {
       var m = monthlyText(r, month);
-      host.appendChild(el("section", { class: "fu-print-page" }, [el("h1", {}, ["التقرير الشهري — " + monthLabelOf(month)]), el("h2", {}, [r.student.name]), el("div", { class: "fu-print-body", html: T().formatPreview(m.text) })]));
+      host.appendChild(el("section", { class: "fu-print-page" }, [el("h1", {}, ["التقرير الشهري — " + monthLabelOf(month)]), el("h2", {}, [r.student.name]), el("div", { class: "fu-print-body", translate: "no", html: T().formatPreview(m.text) })]));
     });
     document.body.appendChild(host); document.body.classList.add("fu-printing");
     function cleanup() { host.remove(); document.body.classList.remove("fu-printing"); window.removeEventListener("afterprint", cleanup); }
@@ -1590,7 +1593,7 @@
     var digits = ck.wa || (L().waDigits ? L().waDigits(rev.student.parent_phone) : "");
     openSheet(function (sheet) {
       var link = el("a", { class: "fu-btn wa", id: "fu-wa-open", target: "_blank", rel: "noopener", href: "#" }, ["فتح واتساب ↗"]);
-      var bubble = el("div", { class: "fu-bubble", id: "fu-preview", dir: "auto" });
+      var bubble = el("div", { class: "fu-bubble", translate: "no", id: "fu-preview", dir: "auto" });
       var ta = el("textarea", { class: "fu-field fu-msg-edit", id: "fu-msg-text", dir: "auto", "aria-label": "نص الرسالة" }); ta.value = m.text;
       function sync() {
         try { bubble.innerHTML = T().formatPreview(ta.value); } catch (e) { bubble.textContent = ta.value; }
@@ -1905,7 +1908,7 @@
       sheet.appendChild(el("div", { class: "fu-row fu-between" }, [el("h2", {}, [(watch ? "تذكير المشاهدة · " : "تذكير الجروب · ") + g.group]), el("span", { class: "fu-chip " + (st === "overdue" ? "red" : st === "today" ? "amber" : "green"), id: "fu-reminder-state" }, [stTxt])]));
       if (err) sheet.appendChild(el("div", { class: "fu-warnbox", role: "alert" }, ["تعذّر تجهيز الرسالة: " + err.message]));
       if (res.missing.length) sheet.appendChild(el("div", { class: "fu-warnbox" }, ["متغيرات غير معروفة في القالب: " + res.missing.join(" ")]));
-      var bubble = el("div", { class: "fu-bubble", id: "fu-preview", dir: "auto" });
+      var bubble = el("div", { class: "fu-bubble", translate: "no", id: "fu-preview", dir: "auto" });
       try { bubble.innerHTML = T().formatPreview(res.text); } catch (e) { bubble.textContent = res.text; }
       sheet.appendChild(bubble);
       sheet.appendChild(el("div", { class: "fu-dim", style: "margin-bottom:12px" }, ["الجروبات مفيهاش رابط مباشر — اضغط «نسخ» والصق الرسالة في جروب واتساب."]));
@@ -2053,7 +2056,7 @@
       case "advance_lessons":
         if (R.prev_session && R.prev_session.at_iso) {
           var w = wallOf(R.prev_session.at_iso), hrs = Math.max(0, Math.round((nowD() - w.date) / 3600000));
-          parts.push(DAYS_AR[weekdayOfYmd(w.ymd)] + " " + fmtTime12(w.hhmm, "ar"), hrs < 1 ? "خلصت دلوقتي" : (hrs < 24 ? "انتهت من " + (hrs === 1 ? "ساعة" : hrs === 2 ? "ساعتين" : hrs + (hrs <= 10 ? " ساعات" : " ساعة")) : "انتهت من " + (function (dd) { return dd === 1 ? "يوم" : dd === 2 ? "يومين" : dd + " أيام"; }(Math.round(hrs / 24)))));
+          parts.push(tt(DAYS_AR[weekdayOfYmd(w.ymd)]) + " " + fmtTime12(w.hhmm, "ar"), hrs < 1 ? "خلصت دلوقتي" : (hrs < 24 ? "انتهت من " + (hrs === 1 ? "ساعة" : hrs === 2 ? "ساعتين" : hrs + (hrs <= 10 ? " ساعات" : " ساعة")) : "انتهت من " + (function (dd) { return dd === 1 ? "يوم" : dd === 2 ? "يومين" : dd + " أيام"; }(Math.round(hrs / 24)))));
         }
         break;
       case "setup_missing":
@@ -2066,7 +2069,7 @@
   function nextLine(R) {
     if (!R || !R.next_event_at_iso) return "";
     var nx = (R.events || []).filter(function (e) { return e.state === "upcoming" && e.fire_at_iso === R.next_event_at_iso; })[0];
-    return (nx ? EV[nx.key].short + " " : "") + whenText(R.next_event_at_iso);
+    return (nx ? tt(EV[nx.key].short) + " " : "") + whenText(R.next_event_at_iso);
   }
 
   // ---- hero card -----------------------------------------------------------------------------
@@ -2225,7 +2228,7 @@
     } }, ["✏️ تعديل"]);
     card.appendChild(el("div", { class: "fu-btns two fu-hero-btns" }, [confirm, edit]));
     var dl = null; try { dl = L().groupDeadlines(s, nowD(), STATE.data.settings, STATE.data); } catch (x) { dl = null; }
-    function dlTxt(d) { return d && d.date ? DAYS_AR[weekdayOfYmd(d.date)] + " " + fmtTime12("23:59", "ar") : "—"; }
+    function dlTxt(d) { return d && d.date ? tt(DAYS_AR[weekdayOfYmd(d.date)]) + " " + fmtTime12("23:59", "ar") : "—"; }
     if (dl && (dl.watch || dl.hw)) card.appendChild(el("div", { class: "fu-hero-next", id: "fu-adv-deadlines" }, ["الميعاد الجديد للمشاهدة: " + dlTxt(dl.watch) + " · للواجب: " + dlTxt(dl.hw)]));
     // what is already done for the session that just ended
     var rows = V.rows, marked = rows.filter(function (r) { return !r.tags.unmarked; }).length;
@@ -2579,7 +2582,9 @@
   }
   function start(session, role) {
     STATE.session = session;
-    STATE.role = role || (session && session.role) || "admin";   // "assistant" / "sassistant" => hide the owner-and-teacher-only controls
+    STATE.role = role || (session && session.role) || "admin";
+    // Language switch: draw the page again so times and day names follow (typed values and focus are kept).
+    if (window.I18n) window.I18n.onChange(function () { if (STATE.data) window.I18n.redraw(function () { updatedLine(); renderYearBar(); renderTabs(); refreshPage(); }); });   // "assistant" / "sassistant" => hide the owner-and-teacher-only controls
     if (window.Draft) {
       window.Draft.init({ page: "followup", user: (session && (session.student_id || session.phone)) || "mock",
         send: function (a, p) { return api(Object.assign({ action: a }, p)); },
