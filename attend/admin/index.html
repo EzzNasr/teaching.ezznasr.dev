@@ -20,7 +20,9 @@
   </header>
   <section id="login" class="card" hidden>
     <h2>Sign in</h2>
-    <label for="tok">Your password (or the admin token)</label>
+    <label for="uid">Teacher ID (leave empty for the admin token)</label>
+    <input id="uid" autocomplete="username" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="U-1A2B3C4D">
+    <label for="tok" style="margin-top:10px">Your password (or the admin token)</label>
     <input id="tok" type="password" autocomplete="current-password" autocapitalize="characters" spellcheck="false">
     <div class="row" style="margin-top:12px"><button id="loginBtn" class="pri">Log in</button></div>
     <div id="loginMsg" class="msg" role="status"></div>
@@ -169,7 +171,7 @@
         <div id="secret" class="secret" hidden>
           <div id="secretWho"></div>
           <code id="secretPw"></code>
-          <div class="msg">Shown once. It cannot be looked up later (only reset). Give it to the teacher now.</div>
+          <div class="msg">The password is shown once. It cannot be looked up later (only reset). Give the teacher the ID and the password now: they sign in with both.</div>
           <div class="row"><button id="secretCopy" class="pri">Copy password</button><button id="secretDone">I saved it, hide</button></div>
         </div>
         <div id="userList" class="scroll"></div>
@@ -201,6 +203,7 @@
     <button id="fsBtn">Fullscreen</button>
     <button id="reqBtn">Phone changes<span id="pBadge" class="badge" hidden>0</span></button>
     <button id="hideBtn">Dashboard</button>
+    <button id="extBtn">+2 minutes</button>
     <button id="closeBtn" class="bad">End attendance</button>
   </div>
 </section>

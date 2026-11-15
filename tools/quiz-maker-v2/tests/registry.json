@@ -744,6 +744,16 @@
       "owner": "att-prod"
     },
     {
+      "id": "R-A14",
+      "title": "Attendance after the first demo: previous QR window accepted, +2 minutes (owner/admin, 15 min cap), sign-in with teacher ID (lock-out per ID), nightly backup keeps 14",
+      "cmd": [
+        "node",
+        "../../tests/attendance/extend_login.test.js"
+      ],
+      "status": "active",
+      "owner": "att-prod"
+    },
+    {
       "id": "R-A10",
       "title": "Attendance live feed + two-mates cheating scenario (masked), legit re-registration not flagged",
       "cmd": [

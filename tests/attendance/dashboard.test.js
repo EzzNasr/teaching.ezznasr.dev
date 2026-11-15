@@ -65,7 +65,7 @@ function ui(saved) {
   ["contract/att_config.js", "contract/att_api.js", "attend/admin/token.js", "attend/admin/qr.js", "attend/admin/admin.js"].forEach(f => vm.runInContext(fs.readFileSync(path.join(site, f), "utf8"), ctx, { filename: f }));
   const wait = async (c, n = 80) => { for (let i = 0; i < n && !c(); i++) await sleep(25); return c(); };
   const tab = n => tabBtns.find(b => b.attrs["data-tab"] === n).click();
-  const type = async (v) => { byId.tok.value = v; byId.loginBtn.click(); };
+  const type = async (v, uid) => { byId.uid.value = uid || ""; byId.tok.value = v; byId.loginBtn.click(); };
   return { byId, ctx, calls, downloads, store, wait, tab, type, tabBtns };
 }
 const cells = tr => tr.children.map(c => c.textContent);
@@ -80,11 +80,15 @@ const btn = (row, label) => all(row, e => e.tag === "button" && e.textContent ==
     ok(u.byId.login.hidden === false || u.byId.login.hidden === true, "page boots");
     await u.wait(() => !u.byId.login.hidden);
     await u.type("WRONG-WRONG-WRONG-WRONG");
+    await u.wait(() => /teacher ID/.test(u.byId.loginMsg.textContent));
+    ok(u.calls.join(",") === "att_me" && u.byId.panel.hidden, "a password without a teacher ID is never sent to att_login: the page asks for the ID");
+    u.calls.length = 0;
+    await u.type("WRONG-WRONG-WRONG-WRONG", T1.id.toLowerCase());
     await u.wait(() => /Wrong/.test(u.byId.loginMsg.textContent));
-    ok(/Wrong password or token/.test(u.byId.loginMsg.textContent) && u.byId.panel.hidden && u.byId.loginBtn.disabled === false, "a wrong value shows one clear message and stays on the login page");
-    ok(u.calls.join(",") === "att_me,att_login", "it is asked as a token first (att_me, never counted), then as a password: " + u.calls.join(","));
-    const lf = gas.run('att_cget_("att:lf")');
-    ok(lf && lf.n === 1, "only ONE failed attempt counts toward the global lock-out");
+    ok(/Wrong ID or password/.test(u.byId.loginMsg.textContent) && u.byId.panel.hidden && u.byId.loginBtn.disabled === false, "a wrong value shows one clear message and stays on the login page");
+    ok(u.calls.join(",") === "att_me,att_login", "it is asked as a token first (att_me, never counted), then as ID + password: " + u.calls.join(","));
+    const lf = gas.run('att_cget_("att:lf:' + T1.id + '")');
+    ok(lf && lf.n === 1 && !gas.run('att_cget_("att:lf")'), "the failed attempt counts for THAT teacher ID only, not toward the shared lock-out");
   }
   {
     const u = ui(null); await u.wait(() => !u.byId.login.hidden);
@@ -104,8 +108,9 @@ const btn = (row, label) => all(row, e => e.tag === "button" && e.textContent ==
   /* ───────── teacher ───────── */
   console.log("teacher view");
   const t1 = ui(null); await t1.wait(() => !t1.byId.login.hidden);
-  await t1.type(T1.pw); await t1.wait(() => !t1.byId.panel.hidden);
-  ok(!t1.byId.panel.hidden && t1.calls.join(",").startsWith("att_me,att_login"), "teacher signs in with the generated password");
+  await t1.type(T1.pw, T1.id); await t1.wait(() => !t1.byId.panel.hidden);
+  ok(!t1.byId.panel.hidden && t1.calls.join(",").startsWith("att_me,att_login"), "teacher signs in with their ID and the generated password");
+  ok(t1.ctx.localStorage._.att_uid === T1.id, "the teacher ID is remembered on this device");
   ok(/Dr Alpha/.test(t1.byId.who.textContent) && /Teacher/.test(t1.byId.who.textContent), "header shows who is signed in and the role: " + t1.byId.who.textContent);
   ok(t1.byId.tabUsers.hidden && t1.byId.tabOverview.hidden && t1.byId.hisUserWrap.hidden, "Users, All sessions and the teacher filter are hidden for a teacher");
   t1.tab("users");
@@ -122,7 +127,7 @@ const btn = (row, label) => all(row, e => e.tag === "button" && e.textContent ==
   ok(drows.length === 3 && /Alpha Course/.test(t1.byId.detTitle.textContent) && /3 present/.test(t1.byId.detSummary.textContent), "detail lists all 3 check-ins with the summary");
   const omar = drows.find(r => /Omar/.test(r.textContent));
   ok(/gave no location/.test(omar.textContent) && /TIMEOUT/.test(omar.textContent), "Omar's row shows flag GEO_UNAVAILABLE and the reason TIMEOUT");
-  ok(/Skipped the location step/.test(drows.find(r => /Nour/.test(r.textContent)).textContent), "Nour's row shows GEO_SKIPPED");
+  ok(/Checked in without location/.test(drows.find(r => /Nour/.test(r.textContent)).textContent), "Nour's row shows GEO_SKIPPED");
   t1.byId.detFlagOnly.checked = true; t1.byId.detFlagOnly._l.change();
   ok(rowsOf(t1.byId.detTable).length === 2, "'Flagged only' hides the clean check-in");
   t1.byId.detFlagOnly.checked = false; t1.byId.detFlagOnly._l.change();
@@ -215,14 +220,14 @@ const btn = (row, label) => all(row, e => e.tag === "button" && e.textContent ==
   ad.byId.secretDone.click();
   // disable: that teacher's open dashboard is signed out on its next call
   const gu = ui(null); await gu.wait(() => !gu.byId.login.hidden);
-  await gu.type(pw2); await gu.wait(() => !gu.byId.panel.hidden);
+  await gu.type(pw2, g.user.user_id); await gu.wait(() => !gu.byId.panel.hidden);
   ok(!gu.byId.panel.hidden, "the reset password signs the teacher in on the dashboard");
   btn(gamma(), "Disable").click(); await ad.wait(() => /disabled/.test(gamma().textContent));
   ok(/disabled/.test(gamma().textContent) && btn(gamma(), "Enable"), "Disable marks the account disabled and offers Enable");
   gas.advance(61000);   // the 60 s "still active?" cache
   gu.tab("history"); await gu.wait(() => !gu.byId.login.hidden);
   ok(!gu.byId.login.hidden && gu.byId.panel.hidden && /disabled/.test(gu.byId.loginMsg.textContent), "a disabled teacher is signed out on the next call with a clear message");
-  await gu.type(pw2); await gu.wait(() => /disabled/.test(gu.byId.loginMsg.textContent));
+  await gu.type(pw2, g.user.user_id); await gu.wait(() => /disabled/.test(gu.byId.loginMsg.textContent));
   ok(gu.byId.panel.hidden, "and cannot sign in again");
   btn(gamma(), "Enable").click(); await ad.wait(() => !/disabled/.test(gamma().textContent.replace(/Disable|Enable/g, "")));
   ok(D({ action: "att_login", password: pw2 }).ok, "Enable lets them in again");
@@ -274,7 +279,7 @@ const btn = (row, label) => all(row, e => e.tag === "button" && e.textContent ==
     const open0 = D({ action: "att_flagged", token: T1.token }).rows.filter(x => !x.review_status);
     u.tab("flagged"); await u.wait(() => /waiting|Nothing/.test(u.byId.flagMsg.textContent));
     ok(open0.length === 1 && rowsOf(u.byId.flagList).length === 1 && /Nour Samir/.test(u.byId.flagList.textContent), "only the undecided flagged check-in is listed (Omar was decided in History): " + open0.map(x => x.student_id));
-    ok(/Skipped the location step/.test(u.byId.flagList.textContent) && /Alpha Course/.test(u.byId.flagList.textContent) && !/GEO_SKIPPED/.test(u.byId.flagList.textContent), "the reason is in plain words, with the lecture name");
+    ok(/Checked in without location/.test(u.byId.flagList.textContent) && /Alpha Course/.test(u.byId.flagList.textContent) && !/GEO_SKIPPED/.test(u.byId.flagList.textContent), "the reason is in plain words, with the lecture name");
     ok(!u.byId.flagBadge.hidden && u.byId.flagBadge.textContent === "1", "the tab shows a badge with the number still to decide");
     const row = rowsOf(u.byId.flagList)[0]; all(row, e => e.tag === "input")[0].value = "was in the front row";
     btn(row, "Accept").click(); await u.wait(() => /accepted/.test(u.byId.flagMsg.textContent));

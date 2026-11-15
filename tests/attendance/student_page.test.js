@@ -131,7 +131,38 @@ const timers = []; const origSI = global.setInterval;
   ok(p.geoCalls.length === 0, "no Permissions API: still waits for a tap");
   p = boot({ perm: "prompt", ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari/604.1", geo: () => ({ code: 1 }) });
   await until(() => p.shown().join() === "gate", "gate"); p.els.gateBtn.click(); await until(() => p.els.gateSteps.children.length > 0, "ios steps");
-  ok(/aA/.test(p.els.gateSteps.children[0].textContent), "iOS gets the aA / Website Settings instructions");
+  ok(/did not ask/.test(p.els.gateTitle.textContent) && /Location Services/.test(p.els.gateSteps.children[0].textContent), "refused at once without a question: the page says the phone did not ask, and starts with the phone's Location Services switch");
+  ok(p.els.gateSteps.children.some(li => /aA/.test(li.textContent)), "...and still gives the aA / Website Settings step");
+  p = boot({ perm: "denied", ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari/604.1", geo: () => ({ code: 1 }) });
+  await until(() => p.shown().join() === "gate" && p.els.gateSteps.children.length > 0, "blocked steps");
+  ok(/Location is blocked/.test(p.els.gateTitle.textContent) && /aA/.test(p.els.gateSteps.children[0].textContent), "a site the browser has blocked gets the aA / Website Settings instructions first");
+
+  console.log("checked in without location -> asked once more at save");
+  const skipThenSave = async (o, per = 1) => {   // per = location requests per attempt (a timeout tries twice: precise, then coarse)
+    const q = boot(Object.assign({ ls: { att_secret: "a".repeat(64), att_id: "20240001" } }, o)); await until(() => q.shown().join() === "gate", "gate");
+    for (let i = 0; i < 2; i++) { q.els.gateBtn.click(); await until(() => q.geoCalls.length === (i + 1) * per && !q.els.gateBtn.disabled, "attempt " + (i + 1)); }
+    await until(() => !q.els.gateSkipBox.hidden, "skip offered"); q.els.gateSkip.click(); await until(() => q.shown().join() === "form", "form");
+    q.els.save.click(); await until(() => q.acts().includes("att_attend"), "attend"); return q;
+  };
+  p = await skipThenSave({ perm: "prompt", geo: n => n <= 2 ? ({ code: 1 }) : okGeo() });
+  ok(p.geoCalls.length === 3 && p.last("att_attend").payload.geo.lat === 31.2 && !p.last("att_attend").payload.geo.denied, "the browser could still ask: Save asks once more, and the location it gets is sent (no flag)");
+  p = await skipThenSave({ perm: "prompt", geo: () => ({ code: 1 }) });
+  ok(p.geoCalls.length === 3 && p.last("att_attend").payload.geo.reason === "USER_SKIPPED" && p.last("att_attend").payload.diag.noprompt === true && p.last("att_attend").payload.diag.fail_reason === "PERMISSION_DENIED",
+    "still refused without a question: sent as skipped, and the report says the phone never asked (noprompt)");
+  p = await skipThenSave({ perm: "denied", geo: () => ({ code: 1 }) });
+  ok(p.geoCalls.length === 2 && p.last("att_attend").payload.geo.reason === "USER_SKIPPED" && p.last("att_attend").payload.diag.noprompt === false, "a site the browser has blocked is NOT asked again at save (it cannot ask)");
+  p = await skipThenSave({ perm: "prompt", geo: () => ({ code: 3 }) }, 2);
+  ok(p.geoCalls.length === 4 && p.last("att_attend").payload.geo.reason === "USER_SKIPPED", "a phone that found no signal is not made to wait again at save");
+
+  console.log("the lecturer added time (+2 minutes)");
+  const soon = () => Date.now() + 500;
+  const closing = st => { const c = soon(); return (a) => a === "att_ticket" ? { ok: true, ticket: "T", expires_at: c, close_utc: new Date(c).toISOString(), server_utc: new Date().toISOString() } : a === "att_status" ? st(c) : undefined; };
+  p = boot({ perm: "granted", ls: { att_secret: "a".repeat(64), att_id: "20240001" }, api: closing(c => ({ ok: true, status: "open", close_utc: new Date(c + 120000).toISOString(), server_utc: new Date().toISOString() })) });
+  await until(() => /More time was added/.test(p.els.msg.textContent), "extended message", 3000);
+  ok(AR_RE.test(p.els.msgAr.textContent) && p.els.save.disabled, "our countdown ended but the lecturer added time: the page says to scan again, in both languages");
+  p = boot({ perm: "granted", ls: { att_secret: "a".repeat(64), att_id: "20240001" }, api: closing(c => ({ ok: true, status: "closed", close_utc: new Date(c).toISOString(), server_utc: new Date().toISOString() })) });
+  await until(() => /Attendance closed/.test(p.els.msg.textContent), "closed message", 3000);
+  ok(p.acts().filter(a => a === "att_status").length === 1 && p.els.save.disabled, "no extra time: attendance closed, after ONE att_status question");
   p = boot({ perm: "prompt", ua: "Mozilla/5.0 (iPhone) Instagram 300.0", geo: () => ({ code: 1 }) });
   await until(() => p.shown().join() === "gate", "gate"); p.els.gateBtn.click(); await until(() => p.els.gateSteps.children.length > 0, "inapp steps");
   ok(/menu/i.test(p.els.gateSteps.children[0].textContent), "in-app browser is told to open in Chrome/Safari");

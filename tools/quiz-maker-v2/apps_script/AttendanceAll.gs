@@ -30,6 +30,8 @@ var ATT_C = {
   // accepted up to this long after its ticket expires / the session closes, so a student stuck in a busy-server retry loop is not lost.
   // NEW tickets are never issued after close. The student page uses the same value for how long it keeps retrying.
   LATE_GRACE_SEC: 120,
+  // "+2 minutes" (2026-11-16, decisions D15): the lecturer or the admin can push the close time back, up to SESSION_MAX_MIN after the start.
+  EXTEND_SEC: 120, SESSION_MAX_MIN: 15,
   // student page (plan section 3). The server does not use these; they are kept here so both sides stay identical (tests/attendance/multiuser.test.js compares them)
   GEO_HIGH_TIMEOUT_MS: 20000, GEO_LOW_TIMEOUT_MS: 10000, GEO_MAX_AGE_MS: 60000, GEO_SKIP_AFTER_FAILS: 2, SUBMIT_WATCHDOG_MS: 30000,
   // multi-user (plan section 4.5)
@@ -73,7 +75,9 @@ function att_tokenOk_(sessionKey, sessionId, token, epochSec) {
   token = String(token || "").toLowerCase();
   var w = Math.floor(epochSec / ATT_C.WINDOW_SEC);
   if (att_eq_(token, att_token_(sessionKey, sessionId, w))) return true;
-  if ((epochSec % ATT_C.WINDOW_SEC) < ATT_C.GRACE_SEC && att_eq_(token, att_token_(sessionKey, sessionId, w - 1))) return true;
+  // The whole previous window is accepted too (2026-11-16, decisions D16): a scanned code works for 10 to 20 s, so a phone that needs a few
+  // seconds to open the page is not told "QR expired". It used to be only the first GRACE_SEC of the next window (3 to 13 s).
+  if (att_eq_(token, att_token_(sessionKey, sessionId, w - 1))) return true;
   return false;
 }
 function att_makeTicket_(sessionId, deviceId, expSec, master) {
@@ -182,14 +186,18 @@ function att_studentName_(sid) {
 function att_studentExists_(sid) {
   return att_rows_("AttStudents").some(function (x) { return x.student_id === sid; });
 }
+/** When the session stops taking new scans: its close_utc (moved by "+2 minutes"); start + SESSION_MIN for a row without one. */
+function att_endMs_(s) {
+  var c = Date.parse(s.close_utc);
+  return isFinite(c) ? c : Date.parse(s.start_utc) + ATT_C.SESSION_MIN * 60000;
+}
 function att_isOpen_(s, nowMs) {
-  return s.status === "open" && nowMs <= Date.parse(s.start_utc) + ATT_C.SESSION_MIN * 60000;
+  return s.status === "open" && nowMs <= att_endMs_(s);
 }
 /** Still accepting check-ins from tickets issued while it was open: open, or closed (by time or by the teacher) less than LATE_GRACE_SEC ago. */
 function att_acceptsLate_(s, nowMs) {
-  var end = Date.parse(s.start_utc) + ATT_C.SESSION_MIN * 60000;
-  if (s.status !== "open") { var c = Date.parse(s.close_utc); if (!isFinite(c)) return false; end = Math.min(end, c); }
-  return nowMs <= end + ATT_C.LATE_GRACE_SEC * 1000;
+  if (s.status !== "open" && !isFinite(Date.parse(s.close_utc))) return false;
+  return nowMs <= att_endMs_(s) + ATT_C.LATE_GRACE_SEC * 1000;
 }
 /** Rows of a tab from row `fromRow` (1-based, >= 2) to the end, same object shape as att_rows_. Only the first `nCols` columns are read. */
 function att_rowsFrom_(name, fromRow, nCols) {
@@ -250,7 +258,7 @@ function att_dispatch_(p) {
     if (att_has_(STUDENT, a)) return STUDENT[a](p);
     if (a === "att_login") return att_login_(p);
     // Signed-in callers (teacher or admin). Every one of these filters by owner inside (a teacher only ever gets their own rows).
-    var SCOPED = { att_me: att_me_, att_start_session: att_startSession_, att_close_session: att_closeSession_, att_live: att_live_, att_rooms: att_rooms_,
+    var SCOPED = { att_me: att_me_, att_start_session: att_startSession_, att_close_session: att_closeSession_, att_extend_session: att_extendSession_, att_live: att_live_, att_rooms: att_rooms_,
       att_calibrate_room: att_calibrateRoom_, att_requests: att_requests_, att_decide_request: att_decideRequest_, att_flagged: att_flagged_, att_export: att_export_, att_roster: att_roster_,
       att_sessions: att_sessionsList_, att_session_detail: att_sessionDetail_, att_review: att_review_, att_manual_checkin: att_manualCheckin_ };
     var ADMIN_ONLY = { att_user_create: att_userCreate_, att_users: att_users_, att_user_update: att_userUpdate_, att_user_reset: att_userReset_, att_overview: att_overview_ };
@@ -274,7 +282,7 @@ function att_ticketAction_(p) {
   if (!att_tokenOk_(att_sessionKey_(s.session_id), s.session_id, p.token, Math.floor(now / 1000))) return att_err_("TOKEN_EXPIRED");
   // The ticket must not outlive the session (plan section 3): capped by the close time as well as the 240 s TTL.
   var nowSec = Math.floor(now / 1000), exp = nowSec + ATT_C.TICKET_SEC;
-  [Date.parse(s.close_utc), Date.parse(s.start_utc) + ATT_C.SESSION_MIN * 60000].forEach(function (ms) { if (isFinite(ms)) exp = Math.min(exp, Math.floor(ms / 1000)); });
+  exp = Math.min(exp, Math.floor(att_endMs_(s) / 1000));
   if (exp <= nowSec) return att_err_("SESSION_CLOSED");
   // The request carries no device id, so d is "" (see HANDOFF-1).
   return att_ok_({ ticket: att_makeTicket_(s.session_id, "", exp), expires_at: exp * 1000, close_utc: s.close_utc, server_utc: att_iso_() });
@@ -348,12 +356,12 @@ function att_normDiag_(d) {
   var n = Math.floor(Number(d.attempts)); if (!isFinite(n) || n < 0) n = 0;
   function b(v) { return (v === true || v === "true") ? "1" : (v === false || v === "false") ? "0" : "?"; }
   var fail = d.fail_reason ? att_geoReason_(d.fail_reason) : "";   // S1 extra: the real failure behind a USER_SKIPPED check-in
-  return { perm: perm, attempts: Math.min(n, 99), online: b(d.online), inapp: b(d.inapp), fail: fail };
+  return { perm: perm, attempts: Math.min(n, 99), online: b(d.online), inapp: b(d.inapp), fail: fail, noprompt: b(d.noprompt) };   // noprompt 1 = the browser refused without asking (location off for the browser on the phone)
 }
 /** AttFlagLog.detail for a flag. The three location-failure flags carry the reason + diagnostics so the NEXT case is diagnosable. */
 function att_flagDetail_(code, dist, geo, diag) {
   if (code === "GEO_DENIED" || code === "GEO_UNAVAILABLE" || code === "GEO_SKIPPED") {
-    return "reason=" + (geo.denied ? geo.reason : "") + (diag ? ";perm=" + diag.perm + ";att=" + diag.attempts + ";online=" + diag.online + ";inapp=" + diag.inapp + (diag.fail ? ";fail=" + diag.fail : "") : ";diag=none");
+    return "reason=" + (geo.denied ? geo.reason : "") + (diag ? ";perm=" + diag.perm + ";att=" + diag.attempts + ";online=" + diag.online + ";inapp=" + diag.inapp + ";noprompt=" + diag.noprompt + (diag.fail ? ";fail=" + diag.fail : "") : ";diag=none");
   }
   return dist == null ? "" : "dist_m=" + Math.round(dist);
 }
@@ -520,13 +528,36 @@ function att_closeSession_(p, u) {
   var s = sc.s;
   if (s.status !== "closed") {
     var row = att_rows_("AttSessions").filter(function (x) { return x.session_id === s.session_id; })[0];
-    var nowIso = att_iso_();
+    var nowIso = att_iso_(new Date(Math.min(Date.now(), att_endMs_(s))));   // ended by hand after the time ran out: the close time stays the real one
     att_withLock_(function () { att_update_("AttSessions", row._row, { status: "closed", close_utc: nowIso }); return true; });
     s.status = "closed"; s.close_utc = nowIso; att_cput_("att:s:" + s.session_id, s);
   }
   var c = att_counts_(s.session_id, att_ownerOf_(s)), summary = { present: c.present, flagged: c.flagged, pending: c.pending };
   att_safeNotify_("session_close", { session_id: s.session_id, course: s.course, summary: summary, owner_name: s.owner_name || "" });
   return att_ok_({ summary: summary });
+}
+
+/** att_extend_session {session_id}: "+2 minutes". The owner (or the admin) pushes the close time back by EXTEND_SEC, counted from the
+ *  current close time, or from now when the time has just run out (still inside the late grace). Never past SESSION_MAX_MIN after the
+ *  start, never for a session the teacher ended. Students who scan after this get the new close time; a page that was already open
+ *  asks att_status when its own countdown ends and tells the student to scan again. */
+function att_extendSession_(p, u) {
+  u = u || att_adminUser_();
+  var sc = att_scopeSession_(u, p.session_id); if (sc.err) return sc.err;
+  var id = sc.s.session_id, out = null;
+  var res = att_withLock_(function () {
+    var row = att_rows_("AttSessions").filter(function (x) { return x.session_id === id; })[0];
+    if (!row) return att_err_("NO_SESSION");
+    var now = Date.now(), end = att_endMs_(row), max = Date.parse(row.start_utc) + ATT_C.SESSION_MAX_MIN * 60000;
+    if (row.status !== "open" || now > end + ATT_C.LATE_GRACE_SEC * 1000) return att_err_("SESSION_CLOSED", "This attendance has already ended");
+    if (end >= max) return att_err_("MAX_REACHED", "Attendance cannot stay open longer than " + ATT_C.SESSION_MAX_MIN + " minutes");
+    var close = att_iso_(new Date(Math.min(Math.max(end, now) + ATT_C.EXTEND_SEC * 1000, max)));
+    att_update_("AttSessions", row._row, { close_utc: close });
+    out = att_clean_(row); out.close_utc = close; out.hall_lat = att_num_(out.hall_lat); out.hall_lng = att_num_(out.hall_lng);
+    return att_ok_({ close_utc: close, server_utc: att_iso_(), can_extend: Date.parse(close) < max });
+  });
+  if (res.ok && out) att_cput_("att:s:" + id, out);
+  return res;
 }
 
 /** Admin activity feed for one session, newest first: registrations (yellow), check-ins (green), attempted cheating (red).
@@ -875,6 +906,31 @@ function att_overview_(p) {
   return att_ok_({ range: { from: p.from || null, to: p.to || null }, totals: totals, by_user: byUser, by_day: byDay });
 }
 
+/* ───────── nightly backup (2026-11-16, decisions D18) ───────── */
+var ATT_BACKUP_FOLDER_ = "Attendance backups", ATT_BACKUP_PREFIX_ = "Attendance backup ", ATT_BACKUP_KEEP_ = 14;
+/** Copies the attendance spreadsheet into the Drive folder "Attendance backups" (made on first use) as "Attendance backup 2026-11-16 0300",
+ *  then moves all but the newest ATT_BACKUP_KEEP_ copies to the bin. Run by the daily trigger; safe to run by hand at any time. */
+function att_backupNow() {
+  var id = PropertiesService.getScriptProperties().getProperty("ATT_SHEET_ID") || ATT_DEFAULT_SHEET_ID;
+  var it = DriveApp.getFoldersByName(ATT_BACKUP_FOLDER_), folder = it.hasNext() ? it.next() : DriveApp.createFolder(ATT_BACKUP_FOLDER_);
+  var name = ATT_BACKUP_PREFIX_ + Utilities.formatDate(new Date(), "Africa/Cairo", "yyyy-MM-dd HHmm");
+  DriveApp.getFileById(id).makeCopy(name, folder);
+  var old = [], files = folder.getFiles();
+  while (files.hasNext()) { var f = files.next(); if (String(f.getName()).indexOf(ATT_BACKUP_PREFIX_) === 0) old.push(f); }
+  old.sort(function (a, b) { return a.getName() < b.getName() ? 1 : a.getName() > b.getName() ? -1 : 0; });   // newest first (the name carries the date)
+  var removed = 0;
+  for (var i = ATT_BACKUP_KEEP_; i < old.length; i++) { old[i].setTrashed(true); removed++; }
+  var msg = "Backup saved: " + name + " (kept " + Math.min(old.length, ATT_BACKUP_KEEP_) + ", binned " + removed + ")";
+  console.log(msg); return msg;
+}
+/** Run ONCE from the editor (asks for Drive access): a backup every night at about 03:00 Cairo time, and one right now as a check. */
+function att_installBackup() {
+  var removed = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === "att_backupNow") { ScriptApp.deleteTrigger(t); removed++; } });
+  ScriptApp.newTrigger("att_backupNow").timeBased().atHour(3).everyDays(1).inTimezone("Africa/Cairo").create();
+  return "Nightly backup installed (replaced " + removed + "). " + att_backupNow();
+}
+
 /* ═════════ tests (run from the editor) ═════════ */
 function att_selfTest() {
   var out = [], allOk = true;
@@ -891,7 +947,7 @@ function att_selfTest() {
   chk("token current window", att_tokenOk_(sk, "S-TEST", att_token_(sk, "S-TEST", w), e), true);
   chk("token previous in grace (t%10=0)", att_tokenOk_(sk, "S-TEST", att_token_(sk, "S-TEST", w - 1), e), true);
   chk("token previous in grace edge (t%10=2)", att_tokenOk_(sk, "S-TEST", att_token_(sk, "S-TEST", w - 1), e + 2), true);
-  chk("token previous rejected (t%10=3)", att_tokenOk_(sk, "S-TEST", att_token_(sk, "S-TEST", w - 1), e + 3), false);
+  chk("token previous window still accepted late in the next one (t%10=9)", att_tokenOk_(sk, "S-TEST", att_token_(sk, "S-TEST", w - 1), e + 9), true);
   chk("token two windows old rejected", att_tokenOk_(sk, "S-TEST", att_token_(sk, "S-TEST", w - 2), e), false);
   chk("hex of signed bytes", att_hex_([-1, 0, 15, 127, -128]), "ff000f7f80");
   chk("haversine ~111.2km/deg", Math.round(att_haversine_(0, 0, 1, 0) / 1000), 111);
@@ -2068,7 +2124,41 @@ function att_loginFail_() {
   try { CacheService.getScriptCache().put("att:lf", JSON.stringify(f), ttl); } catch (e) {}
 }
 
+/** "u-1a2b3c4d", "1A2B3C4D" -> "U-1A2B3C4D"; anything else -> "". */
+function att_userIdCanon_(v) {
+  var m = /^(?:U-?)?([0-9A-F]{8})$/.exec(String(v == null ? "" : v).toUpperCase().replace(/\s+/g, ""));
+  return m ? "U-" + m[1] : "";
+}
+/** Sign-in with the teacher ID + password (2026-11-16, decisions D17). Wrong passwords are counted PER ID, so nobody can lock every
+ *  teacher out by typing rubbish: only the account whose ID is being guessed pauses (LOGIN_MAX_FAILS in LOGIN_WINDOW_SEC -> LOGIN_LOCK_SEC). */
+function att_loginById_(p) {
+  var bad = att_err_("BAD_PASSWORD", "Wrong ID or password");
+  var id = att_userIdCanon_(p.user_id); if (!id) return bad;
+  var lk = att_cget_("att:lock:" + id), left = lk ? Math.ceil((lk.until - Date.now()) / 1000) : 0;
+  if (left > 0) { var e = att_err_("LOCKED", "Too many failed attempts for this ID. Try again in " + Math.ceil(left / 60) + " min."); e.retry_after_sec = left; return e; }
+  var u = att_rows_("AttUsers").filter(function (x) { return x.user_id === id; })[0];
+  if (!u) return bad;   // an ID that does not exist has nothing to lock
+  var canon = att_pwCanon_(p.password), h = canon.length >= 8 ? att_pwHash_(canon) : "";
+  if (!h || !att_eq_(h, String(u.pw_hash || ""))) {
+    var now = Date.now(), f = att_cget_("att:lf:" + id), c = CacheService.getScriptCache();
+    if (!f || now - f.t0 > ATT_C.LOGIN_WINDOW_SEC * 1000) f = { n: 0, t0: now };
+    f.n++;
+    try {
+      if (f.n >= ATT_C.LOGIN_MAX_FAILS) { c.put("att:lock:" + id, JSON.stringify({ until: now + ATT_C.LOGIN_LOCK_SEC * 1000 }), ATT_C.LOGIN_LOCK_SEC); c.remove("att:lf:" + id); }
+      else c.put("att:lf:" + id, JSON.stringify(f), Math.max(1, ATT_C.LOGIN_WINDOW_SEC - Math.floor((now - f.t0) / 1000)));
+    } catch (e2) {}
+    return bad;
+  }
+  if (u.status !== "active") return att_err_("USER_DISABLED", "This account is disabled");
+  att_cdel_("att:lf:" + id);
+  att_withLock_(function () { att_update_("AttUsers", u._row, { last_login: att_iso_() }); return true; });
+  var exp = Math.floor(Date.now() / 1000) + ATT_C.USER_TOKEN_TTL_SEC;
+  return att_ok_({ token: att_userTokenMake_(u.user_id, h.slice(0, 8), exp), user: { user_id: u.user_id, name: u.name, role: "teacher" }, expires_at: exp * 1000 });
+}
+
 function att_login_(p) {
+  // With an ID: counted per ID. Without one (a dashboard page cached from before 2026-11-16): the old password-only path and its shared lock-out.
+  if (p && p.user_id != null && String(p.user_id) !== "") return att_loginById_(p);
   var left = att_loginLocked_();
   if (left) { var lk = att_err_("LOCKED", "Too many failed attempts. Try again in " + Math.ceil(left / 60) + " min."); lk.retry_after_sec = left; return lk; }
   var canon = att_pwCanon_(p && p.password);

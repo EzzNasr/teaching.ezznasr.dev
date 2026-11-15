@@ -36,8 +36,9 @@
   }
 
   // ---------- login ----------
-  // One box: a teacher password OR the admin token. We ask att_me first (it never counts as a failed login), and only if the
-  // server says the value is not a valid token do we try it as a password (att_login: wrong ones count toward the global lock-out).
+  // A teacher signs in with their ID + password; the admin pastes the token and leaves the ID empty. We ask att_me first (it never
+  // counts as a failed login), and only if the server says the value is not a valid token do we try it as a password (att_login).
+  // Wrong passwords are counted per teacher ID (2026-11-16), so one person typing rubbish cannot lock every teacher out.
   function showLogin(text) { $("panel").hidden = true; $("proj").hidden = true; $("login").hidden = false; wait($("loginBtn"), false); msg("loginMsg", text, text ? "err" : ""); }
   function enter(user, tok) {
     S.tok = tok; S.user = user; S.role = user.role === "admin" ? "admin" : "teacher";
@@ -46,7 +47,7 @@
     initPanel();
   }
   function login(saved) {
-    var t = saved || $("tok").value.trim();
+    var t = saved || $("tok").value.trim(), uid = saved ? "" : $("uid").value.trim();
     if (!t) return msg("loginMsg", "Enter your password or the admin token.", "err");
     msg("loginMsg", "Checking\u2026"); wait($("loginBtn"), true);
     function fail(text) { S.tok = null; if (saved) ss("att_admin", null); showLogin(text); }
@@ -55,9 +56,10 @@
       if (r.code === "NETWORK") return fail("No connection.");
       if (r.code === "USER_DISABLED") return fail("This account is disabled.");
       if (saved) return fail("");   // a stale saved token is never sent to att_login as a password
-      return api.call("att_login", { password: t }).then(function (l) {
-        if (l.ok) return enter(l.user, l.token);
-        fail(l.code === "NETWORK" ? "No connection." : l.code === "LOCKED" ? (l.error || "Too many attempts. Wait a few minutes.") : l.code === "USER_DISABLED" ? "This account is disabled." : "Wrong password or token.");
+      if (!uid) return fail("Type your teacher ID as well (the admin gives it to you with the password).");
+      return api.call("att_login", { user_id: uid, password: t }).then(function (l) {
+        if (l.ok) { ls("att_uid", l.user.user_id); return enter(l.user, l.token); }
+        fail(l.code === "NETWORK" ? "No connection." : l.code === "LOCKED" ? (l.error || "Too many attempts. Wait a few minutes.") : l.code === "USER_DISABLED" ? "This account is disabled." : "Wrong ID or password.");
       });
     });
   }
@@ -138,7 +140,7 @@
     });
   }
   function showProjector() {
-    $("panel").hidden = true; $("proj").hidden = false; $("closeBtn").disabled = S.closed;
+    $("panel").hidden = true; $("proj").hidden = false; $("closeBtn").disabled = S.closed; $("extBtn").disabled = S.closed;
     $("pinfo").textContent = S.course + " · " + S.room;
     clearInterval(S.tickTimer); clearInterval(S.liveTimer);
     clearInterval(S.syncTimer);
@@ -266,11 +268,24 @@
   Object.keys(mark.now).forEach(function (k) { seenEv[k] = 1; });
     if (fresh.length) arrive(fresh.slice().reverse());
   }
+  // "+2 minutes": the server moves the close time; the QR comes back if the time had just run out.
+  function extendSession() {
+    if (!S.sess || S.closed) return;
+    wait($("extBtn"), true);
+    A("att_extend_session", { session_id: S.sess }).then(function (r) {
+      wait($("extBtn"), false);
+      if (!r.ok) return alert(r.code === "MAX_REACHED" ? "Attendance cannot stay open any longer." : r.code === "SESSION_CLOSED" ? "This attendance has already ended. Start a new one." : "Could not add time: " + (r.code || "error"));
+      S.closeMs = Date.parse(r.close_utc); S.win = -1;
+      $("pinfo").textContent = S.course + " · " + S.room;
+      $("extBtn").disabled = r.can_extend === false;
+      tick();
+    });
+  }
   function closeSession() {
     if (!S.sess || S.closed || !confirm("End attendance now? New students can no longer check in (anyone already saving gets 2 more minutes).")) return;
     A("att_close_session", { session_id: S.sess }).then(function (r) {
       if (!r.ok) return alert("Could not close: " + (r.code || "error"));
-      S.closed = true; $("closeBtn").disabled = true; tick(); poll();
+      S.closed = true; $("closeBtn").disabled = true; $("extBtn").disabled = true; tick(); poll();
       var s = r.summary || {};
       hideProjector("session");
       $("summary").hidden = false;
@@ -375,8 +390,8 @@
 
   // ---------- needs review: every flagged check-in, decided right here (Accept / Reject + note) ----------
   // Plain words for the flag codes (the codes stay in the CSV export).
-  var FLAG_TEXT = { GEO_FAR: "Outside the hall", GEO_DENIED: "Location was blocked on the phone", GEO_UNAVAILABLE: "The phone gave no location",
-    GEO_SKIPPED: "Skipped the location step", GEO_WEAK: "Weak location signal", SAME_PHONE_MULTI_ID: "Same phone as another student",
+  var FLAG_TEXT = { GEO_FAR: "Outside the hall", GEO_DENIED: "Location off or blocked on the phone", GEO_UNAVAILABLE: "The phone gave no location",
+    GEO_SKIPPED: "Checked in without location", GEO_WEAK: "Weak location signal", SAME_PHONE_MULTI_ID: "Same phone as another student",
     IDENTICAL_COORDS: "Exactly the same location as other students", REPEATED: "Flagged 3 or more times before", MANUAL: "Entered by hand" };
   function flagText(c) { return FLAG_TEXT[c] || c; }
   function setFlagBadge(n) { setBadge($("flagBadge"), n); }
@@ -687,10 +702,10 @@
       var box = $("userList"); clear(box);
       if (!r.users.length) return;
       var t = mk("table", null, "his"), h = mk("tr");
-      ["Name", "Status", "Created", "Last login", ""].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
+      ["Name", "ID", "Status", "Created", "Last login", ""].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
       r.users.forEach(function (u) {
         var on = u.status === "active", tr = mk("tr");
-        tr.appendChild(mk("td", u.name)); tr.appendChild(mk("td", on ? "active" : "disabled", on ? "" : "pill-off"));
+        tr.appendChild(mk("td", u.name)); tr.appendChild(mk("td", u.user_id)); tr.appendChild(mk("td", on ? "active" : "disabled", on ? "" : "pill-off"));
         tr.appendChild(mk("td", when(u.created_at))); tr.appendChild(mk("td", u.last_login ? when(u.last_login) : "never"));
         var td = mk("td"), ren = mk("button", "Rename"), tog = mk("button", on ? "Disable" : "Enable", on ? "bad" : "ok"), rst = mk("button", "Reset password");
         ren.onclick = function () { var n = prompt("New name for " + u.name, u.name); if (n && n.trim() && n.trim() !== u.name) userCall("att_user_update", { user_id: u.user_id, name: n.trim() }); };
@@ -704,7 +719,7 @@
   function userCall(action, payload, what) {
     A(action, payload).then(function (r) {
       if (!r.ok) return msg("userMsg", "Failed: " + (r.error || r.code || "error"), "err");
-      if (r.password) showSecret(r.user.name, r.password, what || "Account created");
+      if (r.password) showSecret(r.user.name + " · ID " + r.user.user_id, r.password, what || "Account created");
       else msg("userMsg", "Saved.", "ok");
       loadUsers();
     });
@@ -720,7 +735,7 @@
     A("att_user_create", { name: n }).then(function (r) {
       wait($("userCreate"), false);
       if (!r.ok) return msg("userMsg", "Failed: " + (r.error || r.code || "error"), "err");
-      $("userName").value = ""; showSecret(r.user.name, r.password, "Account created"); loadUsers();
+      $("userName").value = ""; showSecret(r.user.name + " · ID " + r.user.user_id, r.password, "Account created"); loadUsers();
     });
   }
   function copySecret() {
@@ -748,6 +763,7 @@
     $("startBtn").onclick = startSession;
     $("resumeBtn").onclick = function () { if (S.sess) showProjector(); };
     $("closeBtn").onclick = closeSession;
+    $("extBtn").onclick = extendSession;
     $("csvBtn").onclick = function () { exportCSV(); };
     $("calBtn").onclick = calibrate;
     $("manSave").onclick = saveManual;
@@ -769,6 +785,7 @@
     window.addEventListener("resize", function () { S.win = -1; });
     document.addEventListener("visibilitychange", function () { if (!document.hidden && !$("proj").hidden) wake(); });
     if (DEBUG) T.selfTest().then(function (ok) { console.assert(ok, "TOKEN VECTOR MISMATCH (spec section 2)"); if (ok) console.log("token vector OK"); });
+    $("uid").value = ls("att_uid") || "";   // the teacher types the ID once per device
     var saved = ss("att_admin");
     if (saved) login(saved); else showLogin("");
   }

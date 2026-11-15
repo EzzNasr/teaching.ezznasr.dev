@@ -70,6 +70,10 @@
     GATE_UNSUP_T: "This browser can't share location",
     GATE_UNSUP: "Open this page in Chrome or Safari, then scan the QR again.",
     GATE_FAIL_1: "Location is still unavailable.",
+    // The browser refused at once, without showing its "Allow location?" question: location is off for the browser itself (phone settings).
+    GATE_DEVICE_T: "Your phone did not ask: location is off",
+    GATE_DEVICE: "Location is switched off for this browser in the phone's settings, so it could not ask you. Turn it on with the steps below, then tap Try again.",
+    EXTENDED: "More time was added. Scan the QR on the screen again.",
     HELP_BLOCKED: "How to turn location on",
     HELP_WEAK: "To get a better location signal"
   };
@@ -95,6 +99,7 @@
     GAVE_UP: "\u062a\u0639\u0630\u0651\u0631 \u062d\u0641\u0638 \u062d\u0636\u0648\u0631\u0643: \u0644\u0645 \u0646\u062a\u0645\u0643\u0646 \u0645\u0646 \u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u062e\u0627\u062f\u0645 \u0641\u064a \u0627\u0644\u0648\u0642\u062a \u0627\u0644\u0645\u062d\u062f\u062f. \u0627\u0639\u0631\u0636 \u0647\u0630\u0647 \u0627\u0644\u0634\u0627\u0634\u0629 \u0639\u0644\u0649 \u0627\u0644\u0645\u062d\u0627\u0636\u0631 \u0627\u0644\u0622\u0646 (\u0631\u0642\u0645 \u0627\u0644\u0637\u0627\u0644\u0628 {id}).",
     TAB_PENDING: "\u0644\u0645 \u064a\u064f\u062d\u0641\u0638 \u0628\u0639\u062f",
     SESSION_CLOSED: "\u0627\u0646\u062a\u0647\u0649 \u0648\u0642\u062a \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062d\u0636\u0648\u0631 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062d\u0627\u0636\u0631\u0629.",
+    EXTENDED: "\u062a\u0645\u062a \u0625\u0636\u0627\u0641\u0629 \u0648\u0642\u062a. \u0627\u0645\u0633\u062d \u0631\u0645\u0632 QR \u0639\u0644\u0649 \u0627\u0644\u0634\u0627\u0634\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.",
     QR_EXPIRED: "\u0627\u0646\u062a\u0647\u062a \u0635\u0644\u0627\u062d\u064a\u0629 \u0631\u0645\u0632 QR. \u0627\u0645\u0633\u062d \u0627\u0644\u0634\u0627\u0634\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."
   };
   var STEPS = {
@@ -103,6 +108,13 @@
       android: ["Tap the lock icon next to the address.", "Tap Permissions, then Location, and choose Allow.", "Make sure Location is on in your phone's quick settings."],
       inapp: ["Tap the menu in the corner of this screen.", "Choose Open in browser (Chrome or Safari).", "Scan the QR on the screen again."],
       other: ["Click the lock icon next to the address.", "Set Location to Allow for this site."]
+    },
+    // Refused without a question: the phone-level switch first, then the site-level one.
+    device: {
+      ios: ["Open the phone's Settings > Privacy & Security > Location Services and turn it on.", "In the same list tap Safari Websites and choose While Using the App.", "Come back to this page and tap Try again. When Safari asks, tap Allow.", "Still blocked? Tap aA in the address bar > Website Settings > Location > Allow."],
+      android: ["Swipe down from the top of the screen and turn Location on.", "Open Settings > Apps > Chrome > Permissions > Location and choose Allow only while using the app.", "Come back to this page and tap Try again. When Chrome asks, tap Allow.", "Still blocked? Tap the lock icon next to the address > Permissions > Location > Allow."],
+      inapp: ["Tap the menu in the corner of this screen.", "Choose Open in browser (Chrome or Safari).", "Scan the QR on the screen again."],
+      other: ["Turn on location services on this device.", "Click the lock icon next to the address and set Location to Allow."]
     },
     weak: {
       ios: ["Turn on Location Services in Settings > Privacy & Security.", "Move near a window or doorway.", "Turn Wi-Fi on. It improves indoor location even if you aren't connected."],
@@ -126,7 +138,7 @@
     busyNext: $("busyNext"), busyNextAr: $("busyNextAr"), msgAr: $("msgAr") };
   var st = { secret: null, fp: null, id: null, name: "", recognized: false, ticket: null, ticketExp: 0,
     closeMs: 0, offset: 0, busy: false, dead: false, done: false,
-    view: "none", perm: "unknown", fix: null, geoFail: null, geoAttempts: 0, geoFails: 0, skipped: false, acquiring: false,
+    view: "none", perm: "unknown", fix: null, geoFail: null, geoAttempts: 0, geoFails: 0, skipped: false, acquiring: false, noPrompt: false, closing: false,
     run: 0, lastKind: "attend", wd: null, wl: null, sess: "", pend: null, rt: null, retryAt: 0 };
 
   // ar: the Arabic line shown under the English one (optional).
@@ -262,7 +274,7 @@
     return { denied: true, reason: st.skipped ? "USER_SKIPPED" : ((st.geoFail && st.geoFail.reason) || "PERMISSION_DENIED") };
   }
   function diag() {
-    var d = { perm: st.perm, attempts: st.geoAttempts, online: navigator.onLine !== false, inapp: IN_APP.test(navigator.userAgent || "") };
+    var d = { perm: st.perm, attempts: st.geoAttempts, online: navigator.onLine !== false, inapp: IN_APP.test(navigator.userAgent || ""), noprompt: !!st.noPrompt };
     if (!st.fix && st.geoFail) d.fail_reason = st.geoFail.reason;   // additive (see HANDOFF-S1): why the skipped/failed fix failed
     return d;
   }
@@ -296,10 +308,25 @@
     if (st.dead || st.done) return;
     // A check-in that is still being saved (or retried) is allowed to finish: the server's late grace decides, not our countdown.
     if (left <= 0 && st.busy) { el.sub.textContent = "Still saving your check-in\u2026"; return; }
-    if (left <= 0) { el.sub.textContent = ""; return kill(MESSAGES.SESSION_CLOSED, AR.SESSION_CLOSED); }
+    if (left <= 0) { el.sub.textContent = ""; return closedOrExtended(); }
     // A request already in flight is allowed to finish: the server decides, not our countdown.
     if (st.ticketExp <= srvNow() && !st.busy) { el.sub.textContent = ""; return kill(MESSAGES.QR_EXPIRED, AR.QR_EXPIRED); }
     el.sub.textContent = "QR valid " + mmss(st.ticketExp - srvNow());
+  }
+
+  // Our countdown ended. The instructor may have added time ("+2 minutes") after this page got its ticket: ask the server once.
+  // More time means a new scan (the ticket ended at the old close time); otherwise attendance really is closed.
+  function closedOrExtended() {
+    if (st.closing) return;
+    st.closing = true; setBtns();
+    function closed() { if (!st.dead && !st.done && !st.busy) kill(MESSAGES.SESSION_CLOSED, AR.SESSION_CLOSED); }
+    var q; try { q = api.call("att_status", { session_id: st.sess }); } catch (e) { q = null; }
+    if (!q || !q.then) return closed();
+    q.then(function (r) {
+      if (st.dead || st.done || st.busy) return;
+      if (r && r.ok && r.status === "open" && Date.parse(r.close_utc) > st.closeMs + 1000) return kill(MESSAGES.EXTENDED, AR.EXTENDED);
+      closed();
+    }, closed);
   }
 
   // ---------- views: gate -> form -> done ----------
@@ -320,16 +347,16 @@
   }
   // mode: ask | working | denied | weak | unsupported
   function gateUi(mode) {
-    var p = platform(), help = mode === "denied" || mode === "weak";
+    var p = platform(), help = mode === "denied" || mode === "weak", device = mode === "denied" && st.noPrompt;
     var T = { ask: [MESSAGES.GATE_ASK_T, MESSAGES.GATE_ASK], working: [MESSAGES.GATE_WORK_T, MESSAGES.GATE_WORK],
-      denied: [MESSAGES.GATE_DENIED_T, MESSAGES.GATE_DENIED], weak: [MESSAGES.GATE_WEAK_T, MESSAGES.GATE_WEAK],
+      denied: device ? [MESSAGES.GATE_DEVICE_T, MESSAGES.GATE_DEVICE] : [MESSAGES.GATE_DENIED_T, MESSAGES.GATE_DENIED], weak: [MESSAGES.GATE_WEAK_T, MESSAGES.GATE_WEAK],
       unsupported: [MESSAGES.GATE_UNSUP_T, MESSAGES.GATE_UNSUP] }[mode];
     el.gateTitle.textContent = T[0]; el.gateText.textContent = T[1];
     el.gateBtn.hidden = mode === "unsupported";
     el.gateBtn.disabled = mode === "working" || st.dead;
     el.gateBtn.textContent = mode === "working" ? "Finding your location\u2026" : (mode === "ask" ? "Allow location" : "Try again");
     el.gateHelp.hidden = !help;
-    if (help) { el.gateHelpTitle.textContent = mode === "denied" ? MESSAGES.HELP_BLOCKED : MESSAGES.HELP_WEAK; setSteps(STEPS[mode === "denied" ? "blocked" : "weak"][p]); }
+    if (help) { el.gateHelpTitle.textContent = mode === "denied" ? MESSAGES.HELP_BLOCKED : MESSAGES.HELP_WEAK; setSteps(STEPS[device ? "device" : mode === "denied" ? "blocked" : "weak"][p]); }
     el.gateMsg.textContent = (mode === "denied" || mode === "weak") && st.geoFails > 0 ? MESSAGES.GATE_FAIL_1 : "";
     el.gateSkipBox.hidden = !(st.geoFails >= K.GEO_SKIP_AFTER_FAILS || mode === "unsupported");
   }
@@ -348,9 +375,13 @@
   function gateAttempt(guard) {
     if (st.dead || st.acquiring || st.view !== "gate") return Promise.resolve();
     st.acquiring = true; st.geoAttempts++;
+    var t0 = Date.now(), before = st.perm;
     gateUi("working");
     return acquire(guard).then(function (r) {
       st.acquiring = false;
+      // Refused in under a second while the browser had NOT recorded a "Block" for this site: the student was never asked.
+      // Location is off for the browser itself (phone settings). Show how to turn it on; it is reported as such, not as a refusal.
+      st.noPrompt = !r.ok && r.reason === "PERMISSION_DENIED" && before !== "denied" && Date.now() - t0 < 1000;
       refreshPerm();
       if (st.dead) return;
       if (r.ok) { st.fix = r.pos; st.geoFail = null; st.skipped = false; return enterForm(); }
@@ -388,7 +419,7 @@
     el.namebox.hidden = st.recognized;
   }
   function readId() { var v = el.sid.value.trim(); return CFG.ID_REGEX.test(v) ? v : null; }
-  function setBtns() { [el.save, el.signup, el.change].forEach(function (x) { x.disabled = st.busy || st.dead || st.done; }); }
+  function setBtns() { [el.save, el.signup, el.change].forEach(function (x) { x.disabled = st.busy || st.dead || st.done || st.closing; }); }
   var ROUTE = { ID_TAKEN: 1, ID_BOUND_OTHER_DEVICE: 1, DEVICE_UNKNOWN: 1 };   // -> change-device flow
   function toChangeDevice(id) {
     if (st.recognized) { saveAll("att_id", ""); saveAll("att_name", ""); }
@@ -525,7 +556,20 @@
   function pChange(id, c) { return { ticket: st.ticket, student_id: id, new_secret: st.secret, fp: c.fp }; }
   // Make sure a recent fix exists at submit time. Failure never blocks the check-in: it is sent with its reason.
   function ensureFix(need) {
-    if (!need || fixFresh() || (st.skipped && !st.fix)) return Promise.resolve();
+    if (!need || fixFresh()) return Promise.resolve();
+    if (st.skipped && !st.fix) {
+      // "Continue without location" was tapped. Ask ONE more time at save, when that can still work: the student turned location on
+      // meanwhile (granted), or the earlier refusal was not a recorded "Block" (the browser can still show its question). A site the
+      // browser has blocked, or a phone that simply found no signal, is not asked again: that would only add a wait.
+      return refreshPerm().then(function (s) {
+        var refused = !!st.geoFail && st.geoFail.reason === "PERMISSION_DENIED";
+        if (s !== "granted" && !(refused && s !== "denied")) return;
+        st.geoAttempts++;
+        return acquire(s === "granted").then(function (r) {
+          if (r.ok) { st.fix = r.pos; st.geoFail = null; st.skipped = false; st.noPrompt = false; }
+        });
+      });
+    }
     return acquire(st.perm === "granted").then(function (r) {
       if (r.ok) { st.fix = r.pos; st.geoFail = null; } else st.geoFail = { reason: r.reason };   // an older fix, if any, is still used
     });
