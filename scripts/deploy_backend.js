@@ -120,7 +120,10 @@ const LOG_HEAD = '# Backend deploys\n\n*Written by `scripts/deploy_backend.js`, 
 // ---------- the run (side effects go through `sh`, so tests can fake every command) ----------
 
 function realSh() {
-  const claspBin = path.join(path.dirname(require.resolve('@google/clasp/package.json')), require('@google/clasp/package.json').bin.clasp);
+  const claspDir = path.join(ROOT, 'node_modules', '@google', 'clasp');   // its package.json is not in "exports", so read it directly
+  if (!fs.existsSync(path.join(claspDir, 'package.json'))) throw new Error('clasp is not installed: run npm ci (then npx clasp login once)');
+  const bin = JSON.parse(fs.readFileSync(path.join(claspDir, 'package.json'), 'utf8')).bin;
+  const claspBin = path.join(claspDir, typeof bin === 'string' ? bin : bin.clasp);
   return function sh(cmd, args, opts = {}) {
     const exe = cmd === 'clasp' || cmd === 'node' ? process.execPath : cmd;
     const argv = cmd === 'clasp' ? [claspBin].concat(args) : args;
