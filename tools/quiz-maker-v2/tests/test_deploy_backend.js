@@ -73,7 +73,8 @@ function world(o = {}) {
       if (o.badPush) files['Code.js'] = 'mangled';
       saved = files; return r('Pushed');
     }
-    if (c.startsWith('clasp create-version')) return r('Created version 70.');
+    if (/^clasp (create-version|update-deployment)/.test(c) && !(opts.cwd && fs.existsSync(path.join(opts.cwd, '.clasp.json')))) throw new Error('Project settings not found.');   // real clasp needs .clasp.json in cwd
+    if (c.startsWith('clasp create-version')) { if (o.versionFails) throw new Error('quota'); return r('Created version 70.'); }
     if (c.startsWith('clasp update-deployment')) return r('Deployed');
     if (cmd === 'node') return { code: o.smokeRed ? 1 : 0, out: o.smokeRed ? 'FAIL health check' : '14 pass, 0 fail' };
     throw new Error('unexpected command: ' + c);
@@ -127,6 +128,10 @@ const writes = calls => calls.filter(c => /^clasp (push|create-version|update-de
   w = world({ badPush: true });
   check('a push that did not land as staged rolls back before any version is made',
     await throwsLike(() => D.run(['--yes'], w.deps), /Rolled back/) === true && !w.calls.some(c => c.startsWith('clasp create-version')));
+
+  w = world({ versionFails: true });
+  check('a failure while making the version rolls back too (saved code = Version 69 again)',
+    await throwsLike(() => D.run(['--yes'], w.deps), /Rolled back/) === true && w.saved()['Code.js'] === 'old code');
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

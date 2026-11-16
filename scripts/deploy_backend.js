@@ -203,8 +203,11 @@ async function run(argv, deps = {}) {
   say('pushed and verified');
 
   step('6. version and deployment');
-  const version = createdVersion(sh('clasp', ['create-version', `${commit.slice(0, 7)} ${branch}`]).out);
-  sh('clasp', ['update-deployment', cfg.deploymentId, '--versionNumber', String(version), '--description', commit.slice(0, 7)]);
+  let version;   // clasp finds the project through .clasp.json, so these run in the push folder; any failure rolls back
+  try {
+    version = createdVersion(sh('clasp', ['create-version', `${commit.slice(0, 7)} ${branch}`], { cwd: pushDir }).out);
+    sh('clasp', ['update-deployment', cfg.deploymentId, '--versionNumber', String(version), '--description', commit.slice(0, 7)], { cwd: pushDir });
+  } catch (e) { await rollback('making the version or moving the deployment failed: ' + e.message.split(/\r?\n/).pop(), version); }
   say(`Version ${version} is live on the same deployment (rollback target: Version ${prev})`);
 
   step('7. live smoke test');
@@ -225,7 +228,7 @@ async function run(argv, deps = {}) {
     fsx.writeFileSync(path.join(back, '.clasp.json'), JSON.stringify({ scriptId: cfg.scriptId, rootDir: '.', scriptExtensions: ['.gs'], filePushOrder: order }, null, 2));
     Object.keys(deployed).forEach(n => fsx.writeFileSync(path.join(back, n === 'appsscript.json' ? n : n + '.gs'), deployed[n]));
     sh('clasp', ['push', '--force'], { cwd: back });
-    sh('clasp', ['update-deployment', cfg.deploymentId, '--versionNumber', String(prev), '--description', 'rollback']);
+    sh('clasp', ['update-deployment', cfg.deploymentId, '--versionNumber', String(prev), '--description', 'rollback'], { cwd: back });
     record({ version: newVersion || '-', commit, previous: prev, changed: changes, result: 'ROLLED BACK to Version ' + prev + ': ' + why });
     throw new Error(`${why}. Rolled back: saved code and the deployment are Version ${prev} again. Check with: node scripts/smoke_live.js`);
   }
