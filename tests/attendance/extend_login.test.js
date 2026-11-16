@@ -118,4 +118,27 @@ console.log("nightly backup");
   ok(/kept 14, binned 2/.test(msg), "the log line says what happened: " + msg);
 }
 
+console.log("load test: the scan step (emulated HTTP)");
+{
+  const E = env(), logs = [];
+  let expireNext = 0;   // makes the next N scans arrive with a code two windows old, like a phone far too slow to open the page
+  const call = body => {
+    const o = JSON.parse(body);
+    if (o.action === "att_ticket" && expireNext > 0) { expireNext--; o.token = E.gas.ctx.att_token_(E.gas.ctx.att_sessionKey_(o.session_id), o.session_id, Math.floor(Date.now() / 10000) - 2); }
+    return JSON.stringify(E.gas.ctx.att_dispatch_(o));
+  };
+  const resp = txt => ({ getContentText: () => txt, getResponseCode: () => 200 });
+  E.gas.ctx.UrlFetchApp = { fetch: (_u, opt) => resp(call(opt.payload)), fetchAll: reqs => reqs.map(r => resp(call(r.payload))) };
+  E.gas.ctx.Logger = { log: m => logs.push(String(m)) };
+  const before = E.gas.sheets.AttCheckins._g.length;
+  ok(E.gas.run("att_loadTest(12)") === true && /recorded 12\/12/.test(logs.join("\n")) && /QR expired on scan 0/.test(logs.join("\n")), "att_loadTest: every student scans the live QR code over HTTP first, then checks in: 12/12, no expired scans");
+  ok(E.gas.sheets.AttCheckins._g.length === before + 12, "...12 check-in rows written");
+  // att_cleanupTest between runs, as in the real procedure (two load tests started within 20 s would otherwise share one session: double-tap protection)
+  E.gas.run("att_cleanupTest()"); logs.length = 0; expireNext = 3;
+  ok(E.gas.run("att_loadTestFirstDay(8)") === true && /recorded 8\/8/.test(logs.join("\n")) && /QR expired on scan 3/.test(logs.join("\n")), "first-day run: 3 scans arrive too late, they are counted, those students scan again and everyone is recorded");
+  ok(/"scanned":/.test(logs.join("\n")) && /"QR_EXPIRED":3/.test(logs.join("\n")), "each round's log line shows the scans and the expired ones");
+  E.gas.run("att_cleanupTest()");
+  ok(!E.gas.sheets.AttCheckins._g.some((r, i) => i > 0 && /^9998/.test(String(r[2]))), "att_cleanupTest removes the load-test rows");
+}
+
 console.log(`\n${pass} extend / login / backup checks passed`);

@@ -9,6 +9,8 @@
     // Late grace (2026-11-04, docs/attendance/decisions.md): the server still accepts a check-in this long after its ticket expires / the
     // session closes; the page keeps retrying a busy-server check-in until then. Must equal ATT_C.LATE_GRACE_SEC.
     LATE_GRACE_SEC: 120,
+    // Dashboard only: how often the QR screen asks for the live counters (2026-11-16: 8 s, was 4 s).
+    LIVE_POLL_MS: 8000,
     ID_REGEX: /^[0-9]{4,12}$/, TZ: "Africa/Cairo", TOKEN_LEN: 16,
   });
   if (typeof module !== "undefined") module.exports = g.ATT_CONFIG;

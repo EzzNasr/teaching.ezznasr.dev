@@ -70,7 +70,8 @@ const timers = []; const origSI = global.setInterval;
 
   console.log("gate: permission still to be asked");
   p = boot({ perm: "prompt" }); await until(() => p.shown().join() === "gate", "gate visible");
-  ok(p.els.gateBtn.textContent === "Allow location" && !p.els.gateBtn.disabled, "gate shows an Allow location button");
+  ok(p.els.gateBtn.textContent.startsWith("Allow location") && AR_RE.test(p.els.gateBtn.textContent) && !p.els.gateBtn.disabled, "gate shows an Allow location button, with its Arabic label");
+  ok(AR_RE.test(p.els.gateTitleAr.textContent) && AR_RE.test(p.els.gateTextAr.textContent), "the gate title and text also show in Arabic");
   ok(p.els.form.hidden && p.els.save.disabled, "ID/name/Save are not usable before the gate passes");
   await wait(30); ok(p.geoCalls.length === 0, "NO location request until the student taps");
   ok(!p.acts().includes("att_attend"), "no auto check-in on load");
@@ -133,6 +134,9 @@ const timers = []; const origSI = global.setInterval;
   await until(() => p.shown().join() === "gate", "gate"); p.els.gateBtn.click(); await until(() => p.els.gateSteps.children.length > 0, "ios steps");
   ok(/did not ask/.test(p.els.gateTitle.textContent) && /Location Services/.test(p.els.gateSteps.children[0].textContent), "refused at once without a question: the page says the phone did not ask, and starts with the phone's Location Services switch");
   ok(p.els.gateSteps.children.some(li => /aA/.test(li.textContent)), "...and still gives the aA / Website Settings step");
+  ok(AR_RE.test(p.els.gateTitleAr.textContent) && p.els.gateStepsAr.children.length === p.els.gateSteps.children.length && p.els.gateStepsAr.children.every(li => AR_RE.test(li.textContent)) && !p.els.gateStepsAr.hidden,
+    "the 'phone did not ask' title and every help step are also shown in Arabic");
+  ok(/Try again/.test(p.els.gateBtn.textContent) && AR_RE.test(p.els.gateBtn.textContent) && AR_RE.test(p.els.gateHelpTitleAr.textContent), "the Try again button and the help heading are bilingual");
   p = boot({ perm: "denied", ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari/604.1", geo: () => ({ code: 1 }) });
   await until(() => p.shown().join() === "gate" && p.els.gateSteps.children.length > 0, "blocked steps");
   ok(/Location is blocked/.test(p.els.gateTitle.textContent) && /aA/.test(p.els.gateSteps.children[0].textContent), "a site the browser has blocked gets the aA / Website Settings instructions first");

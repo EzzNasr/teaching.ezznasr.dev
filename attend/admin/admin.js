@@ -144,7 +144,7 @@
     $("pinfo").textContent = S.course + " · " + S.room;
     clearInterval(S.tickTimer); clearInterval(S.liveTimer);
     clearInterval(S.syncTimer);
-    S.tickTimer = setInterval(tick, 200); S.liveTimer = setInterval(poll, 4000); S.syncTimer = setInterval(syncClock, 30000);
+    S.tickTimer = setInterval(tick, 200); S.liveTimer = setInterval(poll, CFG.LIVE_POLL_MS || 8000);   // 8 s (was 4 s): each poll reads five tabs and competes with students' saves for Google's ~30 parallel requests S.syncTimer = setInterval(syncClock, 30000);
     tick(); poll(); syncClock(); wake();
   }
   // Refine clock offset with att_status.server_utc (spec 4); drives the QR window and countdown.
@@ -194,8 +194,12 @@
   function blankQR(text) { $("qr").hidden = true; $("prot").hidden = true; $("pinfo").textContent = text + " · " + S.course + " · " + S.room; }
 
   function poll() {
-    if (!S.sess) return;
+    if (!S.sess || S.polling) return;   // the last answer is not back yet (busy server during the rush): skip this round, never pile up
+    S.polling = true;
+    var done = function () { S.polling = false; };
+    setTimeout(done, 30000);   // safety: a lost answer never stops the counters for good
     A("att_live", { session_id: S.sess }).then(function (r) {
+      done();
       if (!r.ok) return;
       var feed = r.feed || [], nReg = 0, nBad = 0;
       feed.forEach(function (e) { if (e.k === "reg") nReg++; else if (e.k === "bad") nBad++; });

@@ -1110,6 +1110,11 @@ function att_loadRun_(N, firstDay) {
   // stop at the session close + grace, or before Apps Script's 6-minute limit for this run, whichever comes first
   var deadline = Math.min(Date.parse(s.close_utc) + ATT_C.LATE_GRACE_SEC * 1000, t0 + 330000);
   function tk() { return att_makeTicket_(s.session_id, "", Math.floor(Date.now() / 1000) + 60); }
+  // The scan step (2026-11-16): every student first trades the QR code that is on the screen RIGHT NOW for a ticket over HTTP, exactly
+  // like a phone opening the link, and uses that ticket afterwards. A "QR expired" answer under load is counted (the number the first
+  // demo could not give) and that student scans again in the next round, as a real student would.
+  var sKey = att_sessionKey_(s.session_id), tickets = [], expiredScans = 0;
+  function qrNow() { return att_token_(sKey, s.session_id, Math.floor(Date.now() / 1000 / ATT_C.WINDOW_SEC)); }
   function sid(i) { return String(99980000 + i); }
   if (!firstDay) {   // returning students: register them directly first (not timed)
     for (var i = 0; i < N; i++) {
@@ -1117,24 +1122,29 @@ function att_loadRun_(N, firstDay) {
       if (!r.ok) throw new Error("signup " + i + ": " + r.code);
     }
   }
-  // step per student: "signup" (first day only) -> "attend" -> done
+  // step per student: "scan" -> "signup" (first day only) -> "attend" -> done
   var step = [], doneAt = [], tStart = Date.now();
-  for (var j = 0; j < N; j++) step.push(firstDay ? "signup" : "attend");
+  for (var j = 0; j < N; j++) step.push("scan");
   var round = 0, codes = {}, retried = {};
   while (Date.now() < deadline) {
     var idx = []; for (var q = 0; q < N; q++) if (step[q] !== "done") idx.push(q);
     if (!idx.length) break;
     round++;
     var reqs = idx.map(function (k) {
-      var body = step[k] === "signup"
-        ? { action: "att_signup", ticket: tk(), student_id: sid(k), name: "Load " + k, secret: "loadtest-secret-" + k, fp: "lt" + k, geo: at(k) }
-        : { action: "att_attend", ticket: tk(), student_id: sid(k), secret: "loadtest-secret-" + k, fp: "lt" + k, geo: at(k) };
+      var body = step[k] === "scan" ? { action: "att_ticket", session_id: s.session_id, token: qrNow() }
+        : step[k] === "signup"
+        ? { action: "att_signup", ticket: tickets[k], student_id: sid(k), name: "Load " + k, secret: "loadtest-secret-" + k, fp: "lt" + k, geo: at(k) }
+        : { action: "att_attend", ticket: tickets[k], student_id: sid(k), secret: "loadtest-secret-" + k, fp: "lt" + k, geo: at(k) };
       return { url: url, method: "post", contentType: "text/plain;charset=utf-8", muteHttpExceptions: true, followRedirects: true, payload: JSON.stringify(body) };
     });
     var rs = Date.now(), resp = UrlFetchApp.fetchAll(reqs), rc = {};
     resp.forEach(function (x, m) {
       var k = idx[m], o = null;
       try { o = JSON.parse(x.getContentText()); } catch (e) { o = { ok: false, code: "NOT_JSON_" + x.getResponseCode() }; }
+      if (step[k] === "scan") {
+        if (o.ok && o.ticket) { tickets[k] = o.ticket; step[k] = firstDay ? "signup" : "attend"; rc.scanned = (rc.scanned || 0) + 1; return; }
+        if (o.code === "TOKEN_EXPIRED") { expiredScans++; rc.QR_EXPIRED = (rc.QR_EXPIRED || 0) + 1; retried[k] = 1; return; }   // scans again next round
+      }
       if (o.ok && step[k] === "signup") { step[k] = "attend"; rc.signed_up = (rc.signed_up || 0) + 1; return; }
       if (o.ok && o.status === "recorded") { step[k] = "done"; doneAt[k] = Date.now() - tStart; rc.recorded = (rc.recorded || 0) + 1; return; }
       var c = o.code || "?"; rc[c] = (rc[c] || 0) + 1; codes[c] = (codes[c] || 0) + 1; retried[k] = 1;
@@ -1152,7 +1162,7 @@ function att_loadRun_(N, firstDay) {
   var pct = function (p) { return times.length ? (times[Math.min(times.length - 1, Math.floor(p * times.length))] / 1000).toFixed(1) + " s" : "-"; };
   var pass = okN === N && rows.length === N && Object.keys(uniq).length === N;
   log.push((firstDay ? "FIRST DAY (sign-up + check-in)" : "check-in") + ": recorded " + okN + "/" + N + ", rows " + rows.length + ", unique " + Object.keys(uniq).length +
-    ", needed a retry " + Object.keys(retried).length + ", errors seen " + JSON.stringify(codes));
+    ", needed a retry " + Object.keys(retried).length + ", QR expired on scan " + expiredScans + ", errors seen " + JSON.stringify(codes));
   log.push("time until recorded: median " + pct(0.5) + ", 90% " + pct(0.9) + ", slowest " + pct(1) + "  (total " + ((Date.now() - t0) / 1000).toFixed(0) + " s)");
   log.push("=> " + (pass ? "PASS" : "FAIL") + "   then run att_cleanupTest()");
   Logger.log(log.join("\n"));
