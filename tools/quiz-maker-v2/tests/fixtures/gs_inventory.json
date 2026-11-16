@@ -1,0 +1,5150 @@
+{
+ "files": [
+  "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+  "tools/quiz-maker-v2/apps_script/Code.gs",
+  "tools/quiz-maker-v2/apps_script/FollowupLogic.gs",
+  "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+  "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+  "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+  "tools/quiz-maker-v2/apps_script/Requirements.gs",
+  "tools/quiz-maker-v2/apps_script/Revenue.gs"
+ ],
+ "count": 1027,
+ "items": {
+  "ATTENDANCE_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e49151e39ea905d2"
+  },
+  "ATTENDANCE_MODES": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "81793e926898af6e"
+  },
+  "ATTENDANCE_SOURCE": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ed1baa3308231945"
+  },
+  "ATTF_CFG": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "5d372927560c2e81"
+  },
+  "ATTF_EARTH_R_M": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "62fbbe340a04a702"
+  },
+  "ATTF_GEO_REASON_FLAG": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "dddcd9707499efec"
+  },
+  "ATTT_DIGEST_MAX_LINES": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "386dc7229c614c6f"
+  },
+  "ATTT_NOTIFY_SOFT_FLAGS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "64b631872f1ebff4"
+  },
+  "ATTT_QUEUE_KEY": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "e525a42c8bd9aba4"
+  },
+  "ATTT_QUEUE_MAX": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "40089b754f620165"
+  },
+  "ATTT_QUEUE_TTL_SEC": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "abcebfc29455066b"
+  },
+  "ATTT_TRIGGER_FN": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "3b96cf3add1df6cd"
+  },
+  "ATTT_TZ": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "e81b989155cb4147"
+  },
+  "ATTU_ALPHABET": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "a4b5e22bb4bfb4be"
+  },
+  "ATTU_PW_LEN": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "27a880d0bf0925ee"
+  },
+  "ATT_C": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "5488f7dc9af1ee7a"
+  },
+  "ATT_DEFAULT_SHEET_ID": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "c4461ba9f9781777"
+  },
+  "ATT_DEFAULT_WEBAPP_URL": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "beae2a66920dd269"
+  },
+  "ATT_DEMO_NAMES_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "c85efb7ce59b5912"
+  },
+  "ATT_DEMO_P_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "86c288eff9363e36"
+  },
+  "ATT_GEO_FLAGS_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "7029ef331d26d954"
+  },
+  "ATT_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "f56b39ee5fb24d51"
+  },
+  "ATT_MANUAL_REASONS_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "c0314846ad86d6d8"
+  },
+  "ATT_SS_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "80b4fbf7d43bb490"
+  },
+  "BACKUP_KEEP": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "076a0b043a830012"
+  },
+  "CHAPTER_PRICE_EGP": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9574a9f69b1cc694"
+  },
+  "DEFAULT_CURRENT_TERM": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b072726f5d62a483"
+  },
+  "DEFAULT_YEAR_END": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9273dbe30a2c815e"
+  },
+  "ENT_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8bcec7a98e25816a"
+  },
+  "FOLLOWUP_TEMPLATE_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fd42f1d09b42c589"
+  },
+  "FOLLOWUP_TEMPLATE_KEY_RE": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "68a4e3a4c45c8576"
+  },
+  "FU2_DEFAULT_LABELS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+   "hash": "b3ed2a93e0f9bab0"
+  },
+  "FU2_DONE_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "94b8a9248e16cac1"
+  },
+  "FU2_DONE_SHEET": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "76392cb8d1ad4871"
+  },
+  "FU2_LOGIC_EVENTS_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupLogic.gs",
+   "hash": "c8e28eb30df65b26"
+  },
+  "FU2_LOGIC_INTL_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupLogic.gs",
+   "hash": "faf7a353df584536"
+  },
+  "FU2_LOGIC_LOGIC_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupLogic.gs",
+   "hash": "60e03b47ceffe889"
+  },
+  "FU2_LOGIC_VERSION": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupLogic.gs",
+   "hash": "5df1bfab77e35c04"
+  },
+  "FU2_NOTIFY_CALLBACK_MAX": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "9199c1b91542e9e0"
+  },
+  "FU2_NOTIFY_DONE_KIND": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "0eb683f717283690"
+  },
+  "FU2_NOTIFY_HOUR_DEFAULT": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "c7011730ebbe1217"
+  },
+  "FU2_NOTIFY_KINDS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "d09390eb9c6bc3f8"
+  },
+  "FU2_NOTIFY_LOG_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "a5ad8fb9403f6543"
+  },
+  "FU2_NOTIFY_LOG_SHEET": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "26a985ce40875498"
+  },
+  "FU2_NOTIFY_PAGE": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "3f3c074d3183b5a1"
+  },
+  "FU2_NOTIFY_QUIET_FROM": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "81644968612cda57"
+  },
+  "FU2_NOTIFY_QUIET_TO": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "3e5fd5ec7967b8e1"
+  },
+  "FU2_NOTIFY_TZ_LABEL": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "b4deb0235e391f37"
+  },
+  "FU2_REQ_BUILTIN": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+   "hash": "1a7e6a064ed5c966"
+  },
+  "FU2_REQ_SNAPSHOT_COL_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ba0c33ad3cac37a1"
+  },
+  "FU2_SETTINGS_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "7afe09f8931ab80c"
+  },
+  "FU2_SETTINGS_SHEET": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "9dd5bee410871ec9"
+  },
+  "FU2_WA_CLAIM_MAX": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "478effa0f16e5cc1"
+  },
+  "FU2_WA_DEDUPE_DAYS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "62b216a8c455fa8c"
+  },
+  "FU2_WA_EVENTS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "c9164bc3d71a3d6a"
+  },
+  "FU2_WA_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "9816821bd9e85705"
+  },
+  "FU2_WA_LEASE_MS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "28e7c506d62bdbcd"
+  },
+  "FU2_WA_MAX_ATTEMPTS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "36f139b5510989d2"
+  },
+  "FU2_WA_SHEET": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "33f82996b86ad290"
+  },
+  "FU2_WA_SILENT_ALERT_MIN": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "2d9bcf636c404477"
+  },
+  "FU2_WA_TEXT_MAX": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "d9b669f8b4b852cc"
+  },
+  "GRADE_SCOPE_FOLDERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ffea5b001047db6e"
+  },
+  "GRADING_MAX_MODEL_CHARS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "30d53381986f23aa"
+  },
+  "GRADING_QUEUE_LIMIT": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "028685c5dfe93f5a"
+  },
+  "GROUPSETTINGS_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a7c9b167d9cca728"
+  },
+  "GROUP_GRANT_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bf1b4e823059bbdc"
+  },
+  "GROUP_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1c2b73d6c9cda1ac"
+  },
+  "GROUP_NAME_RE": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c9b8e18929763474"
+  },
+  "LESSONTAGS_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e9b863bac2837298"
+  },
+  "LESSON_ALIASES": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "26f5e429e7909a6a"
+  },
+  "LESSON_CACHE_SECONDS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0471c50faea1c993"
+  },
+  "LESSON_EXCLUDE_PREFIXES": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "327b1a05fba001c3"
+  },
+  "LESSON_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "efdcd3352c0e2ee9"
+  },
+  "LESSON_LIST_CACHE_SECONDS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f21a2557bc4ce3e2"
+  },
+  "LOCK_WAIT_MS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "42ac516ca9d9f7c4"
+  },
+  "LOGIN_LOCK_SECONDS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "42eb7cddb6a70368"
+  },
+  "LOGIN_MAX_FAILS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "15423f9b032e7999"
+  },
+  "MAX_ATTENDANCE_ITEMS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "41fef798b59503bc"
+  },
+  "MAX_GROUP_NOTE": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d0e1d0fb38744d91"
+  },
+  "MAX_PENDING_REQUESTS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "01513f8a41789618"
+  },
+  "MAX_PENDING_SUBSCRIPTIONS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0d04ae11468fd642"
+  },
+  "MAX_REVIEW_LESSONS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7ee8d60e8308e48a"
+  },
+  "MAX_TEMPLATE_BODY": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c0b8cd33b93561ac"
+  },
+  "MAX_TEMPLATE_KEYS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6665f5521011b115"
+  },
+  "MIGRATE_TARGETS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e44b680422d97397"
+  },
+  "P2_AUDIT_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e8b6a83831fbb302"
+  },
+  "P2_C_MAX_IMAGES": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "48f8697a8845ad6c"
+  },
+  "P2_C_MAX_IMAGE_BYTES": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4d82bdc87cb4dfa7"
+  },
+  "P2_C_UPLOADS_PER_HOUR": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4d0e09608b109e73"
+  },
+  "P2_FU_ALIAS_FALLBACK": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cad5f69581a4264f"
+  },
+  "P2_FU_AUDIT_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c969d25436ce8c6b"
+  },
+  "P2_FU_G2": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0cf45b4065a7dace"
+  },
+  "P2_FU_KINDS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2adcfb3034bd0991"
+  },
+  "P2_FU_MAX_BATCH": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "895c8a7ad1359da2"
+  },
+  "P2_FU_MONTHLY_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "715eb8b6dbdf353f"
+  },
+  "P2_FU_MONTH_STATUS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "53f732265fb6dfeb"
+  },
+  "P2_FU_NOTIF_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "665538dcf76bf9c5"
+  },
+  "P2_FU_REQ_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a5f05429a5c8fca4"
+  },
+  "P2_LESSON_ALIASES": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "27cea796c7d72e75"
+  },
+  "P3_BULK_CAP": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "68e4e3d9e3d64146"
+  },
+  "P3_FOLLOWUP_FLAGS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bd2f8f04745e92f0"
+  },
+  "P3_REC_DRIVE_LIMIT_MS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "96316b2113378030"
+  },
+  "P3_REC_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bfe92110dbe61f5f"
+  },
+  "P3_REC_TAB": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4c4ab1b232924dc7"
+  },
+  "P3_ROLE_ASSISTANT": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ddba9cb092296209"
+  },
+  "P3_STAFF_ALLOW": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8c751b224958c61d"
+  },
+  "P4S_CACHE_KEY": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "692442850265e384"
+  },
+  "P4S_CACHE_SECONDS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "dbbdae35824ca618"
+  },
+  "P4S_PRICE_RE": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "39741ea0455dae9e"
+  },
+  "P4S_SUBJECTS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8e912dd55ef153af"
+  },
+  "P4TG_ALPHABET": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b0d817d059a6cfb3"
+  },
+  "P4TG_CODE_LEN": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "69cdd5c1707f0edf"
+  },
+  "P4TG_CODE_TTL_SEC": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d2782513fbf51703"
+  },
+  "P4TG_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a4ee02f61a28c6ec"
+  },
+  "P4TG_NOT_AUTH": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c0b2874e8196f651"
+  },
+  "P4TG_STARTS_PER_HOUR": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "aa131919c0bbefb9"
+  },
+  "P4TG_TAB": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4332f8bec6af15f8"
+  },
+  "P4T_EDITLOG_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fbd70de09b7bbb8e"
+  },
+  "P4T_GENERIC": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "beeb50ab352133ca"
+  },
+  "P4T_GROUPOWNERS_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f0bdaec374aa71c4"
+  },
+  "P4T_LOCK_MS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b00878de797cc1fd"
+  },
+  "P4T_LOOKUP_LIMIT": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f0961425dbd7ed1a"
+  },
+  "P4T_LOOKUP_WINDOW_S": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "89ae74535a223c85"
+  },
+  "P4T_PHONE_EDIT_DEFAULT": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6efaf99b7707912d"
+  },
+  "P4T_PHONE_STORES": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a36792fa4d0a3a11"
+  },
+  "P4T_STU_COLS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0ffc3425320b1464"
+  },
+  "P4T_SUBJECTS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ca79be31fd9e86d5"
+  },
+  "P4T_TELEGRAM_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5a82de1005ae6ce6"
+  },
+  "P4_ACTIONS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8476c8f99bdfb181"
+  },
+  "P4_ASSISTANT_DENY": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4b51f38352667284"
+  },
+  "P4_CTX_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "18fb6944f533a577"
+  },
+  "P4_GATE_RAN_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7feae9a12d6c0708"
+  },
+  "P4_GROUPOWNER_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "35d3abd65a552a59"
+  },
+  "P4_GSTATE_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "469e26bfe6275e54"
+  },
+  "P4_LOOKUPS_PER_HOUR": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "03129cb4218f065b"
+  },
+  "P4_NOT_AUTH_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7fcf0ef9b883b998"
+  },
+  "P4_PC_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "de117143f4f68b96"
+  },
+  "P4_SUBJECTS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "67c57858ec016fa1"
+  },
+  "PAYMENT_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "19f1d2920baa86ce"
+  },
+  "PHONE_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "798c2d6fab056574"
+  },
+  "PLAIN_TEXT_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fd78cab685c7fd89"
+  },
+  "QUIZ_ACCESS_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "85605da2a25977aa"
+  },
+  "QUIZ_CACHE_SECONDS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d6dd90ae704cae53"
+  },
+  "QUIZ_CONTENT_CACHE_SECONDS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f3335a86c24425ac"
+  },
+  "QUIZ_CONTENT_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4fe249e615236140"
+  },
+  "QUIZ_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "94211d35d94436d8"
+  },
+  "REQ_BUILTIN_KEYS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "226ed1cd643dfbed"
+  },
+  "REQ_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "e998abfbad9c674c"
+  },
+  "REQ_MAX_CUSTOM": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "5d3ab1d3368a5e30"
+  },
+  "REQ_MAX_MONTH_LESSONS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "f1bfbfab2a6cc633"
+  },
+  "REQ_MODES": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "c0316b8af3586a70"
+  },
+  "REQ_MONTH_GENERAL": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "b472a7ac3d6302d8"
+  },
+  "REQ_PATCH_FIELDS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "ab048fde631e8075"
+  },
+  "REQ_TEXT_COLS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "635bd0046e5f0f10"
+  },
+  "RESET_LOCK_SECONDS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "60545151a064ae1d"
+  },
+  "RESET_MAX_FAILS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a06c7b96f9466c9c"
+  },
+  "REV_AMOUNT_COL": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "0ea737a1ef0bec2b"
+  },
+  "REV_MAX_PRICE": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "85b59078f052bc8f"
+  },
+  "REV_PRICE_PROP": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "e6daef8fb2a36793"
+  },
+  "REV_SUB_PRICE_RE": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "74a6620317738e8b"
+  },
+  "STUDENT_CORE_COLS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9a1753778b1f5286"
+  },
+  "SUB_SCOPE_TAG_RE": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "30992d73b98972f4"
+  },
+  "TERM_PRICE_EGP": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c54698b2812ac45e"
+  },
+  "TEXT_CELL_LIMIT": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ec54d859f7c86e8a"
+  },
+  "TEXT_COLS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f18f61a24339d2f4"
+  },
+  "TIME_COLS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "922eb2494dfa3929"
+  },
+  "TZ": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ba5cf8a4025a19c3"
+  },
+  "UPLOAD_LOCK_WAIT_MS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ded219b98d33b57f"
+  },
+  "VIDEO_CACHE_SECONDS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6d20f07d90e4dc71"
+  },
+  "VIDEO_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6faf8cd2beabedc3"
+  },
+  "VIDEO_SLOTS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "31612cfc26976792"
+  },
+  "WATCH_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "47ab13bd49d64e6f"
+  },
+  "WATCH_THROTTLE_SECONDS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "550d6727a8486950"
+  },
+  "WA_EXTRA_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6e2ee47ee1e23925"
+  },
+  "WA_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1802d9446b27ecda"
+  },
+  "WM_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8ac8fe3c290c5673"
+  },
+  "_G2": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d64158121e4cb44e"
+  },
+  "_accessDays": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c4be9bcded579949"
+  },
+  "_accessState": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6345985e8233a0d1"
+  },
+  "_addDays": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b58be215f84998d2"
+  },
+  "_allLessonsFromGithub": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5fc3d1b4f6b3c57e"
+  },
+  "_anySeen": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0e34f6501f63f5c7"
+  },
+  "_appendByHeader": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4e67f6eb8907e9c8"
+  },
+  "_applyGroupGrantsTo": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "989feadefbeb437a"
+  },
+  "_auditAll": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cc2cbf0fba3f76ca"
+  },
+  "_autoScoreLine": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f969231613b3d156"
+  },
+  "_backupFolder": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a01cdb04726df2fb"
+  },
+  "_cairoDate": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fbf68859f7b917d1"
+  },
+  "_cairoIso": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "64b58821dbd20b0c"
+  },
+  "_cairoTime": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "22e5fb40c181e3b1"
+  },
+  "_canonKey": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "14392da42ae78762"
+  },
+  "_canonicalPhone": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0a4f07f791f44d13"
+  },
+  "_cellOut": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0f7b964182c50af3"
+  },
+  "_checkOverrideYmd": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "50e4f7ff7c24c599"
+  },
+  "_classifyCell": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8719cc52af160fb5"
+  },
+  "_cleanGroupName": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4e5491d8e48bf000"
+  },
+  "_cleanOne": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "78e21145aa0b8e2f"
+  },
+  "_cleanSheets": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "58feb56a322d6b6f"
+  },
+  "_cleanYmd": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "aa1aeebcf5c4278b"
+  },
+  "_colLetter": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "01ad3b281a37019c"
+  },
+  "_dataSs": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f23f5b03a334e0c3"
+  },
+  "_daysBetween": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c456072392d3755c"
+  },
+  "_emptyGroupSettings": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b49f6cbcdd50f0e7"
+  },
+  "_ensureColumns": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b52396551561180a"
+  },
+  "_ensureStudentColumns": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d914a9655341060b"
+  },
+  "_entitlementCovers": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "726555fdace6fbc9"
+  },
+  "_entitlementIndex": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "79af446f8191d318"
+  },
+  "_esc": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "072f58e004789d89"
+  },
+  "_existingKeys": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "96b517c2ee7c2bca"
+  },
+  "_findLessonRow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8bd0e8b5209a8cb2"
+  },
+  "_findQuizContentRow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3f2944e1059fede2"
+  },
+  "_findQuizRow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5972a4789a8951e2"
+  },
+  "_findStudentRow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f0fec2c1701a57c8"
+  },
+  "_findVideoRow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6739b8f3751dd8f9"
+  },
+  "_firstName": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5be5e22c313105b6"
+  },
+  "_firstSegment": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "76bbc27f2c17ff70"
+  },
+  "_fmt": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "29e9d40358b93856"
+  },
+  "_folder": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8aa1fcd29283ef3e"
+  },
+  "_followupSettings": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "111427dfad2f445c"
+  },
+  "_followupSheet": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8c9d5cdd0c05478f"
+  },
+  "_forgetGroupGrants": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "56cf9c92b6fa3ec0"
+  },
+  "_formatTextColumns": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1ebee64445299c51"
+  },
+  "_fu2Conflicts": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "87b0d05ee2e6e25a"
+  },
+  "_fu2Duplicates": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b6ea3f792300f132"
+  },
+  "_fu2GroupOwners_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "944ed80cffea57f2"
+  },
+  "_fu2Hook": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "507844bd92c7ddc2"
+  },
+  "_fu2InOtherGroup": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fa94c703fe9f1852"
+  },
+  "_fu2Move": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5701276551003c7c"
+  },
+  "_fu2MoveOut": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4b52a066f31a593c"
+  },
+  "_fu2ScopedRefusal": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "333acb51ff3dd5ae"
+  },
+  "_fu2TargetOwner_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "18432351c6309ee7"
+  },
+  "_gAnswersSheet": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8b05420cc5cbf42d"
+  },
+  "_gAudit": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9fad9cf5cba3bfb4"
+  },
+  "_gCanon": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "66663ef9fcf96615"
+  },
+  "_gKind": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a48383e26330e58b"
+  },
+  "_gModelMap": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e93755b3dc43fb62"
+  },
+  "_gModelsSheet": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ea854ecb16f56904"
+  },
+  "_gNum": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e91bd9a49926e978"
+  },
+  "_gRecomputeAttempt": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8a596ea5e5c06b58"
+  },
+  "_gradeChapters": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "374b689e730dee6b"
+  },
+  "_gradeCurrentTerm": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6bcdf52e9fa3e30d"
+  },
+  "_gradeFolder": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "27961f2224201141"
+  },
+  "_gradeSuffixForLesson": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3e341bb80b0523d8"
+  },
+  "_gradeYearEnd": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7aec6fef435337dd"
+  },
+  "_grantQuizRaw": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f101e37b3757355d"
+  },
+  "_grantRaw": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "71f3f36984ddc5b3"
+  },
+  "_groupGrantRows": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "dddc86846bdf4492"
+  },
+  "_groupGrantsForApi": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a11b99d5e9394a32"
+  },
+  "_groupKey": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8226bad581f1002f"
+  },
+  "_groupMembers": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7e7f50d865090320"
+  },
+  "_groupSettingsFromRow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b9578b7443f1a875"
+  },
+  "_groupSpellings": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6ad26ac4cf63ca88"
+  },
+  "_hasActiveQuizAccess": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2a19d1c83afb6236"
+  },
+  "_headerIndex": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4eb251a42ccc42f4"
+  },
+  "_heldSubscriptionScopes": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ea458ddae78e7dfe"
+  },
+  "_hhmmOf": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e06ce1e93d539bfd"
+  },
+  "_isLessonLocked": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "600db36af8649e0a"
+  },
+  "_isLockedCell": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5b4833d35f540e76"
+  },
+  "_isQuizLocked": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "71db11dac3d1959e"
+  },
+  "_isTruthyFlag": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "75c75f8c97b350d6"
+  },
+  "_json": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ad4460d89630900c"
+  },
+  "_jsonArrayOfPaths": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fc801c55cab853ee"
+  },
+  "_lastSegment": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b3b2ed7ce2c124cb"
+  },
+  "_latestRequest": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7970297ffde79455"
+  },
+  "_lessonCacheKey": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e22b65666d0ff3a1"
+  },
+  "_lessonLockState": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "32f881e4165f7ec1"
+  },
+  "_lessonLockedNow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "30acc4b646c830e1"
+  },
+  "_lessonPath": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e4eeaa8c90919759"
+  },
+  "_lessonTagsCache": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a8c2d838d51ea890"
+  },
+  "_lessonTagsMap": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "85f7f201f08be5f0"
+  },
+  "_lessonWithTitle_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7e503eb629a836e4"
+  },
+  "_lockIndex": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e1f9e809291fabbc"
+  },
+  "_lookupQuizContent": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9748bb1b011083f7"
+  },
+  "_lookupVideo": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d863d68f8b326ce8"
+  },
+  "_md5": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e97db5346f9cccb4"
+  },
+  "_msOf": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bb6022e66267fcd9"
+  },
+  "_nameLookup": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9ed0729b90e918b5"
+  },
+  "_needCols": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5f8a1d2ad58f1fa2"
+  },
+  "_normalizeEmbedUrl": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3e11ad192d21781e"
+  },
+  "_normalizePhone": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1ed5ea7335eee915"
+  },
+  "_normalizeScope": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b81157aaa1517983"
+  },
+  "_notifyAdmin": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7caa11b255068ce2"
+  },
+  "_notifyQuiz": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "193126b6fa827d2f"
+  },
+  "_notifySubmission": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "02f74b370a7e8c21"
+  },
+  "_p2AuditWrap": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "56e146b5b3d1209a"
+  },
+  "_p2Call": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "048526941cb5d9ba"
+  },
+  "_p2CallOr": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a592ee86bc637e03"
+  },
+  "_p2Post": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cc1e891d4619361c"
+  },
+  "_p2Pre": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bc1865e4ca5f831a"
+  },
+  "_p2cFindWrittenRow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c810702727252ecb"
+  },
+  "_p2cGradeOne": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "411fe70358d7fbb3"
+  },
+  "_p2cGradeQuiz": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b85fe4ccc1c7be77"
+  },
+  "_p2cImageCounts": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7c2e06e60d1cbd44"
+  },
+  "_p2cImageKind": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "90b889a9d95ba7b9"
+  },
+  "_p2cIntIn": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7851d20a053ad791"
+  },
+  "_p2cLatePhotoFlip": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3883bad989ab42b0"
+  },
+  "_p2cMaxMarks": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cee682b0978d210a"
+  },
+  "_p2cParse": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d97662fa95d7ce50"
+  },
+  "_p2cQid": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "46f65d5f1153181b"
+  },
+  "_p2cSlugCandidates": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c438558658103363"
+  },
+  "_p2cStripQuestion": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0c27eda5db7d46af"
+  },
+  "_p2cWrittenSheet": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8f9310b4932b8769"
+  },
+  "_p2fuAddDays": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4ff94a0892bc43d9"
+  },
+  "_p2fuAudit": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "94d6d9dccc7bb12f"
+  },
+  "_p2fuBool": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9d0aeb54c1d92d82"
+  },
+  "_p2fuCanon": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "348d254a115bd773"
+  },
+  "_p2fuCheckYmd": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "67b5d234482abcc1"
+  },
+  "_p2fuClean": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "aa5c0368b4bdaf35"
+  },
+  "_p2fuDow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "542b510078579341"
+  },
+  "_p2fuExpireCenterRows": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "81ad42f00506bf45"
+  },
+  "_p2fuFlag": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6a59a38f12e58921"
+  },
+  "_p2fuHwDue": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "38d744af048a8a39"
+  },
+  "_p2fuInRange": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "daa8fcd959b85394"
+  },
+  "_p2fuLoad": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b9cfdbecbf042be4"
+  },
+  "_p2fuMonthPlan": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3cb24cd29140942b"
+  },
+  "_p2fuMonthRange": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "27e11cbb8b8f1e62"
+  },
+  "_p2fuMonthlyMark": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "007f7ed67d366ca9"
+  },
+  "_p2fuNeedFlag": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "40235f385c2e8576"
+  },
+  "_p2fuNextSessionYmd": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8bf289fc3c9941ee"
+  },
+  "_p2fuNorm": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cf6037d9e4563f5a"
+  },
+  "_p2fuNotifOut": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "81d4c5370ccd01e7"
+  },
+  "_p2fuNotifications": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "251ce921ae81ebac"
+  },
+  "_p2fuNow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0f0c859eeb7e2134"
+  },
+  "_p2fuPathOf": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9ea29be3fba090a8"
+  },
+  "_p2fuReq": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4f14626c29d7ae66"
+  },
+  "_p2fuRequirements": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "855c98b78dd03f70"
+  },
+  "_p2fuRound": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "02c26938bd7a9433"
+  },
+  "_p2fuRows": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cfb05aa9e4eb642d"
+  },
+  "_p2fuSlug": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "016de65e8622f5b7"
+  },
+  "_p2fuSummaryFor": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b10ceaa5850a74af"
+  },
+  "_p2fuToday": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "73eecf6da5d60167"
+  },
+  "_p2fuWeek": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9bc2272ecb3056c1"
+  },
+  "_p2fuWho": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a0cc7791a8e8f17b"
+  },
+  "_p2fuYmd": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9524f80748804e01"
+  },
+  "_p3EnsureRoleColumn": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "edca60d734c5372c"
+  },
+  "_p3FlagOn": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d0529e5358c9962a"
+  },
+  "_p3FlagSnapshot": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "245e21b450c743be"
+  },
+  "_p3IsStaffAction": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7fc4697fd2b54142"
+  },
+  "_p3RoleOfRow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "24e46dd836a5bfc1"
+  },
+  "_p3Who": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cedb2d112f8d3bad"
+  },
+  "_p3bArr": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d195a144002e6a5d"
+  },
+  "_p3bAudit": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e3ffc9be92767cfb"
+  },
+  "_p3bBuildPlan": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "99637744a1a9f370"
+  },
+  "_p3bCapCheck": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "afa90e657500b5f1"
+  },
+  "_p3bCounts": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "308d4dd01021cd4f"
+  },
+  "_p3bFind": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6e5d8db92434308d"
+  },
+  "_p3bIndex": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "88862b4d43659e8a"
+  },
+  "_p3bKind": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "121c6b54b42433e8"
+  },
+  "_p3bLessons": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b8e36f38fc9b0c19"
+  },
+  "_p3bMarkPaymentsRevoked": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "94cd2ee6129c9e0f"
+  },
+  "_p3bRevokeOne": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "81966c00b668cc1e"
+  },
+  "_p3bTarget": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4c6b8b6d6757ef82"
+  },
+  "_p3bTargets": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "56a74657a4de7fea"
+  },
+  "_p3bTerm": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f169103490c2a3e0"
+  },
+  "_p3rIndexDriveMeta": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9dc96a3a16349aaf"
+  },
+  "_p3rSlug": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "62ee5c779d24b547"
+  },
+  "_p3rSubject": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6356497438929042"
+  },
+  "_p3rWriteReport": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "78ed24e97ee19c60"
+  },
+  "_payInfo": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2fc629bd89372a8e"
+  },
+  "_payInfoProp": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cfb153d6938cc7d5"
+  },
+  "_paymentStatuses": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a51ba12aa5f226ec"
+  },
+  "_peekSheet": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cba77b8bd7e5efa6"
+  },
+  "_pendingSubscriptionScopes": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4d99f186e5962846"
+  },
+  "_phoneKey": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1c3bce5faff08ea4"
+  },
+  "_phonesMatch": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e9fae66898b92725"
+  },
+  "_phonesMatchLegacy": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f71be224a62107be"
+  },
+  "_prettyLesson": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "75161bc6cdf0fc88"
+  },
+  "_props": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "93723666fa3a0632"
+  },
+  "_pruneBackups": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b693c8e8d7a587be"
+  },
+  "_quizAccessIndex": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d25e0f87755947c1"
+  },
+  "_quizCacheKey": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "674399c222659e6d"
+  },
+  "_quizContentCacheKey": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e544e9aa9b7c12cb"
+  },
+  "_quizKeys": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c625da8af8c9ae24"
+  },
+  "_quizLockedForStudent": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0c1d300bf80c7645"
+  },
+  "_quizLockedNow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7b5334c5c3a3165c"
+  },
+  "_quizResultsSheet": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d41b6e079460b2d0"
+  },
+  "_readColumns": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fe7828ebb8fa909b"
+  },
+  "_rememberGroupGrant": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c772bf9fb97eec85"
+  },
+  "_repairOne": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "22c18c74e4810885"
+  },
+  "_requireAdmin": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c5fc59bcdef5f987"
+  },
+  "_requireAdminAny": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6be822f672734002"
+  },
+  "_requireAdminSession": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5635aa1cd0778bca"
+  },
+  "_requireStudentSession": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "90161cad847b237d"
+  },
+  "_reserveLoginAttempt": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "37ba38af4aaf1c0b"
+  },
+  "_restoreFromDrive": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ca07ced724007ca1"
+  },
+  "_restoreLeadingZero": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4e50060e66d01979"
+  },
+  "_safeName": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b77f49515fa1642f"
+  },
+  "_scanTextColumns": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b5a5fe00cffd0ef4"
+  },
+  "_scopeCovers": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2eb61f49813e9866"
+  },
+  "_seenBeforeLock": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d2397d854fbbb5af"
+  },
+  "_sessionState": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a41e78f1b07ffb3e"
+  },
+  "_setPlainTextFormats": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c7b4cf44fd419268"
+  },
+  "_sheetByName": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9aca6918e9048f87"
+  },
+  "_sheetValuesAsObjects": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c6d9f889675a9aad"
+  },
+  "_slugName": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e9a10a6becfbf94f"
+  },
+  "_sourcePayment": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "173651ba7d3f849f"
+  },
+  "_ss": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bed9af800ab61f0b"
+  },
+  "_studentCols": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "70d755b00113b15f"
+  },
+  "_students": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "34deddf7e88e09d9"
+  },
+  "_studentsSheet": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f5b4c4f57e81501b"
+  },
+  "_subContent": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cfded69cf7fbff1c"
+  },
+  "_submissionKeys": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f8c32193e24e2438"
+  },
+  "_submissionsSheet": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "32157ddfb69c7849"
+  },
+  "_subscriberPhone": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0926de8c093735d1"
+  },
+  "_subscriptionGradeSuffix": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "34c6f9f152c03c72"
+  },
+  "_subscriptionLabel": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3b58fb5d41a0c12b"
+  },
+  "_tgAdminIds": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "517186113f6cd538"
+  },
+  "_tgCall": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bb275fe367025e85"
+  },
+  "_tidyOne": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b36205ad5531ad5b"
+  },
+  "_todayCairo": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8a969d69324716d2"
+  },
+  "_trashQuietly": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ecb1233b685394cb"
+  },
+  "_videoCacheKey": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "405e97bee849bc32"
+  },
+  "_videoCols": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d05f899cf3e92035"
+  },
+  "_videoKey": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1577f24d0e1d077d"
+  },
+  "_wholePositiveInt": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a4d44dc5e6624b07"
+  },
+  "_withLock": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6e8be3a632c7c489"
+  },
+  "_writableSheet": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c1a2a504f624a060"
+  },
+  "_writtenLine": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f448532277f341c2"
+  },
+  "_ymdOf": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2e58fc6416a3a2b5"
+  },
+  "admin_revenue_fill_old": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "885efe9658a8b3fc"
+  },
+  "admin_revenue_report": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "92812e64b12707b7"
+  },
+  "admin_revenue_set_price": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "8c0a0da7cd9287b8"
+  },
+  "att_acceptsLate_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "c31919f98c868215"
+  },
+  "att_adminToken_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "e4db4ef208a23ae9"
+  },
+  "att_adminUser_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "a382c4dfc47a49f1"
+  },
+  "att_append_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "fb7040e821c207a8"
+  },
+  "att_applyDecision_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "fe792bd436e67dbf"
+  },
+  "att_attend_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "ab1408d17c2c74a1"
+  },
+  "att_auth_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "6830ab743f6042c2"
+  },
+  "att_average_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "9e5d2cc5315e1ed0"
+  },
+  "att_backfillCol_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "56132e1c05dd3eb4"
+  },
+  "att_bucketAdd_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "b86ce2aa18b38ea4"
+  },
+  "att_calibrateRoom_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "f74c1da3184293ae"
+  },
+  "att_canSee_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "ac901da5da6f4b40"
+  },
+  "att_cdel_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "edf92658657a34f2"
+  },
+  "att_cget_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "931dfa8cf04d5220"
+  },
+  "att_changeDevice_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "962ee19b88a339f1"
+  },
+  "att_checkTicket_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "6c859477c65105e6"
+  },
+  "att_cleanName_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "e6ee314714c3f136"
+  },
+  "att_clean_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "cad19798a3575fdb"
+  },
+  "att_cleanupTest": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "587560116c2a8295"
+  },
+  "att_clearDemo": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "83d47f05452c2110"
+  },
+  "att_closeSession_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "4390d5e9e0acc718"
+  },
+  "att_coord_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "9ccc8b1a76d375be"
+  },
+  "att_counts_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "a3f38ab3d9cdcf6e"
+  },
+  "att_cput_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "9ed20182dc66b740"
+  },
+  "att_csvCell_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "2294cbdfec8d4e83"
+  },
+  "att_decideFromTelegram_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "90bc1f283be78a01"
+  },
+  "att_decideRequest_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "8d344f37a5cfc18e"
+  },
+  "att_decide_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "b62d1ced1845dae8"
+  },
+  "att_demoId_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "15a573c42ed07a6e"
+  },
+  "att_demoLive": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "355436653715fa66"
+  },
+  "att_demoSecret_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "a6eb4cd1bb5672a7"
+  },
+  "att_dispatch_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "d6912cc8afdbd43f"
+  },
+  "att_effOwner_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "947e6bb441137dd7"
+  },
+  "att_ensureTabs_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "486816f8ddf3bb0c"
+  },
+  "att_eq_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "a0c87aefda4dc470"
+  },
+  "att_err_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "47db9a11bf84de6d"
+  },
+  "att_export_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "cb03613928373815"
+  },
+  "att_feed_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "79fd08970e51cd7c"
+  },
+  "att_flagDetail_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "5083d0696e6130ee"
+  },
+  "att_flagged_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "165961fc857e1d80"
+  },
+  "att_flagsToStatus_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "829d6e7f3f638076"
+  },
+  "att_flushDigest": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "2742b9a5483c1262"
+  },
+  "att_genPassword_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "47652bc6526a78a4"
+  },
+  "att_geoFlagForReason_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "7feed4efc5384321"
+  },
+  "att_geoReason_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "61be715fa78ebf2c"
+  },
+  "att_getDevice_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "9bf13e1e7644528e"
+  },
+  "att_getRoom_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "e44652fb9d71eb0c"
+  },
+  "att_getSession_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "3026f177aee3ad32"
+  },
+  "att_groupBySession_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "f0ff4d614461d65f"
+  },
+  "att_handleTelegram_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "b052a376df3dc77e"
+  },
+  "att_has_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "28a9fdda1dd80060"
+  },
+  "att_haversineM_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "750d3b39b1dff011"
+  },
+  "att_haversine_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "6151cb9eca141eeb"
+  },
+  "att_hex_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "c6c61d82fe49fd3a"
+  },
+  "att_hmacHex_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "3ac3642770bd348a"
+  },
+  "att_inRange_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "09fb608e3700ec45"
+  },
+  "att_installTrigger": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "7c7e5a1ee8296116"
+  },
+  "att_isDemoEvent_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "ea48c138182e75a7"
+  },
+  "att_isDemoId_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "78d6a331e9b2f538"
+  },
+  "att_isDemoText_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "b30db5f423ef0804"
+  },
+  "att_isOpen_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "aca4311cde11034f"
+  },
+  "att_iso_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "1cec04e2e74db75b"
+  },
+  "att_live_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "b73d57239f6b182a"
+  },
+  "att_loadRun_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "154332928a7d6af6"
+  },
+  "att_loadTest": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "2b603ede6504770a"
+  },
+  "att_loadTestFirstDay": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "aaebbe586effb198"
+  },
+  "att_loadUrl_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "521e487a5b444166"
+  },
+  "att_logFlag_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "2469b52c6cd0c409"
+  },
+  "att_loginFail_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "ef10a17e4f726284"
+  },
+  "att_loginLocked_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "360de6ba60e2d2d0"
+  },
+  "att_login_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "1d8c17bcf5a7916a"
+  },
+  "att_makeTicket_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "3e54f2323a01b2b2"
+  },
+  "att_manualCheckin_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "81ef89bf415eef9a"
+  },
+  "att_masterSecret_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "5975d31ca9b46521"
+  },
+  "att_me_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "27a5b37f6bb64fad"
+  },
+  "att_migrate": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "b8c1dcbd1d96de32"
+  },
+  "att_newBucket_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "7d349f244cddecbb"
+  },
+  "att_normDiag_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "76911c7a57684612"
+  },
+  "att_normGeo_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "17dbf3831304a927"
+  },
+  "att_notify_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "46e3f9916568ce16"
+  },
+  "att_num_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "2290fd479e9d6e5e"
+  },
+  "att_ok_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "175142fb630d5e58"
+  },
+  "att_overview_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "00f250ddd404051a"
+  },
+  "att_ownedSessionIds_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "17b4084179100ae2"
+  },
+  "att_ownerOf_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "433c3c934e3874ae"
+  },
+  "att_pwCanon_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "51fbb6e2106fcb52"
+  },
+  "att_pwHash_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "bf44977a2f8a8b72"
+  },
+  "att_randBytes_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "0df59224e31c3306"
+  },
+  "att_range_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "7c89555eebbc3616"
+  },
+  "att_requests_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "370ed1eda8c31df4"
+  },
+  "att_requireAdmin_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "b01de9bf844f1002"
+  },
+  "att_review_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "aaa9d84b92a08861"
+  },
+  "att_rooms_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "b2338cc7bfa1276a"
+  },
+  "att_roster_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "7a08faee45ba0485"
+  },
+  "att_route_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "dbba892201d32dbb"
+  },
+  "att_rowAt_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "7ab96f1745a7ae0a"
+  },
+  "att_rowsFrom_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "0dfc7e0a7566799c"
+  },
+  "att_rows_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "c0b7e6a84824ab05"
+  },
+  "att_runFlags_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "e476babf11efb8bd"
+  },
+  "att_safeNotify_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "fd89cb8a7c102515"
+  },
+  "att_scopeSession_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "00becde965a08772"
+  },
+  "att_scriptedRun": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "ec701fcd7b223762"
+  },
+  "att_seedDemo": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "33241e2618e43e10"
+  },
+  "att_selfTest": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "8c5af3a42536526a"
+  },
+  "att_sessKey_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "85595455487211bd"
+  },
+  "att_sessionDetail_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "d7c3773e1c393136"
+  },
+  "att_sessionKey_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "4bbc2ac456ed0f55"
+  },
+  "att_sessionsList_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "6e423e5fb5dc837e"
+  },
+  "att_setWebhook": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "043a09567fe11fc7"
+  },
+  "att_setup": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "712e259bb63611b6"
+  },
+  "att_setupTelegram": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "27b715781be84eab"
+  },
+  "att_sha256Hex_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "35efebb7ab4f0e5d"
+  },
+  "att_sheet_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "2ec5f10b5225964d"
+  },
+  "att_signup_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "56ab5c9d57a0080a"
+  },
+  "att_ss_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "eb81e6b6d6eabb8e"
+  },
+  "att_startSession_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "0f84a68503127162"
+  },
+  "att_status_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "3b9e628c528d33c2"
+  },
+  "att_studentExists_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "0e3d94f8ea175c95"
+  },
+  "att_studentName_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "503fa77bbaef6d33"
+  },
+  "att_tally_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "48b386441d3158bd"
+  },
+  "att_testTelegram": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "6e9790dfec165dce"
+  },
+  "att_ticketAction_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "2e2f748e8e62d6ae"
+  },
+  "att_tokenOk_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "95ca69fe98d5b081"
+  },
+  "att_token_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "2e8433b2b67823fe"
+  },
+  "att_unauthorized_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "c96323785ae302f5"
+  },
+  "att_update_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "99844bf1440f6822"
+  },
+  "att_userCreate_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "345844149fc7963d"
+  },
+  "att_userNames_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "872b08f1b677f4bb"
+  },
+  "att_userPublic_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "5f071030f0886965"
+  },
+  "att_userReset_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "53fd4f4a5721becc"
+  },
+  "att_userState_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "ada656d39ed5d407"
+  },
+  "att_userTokenCheck_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "8e03b09b4e1f1830"
+  },
+  "att_userTokenMake_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "78342a3637b86d58"
+  },
+  "att_userUpdate_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "1372f2240e5c9356"
+  },
+  "att_users_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "5480c3ee3355e253"
+  },
+  "att_webhookInfo": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "bfdd856d3e76941b"
+  },
+  "att_withLock_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "1911963ddac2e543"
+  },
+  "attf_coordKey_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "1033d8215790a69a"
+  },
+  "attf_flagCodes_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "2564172bb178d9b0"
+  },
+  "attf_geo_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "ecd730a50a2605b1"
+  },
+  "attf_isFlagged_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "ea658bd723611f72"
+  },
+  "attf_mm_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "be3c156506438a7e"
+  },
+  "attf_num_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "8d056f7e465b90f0"
+  },
+  "attt_adminIds_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "13f2640576144547"
+  },
+  "attt_bool_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "cf4697dbc885ab9b"
+  },
+  "attt_call_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "d876e0bd2721a33b"
+  },
+  "attt_codes_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "8f1116b30a9ff66a"
+  },
+  "attt_drainQueue_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "8b341921a7848b72"
+  },
+  "attt_e_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "f4155e63cfcf5af3"
+  },
+  "attt_enqueueFlag_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "ff3429da9cd3b79c"
+  },
+  "attt_fmtDeviceRequest_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "4b054034eb9cb6e9"
+  },
+  "attt_fmtDigest_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "6a3fc53193808418"
+  },
+  "attt_fmtSessionClose_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "9798bfd7fa2d48c6"
+  },
+  "attt_fmtSessionStart_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "c49294a20ae3ff41"
+  },
+  "attt_json_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "0f03a7058a4c6a9e"
+  },
+  "attt_log_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "806b387b81c56bd1"
+  },
+  "attt_prop_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "a1966ad0e6eb84e8"
+  },
+  "attt_send_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "c7c68181bb1c99a1"
+  },
+  "attt_time_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "c6901b22b5a2db26"
+  },
+  "attt_withLock_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "910b50b14f59f2e1"
+  },
+  "auditSheets": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c4d9cf2a4372abf5"
+  },
+  "cleanEverything": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5bb18161180e035e"
+  },
+  "doGet": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "35b4b8b7863a9a7e"
+  },
+  "doPost": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a793221a037bd5e4"
+  },
+  "findPhoneCollisions": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1e11deb6bdb38e9f"
+  },
+  "fixEverything": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4c6d65b8a06ec6f7"
+  },
+  "fu2_callGlobal_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+   "hash": "29c9107bb6ff2280"
+  },
+  "fu2_core_catalog_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+   "hash": "b7f42ce15d344a05"
+  },
+  "fu2_core_effective_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+   "hash": "3b088ba6f784c4b3"
+  },
+  "fu2_core_overviewInternal_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+   "hash": "3ce3b3e3442a4d4f"
+  },
+  "fu2_core_requirements_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+   "hash": "a8d0343e86ba4f68"
+  },
+  "fu2_core_routes_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+   "hash": "6998013057cfb6b0"
+  },
+  "fu2_core_snapshotParse_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+   "hash": "39087b4e01c87d07"
+  },
+  "fu2_defaultEffective_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+   "hash": "c5e9c0a75032ff2a"
+  },
+  "fu2_dispatch_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+   "hash": "a2dea0220068ede6"
+  },
+  "fu2_logic_dueNow_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupLogic.gs",
+   "hash": "af8bf76ded78b1d4"
+  },
+  "fu2_logic_eventsFor_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupLogic.gs",
+   "hash": "43f15c98d2e87fbb"
+  },
+  "fu2_logic_selfCheck": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupLogic.gs",
+   "hash": "de6850d7ceb43917"
+  },
+  "fu2_logic_version_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupLogic.gs",
+   "hash": "acb7b074c1e5f942"
+  },
+  "fu2_notify_addDays_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "ef2744458dfd09f1"
+  },
+  "fu2_notify_appendText_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "c3479d943661ce28"
+  },
+  "fu2_notify_audit_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "e9c182a3b4ddfed0"
+  },
+  "fu2_notify_bool_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "2786fd25c84b6f92"
+  },
+  "fu2_notify_by_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "05444dc9402f01b6"
+  },
+  "fu2_notify_bytes_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "65c374f5d0a03514"
+  },
+  "fu2_notify_cap_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "bf7f4b38fcaa1d43"
+  },
+  "fu2_notify_cell_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "ab37b83c3ebda788"
+  },
+  "fu2_notify_compose_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "64d128441c9739a7"
+  },
+  "fu2_notify_defaults_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "0923ca87293eceac"
+  },
+  "fu2_notify_doneMap_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "9076648a68b136c1"
+  },
+  "fu2_notify_hourNow_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "eaf07c4613963d32"
+  },
+  "fu2_notify_installTrigger": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "7693047d50ac06cc"
+  },
+  "fu2_notify_keyboard_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "2bbd9493413cbe00"
+  },
+  "fu2_notify_logKey_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "20e9fbf4c6c8e3df"
+  },
+  "fu2_notify_markDone_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "af3bf753325c039b"
+  },
+  "fu2_notify_now_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "e09c0a52835523bf"
+  },
+  "fu2_notify_okResponse_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "3ef93213c7c45916"
+  },
+  "fu2_notify_overviewHook_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "b409704262d6448c"
+  },
+  "fu2_notify_plural_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "40503cd781b9a821"
+  },
+  "fu2_notify_removeTrigger": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "9e13c543e2c0ed50"
+  },
+  "fu2_notify_routes_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "21b01c605304d619"
+  },
+  "fu2_notify_rows_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "10515af8ee80cc5c"
+  },
+  "fu2_notify_sendOne_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "93d2122c26687468"
+  },
+  "fu2_notify_sendTest": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "3f85920d91689907"
+  },
+  "fu2_notify_settingsFromRow_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "37352d394ccb737f"
+  },
+  "fu2_notify_settingsGet_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "0de868bc55d5c1b2"
+  },
+  "fu2_notify_settingsMap_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "a9bf7e2677c82377"
+  },
+  "fu2_notify_settingsSave_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "2ffd50c886e9ed40"
+  },
+  "fu2_notify_telegramCallback_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "5c9417a600e125f9"
+  },
+  "fu2_notify_test_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "031e5fa3d22dc870"
+  },
+  "fu2_notify_tick": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "0c7dc3c8263da2f3"
+  },
+  "fu2_notify_tick_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "b9ac119a7c51fb6a"
+  },
+  "fu2_notify_time12_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "c75509a51f3b2863"
+  },
+  "fu2_notify_today_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "37c86502bbac834f"
+  },
+  "fu2_notify_unclaim_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "309ad55b6941f5b2"
+  },
+  "fu2_notify_wrap_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "b315c63981dc6258"
+  },
+  "fu2_notify_writeRowText_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "e9e30f10ecd8b7f0"
+  },
+  "fu2_notify_writeSettings_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupNotify.gs",
+   "hash": "ea1c4adfd8889c1c"
+  },
+  "fu2_round1_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+   "hash": "ffcceabde5a4b5e0"
+  },
+  "fu2_routes_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupRouter.gs",
+   "hash": "301b88a2966dc1c3"
+  },
+  "fu2_wa_alert_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "0c9e9d9fa611761c"
+  },
+  "fu2_wa_append_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "2925febff9a3de96"
+  },
+  "fu2_wa_batchMode_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "a76f2e0b43ffb157"
+  },
+  "fu2_wa_cancel_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "e325581c3f461789"
+  },
+  "fu2_wa_cfg_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "b4cff9507b3194b5"
+  },
+  "fu2_wa_claim_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "47db3d281da8f8bf"
+  },
+  "fu2_wa_enqueue_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "6535c2959e17f8b2"
+  },
+  "fu2_wa_heartbeat_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "dba9d352b54e3d17"
+  },
+  "fu2_wa_hourNow_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "87f6301b1f2bc9f3"
+  },
+  "fu2_wa_hours_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "b29c2be867aca558"
+  },
+  "fu2_wa_inHours_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "a340b14844e48474"
+  },
+  "fu2_wa_installTrigger": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "1b249d7a8f28709b"
+  },
+  "fu2_wa_int_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "991c526c181c91b9"
+  },
+  "fu2_wa_itemsKey_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "3f634d311a9e88ff"
+  },
+  "fu2_wa_items_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "b75346987c437496"
+  },
+  "fu2_wa_loggedMap_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "65c8037589a4916b"
+  },
+  "fu2_wa_modeLive": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "f2b1855bb579dbcd"
+  },
+  "fu2_wa_modeOff": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "05b0817958e0a440"
+  },
+  "fu2_wa_modeTest": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "fbce0a10804240dd"
+  },
+  "fu2_wa_mode_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "513e1a3a476fe147"
+  },
+  "fu2_wa_nowStr_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "446fd91d7d11e276"
+  },
+  "fu2_wa_public_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "9e533f2741ef16dc"
+  },
+  "fu2_wa_removeTrigger": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "8a332733e9e2f2e9"
+  },
+  "fu2_wa_report_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "d711a83899bb38e7"
+  },
+  "fu2_wa_requireSender_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "3b40baf164459cc6"
+  },
+  "fu2_wa_routes_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "271f80fbb9f228c9"
+  },
+  "fu2_wa_rows_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "bde7436324f80140"
+  },
+  "fu2_wa_seen_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "69dae07bf32ed3e3"
+  },
+  "fu2_wa_sentToday_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "2321e587ec811534"
+  },
+  "fu2_wa_setMode_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "766e83a08663b028"
+  },
+  "fu2_wa_setup": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "2c7eb14fbe43e4f3"
+  },
+  "fu2_wa_sheet_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "c72fe61141e818ea"
+  },
+  "fu2_wa_status_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "01d350fb8fc02826"
+  },
+  "fu2_wa_today_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "7ecd69e7c9ed54db"
+  },
+  "fu2_wa_touch_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "68dd9dc822d30767"
+  },
+  "fu2_wa_watchdog": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "09ee79a519566f51"
+  },
+  "fu2_wa_who_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "56acad9248d683da"
+  },
+  "fu2_wa_wrap_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "643c9543e5aec126"
+  },
+  "fu2_wa_write_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/FollowupWhatsApp.gs",
+   "hash": "b31a15229041c004"
+  },
+  "handleAdminAccessOverview": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "368f8583a4023571"
+  },
+  "handleAdminDecidePayment": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1e858d94e61c04ca"
+  },
+  "handleAdminFollowupOverview": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "98705d94d46a30d5"
+  },
+  "handleAdminFollowupSaveGroup": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c3f614555bdf6e7d"
+  },
+  "handleAdminFollowupSaveTemplates": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "51caccbcf758e190"
+  },
+  "handleAdminFollowupSetAttendance": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "774cf82494f03c04"
+  },
+  "handleAdminGetAll": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5df8ae530fe9d201"
+  },
+  "handleAdminGetQuizContent": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "db61e1f1529986fb"
+  },
+  "handleAdminGetWrittenModels": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0e9e455d4963c618"
+  },
+  "handleAdminGradeWritten": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8714b090e312dbec"
+  },
+  "handleAdminGradingQueue": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9d382928e0ed1d10"
+  },
+  "handleAdminGrantAccess": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3572a3713a49b0c9"
+  },
+  "handleAdminGrantQuizAccess": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e4e6d1b3f8583a7a"
+  },
+  "handleAdminGroupAdd": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0c8322adf84f5e5c"
+  },
+  "handleAdminGroupGrantAccess": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2578595acc676c7f"
+  },
+  "handleAdminGroupGrantQuizAccess": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b13e1f6294a0d22f"
+  },
+  "handleAdminGroupRemove": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9b0ba1bdfc8e033c"
+  },
+  "handleAdminGroupRevokeAccess": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d262023ace3a9838"
+  },
+  "handleAdminGroupRevokeQuizAccess": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "de9b2d2f5e75ebc9"
+  },
+  "handleAdminListGroups": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3f8b2083011849ff"
+  },
+  "handleAdminListLessonTags": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "957d8113b0be4be1"
+  },
+  "handleAdminListLessons": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d5db20709cb86b75"
+  },
+  "handleAdminListPayments": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f945e8d8442b54b4"
+  },
+  "handleAdminListVideos": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c540354c3fefeb5a"
+  },
+  "handleAdminMigrateLessonKeys": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8796f4ef4a805393"
+  },
+  "handleAdminRevokeAccess": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "09f62144f28add61"
+  },
+  "handleAdminRevokeQuizAccess": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "19f34fbc8236b5dc"
+  },
+  "handleAdminSetLessonLock": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fe08d43502d8f744"
+  },
+  "handleAdminSetLessonTags": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "dddae08293d13b01"
+  },
+  "handleAdminSetQuizContent": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "09ad10d1c8cb1b14"
+  },
+  "handleAdminSetQuizLock": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d8ce4c651eb028e1"
+  },
+  "handleAdminSetVideo": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a3cc7e5ade48277f"
+  },
+  "handleAdminSetWrittenModels": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1bb2250a6e7b72e9"
+  },
+  "handleCheckSession": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3a7badf6b05c3473"
+  },
+  "handleCheckStudent": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8614796bb7621c44"
+  },
+  "handleDeleteAttachment": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5cf6d5c6724eba16"
+  },
+  "handleGetMyResults": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "666b2d8a763a08ca"
+  },
+  "handleGetQuiz": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "da31d4f890992417"
+  },
+  "handleGetQuizState": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "31ed19c12ca763b6"
+  },
+  "handleGetSubscriptionOptions": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2f0134deba670c98"
+  },
+  "handleGetVideo": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e3429a7cb2f0c31c"
+  },
+  "handleGetWrittenImage": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "383a4ac28c4e4520"
+  },
+  "handleLoginStudent": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d754a29f45a98913"
+  },
+  "handleRecordWatch": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d44f61be75b466c0"
+  },
+  "handleRegisterStudent": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "75e58a8f906232aa"
+  },
+  "handleReportPhotos": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cb8f8b1cf745b240"
+  },
+  "handleRequestAccess": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fdc49812c4e51cd9"
+  },
+  "handleRequestSubscription": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0666087b038687cc"
+  },
+  "handleResetPassword": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0e7721fdcc120b42"
+  },
+  "handleTelegramUpdate": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e3c2a262dd72a2d5"
+  },
+  "handleUpdateProfile": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e17701e16ff1496a"
+  },
+  "handleUploadAttachment": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "79d183501718d682"
+  },
+  "handleUploadQuizResult": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "48e348836e286760"
+  },
+  "handleUploadSubmission": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b27e2d5b9ee27c18"
+  },
+  "installWeeklyBackupTrigger": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1c7f018a0b2daf10"
+  },
+  "p2_admin_followup_overview": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "90bca606924689ab"
+  },
+  "p2_admin_followup_set_attendance": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "161f555087e439c3"
+  },
+  "p2_admin_get_written_models": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "afe48c7307ede56c"
+  },
+  "p2_admin_grade_written": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a529ff0ed6a41ab8"
+  },
+  "p2_admin_grading_queue": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "48ab7338d1a85e25"
+  },
+  "p2_admin_list_parent_notifications": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d5d9850774e12653"
+  },
+  "p2_admin_log_parent_notification": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4112ef06f54b35fb"
+  },
+  "p2_admin_migrate_lesson_keys": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2d4aad8762c3d371"
+  },
+  "p2_admin_monthly_review": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0790df8650280259"
+  },
+  "p2_admin_set_requirement": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b1483d63f0d35a13"
+  },
+  "p2_admin_set_written_models": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ae148c243edfa1da"
+  },
+  "p2_admin_student_summary": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d86f32f9891291bc"
+  },
+  "p2_audit": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9755194fc8ccb12e"
+  },
+  "p2_flag": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4cb3389df29b31a0"
+  },
+  "p2_get_quiz_review": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5c06b4ea59d9fcee"
+  },
+  "p2_get_written_image": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1c364a9c0f648ec7"
+  },
+  "p2_requireFlag": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f4acafb7d2bd0fba"
+  },
+  "p2_upload_written_image": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "00dfcf2c2583752a"
+  },
+  "p2c_decorate_quiz": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3b7130374cc6792f"
+  },
+  "p2c_prepare_quiz_payload": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f634e43847718052"
+  },
+  "p2k_aliases": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e3933cff05c437a8"
+  },
+  "p2k_canon": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "605d6ebdafe4ae6d"
+  },
+  "p2k_same": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f762ab1c6e165d89"
+  },
+  "p3_action_session_role": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8925ac6e1fc2d38d"
+  },
+  "p3_admin_backfill_submission": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9385f0ab7c0005e8"
+  },
+  "p3_admin_bulk_grant": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bb9f90322ea17dcf"
+  },
+  "p3_admin_bulk_preview": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "039a5632dbc3a95d"
+  },
+  "p3_admin_bulk_revoke": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bb47d4f131fcfde9"
+  },
+  "p3_admin_diagnose_submissions": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "aa65abe16996f15c"
+  },
+  "p3_admin_flag_status": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "464f017ebc32608b"
+  },
+  "p3_admin_list_staff": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a75637113be43ec5"
+  },
+  "p3_admin_restore_submissions": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "69e342046a704f13"
+  },
+  "p3_admin_set_role": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8657e3377cd224e0"
+  },
+  "p3_assistantAllows": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "08be809a931d9986"
+  },
+  "p3_diagnose_core": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a42211c59312528e"
+  },
+  "p3_diagnose_submissions": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2bf166ff969deaa6"
+  },
+  "p3_flag_status": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5f0e7f6b62c98a29"
+  },
+  "p3_restore_submissions": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3d568ea4f1685e49"
+  },
+  "p3_session_role": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "569fc216316e1f9c"
+  },
+  "p3_setup_enable_followup_flags": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8dce7869fc944b3b"
+  },
+  "p3_withRole": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d99f544970c6adff"
+  },
+  "p4_admin_list_edit_log": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1b539f784acc6515"
+  },
+  "p4_admin_list_teachers": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b9795791c5b969e0"
+  },
+  "p4_admin_set_group_owner": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "512201f2dffb9784"
+  },
+  "p4_admin_set_teacher": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d8dd2c716c3adac5"
+  },
+  "p4_admin_teacher_stats": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "70d1dae6714c46f2"
+  },
+  "p4_admin_tg_unlink": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e673901a3b186086"
+  },
+  "p4_adminish_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0068aad2cb2a26b9"
+  },
+  "p4_allowKeys_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8b780ab3a9aab5c5"
+  },
+  "p4_anon_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "396f0623b2b1b98c"
+  },
+  "p4_cacheKey_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1015e7b225ac264f"
+  },
+  "p4_cache_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e1d5b51b4657afee"
+  },
+  "p4_cell_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "771aa595317d1a1d"
+  },
+  "p4_createGroupOwner_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4a6ce1a72a2ae768"
+  },
+  "p4_ctx": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b85dac01be9a976f"
+  },
+  "p4_ctxCompute_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "28383325f4667457"
+  },
+  "p4_ctxForPhone": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cf236870f7eed7c0"
+  },
+  "p4_ctxFor_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "28bd7e195dedf894"
+  },
+  "p4_decide_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3707e1df15217146"
+  },
+  "p4_deny_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "589af08052ab46b2"
+  },
+  "p4_filter": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "948d54a1535bb8cb"
+  },
+  "p4_filterLessonList_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9156bd3f8cf8b110"
+  },
+  "p4_filterLessonLists_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8bb9a870fcaff193"
+  },
+  "p4_filterMap_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "eb75b0a1e34633d3"
+  },
+  "p4_filterRows_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "af1d81bfb28e72e2"
+  },
+  "p4_findRow_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8a223a85a7e81272"
+  },
+  "p4_findTeacherToken_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9045c813ebfc9157"
+  },
+  "p4_gate": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8b5a4607c6c99f15"
+  },
+  "p4_gather_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "148fb7294ede1baf"
+  },
+  "p4_global_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "465a7464e9493ba6"
+  },
+  "p4_gradingCounts_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "df5f258522cfdb8c"
+  },
+  "p4_groupOwnerId_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9754ffee09fe7e76"
+  },
+  "p4_groupState": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2dcdc721f15205aa"
+  },
+  "p4_hashToken_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6dd497b56ca8e813"
+  },
+  "p4_idKey_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "681b53b86d33032b"
+  },
+  "p4_idOf_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8cd363466a1593ee"
+  },
+  "p4_inSubjects_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a27e366252e8c8bf"
+  },
+  "p4_isScoped_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c7afae74706e018c"
+  },
+  "p4_judge_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fa97a8539c0b7bc9"
+  },
+  "p4_keepLessonRow_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fca1364687de7b8d"
+  },
+  "p4_linkReply_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "72338f960a172627"
+  },
+  "p4_linkedSet_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f226efe477f46bae"
+  },
+  "p4_linked_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5d64282f0c9bd8dc"
+  },
+  "p4_log_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3259e7189858d9f6"
+  },
+  "p4_lookupAllowed_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "eb5528178553296e"
+  },
+  "p4_mark_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fb3c663a0e977bda"
+  },
+  "p4_mint_teacher_token": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "af4449a11bdbc2bb"
+  },
+  "p4_needHolds_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "498d461761234ce7"
+  },
+  "p4_notAuth_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "22d7288ef89b2eb3"
+  },
+  "p4_notifKeep_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ac3d0a449582d86f"
+  },
+  "p4_ownerPing_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c8a91b39847b0ebd"
+  },
+  "p4_ownersMap_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c0d85da95c4252fc"
+  },
+  "p4_ownsGroup": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2dcda57dad7c7cd2"
+  },
+  "p4_ownsStudent": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c6b96ee2b2160122"
+  },
+  "p4_parseScope_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4c8d90d7eb313e4a"
+  },
+  "p4_paymentInScope": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7f25733af2b37757"
+  },
+  "p4_pick_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1d95544745573e5c"
+  },
+  "p4_pingDecorate": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0c36cb5d7ad6d51d"
+  },
+  "p4_principalKey_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "72133a268d4a6aae"
+  },
+  "p4_readStudents_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2a7f0894aed0df34"
+  },
+  "p4_registeredSet_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "420be35d20f927b5"
+  },
+  "p4_resetCache_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ae1fd15c6f05e647"
+  },
+  "p4_resetOwners_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c474003bdeafe4ae"
+  },
+  "p4_resolveAttachment_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d0021c2bc96bf477"
+  },
+  "p4_resolveWritten_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "050d34df6459c72e"
+  },
+  "p4_revoke_teacher_token": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8c4c755db5b495a8"
+  },
+  "p4_roleOf_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "045051b83a9bb3b1"
+  },
+  "p4_rowFor_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ee92591e3c49a84d"
+  },
+  "p4_rowOk_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "17a86135c9aedafb"
+  },
+  "p4_rows_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2b582fb5fb7c1e72"
+  },
+  "p4_safeEq_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "06c68c49e9a669ae"
+  },
+  "p4_scopeOf_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bde1896122238262"
+  },
+  "p4_scoped_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "84cc54bab50c7ace"
+  },
+  "p4_selfTest": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9235a6305547ebdd"
+  },
+  "p4_selfTest_people": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0ab0e89099760b1d"
+  },
+  "p4_selfTest_team": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "867a0a21c34c6231"
+  },
+  "p4_selfTest_tg": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4d845c6aec35b35e"
+  },
+  "p4_session_scope": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f7acd8b55f63da21"
+  },
+  "p4_setup": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "41ea173e70a51fda"
+  },
+  "p4_str_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9576e0153a7499ce"
+  },
+  "p4_subjectOf": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c7c1db186a5dc13e"
+  },
+  "p4_summaryFilter_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a3d8d08049d71874"
+  },
+  "p4_teacherAllows": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ca9e09fb314a8630"
+  },
+  "p4_teacherCovers": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9f1d63242d257b4f"
+  },
+  "p4_teacherRow_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8a26efeae06afd8b"
+  },
+  "p4_teacher_list_assistants": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0e9a3fde27f75313"
+  },
+  "p4_teacher_revoke_assistant": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "88b9b825fa46f4d0"
+  },
+  "p4_teacher_set_assistant": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "434e988211370646"
+  },
+  "p4_teacher_update_student": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3a6041fad9166147"
+  },
+  "p4_tg_handleUpdate": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "04ec4b8ef20617ae"
+  },
+  "p4_tg_link_start": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "399f568b797c1624"
+  },
+  "p4_tg_notifyPayment": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7812202c6b6d90a5"
+  },
+  "p4_tg_status": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2cfabcba69842939"
+  },
+  "p4_tg_unlink": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4501292515a7c679"
+  },
+  "p4_tokenAllows": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d86317cb2cb5ba3e"
+  },
+  "p4_tplSuffix_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "abd0ed9e1a6af5ca"
+  },
+  "p4_tplView_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b0d055154573740c"
+  },
+  "p4f_admin_access_overview": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c637dd4c35eb6909"
+  },
+  "p4f_admin_followup_overview": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fa05c0f202bde781"
+  },
+  "p4f_admin_get_all": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7265f195b2f7bd92"
+  },
+  "p4f_admin_grading_queue": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3e82951f9a7fd412"
+  },
+  "p4f_admin_grant_access": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "73d48e15e99232c5"
+  },
+  "p4f_admin_grant_quiz_access": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6d36531f43f2a65d"
+  },
+  "p4f_admin_group_add": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e632f3b8c7041bfc"
+  },
+  "p4f_admin_list_groups": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "524ad8c64d7843e8"
+  },
+  "p4f_admin_list_lesson_tags": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a61e15575ea7a4b7"
+  },
+  "p4f_admin_list_lessons": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "542cc2c9860b2e50"
+  },
+  "p4f_admin_list_parent_notifications": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d3ff3715e449fe40"
+  },
+  "p4f_admin_list_payments": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5dbd864beb2c58b1"
+  },
+  "p4f_admin_list_videos": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8c0cf8d3789655d2"
+  },
+  "p4f_admin_monthly_review": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5fe81f39175d0aff"
+  },
+  "p4f_admin_student_summary": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a8dda6dd94d2101f"
+  },
+  "p4s_add_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4d1a324151461935"
+  },
+  "p4s_block_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d56a4947ee7ae26a"
+  },
+  "p4s_clone_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9298049925b32b63"
+  },
+  "p4s_compute_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "99d7bc3d499d137b"
+  },
+  "p4s_date_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "07d679af43fce1be"
+  },
+  "p4s_dayDiff_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "82cec80194751d82"
+  },
+  "p4s_denied_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6bf31a88664eaaf7"
+  },
+  "p4s_merge_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5265e282d016c9f0"
+  },
+  "p4s_pk_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bae50f5cde6d8e2f"
+  },
+  "p4s_prevMonth_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b551edd007bbc779"
+  },
+  "p4s_read_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9794457911a41278"
+  },
+  "p4s_subject_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "43157cf1cf515df1"
+  },
+  "p4t_appendText_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8d16aaf52a1335b0"
+  },
+  "p4t_audit_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "30fbc798bb4fa091"
+  },
+  "p4t_cascade_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d28dde0ad4afdc19"
+  },
+  "p4t_cleanName_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1f010ba84c7a814e"
+  },
+  "p4t_cleanPhone_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2c329dd2a56acac1"
+  },
+  "p4t_countAssistants_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9b3e907e1c42a1c2"
+  },
+  "p4t_ctx_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e256a54d0c2f2aa7"
+  },
+  "p4t_denied_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cefb9efbe17c443d"
+  },
+  "p4t_ensureCol_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "305e5e95935b655e"
+  },
+  "p4t_findIdx_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0ec8ae6a795ea2e2"
+  },
+  "p4t_generic_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f0c8e9ba26191138"
+  },
+  "p4t_get_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "04a4a8a21105409d"
+  },
+  "p4t_hash_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5e8354e1c3e80439"
+  },
+  "p4t_headers_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "127367b926ce4f6f"
+  },
+  "p4t_isAdminRow_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "002faebed766a7df"
+  },
+  "p4t_isOwner_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "251ccd2920c7f886"
+  },
+  "p4t_lc_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "33bee15aa6a62ae9"
+  },
+  "p4t_lookup_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bc299a98139962d2"
+  },
+  "p4t_maxAssistants_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2be2f49e323a5111"
+  },
+  "p4t_nameOut_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d92a9a8a21c98d28"
+  },
+  "p4t_now_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a653daacc0955781"
+  },
+  "p4t_phoneEditOn_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a75c38106d682656"
+  },
+  "p4t_phoneOut_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6da1d454120abb82"
+  },
+  "p4t_planStore_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0ee4f1616cd0bf61"
+  },
+  "p4t_roleOf_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f136923820380ef6"
+  },
+  "p4t_scope_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bc47a3b436ae18fe"
+  },
+  "p4t_setCell_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6a8ecdd8b8d71de3"
+  },
+  "p4t_staffAudit_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d520d10611bd22cb"
+  },
+  "p4t_staffByPhone_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a3f76135257c048b"
+  },
+  "p4t_studentsForWrite_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c25f71d76edb7fd1"
+  },
+  "p4t_studentsRead_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "39932674ed79893f"
+  },
+  "p4t_teacher_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f8c19cd2743027a0"
+  },
+  "p4t_tokens_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "576ba779888b87e9"
+  },
+  "p4t_who_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ec351e8550a41a9d"
+  },
+  "p4tg_adminIds_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7d3f38a2d61e6304"
+  },
+  "p4tg_cache_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e533c2f5fd2bdd72"
+  },
+  "p4tg_call_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2c0c70f88ea69b2d"
+  },
+  "p4tg_callerTeacher_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b57cf64b7292dfbb"
+  },
+  "p4tg_ctxFor_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a7ab7ea54053c8a6"
+  },
+  "p4tg_deleteRows_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1b2138222cd79490"
+  },
+  "p4tg_edit_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2eb125517d7161ad"
+  },
+  "p4tg_esc_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ff5a29425ee17d1b"
+  },
+  "p4tg_log_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ac1b7b6b8c055bca"
+  },
+  "p4tg_newCode_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "4b124160dd11ad80"
+  },
+  "p4tg_onCallback_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6f8b55798cc9619d"
+  },
+  "p4tg_onMessage_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cdd218db58a23db4"
+  },
+  "p4tg_paymentText_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "bcb35baa7e47c2c2"
+  },
+  "p4tg_payment_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "417efd1c25f480e6"
+  },
+  "p4tg_rows_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c03584540ebddb35"
+  },
+  "p4tg_same_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "921145b1e5709a1c"
+  },
+  "p4tg_seen_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "7cb74bf85700c047"
+  },
+  "p4tg_sha_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "5264d3d1e5c07204"
+  },
+  "p4tg_sheet_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "e2002d14e421935b"
+  },
+  "p4tg_startAllowed_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "89daf4d110445156"
+  },
+  "p4tg_stripOthers_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "813f608a38bfb9b2"
+  },
+  "p4tg_teacherOfChat_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6f9afd2e6bd2e4a6"
+  },
+  "p4tg_unlinkPhone_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "6fa20e96f1d34e78"
+  },
+  "p4tg_upsert_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b387887ef97f59e5"
+  },
+  "previewDuplicates": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "06629e0bd3f844f7"
+  },
+  "removeDuplicates": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0ac9afd7197055d8"
+  },
+  "repairLayout": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "95389d2edf49225c"
+  },
+  "repairSheets": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "afd23a8aec81a0af"
+  },
+  "req_actionCheck_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "f949a5f1e4b82351"
+  },
+  "req_actionGet_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "bdf263cf86a45395"
+  },
+  "req_actionHistory_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "083a23117f013dab"
+  },
+  "req_actionMonthGet_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "6f70517496b3a3ae"
+  },
+  "req_actionMonthSave_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "435998f0b981ded2"
+  },
+  "req_actionSaveGlobal_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "384484d2b1e3e8d6"
+  },
+  "req_actionSaveGroup_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "1ddec606964358fa"
+  },
+  "req_audit_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "8a3438b84b3abdbf"
+  },
+  "req_bool_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "1ba2fcd9d77e9170"
+  },
+  "req_brief_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "eef4f5928f0943bf"
+  },
+  "req_caller_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "6ca2bd2e59978f27"
+  },
+  "req_catalog_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "51328bd466f0f1fb"
+  },
+  "req_checks_for_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "6485414c008e668b"
+  },
+  "req_clone_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "770e89df5e00aa71"
+  },
+  "req_defaults_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "ca3d4e33afa64a46"
+  },
+  "req_effective_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "10efe73b4ef644fd"
+  },
+  "req_fail_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "4f1e4b34623200eb"
+  },
+  "req_globalRow_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "2c0c729b80dfd140"
+  },
+  "req_isCustomKey_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "079002794a5424b3"
+  },
+  "req_isInt_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "a897851be0ed3edc"
+  },
+  "req_isMonth_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "e8f238a1815cf689"
+  },
+  "req_knownGroups_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "39e34e3a09afea9d"
+  },
+  "req_lessonPathKey_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "27233752c57b5a7f"
+  },
+  "req_load_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "daf5e39f3280851e"
+  },
+  "req_monthCell_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "7b5248e9346a2104"
+  },
+  "req_month_all_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "fa4111a94f9ba504"
+  },
+  "req_month_for_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "831b1b788c9a39ce"
+  },
+  "req_month_normalize_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "9aaa0129fa936024"
+  },
+  "req_month_resolve_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "fee5deb5047ee5a5"
+  },
+  "req_normalizeCatalog_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "5204d6016cf9dfc5"
+  },
+  "req_now_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "535ac38489155770"
+  },
+  "req_overviewHook_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "91c83408769d2966"
+  },
+  "req_parseJson_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "6d7b2a9b2d3f88d9"
+  },
+  "req_pick_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "44ab5e690c8bfd47"
+  },
+  "req_resolve_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "1ad4565112f20320"
+  },
+  "req_routes_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "883cc9a8fbb31ae6"
+  },
+  "req_rowArray_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "65a7e4dfe4c086fe"
+  },
+  "req_rows_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "2e1a673231343e57"
+  },
+  "req_sheet_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "50c4e80f4f19f199"
+  },
+  "req_str_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "b38c8b7dd007ee2c"
+  },
+  "req_validWeight_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "42501b9ad04b5d81"
+  },
+  "req_validateRule_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "3614771b7319d078"
+  },
+  "req_what_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "3c39baee0518268d"
+  },
+  "req_who_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "4d52cf839a54a43b"
+  },
+  "req_wrap_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "818545db43880159"
+  },
+  "req_writeRow_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Requirements.gs",
+   "hash": "2988999dc9676780"
+  },
+  "restoreAllFromDrive": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "51974a47fe1a4811"
+  },
+  "restoreLast30Days": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b17106dfeaa764d0"
+  },
+  "rev_amountOf_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "f837ca6288f39852"
+  },
+  "rev_cell_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "bb4812e33a5c4ecb"
+  },
+  "rev_denied_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "2d11ffad157cce27"
+  },
+  "rev_ensureAmountCol_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "d7244d5c6e8d2c74"
+  },
+  "rev_groupsByPhone_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "2f6b04e1a53e3907"
+  },
+  "rev_isOwner_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "fb3b31e240ca9c4d"
+  },
+  "rev_item_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "51ee64097bd04c55"
+  },
+  "rev_lessonPrice_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "218d431c2fc6b45c"
+  },
+  "rev_num_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "00341cfa3fc37b75"
+  },
+  "rev_payments_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "abd02670be632940"
+  },
+  "rev_phoneKey_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "ce7b19da25d94fdc"
+  },
+  "rev_stampLessonPrice_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "34af1430ba99b2bb"
+  },
+  "rev_ym_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
+   "hash": "b098a814fd555d58"
+  },
+  "runSetup": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "46d65056d9ad68db"
+  },
+  "setupSheets": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "b088393e4d30a807"
+  },
+  "tidySheets": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "f71889187dfa1208"
+  },
+  "weeklyBackup": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "d7862489419917bc"
+  }
+ }
+}

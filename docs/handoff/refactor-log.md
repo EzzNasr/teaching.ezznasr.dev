@@ -21,9 +21,12 @@ step; no change to backend or student-facing behaviour.
 | Step | What | Why | Commit |
 |---|---|---|---|
 | 0.1 | Browser tests R-E17 and R-019 no longer reach the real internet (`tests/_hermetic.py`, `seal(ctx, allow)`) | The first baseline run failed both: the page "load" event waited on Google Fonts / outside hosts and timed out. Each passed on a rerun, so they were flaky, not broken. A refactor guard cannot rest on a flaky test. After the fix: 3 of 3 runs green each, then the full gate green | see `git log` |
+| 0.2a | **Backend oracle** R-REF-1: `scripts/gs_inventory.js` records every top-level function and var of the 8 deployed `.gs` files (1,027 names, 849 functions) with a hash of each function's exact source text, in `tools/quiz-maker-v2/tests/fixtures/gs_inventory.json` | The guard for splitting `Code.gs` and every later backend step: a lost, added, changed or doubly-declared function fails the gate and is named; a pure move to another file passes. Proven both ways on the real files (a one-space edit was caught and named; a moved function passed). After a deliberate backend change: `node scripts/gs_inventory.js --write` | see `git log` |
 
 ## Notes and follow-ups found along the way
 
+- Do not run anything else heavy while the gate runs on Windows: a polling loop made Git Bash run out of processes and
+  one browser test (R-A08) failed with no checks run; alone it passed twice.
 - Running the browser tests rewrites 15 tracked screenshots in `tools/quiz-maker-v2/tests/_shots/` and adds 3 new
   ones, so every run leaves the tree dirty. Undo after a run with
   `git checkout -- tools/quiz-maker-v2/tests/_shots && git clean -f tools/quiz-maker-v2/tests/_shots`. Fix planned

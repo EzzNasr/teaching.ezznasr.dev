@@ -1665,6 +1665,16 @@
         "python",
         "tests/e2e_i18n_staff.py"
       ]
+    },
+    {
+      "id": "R-REF-1",
+      "title": "Refactor oracle: every top-level function and var of the deployed .gs files matches tests/fixtures/gs_inventory.json (nothing lost, added, changed or declared twice; a pure file move passes). After a deliberate backend change: node scripts/gs_inventory.js --write",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "cmd": [
+        "node",
+        "tests/test_ref_inventory.js"
+      ]
     }
   ]
 }
