@@ -263,7 +263,7 @@ class QuizTab(ttk.Frame):
                       "This only touches the quiz page's video, nothing else.",
                  fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=640).pack(anchor="w", padx=8, pady=(0, 6))
 
-        del_frame = tk.LabelFrame(self, text="Existing lessons")
+        del_frame = tk.LabelFrame(self, text="Open an existing lesson")
         del_frame.pack(fill="x", **pad)
         row_del = tk.Frame(del_frame)
         row_del.pack(fill="x", padx=8, pady=4)
@@ -280,12 +280,15 @@ class QuizTab(ttk.Frame):
                                   font=("TkDefaultFont", 9, "bold"))
         self.load_btn.pack(side="left")
         tk.Button(btn_row_del, text="Preview in browser", command=self._preview_lesson).pack(side="left", padx=6)
-        tk.Button(btn_row_del, text="Delete lesson...", command=self._delete_lesson,
+        tk.Button(btn_row_del, text="New lesson / clear form", command=self._new_lesson).pack(side="right")
+        # the destructive / recovery actions on their own row, away from the everyday ones
+        btn_row_del2 = tk.Frame(del_frame)
+        btn_row_del2.pack(fill="x", padx=8, pady=(2, 4))
+        tk.Button(btn_row_del2, text="Delete lesson...", command=self._delete_lesson,
                   fg="#8a1f1f").pack(side="left")
-        tk.Button(btn_row_del, text="Recover deleted lesson...", command=self._recover_lesson).pack(side="left", padx=6)
-        tk.Button(btn_row_del, text="Empty trash...", command=self._empty_trash,
-                  fg="#8a1f1f").pack(side="right")
-        tk.Button(btn_row_del, text="New lesson / clear form", command=self._new_lesson).pack(side="right", padx=6)
+        tk.Button(btn_row_del2, text="Recover deleted lesson...", command=self._recover_lesson).pack(side="left", padx=6)
+        tk.Button(btn_row_del2, text="Empty trash...", command=self._empty_trash,
+                  fg="#8a1f1f").pack(side="left")
         tk.Label(del_frame,
                  text="Preview/Load/Delete use the Subject selected above. \u201cLoad for editing\u201d pulls that "
                       "lesson's questions, chapters, name, description, video and assignment prompt back into "
@@ -316,10 +319,13 @@ class QuizTab(ttk.Frame):
         tk.Button(btn_row, text="+ Matching", command=self._add_match).pack(side="left")
         tk.Button(btn_row, text="+ Written (photo)", command=self._add_written).pack(side="left", padx=6)
         tk.Button(btn_row, text="+ Bulk paste...", command=self._bulk_add).pack(side="left", padx=6)
-        tk.Button(btn_row, text="Edit selected", command=self._edit_question).pack(side="left", padx=6)
-        tk.Button(btn_row, text="Remove selected", command=self._remove_question).pack(side="left")
-        tk.Button(btn_row, text="Save draft...", command=self._save_draft).pack(side="right", padx=6)
-        tk.Button(btn_row, text="Load draft...", command=self._load_draft).pack(side="right")
+        # second row: act on the selected question, and drafts
+        btn_row2 = tk.Frame(q_frame)
+        btn_row2.pack(fill="x", padx=8, pady=(0, 6))
+        tk.Button(btn_row2, text="Edit selected", command=self._edit_question).pack(side="left")
+        tk.Button(btn_row2, text="Remove selected", command=self._remove_question).pack(side="left", padx=6)
+        tk.Button(btn_row2, text="Save draft...", command=self._save_draft).pack(side="right", padx=(6, 0))
+        tk.Button(btn_row2, text="Load draft...", command=self._load_draft).pack(side="right")
 
         list_frame = tk.Frame(q_frame)
         list_frame.pack(fill="both", expand=True, padx=8, pady=4)
@@ -335,6 +341,14 @@ class QuizTab(ttk.Frame):
         self.generate_btn = tk.Button(gen_row, text="Generate lesson files", command=self._generate,
                                       font=("TkDefaultFont", 10, "bold"), height=2)
         self.generate_btn.pack(fill="x")
+
+        # Page order, top to bottom, the way a lesson is made: open (or start) a lesson, its details, the
+        # questions, the assignment, the quiz-page video, then Generate.
+        for frame in (del_frame, info_frame, q_frame, assign_frame, solution_frame, gen_row):
+            info = frame.pack_info()
+            info.pop("in", None)
+            frame.pack_forget()
+            frame.pack(**info)
 
         self._refresh_groups()
 
@@ -372,7 +386,7 @@ class QuizTab(ttk.Frame):
     def _delete_lesson(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
             return
         lesson_slug = self.delete_lesson_var.get().strip()
         if not lesson_slug:
@@ -407,7 +421,7 @@ class QuizTab(ttk.Frame):
     def _preview_lesson(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
             return
         lesson_slug = self.delete_lesson_var.get().strip()
         if not lesson_slug:
@@ -435,10 +449,10 @@ class QuizTab(ttk.Frame):
         """Embed (or clear) a video directly on this lesson's quiz.html
         page — independent of the lesson's intro video and independent
         of regenerating the questions. Targets whichever lesson is
-        selected in the 'Existing lessons' combo above."""
+        selected in the 'Open an existing lesson' combo."""
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
             return
         lesson_slug = self.delete_lesson_var.get().strip()
         if not lesson_slug:
@@ -484,7 +498,7 @@ class QuizTab(ttk.Frame):
                                              "the dashboard once you're ready).")
             else:
                 messagebox.showinfo("Done", "Quiz solution video updated.\n\nNote: the Drive bridge Web App URL/admin "
-                                             "token aren't set (top of the window), so this video was baked in as a "
+                                             "token aren't set (Drive bridge settings, bottom left), so this video was baked in as a "
                                              "plain, unprotected embed \u2014 configure the Drive bridge to make it "
                                              "lockable.")
 
@@ -494,7 +508,7 @@ class QuizTab(ttk.Frame):
     def _load_lesson_for_edit(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
             return
         lesson_slug = self.delete_lesson_var.get().strip()
         if not lesson_slug:
@@ -663,7 +677,7 @@ class QuizTab(ttk.Frame):
     def _recover_lesson(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
             return
 
         dlg = RecoverDialog(self, site_root)
@@ -690,7 +704,7 @@ class QuizTab(ttk.Frame):
     def _empty_trash(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
             return
 
         dlg = EmptyTrashDialog(self, site_root)
@@ -921,7 +935,7 @@ class QuizTab(ttk.Frame):
     def _generate(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
             return
 
         lesson_name = self.lesson_name_var.get().strip()
@@ -1156,7 +1170,7 @@ class QuizTab(ttk.Frame):
             if video_url and video_url != inp["video_url"].strip():
                 res["new_video_url"] = video_url     # put back into the form by _on_generated
             if video_url and not video_used_backend:
-                video_warning = ("Drive bridge Web App URL/admin token aren't set (top of the window), so the "
+                video_warning = ("Drive bridge Web App URL/admin token aren't set (Drive bridge settings, bottom left), so the "
                                   "lesson video was baked in as a plain, unprotected embed \u2014 configure the "
                                   "Drive bridge to make it lockable.")
 

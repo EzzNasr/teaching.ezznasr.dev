@@ -96,7 +96,7 @@ class AttachmentTab(ttk.Frame):
                                      command=self._upload, font=("TkDefaultFont", 10, "bold"))
         self.upload_btn.pack(fill="x")
         tk.Label(upload_frame,
-                 text="Uses the Drive bridge configured at the top of the window. The file lands in the "
+                 text="Uses the Drive bridge set up in the sidebar (bottom left). The file lands in the "
                       "attachments folder set in Code.gs — students see it embedded on the lesson page, "
                       "never a drive.google.com link.",
                  fg="gray30", font=("TkDefaultFont", 8), justify="left").pack(anchor="w", padx=8, pady=(0, 6))
@@ -271,8 +271,8 @@ class AttachmentTab(ttk.Frame):
         drive_cfg = common.get_drive_config(common.load_config())
         if not drive_cfg["web_app_url"] or not drive_cfg["admin_token"]:
             messagebox.showerror("Drive bridge not configured",
-                                  "Set the Drive bridge Web App URL and admin token at the top of the "
-                                  "window first (see apps_script/Code.gs for deployment steps).")
+                                  "Set the Drive bridge Web App URL and admin token first (Drive bridge settings, bottom left "
+                                  "of the window; see apps_script/Code.gs for deployment steps).")
             return None
         return drive_cfg
 

@@ -159,8 +159,10 @@ class AssignmentTab(ttk.Frame):
         tk.Button(graded_btn_row, text="+ Matching", command=self._add_match).pack(side="left")
         tk.Button(graded_btn_row, text="+ Written (photo)", command=self._add_written).pack(side="left", padx=6)
         tk.Button(graded_btn_row, text="+ Bulk paste...", command=self._bulk_add_graded).pack(side="left", padx=6)
-        tk.Button(graded_btn_row, text="Edit selected", command=self._edit_graded).pack(side="left", padx=6)
-        tk.Button(graded_btn_row, text="Remove selected", command=self._remove_graded).pack(side="left")
+        graded_btn_row2 = tk.Frame(graded_frame)      # second row: act on the selected question
+        graded_btn_row2.pack(fill="x", padx=8, pady=(0, 6))
+        tk.Button(graded_btn_row2, text="Edit selected", command=self._edit_graded).pack(side="left")
+        tk.Button(graded_btn_row2, text="Remove selected", command=self._remove_graded).pack(side="left", padx=6)
 
         graded_list_frame = tk.Frame(graded_frame)
         graded_list_frame.pack(fill="both", expand=True, padx=8, pady=(0, 4))
@@ -471,7 +473,7 @@ class AssignmentTab(ttk.Frame):
                                              "dashboard once you're ready).")
             else:
                 messagebox.showinfo("Done", "Video embed updated.\n\nNote: the Drive bridge Web App URL/admin token "
-                                             "aren't set (top of the window), so this video was baked in as a plain, "
+                                             "aren't set (Drive bridge settings, bottom left), so this video was baked in as a plain, "
                                              "unprotected embed — configure the Drive bridge to make it lockable.")
 
         background.run_in_background(
@@ -526,7 +528,7 @@ class AssignmentTab(ttk.Frame):
                                              "from the dashboard once you're ready).")
             else:
                 messagebox.showinfo("Done", "Assignment solution video updated.\n\nNote: the Drive bridge Web App "
-                                             "URL/admin token aren't set (top of the window), so this video was "
+                                             "URL/admin token aren't set (Drive bridge settings, bottom left), so this video was "
                                              "baked in as a plain, unprotected embed — configure the Drive bridge "
                                              "to make it lockable.")
 
@@ -552,7 +554,7 @@ class AssignmentTab(ttk.Frame):
     def _update(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
             return
 
         lesson_dir = self._lesson_dir()
@@ -567,7 +569,7 @@ class AssignmentTab(ttk.Frame):
             if not drive_cfg["web_app_url"]:
                 if not messagebox.askyesno(
                         "Drive bridge not configured",
-                        "This submission type needs the Drive bridge Web App URL (set it at the top of the "
+                        "This submission type needs the Drive bridge Web App URL (set it in Drive bridge settings, bottom left of the "
                         "window) or student links/files won't be able to reach your Drive.\n\n"
                         "Continue anyway and set it up later?"):
                     return
