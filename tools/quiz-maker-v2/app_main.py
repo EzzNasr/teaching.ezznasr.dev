@@ -19,7 +19,7 @@ from tkinter import ttk, messagebox, filedialog
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from modules import common, drive_bridge, test_runner, teacher_mode
+from modules import common, drive_bridge, test_runner, teacher_mode, background
 from modules.quiz_tab import QuizTab
 from modules.assignment_tab import AssignmentTab
 from modules.attachment_tab import AttachmentTab
@@ -47,7 +47,8 @@ class DriveConfigDialog(tk.Toplevel):
 
         btn_row = tk.Frame(self)
         btn_row.pack(fill="x", pady=14, padx=12)
-        tk.Button(btn_row, text="Test connection", command=self._test).pack(side="left")
+        self.test_btn = tk.Button(btn_row, text="Test connection", command=self._test)
+        self.test_btn.pack(side="left")
         tk.Button(btn_row, text="Save", command=self._save).pack(side="right", padx=6)
         tk.Button(btn_row, text="Cancel", command=self.destroy).pack(side="right")
 
@@ -56,13 +57,22 @@ class DriveConfigDialog(tk.Toplevel):
         self.grab_set()
 
     def _test(self):
-        try:
-            info = drive_bridge.test_connection(self.url_var.get().strip(), self.token_var.get().strip())
+        url, token = self.url_var.get().strip(), self.token_var.get().strip()
+
+        def done(info):
+            if not self.winfo_exists():       # the dialog was closed while the test ran
+                return
             who = teacher_mode.badge_text(teacher_mode.identity_from_ping(info))
             messagebox.showinfo("Connected", "The Drive bridge responded successfully."
                                 + ("\n\n" + who if who else ""), parent=self)
-        except drive_bridge.DriveBridgeError as e:
-            messagebox.showerror("Connection failed", str(e), parent=self)
+
+        def failed(e):
+            if not self.winfo_exists():
+                return
+            messagebox.showerror("Connection failed", str(e) or e.__class__.__name__, parent=self)
+
+        background.run_in_background(self, lambda job: drive_bridge.test_connection(url, token), done, failed,
+                                     name="Testing the Drive bridge connection", disable=[self.test_btn])
 
     def _save(self):
         self.result = (self.url_var.get().strip(), self.token_var.get().strip())
@@ -100,21 +110,81 @@ class App(tk.Tk):
         self.content = scroll.inner
 
         self.config_data = common.load_config()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         # Teacher mode (Phase 4): a teacher token limits the subjects every tab offers. Must run BEFORE the tabs
         # are built (they read common.SUBJECTS once). Never raises; an unreachable server just means no filtering.
-        self.teacher_identity, self.teacher_badge, self.teacher_problem = teacher_mode.startup(
-            self.config_data, common.SUBJECTS, common.get_drive_config)
+        # It pings the backend (up to ~8 s offline), so it runs in the background behind a small "checking"
+        # panel, and the rest of the window is built when it answers (_finish_startup).
+        self._show_startup_panel()
 
+        def check_token(job):
+            return teacher_mode.startup(self.config_data, common.SUBJECTS, common.get_drive_config)
+
+        background.run_in_background(
+            self, check_token, self._finish_startup,
+            lambda e: self._finish_startup((None, "", "Could not check the token: %s" % e)),
+            name="Checking the Drive bridge token")
+
+    def _show_startup_panel(self):
+        self._startup_panel = tk.Frame(self.content)
+        self._startup_panel.pack(fill="x", padx=40, pady=60)
+        tk.Label(self._startup_panel, text="Starting\u2026 checking your Drive bridge token",
+                 font=("TkDefaultFont", 11)).pack(pady=(0, 10))
+        bar = ttk.Progressbar(self._startup_panel, mode="indeterminate", length=320)
+        bar.pack()
+        bar.start(12)
+
+    def _finish_startup(self, result):
+        self.teacher_identity, self.teacher_badge, self.teacher_problem = result
+        self._startup_panel.destroy()
         self._build_top_bar()
         self._build_notebook()
+        self._install_busy_indicator()
         common.lock_min_width_to_content(self)
         common.enable_select_all_shortcut(self)
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _on_close(self):
+        job = background.runner_for(self).current
+        if job is not None and job.name != "Checking the Drive bridge token" and not messagebox.askyesno(
+                "Still working",
+                "\u201c{}\u201d is still running. If you close now it stops halfway "
+                "(a lesson may be left half-written or a change only half-sent).\n\nClose anyway?".format(job.name),
+                icon="warning"):
+            return
         common.stop_preview_server()
         self.destroy()
+
+    # -- busy state: one shared progress bar for every background job (modules/background.py) -------------
+
+    def _install_busy_indicator(self):
+        runner = background.runner_for(self)
+        runner.set_indicator(self._on_job_start, self._on_job_end)
+        runner.on_rejected = self._on_job_rejected
+
+    def _on_job_start(self, job):
+        self.status_var.set(job.name + "\u2026")
+        self.busy_bar.pack(side="left", padx=(8, 0))
+        self.busy_bar.start(12)
+        if job.cancellable:
+            self.cancel_btn.pack(side="left", padx=(6, 0))
+        self.configure(cursor="watch")
+
+    def _on_job_end(self, job):
+        self.busy_bar.stop()
+        self.busy_bar.pack_forget()
+        self.cancel_btn.pack_forget()
+        self.configure(cursor="")
+
+    def _on_job_rejected(self, busy_name, _new_name):
+        self.bell()
+        self.status_var.set("Still working on \u201c{}\u201d \u2014 please wait for it to finish.".format(busy_name))
+
+    def _cancel_job(self):
+        runner = background.runner_for(self)
+        job = runner.current
+        if job is not None and runner.cancel():
+            self.status_var.set("Cancelled: {}.".format(job.name))
 
     # -- shared top bar: site root + drive bridge --------------------------
 
@@ -153,8 +223,10 @@ class App(tk.Tk):
         self.drive_status_var = tk.StringVar()
         tk.Label(drow, textvariable=self.drive_status_var, anchor="w").pack(side="left", fill="x", expand=True)
         tk.Button(drow, text="Configure...", command=self._configure_drive).pack(side="left", padx=6)
-        tk.Button(drow, text="Sync site assets", command=self._sync_assets).pack(side="left")
-        tk.Button(drow, text="Resync lesson stylesheets", command=self._resync_lesson_stylesheets).pack(side="left", padx=(6, 0))
+        self.sync_btn = tk.Button(drow, text="Sync site assets", command=self._sync_assets)
+        self.sync_btn.pack(side="left")
+        self.resync_btn = tk.Button(drow, text="Resync lesson stylesheets", command=self._resync_lesson_stylesheets)
+        self.resync_btn.pack(side="left", padx=(6, 0))
         tk.Label(drive_frame,
                  text="\"Sync site assets\" writes assets/auth.js, quiz.js, assign.js, attachments.js to your site "
                       "with the current Drive bridge URL baked in. Run it once after configuring, and again "
@@ -170,9 +242,14 @@ class App(tk.Tk):
                  font=("TkDefaultFont", 9, "bold")).pack(anchor="w", padx=8, pady=(0, 4))
 
         self.status_var = tk.StringVar(value="Ready.")
-        status_bar = tk.Label(self.content, textvariable=self.status_var, anchor="w", fg="gray30",
-                               wraplength=760, justify="left")
-        status_bar.pack(fill="x", padx=10, pady=(0, 4))
+        status_row = tk.Frame(self.content)
+        status_row.pack(fill="x", padx=10, pady=(0, 4))
+        status_bar = tk.Label(status_row, textvariable=self.status_var, anchor="w", fg="gray30",
+                               wraplength=600, justify="left")
+        status_bar.pack(side="left", fill="x", expand=True)
+        # shown only while a background job runs (see _on_job_start)
+        self.busy_bar = ttk.Progressbar(status_row, mode="indeterminate", length=140)
+        self.cancel_btn = tk.Button(status_row, text="Cancel", command=self._cancel_job)
 
         if resolved_source == "config":
             self.status_var.set("Site: " + resolved_path)
@@ -219,12 +296,23 @@ class App(tk.Tk):
             url, token = dlg.result
             common.save_drive_config(self.config_data, url, token)
             self._update_drive_status()
-            self.status_var.set("Drive bridge settings saved.")
-            ident, badge, problem = teacher_mode.startup(self.config_data, common.SUBJECTS, common.get_drive_config)
-            self.teacher_badge_var.set(badge or problem)
-            if badge:
-                messagebox.showinfo("Restart needed", "If you changed the token, restart the app so the subject "
-                                    "lists on every tab match it.")
+
+            def recheck(job):
+                return teacher_mode.startup(self.config_data, common.SUBJECTS, common.get_drive_config)
+
+            def done(result):
+                ident, badge, problem = result
+                self.teacher_badge_var.set(badge or problem)
+                self.status_var.set("Drive bridge settings saved.")
+                if badge:
+                    messagebox.showinfo("Restart needed", "If you changed the token, restart the app so the subject "
+                                        "lists on every tab match it.")
+
+            if background.run_in_background(
+                    self, recheck, done,
+                    lambda e: self.status_var.set("Drive bridge settings saved; token check failed: %s" % e),
+                    name="Checking the new token") is None:
+                self.status_var.set("Drive bridge settings saved.")
 
     def _sync_assets(self):
         site_root = self.site_root_var.get().strip()
@@ -240,7 +328,15 @@ class App(tk.Tk):
         # Sync overwrites assets/ from assets_templates/. If a live file was
         # edited directly (not in its template) that edit would be lost, so
         # say which files will really change and let the user stop first.
-        changes = common.preview_site_assets_changes(site_root, drive_cfg["web_app_url"])
+        # Both the comparison and the writing run in the background.
+        web_app_url = drive_cfg["web_app_url"]
+        background.run_in_background(
+            self, lambda job: common.preview_site_assets_changes(site_root, web_app_url),
+            lambda changes: self._sync_assets_confirm(site_root, web_app_url, changes),
+            lambda e: self._job_failed("Sync site assets", e),
+            name="Comparing site assets", disable=[self.sync_btn, self.resync_btn])
+
+    def _sync_assets_confirm(self, site_root, web_app_url, changes):
         replaced = [c for c in changes if c[1] == "changed"]
         if replaced:
             listing = "\n".join("  {}   (+{} / -{} lines)".format(n, a, r) for n, _s, a, r in replaced)
@@ -251,19 +347,37 @@ class App(tk.Tk):
                     "If you edited any of them directly in assets/ instead of in assets_templates/, "
                     "that edit will be lost. (Run  python check_asset_drift.py  to see the differences.)\n\n"
                     "Continue?"):
+                self.status_var.set("Sync cancelled.")
                 return
-        written = common.sync_site_assets(site_root, drive_cfg["web_app_url"])
-        self.status_var.set("Synced: " + ", ".join(os.path.basename(p) for p in written))
-        messagebox.showinfo("Synced", "Updated:\n" + "\n".join(written))
+
+        def synced(written):
+            self.status_var.set("Synced: " + ", ".join(os.path.basename(p) for p in written))
+            messagebox.showinfo("Synced", "Updated:\n" + "\n".join(written))
+
+        background.run_in_background(
+            self, lambda job: common.sync_site_assets(site_root, web_app_url), synced,
+            lambda e: self._job_failed("Sync site assets", e),
+            name="Syncing site assets", disable=[self.sync_btn, self.resync_btn])
+
+    def _job_failed(self, title, e):
+        text = str(e) or e.__class__.__name__
+        self.status_var.set("{} failed: {}".format(title, text.splitlines()[0]))
+        messagebox.showerror(title, "{} failed:\n\n{}".format(title, text))
 
     def _resync_lesson_stylesheets(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
             messagebox.showerror("Site location missing", "Pick a valid site root folder first.")
             return
-        touched = common.sync_all_lesson_stylesheets(site_root)
-        self.status_var.set("Resynced base.css/forms.css into {} lesson folder(s).".format(len(touched)))
-        messagebox.showinfo("Resynced", "Updated base.css + forms.css in {} lesson folder(s).".format(len(touched)))
+
+        def resynced(touched):
+            self.status_var.set("Resynced base.css/forms.css into {} lesson folder(s).".format(len(touched)))
+            messagebox.showinfo("Resynced", "Updated base.css + forms.css in {} lesson folder(s).".format(len(touched)))
+
+        background.run_in_background(
+            self, lambda job: common.sync_all_lesson_stylesheets(site_root), resynced,
+            lambda e: self._job_failed("Resync lesson stylesheets", e),
+            name="Resyncing lesson stylesheets", disable=[self.sync_btn, self.resync_btn])
 
     # -- tabs ----------------------------------------------------------------
 
