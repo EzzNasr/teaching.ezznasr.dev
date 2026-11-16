@@ -1,0 +1,14 @@
+# Editor settings that match the existing code. Deliberately minimal: no trailing-whitespace or final-newline rules,
+# so saving a file in an editor never rewrites lines you did not touch (keeps diffs reviewable).
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_size = 4
+
+[*.md]
+indent_size = 2
