@@ -1,0 +1,36 @@
+{
+  "_about": "Baseline for R-REF-2 (tests/test_ref_actions.js). Recorded 2026-11-16 at the start of the refactor. authz_only may only shrink; not_in_p4_actions changes only on purpose (teacher access is a decision).",
+  "min_total": 132,
+  "min_per_router": { "router": 88, "followup": 18, "attendance": 26 },
+  "authz_list_files": [
+    "tools/quiz-maker-v2/tests/fixtures/p4_matrix.json",
+    "tools/quiz-maker-v2/tests/test_p4_s2_scope.js",
+    "tools/quiz-maker-v2/tests/test_p3_roles.js"
+  ],
+  "authz_only": [
+    "check_student",
+    "p3_admin_diagnose_submissions",
+    "p3_admin_flag_status",
+    "p3_admin_restore_submissions",
+    "update_profile"
+  ],
+  "not_in_p4_actions": [
+    "admin_fu2_group_duplicates",
+    "admin_fu2_notify_settings_get",
+    "admin_fu2_notify_settings_save",
+    "admin_fu2_notify_test",
+    "admin_fu2_wa_cancel",
+    "admin_fu2_wa_claim",
+    "admin_fu2_wa_enqueue",
+    "admin_fu2_wa_heartbeat",
+    "admin_fu2_wa_report",
+    "admin_fu2_wa_status",
+    "admin_req_check",
+    "admin_req_get",
+    "admin_req_history",
+    "admin_req_month_get",
+    "admin_req_month_save",
+    "admin_req_save_global",
+    "admin_req_save_group"
+  ]
+}

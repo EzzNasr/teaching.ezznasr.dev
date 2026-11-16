@@ -1675,6 +1675,16 @@
         "node",
         "tests/test_ref_inventory.js"
       ]
+    },
+    {
+      "id": "R-REF-2",
+      "title": "Refactor guard: every backend action (Code.gs router, follow-up routes, attendance) is named by a test; actions tested only by the authorization lists may only shrink (fixtures/action_baseline.json); every P4_ACTIONS / P3_STAFF_ALLOW / P4_ASSISTANT_DENY name is a routed action; a new action must be added to P4_ACTIONS or listed as teacher-denied on purpose",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "cmd": [
+        "node",
+        "tests/test_ref_actions.js"
+      ]
     }
   ]
 }
