@@ -1,0 +1,5 @@
+# Every change needs the owner's review. Enforced only once branch protection on main turns on
+# "Require review from Code Owners" (GitHub settings). Note: that setting also makes teacher lesson pull requests
+# (docs/handoff/teacher-publishing.md) wait for the owner even when a teacher has auto_merge on.
+# Add a second maintainer here when there is one.
+* @EzzNasr

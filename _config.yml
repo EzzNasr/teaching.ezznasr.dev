@@ -3,6 +3,7 @@
 exclude:
   - tools
   - README.md
+  - CONTRIBUTING.md
   - package.json
   - package-lock.json
   - requirements-dev.txt
