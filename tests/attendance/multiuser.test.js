@@ -221,7 +221,7 @@ const crow = (D, sid, id) => detail(D, sid).checkins.find(c => c.student_id === 
   ok(cl.ok && cl.summary.present === 2 && cl.summary.flagged === 1 && D({ action: "att_close_session", token: t1.token, session_id: s1.session_id }).ok, "the admin may close a teacher's session; a teacher closes their own");
   ok(gas.sent.some(m => /session closed/i.test(m.text) && /Owner: Teacher Two/.test(m.text)), "Telegram close message names the owner");
   const ex1 = D({ action: "att_export", token: t1.token, session_id: s1.session_id }).csv.split("\r\n");
-  ok(ex1[0] === "student_id,name,server_utc,status,flags,dist_m,acc,geo_reason,review_status,review_note" && ex1.length === 3 && ex1.some(l => /^1002,Stu Two,.*GEO_UNAVAILABLE.*TIMEOUT/.test(l)), "export: own rows, with geo_reason + review columns");
+  ok(ex1[0] === "student_id,name,server_utc,status,flags,dist_m,acc,geo_reason,review_status,review_note,attendance" && ex1.length === 3 && ex1.some(l => /^1002,Stu Two,.*GEO_UNAVAILABLE.*TIMEOUT.*,present$/.test(l)), "export: own rows, with geo_reason + review columns");
 
   /* ───────────────────────── 4. review, history, overview ───────────────────────── */
   console.log("review");

@@ -323,7 +323,8 @@
       clear(box);
       if (!r.ok) return box.appendChild(mk("div", "Could not load: " + (r.error || r.code || "error"), "msg err"));
       var all = r.checkins || [], man = all.filter(function (c) { return /(^|,)MANUAL(,|$)/.test(c.flags || ""); });
-      $("manListTitle").textContent = "Entered by hand in this lecture: " + man.length + " (present in total: " + all.length + ")";
+      var present = all.filter(function (c) { return c.review_status !== "rejected"; }).length;
+      $("manListTitle").textContent = "Entered by hand in this lecture: " + man.length + " (present in total: " + present + ")";
       if (!man.length) return box.appendChild(mk("div", "Nobody entered by hand yet.", "msg"));
       var t = mk("table", null, "his"), h = mk("tr");
       ["Time", "Student", "Reason", "Entered by"].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
@@ -349,7 +350,8 @@
         return msg("manMsg", "Not saved: " + (r.error || r.code || "error"), "err");
       }
       var who = (r.name ? r.name + " (" + id + ")" : id), at = fTimeS.format(new Date(r.server_utc));
-      if (r.status === "already") msg("manMsg", who + " is already present (" + (r.manual ? "entered by hand" : "checked in by phone") + " at " + at + "). Nothing changed.", "ok");
+      if (r.overrode_reject) msg("manMsg", "\u2713 Marked present: " + who + ". Their phone check-in had been rejected; it now counts as present.", "ok");
+      else if (r.status === "already") msg("manMsg", who + " is already present (" + (r.manual ? "entered by hand" : "checked in by phone") + " at " + at + "). Nothing changed.", "ok");
       else msg("manMsg", "✓ Marked present: " + who + " at " + at + (r.new_student ? ". New student added to the roster." : "."), "ok");
       $("manId").value = ""; $("manName").value = ""; $("manNote").value = "";
       try { $("manId").focus(); } catch (e) {}
@@ -417,7 +419,7 @@
         if (x.dist_m !== "" && x.dist_m != null) why.appendChild(mk("div", Math.round(Number(x.dist_m)) + " m from the hall", "msg"));
         tr.appendChild(why);
         var d = mk("td", null, "dec");
-        if (x.review_status) d.appendChild(mk("div", (x.review_status === "accepted" ? "Accepted" : "Rejected") + (x.review_note ? ": " + x.review_note : ""), "tag " + (x.review_status === "accepted" ? "good" : "bad")));
+        if (x.review_status) d.appendChild(mk("div", (x.review_status === "accepted" ? "Accepted" : "Rejected \u00b7 counted absent") + (x.review_note ? ": " + x.review_note : ""), "tag " + (x.review_status === "accepted" ? "good" : "bad")));
         var note = mk("input", null, "note"); note.setAttribute("placeholder", "note (optional)"); note.value = x.review_note || "";
         var ok = mk("button", "Accept", "ok"), no = mk("button", "Reject", "bad");
         ok.onclick = function () { decideFlag(x, "accepted", note, [ok, no]); }; no.onclick = function () { decideFlag(x, "rejected", note, [ok, no]); };
@@ -464,12 +466,13 @@
     });
     groups = groups.slice(-lim);
     var gOf = {}; groups.forEach(function (g, i) { Object.keys(g.ids).forEach(function (id) { gOf[id] = i; }); });
-    var here = {}; // "groupIndex|studentId" -> attended
+    var here = {}, rej = {}; // "groupIndex|studentId" -> attended / rejected by the teacher (counted absent, D20)
     d.marks.forEach(function (m) { if (m[0] in gOf) here[gOf[m[0]] + "|" + m[1]] = true; });
+    (d.rejected || []).forEach(function (m) { if (m[0] in gOf) rej[gOf[m[0]] + "|" + m[1]] = true; });
     var rows = d.students.filter(function (s) { return !q || String(s.student_id).toLowerCase().indexOf(q) >= 0 || String(s.name || "").toLowerCase().indexOf(q) >= 0; })
       .map(function (s) {
-        var cells = groups.map(function (g, i) { return !!here[i + "|" + s.student_id]; });
-        var n = cells.filter(Boolean).length;
+        var cells = groups.map(function (g, i) { var k = i + "|" + s.student_id; return here[k] ? true : rej[k] ? "rej" : false; });   // a same-day phone or hand check-in wins over a rejected one
+        var n = cells.filter(function (c) { return c === true; }).length;
         return { id: s.student_id, name: s.name || "", cells: cells, n: n, pct: groups.length ? Math.round(100 * n / groups.length) : 0 };
       }).sort(function (a, b) { return (a.name || "\uffff").localeCompare(b.name || "\uffff") || String(a.id).localeCompare(String(b.id)); });
     return { sessions: groups, rows: rows };
@@ -477,7 +480,7 @@
   function renderRoster() {
     var box = $("rosTable"); clear(box);
     var m = rosterModel();
-    msg("rosMsg", m.rows.length + " student" + (m.rows.length === 1 ? "" : "s") + " · " + m.sessions.length + " lecture" + (m.sessions.length === 1 ? "" : "s") + " · ✓ = present");
+    msg("rosMsg", m.rows.length + " student" + (m.rows.length === 1 ? "" : "s") + " · " + m.sessions.length + " lecture" + (m.sessions.length === 1 ? "" : "s") + " · ✓ = present · ✗ = rejected (counted absent)");
     if (!m.rows.length) return;
     var t = mk("table", null, "ros"), h = mk("tr");
     h.appendChild(mk("th", "Student", "l")); h.appendChild(mk("th", "Attended")); h.appendChild(mk("th", "%"));
@@ -489,7 +492,10 @@
       var tr = mk("tr"), td0 = mk("td", null, "l");
       td0.appendChild(mk("b", r.name || "(no name)")); td0.appendChild(mk("small", String(r.id))); tr.appendChild(td0);
       tr.appendChild(mk("td", r.n + " / " + m.sessions.length)); tr.appendChild(mk("td", r.pct + "%"));
-      r.cells.forEach(function (c) { tr.appendChild(c ? mk("td", "\u2713", "pre") : mk("td", "\u2013", "abs")); });
+      r.cells.forEach(function (c) {
+        if (c === "rej") { var x = mk("td", "\u2717", "abs rejc"); x.setAttribute("title", "Rejected by the teacher: counted absent"); tr.appendChild(x); }
+        else tr.appendChild(c ? mk("td", "\u2713", "pre") : mk("td", "\u2013", "abs"));
+      });
       t.appendChild(tr);
     });
     box.appendChild(t);
@@ -505,7 +511,7 @@
     var head = ["student_id", "name", "present", "total", "percent"].concat(m.sessions.map(function (x) { return fDate.format(new Date(x.start_utc)) + " " + (x.course || ""); }));
     var lines = [head.map(csvCell).join(",")];
     m.rows.forEach(function (r) {
-      lines.push([r.id, r.name, r.n, m.sessions.length, r.pct].concat(r.cells.map(function (c) { return c ? "Present" : "Absent"; })).map(csvCell).join(","));
+      lines.push([r.id, r.name, r.n, m.sessions.length, r.pct].concat(r.cells.map(function (c) { return c === true ? "Present" : c === "rej" ? "Absent (rejected)" : "Absent"; })).map(csvCell).join(","));
     });
     var blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
     var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -618,7 +624,7 @@
       var s = r.session, t = r.summary || {};
       H.rows = r.checkins || [];
       $("detTitle").textContent = (s.course || "") + " · " + (s.room_name || "") + " · " + when(s.start_utc) + (S.role === "admin" ? " · " + (s.owner_name || s.owner_user_id || "") : "");
-      $("detSummary").textContent = (t.present | 0) + " present · " + (t.flagged | 0) + " looked unusual · " + (t.unreviewed | 0) + " still to decide";
+      $("detSummary").textContent = (t.present | 0) + " present · " + (t.flagged | 0) + " looked unusual · " + (t.unreviewed | 0) + " still to decide" + ((t.rejected | 0) ? " · " + t.rejected + " rejected (counted absent)" : "");
       renderDetail();
     });
   }
@@ -638,7 +644,7 @@
       tr.appendChild(mk("td", r.dist_m == null ? "" : Math.round(r.dist_m) + " m", "n")); tr.appendChild(mk("td", r.acc == null ? "" : Math.round(r.acc) + " m", "n"));
       tr.appendChild(mk("td", r.geo_reason || ""));
       var rv = mk("td");
-      if (r.review_status) { rv.appendChild(mk("span", r.review_status, "tag " + (r.review_status === "accepted" ? "good" : "bad"))); if (r.review_note) rv.appendChild(mk("div", r.review_note, "msg")); if (r.reviewed_by_name || r.reviewed_at) rv.appendChild(mk("div", (r.reviewed_by_name || "") + (r.reviewed_at ? " · " + when(r.reviewed_at) : ""), "msg")); }
+      if (r.review_status) { rv.appendChild(mk("span", r.review_status === "rejected" ? "rejected \u00b7 counted absent" : r.review_status, "tag " + (r.review_status === "accepted" ? "good" : "bad"))); if (r.review_note) rv.appendChild(mk("div", r.review_note, "msg")); if (r.reviewed_by_name || r.reviewed_at) rv.appendChild(mk("div", (r.reviewed_by_name || "") + (r.reviewed_at ? " · " + when(r.reviewed_at) : ""), "msg")); }
       else rv.appendChild(mk("span", isFlagged(r) ? "to review" : "", "msg"));
       tr.appendChild(rv);
       var d = mk("td", null, "dec"), note = mk("input", null, "note"); note.setAttribute("placeholder", "note (optional)"); note.value = r.review_note || "";

@@ -150,6 +150,9 @@ function att_withLock_(fn) {
   if (!lock.tryLock(ATT_C.LOCK_MS)) return att_err_("BUSY", "Server busy, try again");
   try { return fn(); } finally { lock.releaseLock(); }
 }
+/** A check-in the teacher rejected (Needs review / History) counts as ABSENT everywhere: totals, roster, CSV, live counter, Telegram
+ *  summary (2026-11-16, decisions D20). The row is kept, so the decision can still be changed back to Accepted. */
+function att_isRejected_(r) { return !!r && String(r.review_status || "") === "rejected"; }
 function att_clean_(o) { var c = {}; Object.keys(o).forEach(function (k) { if (k !== "_row") c[k] = o[k]; }); return c; }
 
 function att_getSession_(id) {
@@ -519,7 +522,8 @@ function att_startSession_(p, u) {
 function att_counts_(sessionId, ownerId) {
   var rows = att_rows_("AttCheckins").filter(function (r) { return r.session_id === sessionId; });
   var pending = att_rows_("AttRequests").filter(function (r) { return r.status === "pending" && (ownerId == null || att_ownerOf_(r) === ownerId); }).length;
-  return { rows: rows, present: rows.length, flagged: rows.filter(function (r) { return r.status === "review"; }).length, pending: pending };
+  var rejected = rows.filter(att_isRejected_).length;
+  return { rows: rows, present: rows.length - rejected, rejected: rejected, flagged: rows.filter(function (r) { return r.status === "review"; }).length, pending: pending };
 }
 
 function att_closeSession_(p, u) {
@@ -532,7 +536,7 @@ function att_closeSession_(p, u) {
     att_withLock_(function () { att_update_("AttSessions", row._row, { status: "closed", close_utc: nowIso }); return true; });
     s.status = "closed"; s.close_utc = nowIso; att_cput_("att:s:" + s.session_id, s);
   }
-  var c = att_counts_(s.session_id, att_ownerOf_(s)), summary = { present: c.present, flagged: c.flagged, pending: c.pending };
+  var c = att_counts_(s.session_id, att_ownerOf_(s)), summary = { present: c.present, rejected: c.rejected, flagged: c.flagged, pending: c.pending };
   att_safeNotify_("session_close", { session_id: s.session_id, course: s.course, summary: summary, owner_name: s.owner_name || "" });
   return att_ok_({ summary: summary });
 }
@@ -568,7 +572,7 @@ function att_feed_(sessionId, u) {
   var names = {}; att_rows_("AttStudents").forEach(function (x) { names[x.student_id] = x; });
   var ev = [], here = {};
   att_rows_("AttCheckins").forEach(function (r) {
-    if (r.session_id !== sessionId) return;
+    if (r.session_id !== sessionId || att_isRejected_(r)) return;
     here[r.student_id] = 1;
     ev.push({ t: r.server_utc, k: "att", n: (names[r.student_id] || {}).name || "", id: r.student_id });
   });
@@ -605,7 +609,7 @@ function att_live_(p, u) {
     registered = Object.keys(seen).length;
   }
   var recent = c.rows.slice(-10).reverse().map(function (r) { return { student_id: r.student_id, server_utc: r.server_utc, status: r.status }; });
-  return att_ok_({ registered: registered, present: c.present, flagged: c.flagged, pending: c.pending, recent: recent, feed: att_feed_(sid, u) });
+  return att_ok_({ registered: registered, present: c.present, rejected: c.rejected, flagged: c.flagged, pending: c.pending, recent: recent, feed: att_feed_(sid, u) });
 }
 
 function att_rooms_(p, u) {
@@ -720,8 +724,10 @@ function att_roster_(p, u) {
   sessions = sessions.slice(Math.max(0, sessions.length - limit));
   var inSet = {}; sessions.forEach(function (x) { inSet[x.session_id] = 1; });
   var checkins = att_rows_("AttCheckins");
-  var marks = checkins.filter(function (r) { return inSet[r.session_id]; })
+  var marks = checkins.filter(function (r) { return inSet[r.session_id] && !att_isRejected_(r); })
     .map(function (r) { return [r.session_id, r.student_id, r.server_utc, r.status]; });
+  var rejected = checkins.filter(function (r) { return inSet[r.session_id] && att_isRejected_(r); })
+    .map(function (r) { return [r.session_id, r.student_id, r.server_utc, r.review_note || ""]; });
   var known = null;
   if (owner != null) { known = {}; checkins.forEach(function (r) { if (scopeIds[r.session_id]) known[r.student_id] = 1; }); }
   var students = att_rows_("AttStudents").filter(function (x) { return x.status === "active" && (known === null || known[x.student_id]); })
@@ -729,7 +735,7 @@ function att_roster_(p, u) {
   return att_ok_({
     students: students,
     sessions: sessions.map(function (x) { return { session_id: x.session_id, course: x.course, room_id: x.room_id, start_utc: x.start_utc, status: x.status, owner_user_id: att_ownerOf_(x), owner_name: x.owner_name || "" }; }),
-    marks: marks, courses: courses });
+    marks: marks, rejected: rejected, courses: courses });
 }
 
 function att_csvCell_(v) {
@@ -742,9 +748,9 @@ function att_export_(p, u) {
   var sc = att_scopeSession_(u, String(p.session_id || "")); if (sc.err) return sc.err;
   var sid = sc.s.session_id;
   var names = {}; att_rows_("AttStudents").forEach(function (s) { names[s.student_id] = s.name; });
-  var lines = [["student_id", "name", "server_utc", "status", "flags", "dist_m", "acc", "geo_reason", "review_status", "review_note"].join(",")];
+  var lines = [["student_id", "name", "server_utc", "status", "flags", "dist_m", "acc", "geo_reason", "review_status", "review_note", "attendance"].join(",")];
   att_rows_("AttCheckins").filter(function (r) { return r.session_id === sid; }).forEach(function (r) {
-    lines.push([r.student_id, names[r.student_id] || "", r.server_utc, r.status, r.flags, r.dist_m, r.acc, r.geo_reason, r.review_status, r.review_note].map(att_csvCell_).join(","));
+    lines.push([r.student_id, names[r.student_id] || "", r.server_utc, r.status, r.flags, r.dist_m, r.acc, r.geo_reason, r.review_status, r.review_note, att_isRejected_(r) ? "absent (rejected)" : "present"].map(att_csvCell_).join(","));
   });
   return att_ok_({ csv: lines.join("\r\n") });
 }
@@ -752,23 +758,24 @@ function att_export_(p, u) {
 /* ───────── session history, overview, review (plan §4.6) ───────── */
 var ATT_GEO_FLAGS_ = ["GEO_DENIED", "GEO_UNAVAILABLE", "GEO_SKIPPED", "GEO_FAR", "GEO_WEAK"];
 
-/** {present, flagged, unreviewed, geo:{GEO_*: n}} for a list of AttCheckins rows. unreviewed = flagged (status review) with no review decision yet. */
+/** {present, rejected, flagged, unreviewed, geo:{GEO_*: n}} for a list of AttCheckins rows. present leaves out rejected check-ins (D20);
+ *  flagged still counts them (it is what looked unusual); unreviewed = flagged (status review) with no review decision yet. */
 function att_tally_(rows) {
   var t = att_newBucket_(); delete t.sessions;
   rows.forEach(function (r) {
-    t.present++;
+    if (att_isRejected_(r)) t.rejected++; else t.present++;
     if (r.status === "review") { t.flagged++; if (!r.review_status) t.unreviewed++; }
     String(r.flags || "").split(",").forEach(function (c) { if (c && att_has_(t.geo, c)) t.geo[c]++; });
   });
   return t;
 }
 function att_newBucket_() {
-  var b = { sessions: 0, present: 0, flagged: 0, unreviewed: 0, geo: {} };
+  var b = { sessions: 0, present: 0, rejected: 0, flagged: 0, unreviewed: 0, geo: {} };
   ATT_GEO_FLAGS_.forEach(function (c) { b.geo[c] = 0; });
   return b;
 }
 function att_bucketAdd_(b, t) {
-  b.sessions++; b.present += t.present; b.flagged += t.flagged; b.unreviewed += t.unreviewed;
+  b.sessions++; b.present += t.present; b.rejected += t.rejected; b.flagged += t.flagged; b.unreviewed += t.unreviewed;
   ATT_GEO_FLAGS_.forEach(function (c) { b.geo[c] += t.geo[c]; });
 }
 function att_groupBySession_(rows) {
@@ -808,7 +815,7 @@ function att_sessionsList_(p, u) {
     sessions: page.map(function (s) {
       var t = att_tally_(by[s.session_id] || []), o = att_ownerOf_(s);
       return { session_id: s.session_id, course: s.course, room_id: s.room_id, room_name: rooms[s.room_id] || "", start_utc: s.start_utc, close_utc: s.close_utc, status: s.status,
-        owner_user_id: o, owner_name: names[o] || s.owner_name || "", present: t.present, flagged: t.flagged, unreviewed: t.unreviewed, geo: t.geo };
+        owner_user_id: o, owner_name: names[o] || s.owner_name || "", present: t.present, rejected: t.rejected, flagged: t.flagged, unreviewed: t.unreviewed, geo: t.geo };
     }),
     next_cursor: more ? att_sessKey_(page[page.length - 1]) : null });
 }
@@ -870,6 +877,12 @@ function att_manualCheckin_(p, u) {
   var name = String(p.name == null ? "" : p.name).replace(/\s+/g, " ").trim().slice(0, ATT_C.NAME_MAX);
   var res = att_withLock_(function () {
     var cur = att_rows_("AttCheckins").filter(function (r) { return r.session_id === s.session_id && r.student_id === sid; })[0];
+    if (cur && att_isRejected_(cur)) {
+      var when = att_iso_(), was = cur.review_note ? " (was rejected: " + cur.review_note + ")" : " (was rejected)";
+      att_update_("AttCheckins", cur._row, { review_status: "accepted", reviewed_by: u.user_id, reviewed_at: when,
+        review_note: ("Manual entry: " + ATT_MANUAL_REASONS_[reason] + (note ? " - " + note : "") + was).slice(0, 500) });
+      return att_ok_({ status: "recorded", server_utc: cur.server_utc, name: att_studentName_(sid), overrode_reject: true });
+    }
     if (cur) return att_ok_({ status: "already", server_utc: cur.server_utc, manual: cur.device_id === "MANUAL", name: att_studentName_(sid) });
     var st = att_rows_("AttStudents").filter(function (x) { return x.student_id === sid; })[0], created = false, nowIso = att_iso_();
     if (!st) {
