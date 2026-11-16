@@ -30,6 +30,7 @@ step; no change to backend or student-facing behaviour.
 | Step | What | Why | Commit |
 |---|---|---|---|
 | 1.1 | `tools/quiz-maker-v2/tests/_shots/` is git-ignored and its 20 committed screenshots untracked (still on disk, still in history) | The browser tests rewrite them on every run, so every gate run left 15-18 changed files. Nothing reads or embeds them (`build_zip.py` already excluded the folder). Full gate green and the tree stays clean after a run | see `git log` |
+| 1.2 | Pinned test dependencies: root `package.json` (private, dev only: jsdom 24.1.3) + `package-lock.json`; `requirements-dev.txt` (Playwright 1.64.1, Pillow 13.0.0). CI installs with `npm ci` and `pip install -r requirements-dev.txt`. `npm test` / `npm run test:all` wrap the gate. The new files are excluded from the published site (`_config.yml`); `node_modules/` is ignored | CI used to install whatever version was newest that day, so a dependency release could turn the gate red (or a compromised one could run in CI) with no code change. `npm ci` from the lockfile was proven in a clean folder, then the full gate ran green on an `npm ci` install. **Not yet run on GitHub Actions** (nothing is pushed) | see `git log` |
 
 ## Notes and follow-ups found along the way
 

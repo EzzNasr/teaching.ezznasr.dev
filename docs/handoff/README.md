@@ -47,8 +47,8 @@ Private documents (outside the repo, in the owner's `Docs/` folder; ask the owne
 # 1. The test gate (Node 18+, Python 3.10+). Fast part: seconds.
 bash scripts/test_all.sh
 
-# 2. Everything, as CI runs it (needs jsdom, Playwright and Chromium).
-npm install --no-save jsdom@24 && pip install playwright pillow && python -m playwright install chromium
+# 2. Everything, as CI runs it (pinned jsdom, Playwright, Pillow, plus Chromium).
+npm ci && pip install -r requirements-dev.txt && python -m playwright install chromium
 PYTHONIOENCODING=utf-8 bash scripts/test_all.sh --strict --e2e --require-all
 
 # 3. The site: any static server from the repo root.

@@ -1,0 +1,4 @@
+# Python packages the test gate needs (browser tests and the photo-capture tests). Not used by the site.
+# Install: pip install -r requirements-dev.txt && python -m playwright install --with-deps chromium
+playwright==1.64.1
+pillow==13.0.0
