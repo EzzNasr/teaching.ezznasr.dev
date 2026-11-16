@@ -139,7 +139,10 @@ class TagsTab(ttk.Frame):
         site_root = self.site_root_var.get().strip()
         self.lessons = find_grade_lessons(site_root) if site_root and os.path.isdir(site_root) else []
         self._fill_list()
-        if not self._loaded_once and self.lessons:
+        cfg = common.get_drive_config(common.load_config())
+        if not self._loaded_once and self.lessons and cfg["web_app_url"] and cfg["admin_token"]:
+            # first look at the tab pulls the tags; without a Drive bridge it waits quietly (no error popup
+            # at startup) and "Load tags from server" still explains what is missing
             self._loaded_once = True
             self._load_tags()
 
@@ -181,7 +184,7 @@ class TagsTab(ttk.Frame):
         cfg = common.get_drive_config(common.load_config())
         if not cfg["web_app_url"] or not cfg["admin_token"]:
             messagebox.showerror("Drive bridge not configured",
-                                 "Set the Web App URL and admin token first (\"Configure...\" at the top of the window).",
+                                 "Set the Web App URL and admin token first (\"Drive bridge settings…\", bottom left).",
                                  parent=self)
             return None
         return cfg
