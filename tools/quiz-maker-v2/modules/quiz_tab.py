@@ -21,7 +21,7 @@ import tkinter as tk
 import webbrowser
 from tkinter import ttk, messagebox, filedialog
 
-from modules import common, drive_bridge
+from modules import common, drive_bridge, background
 from modules.common import (
     GRADED_BULK_HELP,
     parse_bulk_graded_questions,
@@ -253,7 +253,8 @@ class QuizTab(ttk.Frame):
         tk.Label(row_sol, text="Video URL:", width=14, anchor="w").pack(side="left")
         self.quiz_solution_video_var = tk.StringVar()
         tk.Entry(row_sol, textvariable=self.quiz_solution_video_var).pack(side="left", fill="x", expand=True)
-        tk.Button(row_sol, text="Update", command=self._update_quiz_solution_video).pack(side="left", padx=6)
+        self.solution_update_btn = tk.Button(row_sol, text="Update", command=self._update_quiz_solution_video)
+        self.solution_update_btn.pack(side="left", padx=6)
         tk.Label(solution_frame,
                  text="A homework-solving/walkthrough video embedded directly on this lesson's quiz.html page "
                       "(separate from the intro video above, which lives on the lesson's main page). Paste any "
@@ -275,8 +276,9 @@ class QuizTab(ttk.Frame):
 
         btn_row_del = tk.Frame(del_frame)
         btn_row_del.pack(fill="x", padx=8, pady=(0, 4))
-        tk.Button(btn_row_del, text="Load for editing", command=self._load_lesson_for_edit,
-                  font=("TkDefaultFont", 9, "bold")).pack(side="left")
+        self.load_btn = tk.Button(btn_row_del, text="Load for editing", command=self._load_lesson_for_edit,
+                                  font=("TkDefaultFont", 9, "bold"))
+        self.load_btn.pack(side="left")
         tk.Button(btn_row_del, text="Preview in browser", command=self._preview_lesson).pack(side="left", padx=6)
         tk.Button(btn_row_del, text="Delete lesson...", command=self._delete_lesson,
                   fg="#8a1f1f").pack(side="left")
@@ -330,8 +332,9 @@ class QuizTab(ttk.Frame):
 
         gen_row = tk.Frame(self)
         gen_row.pack(fill="x", padx=10, pady=12)
-        tk.Button(gen_row, text="Generate lesson files", command=self._generate,
-                  font=("TkDefaultFont", 10, "bold"), height=2).pack(fill="x")
+        self.generate_btn = tk.Button(gen_row, text="Generate lesson files", command=self._generate,
+                                      font=("TkDefaultFont", 10, "bold"), height=2)
+        self.generate_btn.pack(fill="x")
 
         self._refresh_groups()
 
@@ -447,37 +450,46 @@ class QuizTab(ttk.Frame):
         quiz_path = os.path.join(lesson_dir, "quiz.html")
         lesson_key = common.lesson_url_path(subject_slug, group_relpath, lesson_slug)
         drive_cfg = common.get_drive_config(common.load_config())
+        video_url = self.quiz_solution_video_var.get()
 
-        try:
-            embed_url, used_backend = common.set_lesson_video(
+        # The backend call (and the page write after it) runs off the Tk thread; see modules/background.py.
+        def task(job):
+            return common.set_lesson_video(
                 drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "quiz",
-                self.quiz_solution_video_var.get(), lesson_slug.replace("-", " ").title(), quiz_path)
-        except FileNotFoundError:
-            messagebox.showerror("No quiz page found",
-                                  "{}/quiz.html doesn't exist yet \u2014 generate this lesson first.".format(lesson_slug))
-            return
-        except ValueError:
-            messagebox.showerror("Couldn't find the video area",
-                                  "This lesson's quiz.html doesn't have the expected media-slot section \u2014 "
-                                  "it may have been hand-edited or use an older template.")
-            return
-        except drive_bridge.DriveBridgeError as e:
-            messagebox.showerror("Couldn't reach the Drive bridge", str(e))
-            return
+                video_url, lesson_slug.replace("-", " ").title(), quiz_path)
 
-        if embed_url != self.quiz_solution_video_var.get().strip():
-            self.quiz_solution_video_var.set(embed_url)
-        self.status_var.set("Updated solution video for {}/{} quiz page".format(subject_slug, lesson_slug))
-        if not embed_url:
-            messagebox.showinfo("Done", "Quiz solution video cleared.")
-        elif used_backend:
-            messagebox.showinfo("Done", "Quiz solution video updated (starts locked if new \u2014 unlock it from "
-                                         "the dashboard once you're ready).")
-        else:
-            messagebox.showinfo("Done", "Quiz solution video updated.\n\nNote: the Drive bridge Web App URL/admin "
-                                         "token aren't set (top of the window), so this video was baked in as a "
-                                         "plain, unprotected embed \u2014 configure the Drive bridge to make it "
-                                         "lockable.")
+        def failed(e):
+            self.status_var.set("Solution video not updated.")
+            if isinstance(e, FileNotFoundError):
+                messagebox.showerror("No quiz page found",
+                                      "{}/quiz.html doesn't exist yet \u2014 generate this lesson first.".format(lesson_slug))
+            elif isinstance(e, ValueError):
+                messagebox.showerror("Couldn't find the video area",
+                                      "This lesson's quiz.html doesn't have the expected media-slot section \u2014 "
+                                      "it may have been hand-edited or use an older template.")
+            elif isinstance(e, drive_bridge.DriveBridgeError):
+                messagebox.showerror("Couldn't reach the Drive bridge", str(e))
+            else:
+                messagebox.showerror("Solution video not updated", "{}: {}".format(e.__class__.__name__, e))
+
+        def done(result):
+            embed_url, used_backend = result
+            if embed_url != self.quiz_solution_video_var.get().strip():
+                self.quiz_solution_video_var.set(embed_url)
+            self.status_var.set("Updated solution video for {}/{} quiz page".format(subject_slug, lesson_slug))
+            if not embed_url:
+                messagebox.showinfo("Done", "Quiz solution video cleared.")
+            elif used_backend:
+                messagebox.showinfo("Done", "Quiz solution video updated (starts locked if new \u2014 unlock it from "
+                                             "the dashboard once you're ready).")
+            else:
+                messagebox.showinfo("Done", "Quiz solution video updated.\n\nNote: the Drive bridge Web App URL/admin "
+                                             "token aren't set (top of the window), so this video was baked in as a "
+                                             "plain, unprotected embed \u2014 configure the Drive bridge to make it "
+                                             "lockable.")
+
+        background.run_in_background(self, task, done, failed, name="Updating the quiz solution video",
+                                     disable=[self.solution_update_btn])
 
     def _load_lesson_for_edit(self):
         site_root = self.site_root_var.get().strip()
@@ -522,29 +534,57 @@ class QuizTab(ttk.Frame):
         # the Drive-bridge Videos sheet over whatever's baked in the page --
         lesson_key = common.lesson_url_path(subject_slug, group_relpath, lesson_slug)
         drive_cfg = common.get_drive_config(common.load_config())
+        index_path = os.path.join(lesson_dir, "index.html")
 
-        # Once a lesson's quiz content has been synced (set_quiz_content, in
-        # _generate() below), quiz.html itself may only carry meta (title/
-        # subject/lesson) — the questions live server-side instead, same as
-        # a synced video's URL isn't baked into the page either. Prefer that
-        # stored copy here so re-opening a synced lesson for editing doesn't
-        # show an empty question list; falls back to whatever's already in
-        # the page (legacy pages, or no Drive bridge configured) otherwise.
-        if drive_cfg["web_app_url"] and drive_cfg["admin_token"]:
-            try:
-                synced_quiz = drive_bridge.get_quiz_content(
-                    drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key)
-            except drive_bridge.DriveBridgeError:
-                synced_quiz = None
-            if synced_quiz and isinstance(synced_quiz.get("questions"), list):
-                questions = synced_quiz["questions"]
-                if any(isinstance(q, dict) and q.get("type") == "written" for q in questions):
-                    try:   # model answers live in WrittenModels, not in the quiz content
-                        common.merge_written_models(questions, drive_bridge.get_written_models(
-                            drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key))
-                    except drive_bridge.DriveBridgeError as e:
-                        messagebox.showwarning("Model answers not loaded",
-                                               "Couldn't read the written questions' model answers:\n{}".format(e))
+        # Everything that asks the backend runs off the Tk thread (modules/background.py); only reads, so the
+        # user may cancel it. The form is only touched afterwards, in _apply_loaded_lesson().
+        def fetch(job):
+            out = {"questions": questions, "models_error": None}
+            # Once a lesson's quiz content has been synced (set_quiz_content, in
+            # _generate() below), quiz.html itself may only carry meta (title/
+            # subject/lesson) — the questions live server-side instead, same as
+            # a synced video's URL isn't baked into the page either. Prefer that
+            # stored copy here so re-opening a synced lesson for editing doesn't
+            # show an empty question list; falls back to whatever's already in
+            # the page (legacy pages, or no Drive bridge configured) otherwise.
+            if drive_cfg["web_app_url"] and drive_cfg["admin_token"]:
+                try:
+                    synced_quiz = drive_bridge.get_quiz_content(
+                        drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key)
+                except drive_bridge.DriveBridgeError:
+                    synced_quiz = None
+                if synced_quiz and isinstance(synced_quiz.get("questions"), list):
+                    out["questions"] = synced_quiz["questions"]
+                    if any(isinstance(q, dict) and q.get("type") == "written" for q in out["questions"]):
+                        try:   # model answers live in WrittenModels, not in the quiz content
+                            common.merge_written_models(out["questions"], drive_bridge.get_written_models(
+                                drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key))
+                        except drive_bridge.DriveBridgeError as e:
+                            out["models_error"] = str(e)
+            if job.cancelled:
+                return out
+            out["video_url"] = common.get_lesson_video_url(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "lesson", index_path)
+            out["quiz_solution_video_url"] = common.get_lesson_video_url(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "quiz", quiz_path)
+            return out
+
+        def failed(e):
+            self.status_var.set("Couldn't load {}.".format(lesson_slug))
+            messagebox.showerror("Couldn't load the lesson", "{}: {}".format(e.__class__.__name__, e))
+
+        background.run_in_background(
+            self, fetch,
+            lambda out: self._apply_loaded_lesson(out, quiz_json, subject_slug, group_relpath, lesson_slug,
+                                                  lesson_dir, index_path),
+            failed, name="Loading {} for editing".format(lesson_slug), disable=[self.load_btn], cancellable=True)
+
+    def _apply_loaded_lesson(self, out, quiz_json, subject_slug, group_relpath, lesson_slug, lesson_dir, index_path):
+        """Main thread: the second half of _load_lesson_for_edit, once the backend has answered."""
+        questions = out["questions"]
+        if out["models_error"] is not None:
+            messagebox.showwarning("Model answers not loaded",
+                                   "Couldn't read the written questions' model answers:\n{}".format(out["models_error"]))
 
         if self.questions or self.lesson_name_var.get().strip():
             if not messagebox.askyesno(
@@ -553,12 +593,12 @@ class QuizTab(ttk.Frame):
                     "list currently in the form below with {}'s saved content.\n\n"
                     "Anything you've typed here that hasn't been generated yet will be lost. Continue?".format(
                         lesson_slug)):
+                self.status_var.set("Load cancelled \u2014 the form was left as it was.")
                 return
 
         # -- description, from index.html (best-effort; quiz.html alone
         # doesn't carry it) --------------------------------------------
         lesson_desc = ""
-        index_path = os.path.join(lesson_dir, "index.html")
         if os.path.isfile(index_path):
             with open(index_path, "r", encoding="utf-8") as f:
                 index_content = f.read()
@@ -566,12 +606,8 @@ class QuizTab(ttk.Frame):
             if desc_match:
                 lesson_desc = desc_match.group(1).strip()
 
-        # -- video (lesson page) and solution video (quiz.html), preferring
-        # the Drive-bridge Videos sheet over whatever's baked in the page --
-        video_url = common.get_lesson_video_url(
-            drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "lesson", index_path)
-        quiz_solution_video_url = common.get_lesson_video_url(
-            drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "quiz", quiz_path)
+        video_url = out["video_url"]
+        quiz_solution_video_url = out["quiz_solution_video_url"]
 
         # -- assignment prompt + whether one exists, from assignment.html --
         # (submission mode itself is left alone here — see _generate(),
@@ -914,10 +950,39 @@ class QuizTab(ttk.Frame):
             if not messagebox.askyesno("Folder exists",
                                         "{}  already exists. Overwrite its files?".format(location_label)):
                 return
+
+        # Everything the files are made from, read from the form NOW: the writing (and the backend calls in
+        # between) runs in a worker thread, which must never touch a widget (modules/background.py).
+        inp = {
+            "site_root": site_root, "lesson_name": lesson_name, "subject_slug": subject_slug,
+            "subject_title": subject_title, "group_relpath": group_relpath, "lesson_slug": lesson_slug,
+            "lesson_dir": lesson_dir, "location_label": location_label,
+            "include_assignment": self.include_assignment_var.get(),
+            "questions": copy.deepcopy(self.questions),
+            "lesson_desc": self.lesson_desc_var.get().strip(),
+            "assign_prompt": self.assign_prompt_var.get().strip(),
+            "video_url": self.video_url_var.get(),
+        }
+        background.run_in_background(
+            self, lambda job: self._write_lesson_files(inp),
+            lambda res: self._on_generated(inp, res), lambda e: self._on_generate_failed(inp, e),
+            name="Generating {}".format(location_label), disable=[self.generate_btn])
+
+    @staticmethod
+    def _write_lesson_files(inp):
+        """Worker thread: write the lesson's files and call the backend. Same steps, same output as before
+        this ran in the background; dialogs are collected in `res` and shown by _on_generated."""
+        site_root, lesson_name = inp["site_root"], inp["lesson_name"]
+        subject_slug, subject_title = inp["subject_slug"], inp["subject_title"]
+        group_relpath, lesson_slug = inp["group_relpath"], inp["lesson_slug"]
+        lesson_dir, location_label = inp["lesson_dir"], inp["location_label"]
+        questions = inp["questions"]
+        res = {"sync_error": None, "new_video_url": None, "video_warning": None, "card_error": None,
+               "include_assignment": inp["include_assignment"]}
         os.makedirs(lesson_dir, exist_ok=True)
         common.write_lesson_stylesheets(lesson_dir)
 
-        include_assignment = self.include_assignment_var.get()
+        include_assignment = inp["include_assignment"]
 
         # Determined once, used both when (re)writing assignment.html below
         # and for the lesson-card link's description text further down.
@@ -944,7 +1009,7 @@ class QuizTab(ttk.Frame):
         # ---- quiz.html ----
         # Written questions: the model answer goes to the WrittenModels tab, never into the
         # quiz JSON (get_quiz serves that to every student) or the page.
-        public_questions, written_models = common.split_written_models(self.questions)
+        public_questions, written_models = common.split_written_models(questions)
         quiz_json = {
             "title": lesson_name,
             "subject": subject_slug,
@@ -975,10 +1040,7 @@ class QuizTab(ttk.Frame):
                     drive_bridge.set_written_models(
                         drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, written_models)
             except drive_bridge.DriveBridgeError as e:
-                messagebox.showerror(
-                    "Couldn't reach the Drive bridge",
-                    "The quiz's questions weren't synced to the server, so they've been kept "
-                    "in the page itself for now instead (same as before this feature):\n{}".format(e))
+                res["sync_error"] = str(e)      # shown by _on_generated, before the "Done" message
 
         quiz_meta = {"title": lesson_name, "subject": subject_slug, "lesson": lesson_slug}
         if not content_synced:
@@ -1000,7 +1062,7 @@ class QuizTab(ttk.Frame):
                      .replace("{{SUBJECT_SLUG}}", subject_slug)
                      .replace("{{LESSON_SLUG}}", lesson_slug)
                      .replace("{{LESSON_TITLE}}", lesson_name)
-                     .replace("{{QUESTION_COUNT}}", str(len(self.questions)))
+                     .replace("{{QUESTION_COUNT}}", str(len(questions)))
                      .replace("{{QUIZ_JSON}}", json.dumps(quiz_meta, indent=2))
                      .replace("{{VIDEO_BLOCK}}", quiz_video_block)
                      .replace("{{TRACK_CLASS}}", track_class)
@@ -1028,7 +1090,7 @@ class QuizTab(ttk.Frame):
                                 .replace("{{LESSON_SLUG}}", lesson_slug)
                                 .replace("{{LESSON_TITLE}}", lesson_name)
                                 .replace("{{SUBMIT_MODE}}", submit_mode)
-                                .replace("{{ASSIGN_PROMPT}}", self.assign_prompt_var.get().strip() or
+                                .replace("{{ASSIGN_PROMPT}}", inp["assign_prompt"] or
                                          "Paste your completed assignment below.")
                                 .replace("{{VIDEO_BLOCK}}", assign_video_block)
                                 .replace("{{TRACK_CLASS}}", track_class)
@@ -1066,9 +1128,9 @@ class QuizTab(ttk.Frame):
                               .replace("{{SUBJECT_TITLE}}", subject_title)
                               .replace("{{LESSON_SLUG}}", lesson_slug)
                               .replace("{{LESSON_TITLE}}", lesson_name)
-                              .replace("{{LESSON_DESC}}", self.lesson_desc_var.get().strip())
+                              .replace("{{LESSON_DESC}}", inp["lesson_desc"])
                               .replace("{{VIDEO_BLOCK}}", video_block)
-                              .replace("{{QUESTION_COUNT}}", str(len(self.questions)))
+                              .replace("{{QUESTION_COUNT}}", str(len(questions)))
                               .replace("{{ASSIGNMENT_LINK_BLOCK}}", assign_link_block)
                               .replace("{{TRACK_CLASS}}", track_class)
                      .replace("{{LESSON_URL_PATH}}", location_label))
@@ -1084,15 +1146,15 @@ class QuizTab(ttk.Frame):
         try:
             video_url, video_used_backend = common.set_lesson_video(
                 drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, "lesson",
-                self.video_url_var.get(), lesson_name, lesson_index_path)
+                inp["video_url"], lesson_name, lesson_index_path)
         except drive_bridge.DriveBridgeError as e:
-            video_url, video_used_backend = self.video_url_var.get().strip(), False
+            video_url, video_used_backend = inp["video_url"].strip(), False
             video_warning = ("The lesson's video couldn't be saved: {}\n\nEverything else was generated "
                               "normally \u2014 fix the Drive bridge connection and click Generate again, or "
                               "paste the video URL again once it's reachable.".format(e))
         else:
-            if video_url and video_url != self.video_url_var.get().strip():
-                self.video_url_var.set(video_url)
+            if video_url and video_url != inp["video_url"].strip():
+                res["new_video_url"] = video_url     # put back into the form by _on_generated
             if video_url and not video_used_backend:
                 video_warning = ("Drive bridge Web App URL/admin token aren't set (top of the window), so the "
                                   "lesson video was baked in as a plain, unprotected embed \u2014 configure the "
@@ -1104,25 +1166,58 @@ class QuizTab(ttk.Frame):
             with open(attachments_path, "w", encoding="utf-8") as f:
                 json.dump([], f)
 
+        res["video_warning"] = video_warning
+
         # ---- group/subject index.html: create or update the lesson's card ----
         index_path = common.group_index_path(site_root, subject_slug, group_relpath)
+        res["index_path"] = index_path
         try:
             style_used = common.upsert_lesson_card(
                 site_root, subject_slug, group_relpath, lesson_slug,
-                lesson_name, self.lesson_desc_var.get().strip(), len(self.questions))
+                lesson_name, inp["lesson_desc"], len(questions))
         except ValueError as e:
+            res["card_error"] = str(e)
+            return res
+        res["style_used"] = style_used
+
+        common.run_seo_build(site_root)  # titles / meta / sitemap for the new lesson
+        return res
+
+    def _on_generate_failed(self, inp, e):
+        """Main thread: an unexpected error while writing (disk full, permission denied...)."""
+        self.status_var.set("Generating {} failed: {}".format(inp["location_label"], e))
+        messagebox.showerror("Generate lesson files failed",
+                             "Something went wrong while writing {}:\n\n{}: {}\n\nSome of its files may "
+                             "already have been written; fix the problem and click Generate again.".format(
+                                 inp["lesson_dir"], e.__class__.__name__, e))
+
+    def _on_generated(self, inp, res):
+        """Main thread: show what the worker collected, then refresh the lesson lists."""
+        subject_slug, group_relpath, lesson_slug = inp["subject_slug"], inp["group_relpath"], inp["lesson_slug"]
+        lesson_dir, location_label = inp["lesson_dir"], inp["location_label"]
+        index_path = res["index_path"]
+        if res["sync_error"] is not None:
+            messagebox.showerror(
+                "Couldn't reach the Drive bridge",
+                "The quiz's questions weren't synced to the server, so they've been kept "
+                "in the page itself for now instead (same as before this feature):\n{}".format(res["sync_error"]))
+        if res["new_video_url"] and self.video_url_var.get() == inp["video_url"]:
+            self.video_url_var.set(res["new_video_url"])
+
+        if res["card_error"] is not None:
+            self.status_var.set("Generated {}/ but couldn't update the listing page.".format(location_label))
             messagebox.showerror("Couldn't update the listing page",
                                   "Lesson files were generated at:\n{}\n\nBut inserting the card into\n{}\n"
-                                  "failed:\n\n{}".format(lesson_dir, index_path, e))
+                                  "failed:\n\n{}".format(lesson_dir, index_path, res["card_error"]))
             self._editing = {"subject_slug": subject_slug, "group_relpath": group_relpath, "lesson_slug": lesson_slug}
             self._refresh_lessons()
             if self.on_lessons_changed:
                 self.on_lessons_changed()
             return
 
-        common.run_seo_build(site_root)  # titles / meta / sitemap for the new lesson
+        video_warning = res["video_warning"]
         status = "Generated {}/ ({} files) and updated {} ({} style)".format(
-            location_label, 3 if include_assignment else 2, index_path, style_used)
+            location_label, 3 if res["include_assignment"] else 2, index_path, res["style_used"])
         self.status_var.set(status + (" \u2014 video not saved, see popup" if video_warning else ""))
         done_msg = ("Lesson files created at:\n{}\n\nListing page updated:\n{}\n\n"
                      "Tip: switch to the Attachment Maker or Assignment Maker tabs to "
