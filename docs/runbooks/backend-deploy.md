@@ -56,5 +56,6 @@ Or open the `/exec` URL in a browser: the JSON has `version.commit`. `null` mean
   `docs/attendance/decisions.md`.
 - A new `.gs` file must be added to `apps_script/deploy.json` (the script refuses to deploy an unlisted file).
 - A change to scopes or web-app settings goes into `apps_script/appsscript.json` first, on purpose, in its own commit.
-- There is no staging project yet. It comes at the start of refactor Phase 3. Until then, check new screens after a
+- There is no staging project yet. It comes at the start of refactor Phase 3 (setup steps:
+  [staging-setup.md](staging-setup.md)). Until then, check new screens after a
   deploy with the demo data in the live sheet (`att_seedDemo` / `att_clearDemo`).
