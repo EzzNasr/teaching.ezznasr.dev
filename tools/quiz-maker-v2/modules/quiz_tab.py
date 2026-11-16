@@ -21,7 +21,8 @@ import tkinter as tk
 import webbrowser
 from tkinter import ttk, messagebox, filedialog
 
-from modules import common, drive_bridge, background
+from modules import common, drive_bridge, background, theme
+from modules.question_panel import QuestionPanel
 from modules.common import (
     GRADED_BULK_HELP,
     parse_bulk_graded_questions,
@@ -184,6 +185,13 @@ class QuizTab(ttk.Frame):
         common.enable_clipboard_shortcuts(self)
         self._build_form()
         self._bind_undo_redo()
+        # "Unsaved changes": any edit to the form or the question list since the last load / generate / clear
+        self.dirty = False
+        self._dirty_rev = 0
+        self.on_dirty_changed = None          # app_main shows the marker in the header
+        for var in (self.lesson_name_var, self.lesson_desc_var, self.video_url_var, self.include_assignment_var,
+                    self.assign_prompt_var):
+            var.trace_add("write", lambda *_a: self._mark_dirty())
 
     def _build_form(self):
         pad = {"padx": 10, "pady": 6}
@@ -243,7 +251,7 @@ class QuizTab(ttk.Frame):
         self.assign_prompt_var = tk.StringVar(value="Paste your completed assignment below.")
         tk.Entry(row5, textvariable=self.assign_prompt_var).pack(side="left", fill="x", expand=True)
         tk.Label(assign_frame, text="This creates a basic text-paste assignment page. For URL/file submission "
-                                     "modes, use the Assignment Maker tab after generating this lesson.",
+                                     "modes, use the Assignment section after generating this lesson.",
                  fg="gray30", font=("TkDefaultFont", 8)).pack(anchor="w", padx=8, pady=(0, 6))
 
         solution_frame = tk.LabelFrame(self, text="Solution video (shown on the quiz page itself)")
@@ -310,7 +318,9 @@ class QuizTab(ttk.Frame):
         self.chapter_combo.pack(side="left")
         tk.Label(chapter_row,
                  text="Applies to new questions added below (bulk paste can override per-block with \"Ch: N\").",
-                 fg="gray30", font=("TkDefaultFont", 8)).pack(side="left", padx=8)
+                 fg="gray30", font=("TkDefaultFont", 8), wraplength=330, justify="left").pack(side="left", padx=8)
+        tk.Button(chapter_row, text="Save draft...", command=self._save_draft).pack(side="right", padx=(6, 0))
+        tk.Button(chapter_row, text="Load draft...", command=self._load_draft).pack(side="right")
 
         btn_row = tk.Frame(q_frame)
         btn_row.pack(fill="x", padx=8, pady=6)
@@ -319,22 +329,12 @@ class QuizTab(ttk.Frame):
         tk.Button(btn_row, text="+ Matching", command=self._add_match).pack(side="left")
         tk.Button(btn_row, text="+ Written (photo)", command=self._add_written).pack(side="left", padx=6)
         tk.Button(btn_row, text="+ Bulk paste...", command=self._bulk_add).pack(side="left", padx=6)
-        # second row: act on the selected question, and drafts
-        btn_row2 = tk.Frame(q_frame)
-        btn_row2.pack(fill="x", padx=8, pady=(0, 6))
-        tk.Button(btn_row2, text="Edit selected", command=self._edit_question).pack(side="left")
-        tk.Button(btn_row2, text="Remove selected", command=self._remove_question).pack(side="left", padx=6)
-        tk.Button(btn_row2, text="Save draft...", command=self._save_draft).pack(side="right", padx=(6, 0))
-        tk.Button(btn_row2, text="Load draft...", command=self._load_draft).pack(side="right")
-
-        list_frame = tk.Frame(q_frame)
-        list_frame.pack(fill="both", expand=True, padx=8, pady=4)
-        self.q_listbox = tk.Listbox(list_frame)
-        self.q_listbox.pack(side="left", fill="both", expand=True)
-        scrollbar = tk.Scrollbar(list_frame, command=self.q_listbox.yview)
-        scrollbar.pack(side="right", fill="y")
-        self.q_listbox.config(yscrollcommand=scrollbar.set)
-        self.q_listbox.bind("<Double-Button-1>", lambda e: self._edit_question())
+        # the list: select several (Shift/Ctrl+click, Ctrl+A) and edit, duplicate, move, re-chapter or
+        # remove them together (modules/question_panel.py); every change is one Ctrl+Z step
+        self.qpanel = QuestionPanel(q_frame, get_items=lambda: self.questions, set_items=self._set_questions,
+                                    on_edit=self._edit_question_at, before_change=self._snapshot,
+                                    status_var=self.status_var, new_qid=common.new_written_qid)
+        self.qpanel.pack(fill="both", expand=True, padx=8, pady=(4, 8))
 
         gen_row = tk.Frame(self)
         gen_row.pack(fill="x", padx=10, pady=12)
@@ -386,7 +386,7 @@ class QuizTab(ttk.Frame):
     def _delete_lesson(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
         lesson_slug = self.delete_lesson_var.get().strip()
         if not lesson_slug:
@@ -413,7 +413,7 @@ class QuizTab(ttk.Frame):
         self._refresh_lessons()
         self.status_var.set("Deleted lesson {}/{}/{} — moved to {}".format(
             subject_slug, group_relpath, lesson_slug, moved_to))
-        messagebox.showinfo("Deleted", "Removed {}/{}/{} from the site.\n\nMoved to:\n{}".format(
+        theme.notify(self, "Deleted", "Removed {}/{}/{} from the site.\n\nMoved to:\n{}".format(
             subject_slug, group_relpath, lesson_slug, moved_to))
         if self.on_lessons_changed:
             self.on_lessons_changed()
@@ -421,7 +421,7 @@ class QuizTab(ttk.Frame):
     def _preview_lesson(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
         lesson_slug = self.delete_lesson_var.get().strip()
         if not lesson_slug:
@@ -452,7 +452,7 @@ class QuizTab(ttk.Frame):
         selected in the 'Open an existing lesson' combo."""
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
         lesson_slug = self.delete_lesson_var.get().strip()
         if not lesson_slug:
@@ -492,13 +492,13 @@ class QuizTab(ttk.Frame):
                 self.quiz_solution_video_var.set(embed_url)
             self.status_var.set("Updated solution video for {}/{} quiz page".format(subject_slug, lesson_slug))
             if not embed_url:
-                messagebox.showinfo("Done", "Quiz solution video cleared.")
+                theme.notify(self, "Done", "Quiz solution video cleared.")
             elif used_backend:
-                messagebox.showinfo("Done", "Quiz solution video updated (starts locked if new \u2014 unlock it from "
+                theme.notify(self, "Done", "Quiz solution video updated (starts locked if new \u2014 unlock it from "
                                              "the dashboard once you're ready).")
             else:
-                messagebox.showinfo("Done", "Quiz solution video updated.\n\nNote: the Drive bridge Web App URL/admin "
-                                             "token aren't set (Drive bridge settings, bottom left), so this video was baked in as a "
+                theme.notify(self, "Done", "Quiz solution video updated.\n\nNote: the Drive bridge Web App URL/admin "
+                                             "token aren't set (Settings → Drive bridge), so this video was baked in as a "
                                              "plain, unprotected embed \u2014 configure the Drive bridge to make it "
                                              "lockable.")
 
@@ -508,7 +508,7 @@ class QuizTab(ttk.Frame):
     def _load_lesson_for_edit(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
         lesson_slug = self.delete_lesson_var.get().strip()
         if not lesson_slug:
@@ -655,6 +655,7 @@ class QuizTab(ttk.Frame):
         self.status_var.set(
             "Loaded {} for editing ({} question(s)). Make your changes, then Generate lesson files to "
             "save them in place.".format(lesson_slug, len(self.questions)))
+        self._clear_dirty()
 
     def _new_lesson(self):
         if self.questions or self.lesson_name_var.get().strip():
@@ -672,12 +673,13 @@ class QuizTab(ttk.Frame):
         self.questions = []
         self._refresh_listbox()
         self._editing = None
+        self._clear_dirty()
         self.status_var.set("Form cleared \u2014 ready for a new lesson.")
 
     def _recover_lesson(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
 
         dlg = RecoverDialog(self, site_root)
@@ -697,14 +699,14 @@ class QuizTab(ttk.Frame):
 
         self._refresh_lessons()
         self.status_var.set("Recovered {}/{} from trash.".format(subject_slug, lesson_slug))
-        messagebox.showinfo("Recovered", "{}/{} is back on the site.".format(subject_slug, lesson_slug))
+        theme.notify(self, "Recovered", "{}/{} is back on the site.".format(subject_slug, lesson_slug))
         if self.on_lessons_changed:
             self.on_lessons_changed()
 
     def _empty_trash(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
 
         dlg = EmptyTrashDialog(self, site_root)
@@ -714,7 +716,7 @@ class QuizTab(ttk.Frame):
 
         removed = common.purge_deleted_lessons(site_root)
         self.status_var.set("Emptied trash — permanently removed {} lesson(s).".format(len(removed)))
-        messagebox.showinfo("Trash emptied",
+        theme.notify(self, "Trash emptied",
                              "Permanently removed {} lesson(s) from _deleted-lessons/.".format(len(removed)))
 
     # -- question list --------------------------------------------------
@@ -749,16 +751,28 @@ class QuizTab(ttk.Frame):
             "chapter": q.get("chapter", 1),
         }
 
-    def _refresh_listbox(self):
-        self.q_listbox.delete(0, "end")
-        for i, q in enumerate(self.questions):
-            qtype = q.get("type", "mcq")
-            text = q.get("prompt", q.get("q", ""))
-            preview = text[:60].replace("\n", " ")
-            chapter = q.get("chapter")
-            ch_label = "Ch{} ".format(chapter) if chapter is not None else ""
-            self.q_listbox.insert("end", "{:>2}. {}[{}] {}".format(
-                i + 1, ch_label, self._TYPE_LABELS.get(qtype, "?"), preview))
+    def _refresh_listbox(self, select=None):
+        self.qpanel.refresh(select=select)
+        if hasattr(self, "_mark_dirty"):
+            self._mark_dirty()
+
+    def _mark_dirty(self):
+        self._dirty_rev = getattr(self, "_dirty_rev", 0) + 1
+        if not getattr(self, "dirty", True):
+            self.dirty = True
+            if self.on_dirty_changed:
+                self.on_dirty_changed(True)
+
+    def _clear_dirty(self, if_rev=None):
+        """Mark the form saved; with if_rev, only when nothing changed since that revision."""
+        if if_rev is not None and if_rev != self._dirty_rev:
+            return
+        self.dirty = False
+        if self.on_dirty_changed:
+            self.on_dirty_changed(False)
+
+    def _set_questions(self, items):
+        self.questions = items
 
     def _add_mcq(self):
         dlg = MCQItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
@@ -766,7 +780,7 @@ class QuizTab(ttk.Frame):
         if dlg.result:
             self._snapshot()
             self.questions.append(dlg.result)
-            self._refresh_listbox()
+            self._refresh_listbox(select=[len(self.questions) - 1])
 
     def _add_truefalse(self):
         dlg = TrueFalseItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
@@ -774,7 +788,7 @@ class QuizTab(ttk.Frame):
         if dlg.result:
             self._snapshot()
             self.questions.append(dlg.result)
-            self._refresh_listbox()
+            self._refresh_listbox(select=[len(self.questions) - 1])
 
     def _add_match(self):
         dlg = MatchItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
@@ -782,7 +796,7 @@ class QuizTab(ttk.Frame):
         if dlg.result:
             self._snapshot()
             self.questions.append(dlg.result)
-            self._refresh_listbox()
+            self._refresh_listbox(select=[len(self.questions) - 1])
 
     def _add_written(self):
         dlg = WrittenItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
@@ -790,7 +804,7 @@ class QuizTab(ttk.Frame):
         if dlg.result:
             self._snapshot()
             self.questions.append(dlg.result)
-            self._refresh_listbox()
+            self._refresh_listbox(select=[len(self.questions) - 1])
 
     def _bulk_add(self):
         dlg = GradedBulkDialog(self, current_chapter=self._current_chapter())
@@ -798,15 +812,17 @@ class QuizTab(ttk.Frame):
         if dlg.result:
             self._snapshot()
             self.questions.extend(dlg.result)
-            self._refresh_listbox()
+            self._refresh_listbox(select=list(range(len(self.questions) - len(dlg.result), len(self.questions))))
             self.status_var.set("Added {} question(s) from bulk paste.".format(len(dlg.result)))
 
     def _edit_question(self):
-        sel = self.q_listbox.curselection()
-        if not sel:
-            messagebox.showinfo("No selection", "Select a question to edit.")
+        sel = self.qpanel.selection()
+        if len(sel) != 1:
+            messagebox.showinfo("No selection", "Select one question to edit." if sel else "Select a question to edit.")
             return
-        idx = sel[0]
+        self._edit_question_at(sel[0])
+
+    def _edit_question_at(self, idx):
         existing = self._normalize_legacy(self.questions[idx])
         dialog_cls = {"mcq": MCQItemDialog, "truefalse": TrueFalseItemDialog, "match": MatchItemDialog,
                       "written": WrittenItemDialog}[existing["type"]]
@@ -816,17 +832,14 @@ class QuizTab(ttk.Frame):
         if dlg.result:
             self._snapshot()
             self.questions[idx] = dlg.result
-            self._refresh_listbox()
+            self._refresh_listbox(select=[idx])
 
     def _remove_question(self):
-        sel = self.q_listbox.curselection()
-        if not sel:
-            messagebox.showinfo("No selection", "Select a question to remove.")
+        """Remove every selected question (one undo step)."""
+        if not self.qpanel.selection():
+            messagebox.showinfo("No selection", "Select one or more questions to remove.")
             return
-        idx = sel[0]
-        self._snapshot()
-        del self.questions[idx]
-        self._refresh_listbox()
+        self.qpanel.remove_selected()
 
     # -- undo / redo for the question list --------------------------------
     # Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) undo/redo add/edit/remove/bulk-paste
@@ -935,7 +948,7 @@ class QuizTab(ttk.Frame):
     def _generate(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site folder first (“Change…”, top right).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
 
         lesson_name = self.lesson_name_var.get().strip()
@@ -976,6 +989,7 @@ class QuizTab(ttk.Frame):
             "lesson_desc": self.lesson_desc_var.get().strip(),
             "assign_prompt": self.assign_prompt_var.get().strip(),
             "video_url": self.video_url_var.get(),
+            "rev": self._dirty_rev,            # edits made while it generates stay "unsaved"
         }
         background.run_in_background(
             self, lambda job: self._write_lesson_files(inp),
@@ -1170,7 +1184,7 @@ class QuizTab(ttk.Frame):
             if video_url and video_url != inp["video_url"].strip():
                 res["new_video_url"] = video_url     # put back into the form by _on_generated
             if video_url and not video_used_backend:
-                video_warning = ("Drive bridge Web App URL/admin token aren't set (Drive bridge settings, bottom left), so the "
+                video_warning = ("Drive bridge Web App URL/admin token aren't set (Settings → Drive bridge), so the "
                                   "lesson video was baked in as a plain, unprotected embed \u2014 configure the "
                                   "Drive bridge to make it lockable.")
 
@@ -1224,6 +1238,7 @@ class QuizTab(ttk.Frame):
                                   "Lesson files were generated at:\n{}\n\nBut inserting the card into\n{}\n"
                                   "failed:\n\n{}".format(lesson_dir, index_path, res["card_error"]))
             self._editing = {"subject_slug": subject_slug, "group_relpath": group_relpath, "lesson_slug": lesson_slug}
+            self._clear_dirty(if_rev=inp["rev"])
             self._refresh_lessons()
             if self.on_lessons_changed:
                 self.on_lessons_changed()
@@ -1234,13 +1249,14 @@ class QuizTab(ttk.Frame):
             location_label, 3 if res["include_assignment"] else 2, index_path, res["style_used"])
         self.status_var.set(status + (" \u2014 video not saved, see popup" if video_warning else ""))
         done_msg = ("Lesson files created at:\n{}\n\nListing page updated:\n{}\n\n"
-                     "Tip: switch to the Attachment Maker or Assignment Maker tabs to "
-                     "add files or change the submission mode for this lesson.".format(lesson_dir, index_path))
+                     "Tip: the Attachments and Assignment sections add files or change how students "
+                     "submit for this lesson.".format(lesson_dir, index_path))
         if video_warning:
             messagebox.showwarning("Done, with a video issue", done_msg + "\n\n" + video_warning)
         else:
-            messagebox.showinfo("Done", done_msg)
+            theme.notify(self, "Done", done_msg)
         self._editing = {"subject_slug": subject_slug, "group_relpath": group_relpath, "lesson_slug": lesson_slug}
+        self._clear_dirty(if_rev=inp["rev"])
         self._refresh_lessons()
         if lesson_slug in self.delete_lesson_combo["values"]:
             self.delete_lesson_var.set(lesson_slug)
