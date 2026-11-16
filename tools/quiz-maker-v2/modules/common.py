@@ -428,6 +428,13 @@ class ScrollableFrame(tk.Frame):
             return
         w = widget_under
         while w is not None and w is not self:
+            # over a list / table / text box that can scroll itself: let it scroll, not the whole page
+            if w.winfo_class() in ("Treeview", "Listbox", "Text"):
+                try:
+                    if tuple(round(f, 3) for f in w.yview()) != (0.0, 1.0):
+                        return
+                except (tk.TclError, AttributeError):
+                    pass
             w = w.master
         if w is not self:
             return  # pointer is over a different window (e.g. a dialog) — ignore
@@ -1487,7 +1494,7 @@ literal star at the very end of an option, write \\* instead of *. In a question
 prompt (it is HTML) write \\lt and \\gt instead of < and >. Math is not rendered
 inside the answer dropdowns of a MATCH question.
 
-In both the Quiz Maker and Assignment Maker tabs, a "Ch: N" line on its
+In both the Quiz & lesson and Assignment sections, a "Ch: N" line on its
 own sets the chapter for every question after it, until the next "Ch:"
 line \u2014 same convention in both places. Questions before the first
 "Ch:" line use the chapter selected in the dropdown above this box."""
