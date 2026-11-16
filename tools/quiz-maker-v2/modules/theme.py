@@ -15,7 +15,7 @@ are left alone (the sidebar draws itself). Pure styling: no command, variable or
 """
 import tkinter as tk
 from tkinter import font as tkfont
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 P = {
     "bg": "#f4f7fb", "panel": "#ffffff", "panel_soft": "#eef4fb", "line": "#d6e1ef", "line_strong": "#b8c9df",
@@ -340,3 +340,18 @@ class Tooltip(object):
         if self._tip:
             self._tip.destroy()
             self._tip = None
+
+
+def notify(widget, title, message, kind="success"):
+    """A success message that does not need a click: a toast in the corner of the main window (app_main
+    installs root._toast_host). Without a host (a test, or before the window is built) it falls back to the
+    old message box. Errors and questions still use message boxes."""
+    try:
+        root = widget._root()
+    except AttributeError:
+        root = None
+    host = getattr(root, "_toast_host", None)
+    if host:
+        host(title, message, kind)
+    else:
+        messagebox.showinfo(title, message)

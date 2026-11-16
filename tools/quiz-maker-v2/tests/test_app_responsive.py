@@ -162,9 +162,28 @@ lesson_dir = os.path.join(common.group_dir(site, "programming", q._group_relpath
 check("generate: files written", all(os.path.isfile(os.path.join(lesson_dir, f))
                                      for f in ("index.html", "quiz.html", "assignment.html", "attachments.json")))
 check("generate: double-click sent the quiz once", CALLS.count("admin_set_quiz_content") == 1, CALLS)
-check("generate: one 'Done' dialog", [d for d in DIALOGS if d[1] == "Done"] == [("showinfo", "Done")], DIALOGS)
+check("generate: 'Done' shown once, as a toast (no click needed)",
+      not [d for d in DIALOGS if d[1] == "Done"] and getattr(app, "last_toast", ("",))[0] == "Done",
+      (DIALOGS, getattr(app, "last_toast", None)))
 check("generate: button enabled again", str(q.generate_btn.cget("state")) == "normal")
 check("generate: status reports the result", app.status_var.get().startswith("Generated "), app.status_var.get())
+
+# 2b. the question list: select several, remove them in one step, undo brings them back
+q.questions = [{"type": "mcq", "prompt": "p%d" % i, "options": ["a", "b"], "correct": [0], "chapter": 1}
+               for i in range(5)]
+q._refresh_listbox()
+q.qpanel.tree.selection_set(("1", "3"))
+app.update()
+check("question list: 'Remove 2 selected' offered", q.qpanel.remove_btn.cget("text") == "Remove 2 selected",
+      q.qpanel.remove_btn.cget("text"))
+q.qpanel.remove_selected()
+check("question list: both removed at once", [x["prompt"] for x in q.questions] == ["p0", "p2", "p4"],
+      [x["prompt"] for x in q.questions])
+check("question list: the form is marked unsaved", q.dirty)
+q.focus_set()
+q._handle_undo()
+check("question list: one Ctrl+Z restores both", [x["prompt"] for x in q.questions] == ["p0", "p1", "p2", "p3", "p4"],
+      [x["prompt"] for x in q.questions])
 
 # 3. Load for editing (read-only: offers Cancel)
 q._new_lesson()
@@ -183,7 +202,8 @@ check("load for editing: Cancel button hidden again", app.cancel_btn.winfo_manag
 
 # 4. Sync site assets
 measure("sync site assets", app._sync_assets)
-check("sync site assets: confirmed with a dialog", any(d[1] == "Synced" for d in DIALOGS), DIALOGS)
+check("sync site assets: confirmed with a toast", getattr(app, "last_toast", ("",))[0] == "Synced",
+      getattr(app, "last_toast", None))
 
 app.destroy()
 srv.shutdown()

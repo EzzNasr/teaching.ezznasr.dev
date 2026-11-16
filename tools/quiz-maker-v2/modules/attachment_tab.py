@@ -19,7 +19,7 @@ import os
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
-from modules import common, drive_bridge, background
+from modules import common, drive_bridge, background, theme
 
 
 def _msg(e):
@@ -62,7 +62,7 @@ class AttachmentTab(ttk.Frame):
         tk.Label(pick_frame,
                  text="Where the lesson lives inside the subject \u2014 e.g. \u201c(subject root)\u201d for flat "
                       "subjects, or a nested folder like \u201cBaccalaureate / Grade 1 Secondary\u201d. Must "
-                      "match what the lesson was actually generated under (Quiz Maker tab) or it won't show "
+                      "match what the lesson was actually generated under (Quiz & lesson section) or it won't show "
                       "up below.",
                  fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=560).pack(anchor="w", padx=8, pady=(0, 6))
 
@@ -96,7 +96,7 @@ class AttachmentTab(ttk.Frame):
                                      command=self._upload, font=("TkDefaultFont", 10, "bold"))
         self.upload_btn.pack(fill="x")
         tk.Label(upload_frame,
-                 text="Uses the Drive bridge set up in the sidebar (bottom left). The file lands in the "
+                 text="Uses the Drive bridge set up in Settings. The file lands in the "
                       "attachments folder set in Code.gs — students see it embedded on the lesson page, "
                       "never a drive.google.com link.",
                  fg="gray30", font=("TkDefaultFont", 8), justify="left").pack(anchor="w", padx=8, pady=(0, 6))
@@ -216,7 +216,7 @@ class AttachmentTab(ttk.Frame):
         lesson_dir = self._lesson_dir()
         if not lesson_dir or not os.path.isdir(lesson_dir):
             messagebox.showerror("No lesson selected", "Pick a subject and lesson first (generate it in the "
-                                                         "Quiz Maker tab if it doesn't exist yet).")
+                                                         "Quiz & lesson section if it doesn't exist yet).")
             return
 
         file_path = self.selected_file_path.get().strip()
@@ -260,7 +260,7 @@ class AttachmentTab(ttk.Frame):
         self.title_var.set("")
         self.status_var.set("Uploaded and added \"{}\" to {}/{}/attachments.json".format(
             title, self._subject_slug(), self.lesson_var.get()))
-        messagebox.showinfo("Uploaded", "\"{}\" is now attached to this lesson.".format(title))
+        theme.notify(self, "Uploaded", "\"{}\" is now attached to this lesson.".format(title))
 
     def _on_upload_failed(self, error_message):
         self.upload_btn.config(state="normal", text="Upload to Drive & add to lesson")
@@ -271,8 +271,8 @@ class AttachmentTab(ttk.Frame):
         drive_cfg = common.get_drive_config(common.load_config())
         if not drive_cfg["web_app_url"] or not drive_cfg["admin_token"]:
             messagebox.showerror("Drive bridge not configured",
-                                  "Set the Drive bridge Web App URL and admin token first (Drive bridge settings, bottom left "
-                                  "of the window; see apps_script/Code.gs for deployment steps).")
+                                  "Set the Drive bridge Web App URL and admin token first (Settings → Drive bridge; "
+                                  "see apps_script/Code.gs for deployment steps).")
             return None
         return drive_cfg
 
@@ -403,7 +403,7 @@ class AttachmentTab(ttk.Frame):
             self._save_attachments(items)
         self._refresh_attachment_list()
         self.status_var.set("Replaced \"{}\" with the new file \u2014 same slot on the lesson page.".format(title))
-        messagebox.showinfo("Replaced", "\"{}\" now points at the newly uploaded file.".format(title))
+        theme.notify(self, "Replaced", "\"{}\" now points at the newly uploaded file.".format(title))
 
     def _on_replace_failed(self, error_message):
         self._set_list_buttons_busy(False)

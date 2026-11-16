@@ -20,6 +20,7 @@ from tkinter import ttk, messagebox, filedialog
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from modules import common, drive_bridge, test_runner, teacher_mode, background, theme
+from modules.settings_window import SettingsWindow
 from modules.quiz_tab import QuizTab
 from modules.assignment_tab import AssignmentTab
 from modules.attachment_tab import AttachmentTab
@@ -99,6 +100,15 @@ class App(tk.Tk):
         common.fit_geometry(self, 1180, 820, min_w=900, min_h=560)
 
         self.config_data = common.load_config()
+        saved = self.config_data.get("ui_window_geometry")
+        if isinstance(saved, str) and saved.count("x") == 1:
+            try:                                   # where you left it last time (if it still fits the screen)
+                w, rest = saved.split("x", 1)
+                h = rest.split("+")[0]
+                if int(w) <= self.winfo_screenwidth() and int(h) <= self.winfo_screenheight():
+                    self.geometry(saved)
+            except (ValueError, tk.TclError):
+                pass
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         resolved_path, self._resolved_source = common.resolve_site_root(self.config_data.get("site_root", ""))
@@ -150,8 +160,17 @@ class App(tk.Tk):
         header._themed = True
         header.pack(side="top", fill="x")
         tk.Frame(main, bg=P["line"], height=1).pack(side="top", fill="x")
-        site = tk.Frame(header, bg=P["panel"])
-        site.pack(side="right", padx=24)
+        actions = tk.Frame(header, bg=P["panel"])
+        actions.pack(side="right", padx=24)
+        # the current page's main action (Generate / Update), so it is never a long scroll away
+        self.page_action_btn = tk.Button(actions, text="", command=self._page_action)
+        theme.style_button(self.page_action_btn, "primary")
+        self.page_action_tip = theme.Tooltip(self.page_action_btn, lambda: self._page_action_tip)
+        self._page_action_tip = ""
+        self.dirty_var = tk.StringVar(value="")
+        self.dirty_lbl = tk.Label(actions, textvariable=self.dirty_var, bg=P["panel"], fg=P["warn"],
+                                  font=theme.FONTS["bold"])
+        self.dirty_lbl.pack(side="left", padx=(0, 12))
         titles = tk.Frame(header, bg=P["panel"])
         titles.pack(side="left", fill="x", expand=True, padx=28, pady=(16, 14))
         self.page_title_var = tk.StringVar(value="Lesson Maker")
@@ -159,22 +178,7 @@ class App(tk.Tk):
         tk.Label(titles, textvariable=self.page_title_var, bg=P["panel"], fg=P["ink"], font=theme.FONTS["title"],
                  anchor="w").pack(fill="x")
         tk.Label(titles, textvariable=self.page_sub_var, bg=P["panel"], fg=P["ink_dim"],
-                 font=theme.FONTS["subtitle"], anchor="w", justify="left", wraplength=380).pack(fill="x")
-        tk.Label(site, text="SITE FOLDER", bg=P["panel"], fg=P["ink_dim"], font=theme.FONTS["caps"],
-                 anchor="e").pack(fill="x")
-        chip = tk.Frame(site, bg=P["panel"])
-        chip.pack(anchor="e")
-        self._site_label_var = tk.StringVar()
-        site_lbl = tk.Label(chip, textvariable=self._site_label_var, bg=P["panel_soft"], fg=P["ink"],
-                            font=theme.FONTS["body"], padx=10, pady=5)
-        site_lbl.pack(side="left")
-        theme.Tooltip(site_lbl, lambda: self.site_root_var.get() or "No site folder chosen yet")
-        change = tk.Button(chip, text="Change…", command=self._pick_site_root)
-        theme.style_button(change, "ghost")
-        change.configure(bg=P["panel"], padx=10)
-        change.pack(side="left", padx=(4, 0))
-        self.site_root_var.trace_add("write", lambda *_a: self._show_site_label())
-        self._show_site_label()
+                 font=theme.FONTS["subtitle"], anchor="w", justify="left", wraplength=520).pack(fill="x")
 
         status_row = tk.Frame(main, bg=P["panel"])
         status_row._themed = True
@@ -206,13 +210,8 @@ class App(tk.Tk):
         elif source == "absolute-fallback":
             self.status_var.set("Site found at fallback location: " + path)
         else:
-            self.status_var.set("Site folder not found automatically — click Change… (top right) to "
-                                "locate it (needs assets/ and CNAME inside).")
-
-    def _show_site_label(self):
-        path = self.site_root_var.get().strip().replace("\\", "/").rstrip("/")
-        parts = [x for x in path.split("/") if x]
-        self._site_label_var.set(("…/" + "/".join(parts[-2:]) if len(parts) > 2 else path) or "not set")
+            self.status_var.set("Site folder not found automatically — open Settings (Ctrl+,) to "
+                                "choose it (needs assets/ and CNAME inside).")
 
     def _show_startup_panel(self):
         P = theme.P
@@ -236,8 +235,15 @@ class App(tk.Tk):
         self._install_busy_indicator()     # before the tabs: the Tags tab starts loading as it is built
         self._build_notebook()
         theme.skin(self.content)
-        self.show_section(0)
+        self.quiz_tab.on_dirty_changed = self._show_dirty
+        last = self.config_data.get("ui_last_section", 0)
+        self.show_section(last if isinstance(last, int) and 0 <= last < len(SECTIONS) else 0)
         common.enable_select_all_shortcut(self)
+        self._bind_shortcuts()
+        self._toast = None
+        self._toast_host = self._show_toast
+        if not common.is_valid_site_root(self.site_root_var.get().strip()):
+            self.after(300, self._configure_drive)        # first run / moved folder: open Settings
 
     def _on_close(self):
         job = background.runner_for(self).current
@@ -247,6 +253,18 @@ class App(tk.Tk):
                 "(a lesson may be left half-written or a change only half-sent).\n\nClose anyway?".format(job.name),
                 icon="warning"):
             return
+        quiz = getattr(self, "quiz_tab", None)
+        if quiz is not None and getattr(quiz, "dirty", False) and job is None and not messagebox.askyesno(
+                "Unsaved changes",
+                "The lesson in the Quiz page has changes that were not generated yet.\n\nClose anyway and lose them?",
+                icon="warning"):
+            return
+        try:
+            self.config_data["ui_window_geometry"] = self.geometry()
+            self.config_data["ui_last_section"] = getattr(self, "_section", 0)
+            common.save_config(self.config_data)
+        except Exception:
+            pass
         common.stop_preview_server()
         self.destroy()
 
@@ -297,54 +315,33 @@ class App(tk.Tk):
         return b
 
     def _build_top_bar(self):
+        """Sidebar footer: the Drive bridge status and the Settings button. The site folder, the bridge's URL and
+        token and the site tools live in the Settings window (modules/settings_window.py)."""
         P = theme.P
+        self.sync_btn = self.resync_btn = None        # these buttons live in the Settings window while it is open
         tools = self.tools_frame
-        tk.Label(tools, text="SITE TOOLS", bg=P["nav"], fg=P["nav_dim"], font=theme.FONTS["caps"],
-                 anchor="w").pack(fill="x", padx=20, pady=(0, 4))
-        self.sync_btn = self._sidebar_button(
-            tools, "⟳   Sync site assets", self._sync_assets,
-            "Writes assets/auth.js, quiz.js, assign.js, attachments.js to your site with the current Drive "
-            "bridge URL baked in. Run it once after configuring, and again any time you update this package.")
-        self.sync_btn.pack(fill="x")
-        self.resync_btn = self._sidebar_button(
-            tools, "≡   Resync stylesheets", self._resync_lesson_stylesheets,
-            "Copies the current base.css/forms.css into every already-generated lesson folder (newly generated "
-            "lessons get this automatically). Run it any time you change a lesson's accent color or edit base.css.")
-        self.resync_btn.pack(fill="x")
-        # "Run tests": opens a terminal and streams scripts/test_all.sh live (see modules/test_runner.py)
-        tests_btn = tk.Menubutton(tools, text="▶   Run tests  ▾", anchor="w", bg=P["nav"], fg=P["nav_ink"],
-                                  activebackground=P["nav_hover"], activeforeground="#ffffff", relief="flat", bd=0,
-                                  highlightthickness=0, padx=20, pady=6, cursor="hand2", font=theme.FONTS["body"])
-        tests_btn._themed = True
-        tests_menu = tk.Menu(tests_btn, tearoff=0)
-        for _mode, (_flags, _label) in test_runner.MODES.items():
-            tests_menu.add_command(label=_label, command=lambda m=_mode: self._run_tests(m))
-        tests_btn.configure(menu=tests_menu)
-        tests_btn.pack(fill="x")
-
-        conn = tk.Frame(tools, bg=P["nav_hover"])
-        conn.pack(fill="x", padx=14, pady=(14, 0))
+        conn = tk.Frame(tools, bg=P["nav_hover"], cursor="hand2")
+        conn.pack(fill="x", padx=14, pady=(14, 8))
         tk.Label(conn, text="DRIVE BRIDGE", bg=P["nav_hover"], fg=P["nav_dim"], font=theme.FONTS["caps"],
                  anchor="w").pack(fill="x", padx=12, pady=(10, 0))
         row = tk.Frame(conn, bg=P["nav_hover"])
         row.pack(fill="x", padx=12, pady=(2, 2))
-        self._drive_dot = tk.Label(row, text="●", bg=P["nav_hover"], font=theme.FONTS["body"])
+        self._drive_dot = tk.Label(row, text="\u25cf", bg=P["nav_hover"], font=theme.FONTS["body"])
         self._drive_dot.pack(side="left")
         self.drive_status_var = tk.StringVar()
         status_lbl = tk.Label(row, textvariable=self.drive_status_var, bg=P["nav_hover"], fg="#ffffff",
                               font=theme.FONTS["bold"], anchor="w")
         status_lbl.pack(side="left", padx=(6, 0))
-        theme.Tooltip(status_lbl, lambda: common.get_drive_config(self.config_data)["web_app_url"]
-                      or "Needed for file/link submissions, attachments, locked videos and synced quizzes.")
         self.teacher_badge_var = tk.StringVar(value=self.teacher_badge or self.teacher_problem)
         tk.Label(conn, textvariable=self.teacher_badge_var, bg=P["nav_hover"], fg=P["nav_ink"],
-                 font=theme.FONTS["small"], anchor="w", justify="left", wraplength=200).pack(fill="x", padx=12)
-        settings = tk.Button(conn, text="Settings…", command=self._configure_drive,
-                             bg=P["nav_active"], fg="#ffffff", activebackground=P["accent"],
-                             activeforeground="#ffffff", relief="flat", bd=0, highlightthickness=0,
-                             padx=10, pady=5, cursor="hand2", font=theme.FONTS["small"])
-        settings._themed = True
-        settings.pack(fill="x", padx=12, pady=(8, 12))
+                 font=theme.FONTS["small"], anchor="w", justify="left", wraplength=200).pack(fill="x", padx=12,
+                                                                                             pady=(0, 10))
+        for w in (conn, row, status_lbl, self._drive_dot):
+            w.bind("<Button-1>", lambda _e: self._configure_drive())
+        theme.Tooltip(conn, "Open Settings to change the Drive bridge, the site folder, or run the site tools")
+        settings = self._sidebar_button(tools, "\u2699   Settings", self._configure_drive, "Settings (Ctrl+,)")
+        settings.configure(font=theme.FONTS["nav"], pady=9)
+        settings.pack(fill="x")
         self._update_drive_status()
 
     def _run_tests(self, mode):
@@ -355,12 +352,13 @@ class App(tk.Tk):
         else:
             self.status_var.set("Tests running in a separate terminal window...")
 
-    def _pick_site_root(self):
-        path = filedialog.askdirectory(title="Select your teaching-site repo folder")
+    def _pick_site_root(self, parent=None):
+        path = filedialog.askdirectory(title="Select your teaching-site repo folder", parent=parent or self)
         if path:
             self.site_root_var.set(path)
             self.config_data["site_root"] = path
             common.save_config(self.config_data)
+            self.status_var.set("Site: " + path)
             for tab in (self.quiz_tab, self.assignment_tab, self.attachment_tab, self.tags_tab):
                 if hasattr(tab, "_refresh_groups"):
                     tab._refresh_groups()
@@ -377,30 +375,87 @@ class App(tk.Tk):
             self._drive_dot.configure(fg=theme.P["warn"])
 
     def _configure_drive(self):
-        drive_cfg = common.get_drive_config(self.config_data)
-        dlg = DriveConfigDialog(self, drive_cfg["web_app_url"], drive_cfg["admin_token"])
-        self.wait_window(dlg)
-        if dlg.result:
-            url, token = dlg.result
-            common.save_drive_config(self.config_data, url, token)
-            self._update_drive_status()
+        """Open (or bring forward) the Settings window."""
+        win = getattr(self, "_settings_win", None)
+        if win is not None and win.winfo_exists():
+            win.deiconify()
+            win.lift()
+            win.focus_set()
+            return
+        self._settings_win = SettingsWindow(self)
 
-            def recheck(job):
-                return teacher_mode.startup(self.config_data, common.SUBJECTS, common.get_drive_config)
+    def _apply_drive_settings(self, url, token):
+        """Save the Drive bridge URL/token (from the Settings window) and re-check who the token belongs to."""
+        common.save_drive_config(self.config_data, url, token)
+        self._update_drive_status()
 
-            def done(result):
-                ident, badge, problem = result
-                self.teacher_badge_var.set(badge or problem)
-                self.status_var.set("Drive bridge settings saved.")
-                if badge:
-                    messagebox.showinfo("Restart needed", "If you changed the token, restart the app so the subject "
-                                        "lists on every tab match it.")
+        def recheck(job):
+            return teacher_mode.startup(self.config_data, common.SUBJECTS, common.get_drive_config)
 
-            if background.run_in_background(
-                    self, recheck, done,
-                    lambda e: self.status_var.set("Drive bridge settings saved; token check failed: %s" % e),
-                    name="Checking the new token") is None:
-                self.status_var.set("Drive bridge settings saved.")
+        def done(result):
+            ident, badge, problem = result
+            self.teacher_badge_var.set(badge or problem)
+            self.status_var.set("Drive bridge settings saved.")
+            if badge:
+                messagebox.showinfo("Restart needed", "If you changed the token, restart the app so the subject "
+                                    "lists on every tab match it.")
+
+        if background.run_in_background(
+                self, recheck, done,
+                lambda e: self.status_var.set("Drive bridge settings saved; token check failed: %s" % e),
+                name="Checking the new token") is None:
+            self.status_var.set("Drive bridge settings saved.")
+
+    # -- toasts: success messages that don't need a click (theme.notify) -----------------------------------
+
+    def _show_toast(self, title, message, kind="success"):
+        P = theme.P
+        if self._toast is not None:
+            self._toast.destroy()
+        self.last_toast = (title, message)
+        t = tk.Frame(self, bg=P["ink"], cursor="hand2")
+        t._themed = True
+        tk.Frame(t, bg=P["success"] if kind == "success" else P["accent"], width=5).pack(side="left", fill="y")
+        box = tk.Frame(t, bg=P["ink"])
+        box.pack(side="left", fill="both", padx=(12, 16), pady=10)
+        tk.Label(box, text=("\u2713  " if kind == "success" else "") + title, bg=P["ink"], fg="#ffffff",
+                 font=theme.FONTS["bold"], anchor="w").pack(fill="x")
+        if message:
+            tk.Label(box, text=message, bg=P["ink"], fg=P["nav_ink"], font=theme.FONTS["small"], anchor="w",
+                     justify="left", wraplength=380).pack(fill="x", pady=(2, 0))
+        tk.Label(box, text="click to close", bg=P["ink"], fg=P["nav_dim"], font=theme.FONTS["caps"],
+                 anchor="e").pack(fill="x", pady=(4, 0))
+        t.place(relx=1.0, rely=1.0, x=-24, y=-52, anchor="se")
+        t.lift()
+        self._toast = t
+
+        def close(_e=None, me=t):
+            if self._toast is me:
+                self._toast = None
+            if me.winfo_exists():
+                me.destroy()
+        for w in [t, box] + list(box.winfo_children()):
+            w.bind("<Button-1>", close)
+        self.after(8000 if len(message) < 160 else 14000, close)
+
+    # -- keyboard shortcuts, page action, unsaved marker --------------------------------------------------------
+
+    def _bind_shortcuts(self):
+        for i in range(len(SECTIONS)):
+            self.bind_all("<Control-Key-%d>" % (i + 1), lambda _e, i=i: self.show_section(i))
+        self.bind_all("<Control-comma>", lambda _e: self._configure_drive())
+        self.bind_all("<Control-g>", lambda _e: self._page_action())
+        self.bind_all("<F5>", lambda _e: self._on_tab_changed())
+
+    def _page_action(self):
+        tab = self.notebook.nametowidget(self.notebook.select())
+        if tab is self.quiz_tab:
+            self.quiz_tab._generate()
+        elif tab is self.assignment_tab:
+            self.assignment_tab._update()
+
+    def _show_dirty(self, dirty):
+        self.dirty_var.set("\u25cf  Unsaved changes" if dirty else "")
 
     def _sync_assets(self):
         site_root = self.site_root_var.get().strip()
@@ -440,7 +495,7 @@ class App(tk.Tk):
 
         def synced(written):
             self.status_var.set("Synced: " + ", ".join(os.path.basename(p) for p in written))
-            messagebox.showinfo("Synced", "Updated:\n" + "\n".join(written))
+            theme.notify(self, "Synced", "Updated:\n" + "\n".join(written))
 
         background.run_in_background(
             self, lambda job: common.sync_site_assets(site_root, web_app_url), synced,
@@ -460,7 +515,7 @@ class App(tk.Tk):
 
         def resynced(touched):
             self.status_var.set("Resynced base.css/forms.css into {} lesson folder(s).".format(len(touched)))
-            messagebox.showinfo("Resynced", "Updated base.css + forms.css in {} lesson folder(s).".format(len(touched)))
+            theme.notify(self, "Resynced", "Updated base.css + forms.css in {} lesson folder(s).".format(len(touched)))
 
         background.run_in_background(
             self, lambda job: common.sync_all_lesson_stylesheets(site_root), resynced,
@@ -523,6 +578,16 @@ class App(tk.Tk):
         page = self.notebook.nametowidget(self.notebook.tabs()[index])
         self.update_idletasks()
         self.notebook.configure(height=page.winfo_reqheight())
+        action = {0: ("Generate lesson files", "Write this lesson's files and send its quiz (Ctrl+G)"),
+                  1: ("Update assignment page", "Write assignment.html for the selected lesson (Ctrl+G)")}.get(index)
+        if action:
+            self.page_action_btn.configure(text=action[0])
+            self._page_action_tip = action[1]
+            self.page_action_btn.pack(side="left")
+        else:
+            self.page_action_btn.pack_forget()
+        self.dirty_lbl.pack_configure() if index == 0 else None
+        self.dirty_var.set("\u25cf  Unsaved changes" if index == 0 and getattr(self.quiz_tab, "dirty", False) else "")
         self.page_title_var.set(SECTIONS[index][1])
         self.page_sub_var.set(SECTIONS[index][2])
         self._scroll.canvas.yview_moveto(0)

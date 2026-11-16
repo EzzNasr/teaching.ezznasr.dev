@@ -184,7 +184,7 @@ class TagsTab(ttk.Frame):
         cfg = common.get_drive_config(common.load_config())
         if not cfg["web_app_url"] or not cfg["admin_token"]:
             messagebox.showerror("Drive bridge not configured",
-                                 "Set the Web App URL and admin token first (\"Drive bridge settings…\", bottom left).",
+                                 "Set the Web App URL and admin token first (Settings → Drive bridge, Ctrl+,).",
                                  parent=self)
             return None
         return cfg
