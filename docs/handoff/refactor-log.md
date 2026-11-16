@@ -33,6 +33,18 @@ step; no change to backend or student-facing behaviour.
 | 1.2 | Pinned test dependencies: root `package.json` (private, dev only: jsdom 24.1.3) + `package-lock.json`; `requirements-dev.txt` (Playwright 1.64.1, Pillow 13.0.0). CI installs with `npm ci` and `pip install -r requirements-dev.txt`. `npm test` / `npm run test:all` wrap the gate. The new files are excluded from the published site (`_config.yml`); `node_modules/` is ignored | CI used to install whatever version was newest that day, so a dependency release could turn the gate red (or a compromised one could run in CI) with no code change. `npm ci` from the lockfile was proven in a clean folder, then the full gate ran green on an `npm ci` install. **Not yet run on GitHub Actions** (nothing is pushed) | see `git log` |
 | 1.3 | `.editorconfig` (UTF-8, 2-space indent, 4 for Python: what the code already uses) and `.nvmrc` (Node 22, as in CI) | A new developer's editor and Node version match the project without asking. No whitespace rules, so no editor rewrites lines on save. Config only: fast strict gate green | see `git log` |
 
+## Phase 2: scripted deploy (slimmed, 2026-11-16)
+
+Agreed with the owner: the staging project (old step 2.2) moves to the start of Phase 3. Phase 2 is clasp against the
+production project, one endpoint config, the `version` action and a deploy script. **Rule: `clasp push` only as part of
+a deploy**, because time-driven and installable triggers run the latest saved code, not the deployed version: a push
+between deploys would change the live reminders and the message queue at once. Demo data in the live sheet
+(`att_seedDemo` / `att_clearDemo`) stays the way to look at screens after a deploy.
+
+| Step | What | Why | Commit |
+|---|---|---|---|
+| 2.0 | `@google/clasp` 3.4.1 pinned as a dev dependency (`npx clasp ...`); `.clasprc.json` git-ignored | One known clasp version for everyone. Its sign-in token lives in the home folder, never in the repo. `npm audit` lists 8 advisories (6 moderate, 2 high) in clasp's own dependencies: a local developer tool, not shipped and not run in CI (installed with `--ignore-scripts`); revisit on the next clasp release | see `git log` |
+
 ## Where it stands (2026-11-16, morning)
 
 Phase 0 and the first part of Phase 1 are done: 7 commits after the handoff docs, all local, nothing pushed or
