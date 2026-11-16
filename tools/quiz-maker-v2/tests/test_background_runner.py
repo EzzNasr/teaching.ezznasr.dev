@@ -224,5 +224,38 @@ else:
           disabled_while == "disabled" and str(tbtn.cget("state")) == "normal")
     tkroot.destroy()
 
+# 10. a backend that never answers ends in a clear error after the timeout (no job that runs forever)
+import http.server  # noqa: E402
+from modules import drive_bridge  # noqa: E402
+
+
+class Slow(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        time.sleep(1.5)
+        try:
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"ok": true}')
+        except Exception:
+            pass
+
+    def log_message(self, *a):
+        pass
+
+
+srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Slow)
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+t0 = time.time()
+try:
+    drive_bridge._post_json("http://127.0.0.1:%d/exec" % srv.server_address[1], {"action": "ping"}, timeout=0.3)
+    err = None
+except drive_bridge.DriveBridgeError as e:
+    err = str(e)
+except Exception as e:  # anything else is the bug this guards against
+    err = "WRONG TYPE %s: %s" % (e.__class__.__name__, e)
+check("slow backend: DriveBridgeError that names the timeout", err and "didn't answer within 0.3 seconds" in err, err)
+check("slow backend: gave up near the timeout", time.time() - t0 < 1.4, time.time() - t0)
+srv.shutdown()
+
 print("\n%s (%d failure%s)" % ("ALL PASS" if not fails else "FAILED", fails, "" if fails == 1 else "s"))
 sys.exit(1 if fails else 0)
