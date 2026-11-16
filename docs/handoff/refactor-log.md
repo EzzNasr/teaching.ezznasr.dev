@@ -25,14 +25,17 @@ step; no change to backend or student-facing behaviour.
 | 0.2b | **Action guard** R-REF-2: `scripts/action_inventory.js` reads every routed action from the three routers (132: 88 in `Code.gs`, 18 follow-up, 26 attendance). The test fails if an action has no test at all, if a new action is tested only by the authorization lists (5 such actions today, recorded in `fixtures/action_baseline.json`; the list may only shrink), if `P4_ACTIONS` / `P3_STAFF_ALLOW` / `P4_ASSISTANT_DENY` name an action that does not exist, or if a new action is neither in `P4_ACTIONS` nor listed as teacher-denied on purpose | Guards the router and authorization refactor (Phase 4.1, 4.4): no action can be dropped, renamed or added silently. Proven: a fake untested action was caught by two checks and named | see `git log` |
 | 0.3 | `ASSEMBLY-FIXES.md` moved from the repo root to `docs/history/P4-ASSEMBLY-FIXES.md` | A finished session note; nothing links to it. Docs-only, so the fast strict gate was run (green); the next full gate covers it too. Deleting `attend/admin/e2e.test.js` (attendance F9) is postponed: the attendance session asked that `attend/` stay untouched until its branch is merged | see `git log` |
 
+## Phase 1: tooling
+
+| Step | What | Why | Commit |
+|---|---|---|---|
+| 1.1 | `tools/quiz-maker-v2/tests/_shots/` is git-ignored and its 20 committed screenshots untracked (still on disk, still in history) | The browser tests rewrite them on every run, so every gate run left 15-18 changed files. Nothing reads or embeds them (`build_zip.py` already excluded the folder). Full gate green and the tree stays clean after a run | see `git log` |
+
 ## Notes and follow-ups found along the way
 
 - Do not run anything else heavy while the gate runs on Windows: a polling loop made Git Bash run out of processes and
   one browser test (R-A08) failed with no checks run; alone it passed twice.
-- Running the browser tests rewrites 15 tracked screenshots in `tools/quiz-maker-v2/tests/_shots/` and adds 3 new
-  ones, so every run leaves the tree dirty. Undo after a run with
-  `git checkout -- tools/quiz-maker-v2/tests/_shots && git clean -f tools/quiz-maker-v2/tests/_shots`. Fix planned
-  in Phase 1 (write screenshots to an ignored folder).
+- ~~Browser tests dirty the tree with screenshots~~: fixed in step 1.1.
 - Nine more browser tests (`e2e_R004_access_order.py`, `e2e_followup_walk.py`, `e2e_groups.py`,
   `e2e_lesson_video_lock.py`, `e2e_month_lessons.py`, `e2e_one_group.py`, `e2e_p3_bulk_access.py`,
   `e2e_p3_followup.py`, `e2e_student_summary_requirements.py`) have no catch-all route either. They were stable in the
