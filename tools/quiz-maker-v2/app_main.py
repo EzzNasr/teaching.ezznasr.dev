@@ -139,8 +139,8 @@ class App(tk.Tk):
         self.teacher_identity, self.teacher_badge, self.teacher_problem = result
         self._startup_panel.destroy()
         self._build_top_bar()
+        self._install_busy_indicator()     # before the tabs: the Tags tab starts loading as it is built
         self._build_notebook()
-        self._install_busy_indicator()
         common.lock_min_width_to_content(self)
         common.enable_select_all_shortcut(self)
 
