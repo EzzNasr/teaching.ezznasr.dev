@@ -23,11 +23,10 @@ hand exactly as before.
 
 import os
 import re
-import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from modules import common, drive_bridge
+from modules import common, drive_bridge, background
 
 SUBJECT = "programming"
 GRADES = [
@@ -187,24 +186,23 @@ class TagsTab(ttk.Frame):
             return None
         return cfg
 
-    def _call(self, payload, on_ok, on_err):
+    def _call(self, payload, on_ok, on_err, status=None):
         """Runs one bridge call off the UI thread; on_ok(result) / on_err(message) run on it."""
         cfg = self._bridge()
         if not cfg:
             return
         payload = dict(payload, token=cfg["admin_token"])
+        # ANY failure (timeout, reset, bad JSON...) comes back to on_err, so the button is always re-enabled.
+        if background.run_in_background(
+                self, lambda job: drive_bridge._post_json(cfg["web_app_url"], payload),
+                lambda result: self._done(on_ok, result),
+                lambda e: self._done(on_err, str(e) or e.__class__.__name__),
+                name=status or "Talking to the server") is None:
+            return
         self._busy = True
         self.save_btn.config(state="disabled")
-
-        def worker():
-            try:
-                result = drive_bridge._post_json(cfg["web_app_url"], payload)
-                self.after(0, lambda: self._done(on_ok, result))
-            except Exception as e:   # ANY failure (timeout, reset, bad JSON...) must re-enable the button
-                msg = str(e) or e.__class__.__name__
-                self.after(0, lambda: self._done(on_err, msg))
-
-        threading.Thread(target=worker, daemon=True).start()
+        if status:
+            self.status_var.set(status)
 
     def _done(self, fn, arg):
         self._busy = False
@@ -216,8 +214,6 @@ class TagsTab(ttk.Frame):
     def _load_tags(self):
         if self._busy:
             return
-        self.status_var.set("Loading lesson tags\u2026")
-
         def ok(result):
             self.tags = {}
             for row in result.get("tags", []):
@@ -229,7 +225,7 @@ class TagsTab(ttk.Frame):
             self.status_var.set("Couldn't load tags.")
             messagebox.showerror("Couldn't load tags", msg, parent=self)
 
-        self._call({"action": "admin_list_lesson_tags"}, ok, err)
+        self._call({"action": "admin_list_lesson_tags"}, ok, err, status="Loading lesson tags\u2026")
 
     def _save(self):
         if self._busy:
@@ -244,8 +240,6 @@ class TagsTab(ttk.Frame):
             messagebox.showerror("Both or neither", "Fill in BOTH chapter and term, or leave both blank to clear the tag.",
                                  parent=self)
             return
-        self.status_var.set("Saving tag\u2026")
-
         def ok(result):
             c, t = result.get("chapter", ""), result.get("term", "")
             if c == "" and t == "":
@@ -261,7 +255,8 @@ class TagsTab(ttk.Frame):
             self.status_var.set("Tag not saved.")
             messagebox.showerror("Tag not saved", msg, parent=self)
 
-        self._call({"action": "admin_set_lesson_tags", "lesson": path, "chapter": chapter, "term": term}, ok, err)
+        self._call({"action": "admin_set_lesson_tags", "lesson": path, "chapter": chapter, "term": term}, ok, err,
+                   status="Saving tag\u2026")
 
     def _select_next_untagged(self, after_path):
         """With 'Untagged only' on, the saved row disappears \u2014 move to the next one so a first
