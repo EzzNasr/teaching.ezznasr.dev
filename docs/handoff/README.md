@@ -27,7 +27,7 @@ Nothing deploys anything else. A change to the backend is pasted by hand into th
 | 3 | [feature-catalogue.md](feature-catalogue.md) | Every feature: page, script, backend actions, tabs, switches, tests | 30 min |
 | 4 | [backend-reference.md](backend-reference.md) | Every backend action, sheet tab, Script Property and trigger | reference |
 | 5 | [security-model.md](security-model.md) | How identity and permissions work, and the risk areas (no exploit detail: the repo is public) | 15 min |
-| 6 | [../TESTING.md](../TESTING.md), [../REGRESSION.md](../REGRESSION.md) | The test gate and all 151 registered cases | 10 min |
+| 6 | [../TESTING.md](../TESTING.md), [../REGRESSION.md](../REGRESSION.md) | The test gate and all 153 registered cases (151 active), including the two refactor guards | 10 min |
 | 7 | [refactor-log.md](refactor-log.md) | What the refactoring has changed so far, step by step, with the commit to revert | 5 min |
 | 8 | [../attendance/](../attendance/README.md), [../whatsapp/](../whatsapp/README.md), [../runbooks/](../runbooks/) | Per-feature decisions, deploy records, operations | as needed |
 

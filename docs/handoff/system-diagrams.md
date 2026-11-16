@@ -479,7 +479,7 @@ Solid arrows are generators (edit the left side only). Dotted lines are pairs ke
 flowchart TB
   gate["scripts/test_all.sh"]
   gate --> syn["1. Syntax<br/>node --check on every .js and .gs, Python ast"]
-  gate --> regi["2. Registry: 151 cases (R-...)"]
+  gate --> regi["2. Registry: 153 cases, 151 active (R-...)"]
   gate --> orph["3. Every test file is registered"]
   gate --> livet["5. --live: read-only smoke test of the real /exec"]
 
@@ -488,6 +488,7 @@ flowchart TB
   regi --> py["Python: Quiz Maker, drift and lesson-path checks"]
   regi --> e2e["Playwright + Chromium: pages in ?mock=1,<br/>or against the emulated backend"]
   regi --> parity["Parity / drift: generated files, client-server constants"]
+  regi --> guards["Refactor guards: R-REF-1 backend inventory,<br/>R-REF-2 every action tested and in the permission tables"]
 
   editor["Only in the real Apps Script editor:<br/>att_selfTest, att_scriptedRun, att_loadTest"]
 ```
