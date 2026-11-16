@@ -1538,6 +1538,17 @@
       ]
     },
     {
+      "id": "R-QM-BG",
+      "title": "Desktop tool: slow work runs off the Tk thread; results and errors come back on the main thread; a double-click never starts two jobs",
+      "status": "active",
+      "needs": "python",
+      "owner": "quiz-maker",
+      "cmd": [
+        "python",
+        "tests/test_background_runner.py"
+      ]
+    },
+    {
       "id": "R-FU2-ONEGROUP",
       "title": "One group per student: in_other_group, move:true, all-or-nothing bulk, audit, atomic under the lock",
       "status": "active",
