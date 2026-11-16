@@ -6,7 +6,12 @@
 // Catches: wrong/old version pasted, deploy not updated, router broken, a feature flag left in the wrong state.
 const fs = require('fs'), path = require('path');
 const site = path.resolve(__dirname, '..');
-let url = process.argv[2];
+//   node scripts/smoke_live.js <url> --expect-commit <sha>   also: the health check (GET) names exactly this commit
+//                                                           (scripts/deploy_backend.js passes it after every deploy)
+const args = process.argv.slice(2);
+const ei = args.indexOf('--expect-commit');
+const expectCommit = ei !== -1 ? String(args.splice(ei, 2)[1] || '') : '';
+let url = args[0];
 if (!url) {
   const m = /DRIVE_ENDPOINT\s*=\s*"([^"]+)"/.exec(fs.readFileSync(path.join(site, 'assets/assign.js'), 'utf8'));
   if (!m) { console.log('FAIL no DRIVE_ENDPOINT in assets/assign.js (run "Sync site assets")'); process.exit(1); }
@@ -24,6 +29,14 @@ const post = async body => {
   let r;
   try { r = await post({ action: 'ping' }); } catch (e) { t('endpoint reachable', false, e.message); return done(); }
   t('endpoint reachable and answers JSON', r && !r._raw, JSON.stringify(r));
+  let g;   // health check: which commit is live (null = pasted by hand, before scripted deploys)
+  for (let i = 0; i < 3; i++) {   // up to 3 tries: the first connection on some networks times out (IPv6 tried first)
+    try { const gr = await fetch(url, { redirect: 'follow' }); g = JSON.parse(await gr.text()); break; }
+    catch (e) { g = { _err: e.message + (e.cause && e.cause.code ? ' ' + e.cause.code : '') }; }
+  }
+  t('health check (GET) answers ok', g && g.ok === true, JSON.stringify(g));
+  console.log('live commit: ' + (g && g.version ? g.version.short + ' (deployed ' + g.version.deployed_at + ')' : 'not stamped (pasted by hand)'));
+  if (expectCommit) t('health check names the deployed commit ' + expectCommit.slice(0, 7), !!(g && g.version && g.version.commit === expectCommit), JSON.stringify(g && g.version));
   t('ping is routed (ok, or "Not authorized" because it needs the admin token)', r && (r.ok === true || /Not authorized/i.test(r.error || '')), JSON.stringify(r));
   r = await post({ action: '__smoke_unknown__' });
   t('router rejects an unknown action', r.ok === false && /Unknown action/i.test(r.error || ''), JSON.stringify(r));

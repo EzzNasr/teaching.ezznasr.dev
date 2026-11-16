@@ -19,7 +19,7 @@ from tkinter import ttk, messagebox, filedialog
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from modules import common, drive_bridge, test_runner, teacher_mode
+from modules import common, drive_bridge, test_runner, teacher_mode, deploy_runner
 from modules.quiz_tab import QuizTab
 from modules.assignment_tab import AssignmentTab
 from modules.attachment_tab import AttachmentTab
@@ -141,6 +141,13 @@ class App(tk.Tk):
             tests_menu.add_command(label=_label, command=lambda m=_mode: self._run_tests(m))
         tests_btn.configure(menu=tests_menu)
         tests_btn.pack(side="left")
+        # "Deploy backend": opens a terminal running scripts/deploy_backend.js (see modules/deploy_runner.py)
+        deploy_btn = tk.Menubutton(row, text="Deploy backend ▾", relief="raised", padx=8)
+        deploy_menu = tk.Menu(deploy_btn, tearoff=0)
+        for _mode, (_flags, _label) in deploy_runner.MODES.items():
+            deploy_menu.add_command(label=_label, command=lambda m=_mode: self._deploy_backend(m))
+        deploy_btn.configure(menu=deploy_menu)
+        deploy_btn.pack(side="left", padx=(6, 0))
         tk.Label(root_frame,
                  text="Path to your local teaching-site repo (the folder containing programming/, english/, "
                       "math/, assets/, CNAME). Shared by all three tabs below.",
@@ -191,6 +198,21 @@ class App(tk.Tk):
             messagebox.showerror("Run tests", err)
         else:
             self.status_var.set("Tests running in a separate terminal window...")
+
+    def _deploy_backend(self, mode):
+        """Open a terminal running the backend deploy (dry run, or the real deploy after two confirmations)."""
+        if mode == "deploy" and not messagebox.askyesno(
+                "Deploy backend",
+                "This replaces the LIVE backend (Apps Script) with the code in your site folder.\n\n"
+                "- Not during a class or an open quiz window.\n"
+                "- Run 'Check only' first.\n"
+                "- The window will ask you to type DEPLOY.\n\nOpen the deploy window?", icon="warning"):
+            return
+        err = deploy_runner.launch(self.site_root_var.get().strip(), mode)
+        if err:
+            messagebox.showerror("Deploy backend", err)
+        else:
+            self.status_var.set("Backend %s running in a separate terminal window..." % ("check" if mode == "check" else "deploy"))
 
     def _pick_site_root(self):
         path = filedialog.askdirectory(title="Select your teaching-site repo folder")

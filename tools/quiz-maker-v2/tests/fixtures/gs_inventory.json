@@ -2974,7 +2974,7 @@
   "doGet": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "35b4b8b7863a9a7e"
+   "hash": "442b9f4088d4445c"
   },
   "doPost": {
    "kind": "function",

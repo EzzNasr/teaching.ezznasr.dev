@@ -1705,6 +1705,26 @@
         "node",
         "tests/test_ref_actions.js"
       ]
+    },
+    {
+      "id": "R-DEP-1",
+      "title": "Scripted backend deploy (scripts/deploy_backend.js, clasp faked): dry run changes nothing; a dirty tree, an unpushed or non-main commit, a red gate, editor drift or a different manifest stop it before any push; push > verify > version > same deployment id > smoke, in that order; a red smoke or a bad push rolls back to the previous version and records it; doGet returns the generated Version.gs commit (null when pasted by hand)",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "cmd": [
+        "node",
+        "tests/test_deploy_backend.js"
+      ]
+    },
+    {
+      "id": "R-DEP-2",
+      "title": "Quiz Maker 'Deploy backend' menu (modules/deploy_runner.py): check = dry run, deploy = --yes; a missing script or clasp explains itself; nothing deploys unless DEPLOY is typed in the window; the app asks first",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "cmd": [
+        "python",
+        "tests/test_deploy_runner.py"
+      ]
     }
   ]
 }
