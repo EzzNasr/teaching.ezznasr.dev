@@ -14,7 +14,7 @@ step; no change to backend or student-facing behaviour.
 |---|---|
 | Tag | `pre-refactor` (the commit of step 0.1) |
 | Gate | ALL GREEN at the tag: 149 active cases pass, 2 retired, nothing skipped. After step 0.2b: 151 active |
-| Live backend | Version 67 = commit `3b21e9d` (per `docs/attendance/decisions.md`; not re-checked) |
+| Live backend | Version 67 = commit `3b21e9d` at the start (per `docs/attendance/decisions.md`). Checked with clasp on 2026-11-16 (step 2.1): live was Version 69, file for file equal to `32436a7` |
 
 ## Phase 0: safety net
 
@@ -44,6 +44,8 @@ between deploys would change the live reminders and the message queue at once. D
 | Step | What | Why | Commit |
 |---|---|---|---|
 | 2.0 | `@google/clasp` 3.4.1 pinned as a dev dependency (`npx clasp ...`); `.clasprc.json` git-ignored | One known clasp version for everyone. Its sign-in token lives in the home folder, never in the repo. `npm audit` lists 8 advisories (6 moderate, 2 high) in clasp's own dependencies: a local developer tool, not shipped and not run in CI (installed with `--ignore-scripts`); revisit on the next clasp release | see `git log` |
+| 2.1 | **Live code compared with the repo**, read only: `clasp clone` of the TeachingSite project into a scratch folder outside the repo, `clasp pull --versionNumber 69` for the live web-app version, each file compared with line endings normalised | The proof the paste deploys never gave. Result on 2026-11-16: the web-app deployment the site calls is at **Version 69**; its 8 files equal the repo at `32436a7` file for file, and the editor's saved code equals Version 69 (so the triggers run the same code). `main` is **ahead of live**: the attendance commits `6288a32`, `752efb2`, `43880ad` change `AttendanceAll.gs` and are not deployed yet. A second project, "Attendance", has only a HEAD deployment and no web app (not used by the site). No `.clasp.json` committed yet: it comes with the deploy script | (no code change; recorded with the merge below) |
+| merge | `main` merged into this branch (brings in the attendance work above and two page commits). R-REF-1 flagged only attendance names (8 added, 21 changed, all `att_*` / `ATT_*`): recorded with `node scripts/gs_inventory.js --write` (now 1,035 names). R-REF-2 floor raised to 133 actions (27 attendance) for the new attendance action. Full gate after the merge: 151 pass, 2 fail. **R-G01 is inherited from `main`** (red there since `87f3f6d`/`e5057bb`): `programming/baccalaureate/grade-2-secondary/chapter-2-general-exam/` holds only `base.css` and `forms.css`, no lesson page, so the grade page does not list it; the owner decides (finish the lesson or remove the folder). R-REQ4 timed out once under load and passed 3 of 3 alone (a race after an async save; noted below) | Keeps the pull request current. The backend files on this branch now equal `main` exactly | see `git log` |
 
 ## Where it stands (2026-11-16, morning)
 
@@ -67,3 +69,4 @@ deployed, no change to backend or page behaviour. Next in the frozen order:
   `e2e_lesson_video_lock.py`, `e2e_month_lessons.py`, `e2e_one_group.py`, `e2e_p3_bulk_access.py`,
   `e2e_p3_followup.py`, `e2e_student_summary_requirements.py`) have no catch-all route either. They were stable in the
   baseline; seal them if one ever times out on a page load.
+- R-REQ4 (`e2e_requirements.py`) timed out once in the full gate (2026-11-16, after the merge) waiting for the new manual requirement card; it already blocks outside requests and passed 3 of 3 alone. Likely a re-render from the previous async save landing mid-step. Watch it; if it recurs, wait for the save to finish before the next step.

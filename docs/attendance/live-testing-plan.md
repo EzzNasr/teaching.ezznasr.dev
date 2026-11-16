@@ -24,9 +24,9 @@ numbers in [load-testing.md](load-testing.md).*
 
 | # | Change | Why | Size |
 |---|---|---|---|
-| P0-1 | **Rejected check-ins must not count as present.** Today a check-in the teacher rejects still shows ✓ in All students, counts in Present totals, the CSV `Present` column and the Telegram summary. Count `review_status = rejected` as absent everywhere (roster, tallies, export, summary) and show it as "rejected" in the grid. | A teacher who rejects a cheater expects them to be marked absent. | small (server + dashboard + tests) |
+| P0-1 | ~~**Rejected check-ins must not count as present.**~~ **Done 2026-11-16 (decisions D20).** Today a check-in the teacher rejects still shows ✓ in All students, counts in Present totals, the CSV `Present` column and the Telegram summary. Count `review_status = rejected` as absent everywhere (roster, tallies, export, summary) and show it as "rejected" in the grid. | A teacher who rejects a cheater expects them to be marked absent. | small (server + dashboard + tests) |
 | P0-2 | **Undo a hand entry.** A "Remove" button on the teacher's own hand entries (MANUAL rows only), logged. | A typo in the ID today can only be "rejected", and (P0-1) still counts. | small |
-| P0-3 | **Nightly backup of the attendance sheet** (F7): a daily trigger copies the file to a dated copy in Drive and keeps the last 14. | The sheet is the only copy of attendance records. | small |
+| P0-3 | ~~**Nightly backup of the attendance sheet** (F7)~~ **Done 2026-11-16 (decisions D18).**: a daily trigger copies the file to a dated copy in Drive and keeps the last 14. | The sheet is the only copy of attendance records. | small |
 | P0-4 | **Clear test and demo data** before the first lecture: `att_cleanupTest()`, `att_clearDemo()`. | Keeps the admin views and exports clean. | none |
 | P0-5 | **The real-device checklist** in [deploy.md](deploy.md) section 6 on at least one iPhone and one Android, on mobile data. | The automated tests cannot cover cameras, permission prompts and flaky networks. | 30 min |
 | P0-6 | **Privacy note for professors** (F8): what is stored (ID, name, a location fix per check-in, a phone fingerprint), who sees it (the lecture's teacher and the admin), how long it is kept. | Students' locations are personal data. | text only |

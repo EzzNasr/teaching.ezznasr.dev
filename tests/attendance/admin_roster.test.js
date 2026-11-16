@@ -108,5 +108,22 @@ const find = (id) => rows().slice(1).find(r => r.children[0].textContent.include
   ok(csv[0].startsWith("student_id,name,present,total,percent,2026-10-11") && csv[0].includes("2026-10-19"), "CSV header has the lecture dates");
   ok(csv.some(l => l.startsWith("10001,Mona Ali,3,3,100,")) && csv.some(l => l.startsWith("10003,Nour Samir,0,3,0,Absent,Absent,Absent")), "CSV rows: IDs, names, counts, Present/Absent");
   ok(csv.some(l => l.includes("'=cmd|calc")) && !csv.some(l => /(^|,)=cmd/.test(l)), "CSV neutralises a name that starts with '=' (spreadsheet formula injection)");
+
+  // A rejected check-in (D20) is absent: Omar's 19 Oct Math check-in is rejected by the teacher.
+  const math19 = gas.sheets.AttCheckins._g.find((r, i) => i > 0 && r[2] === "10002" && r[4].startsWith("2026-10-19"));
+  D({ action: "att_review", ...A, checkin_id: math19[0], decision: "rejected", note: "far" });
+  byId.rosRefresh.onclick();
+  for (let i = 0; i < 60 && cells(find("10002") || { children: [] })[1] !== "1 / 3"; i++) await sleep(25);
+  const omar2 = find("10002"), c19 = omar2.children[5];
+  ok(cells(omar2)[1] === "1 / 3" && cells(omar2)[2] === "33%", "after the teacher rejects Omar's 19 Oct check-in: 1 / 3 = 33%");
+  ok(c19.textContent === "\u2717" && /rejc/.test(c19.className) && /counted absent/.test(c19.attrs.title || ""), "that cell shows a red cross that says it was rejected and counts as absent");
+  ok(/rejected \(counted absent\)/.test(byId.rosMsg.textContent), "the legend explains the cross: " + byId.rosMsg.textContent);
+  byId.rosCsv.click();
+  const csv2 = downloads[downloads.length - 1].text.replace(/^\ufeff/, "").split("\r\n");
+  ok(csv2.some(l => l.startsWith("10002,Omar Hassan,1,3,33,") && /,Absent \(rejected\)$/.test(l)), "roster CSV: Omar 1 of 3, the 19 Oct column says Absent (rejected)");
+  D({ action: "att_review", ...A, checkin_id: math19[0], decision: "accepted" });
+  byId.rosRefresh.onclick();
+  for (let i = 0; i < 60 && cells(find("10002") || { children: [] })[1] !== "2 / 3"; i++) await sleep(25);
+  ok(cells(find("10002"))[1] === "2 / 3" && cells(find("10002"))[5] === "\u2713", "accepting it again turns the cross back into a tick");
   console.log("\n" + pass + " roster page checks passed"); process.exit(0);
 })().catch(e => { console.error("\nFAIL:", e.message); process.exit(1); });

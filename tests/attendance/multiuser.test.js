@@ -221,7 +221,7 @@ const crow = (D, sid, id) => detail(D, sid).checkins.find(c => c.student_id === 
   ok(cl.ok && cl.summary.present === 2 && cl.summary.flagged === 1 && D({ action: "att_close_session", token: t1.token, session_id: s1.session_id }).ok, "the admin may close a teacher's session; a teacher closes their own");
   ok(gas.sent.some(m => /session closed/i.test(m.text) && /Owner: Teacher Two/.test(m.text)), "Telegram close message names the owner");
   const ex1 = D({ action: "att_export", token: t1.token, session_id: s1.session_id }).csv.split("\r\n");
-  ok(ex1[0] === "student_id,name,server_utc,status,flags,dist_m,acc,geo_reason,review_status,review_note" && ex1.length === 3 && ex1.some(l => /^1002,Stu Two,.*GEO_UNAVAILABLE.*TIMEOUT/.test(l)), "export: own rows, with geo_reason + review columns");
+  ok(ex1[0] === "student_id,name,server_utc,status,flags,dist_m,acc,geo_reason,review_status,review_note,attendance" && ex1.length === 3 && ex1.some(l => /^1002,Stu Two,.*GEO_UNAVAILABLE.*TIMEOUT.*,present$/.test(l)), "export: own rows, with geo_reason + review columns");
 
   /* ───────────────────────── 4. review, history, overview ───────────────────────── */
   console.log("review");
@@ -280,13 +280,13 @@ const crow = (D, sid, id) => detail(D, sid).checkins.find(c => c.student_id === 
     ok(r.ok && row.flags === flag && row.geo_reason === reason && row.status === "review" && row.lat === null, reason + " -> " + flag + ", geo_reason stored, status review");
   }
   const logOf = id => flagLog(G.gas).filter(l => l.student === id);
-  ok(logOf("8100")[0].detail === "reason=PERMISSION_DENIED;perm=denied;att=2;online=0;inapp=1", "AttFlagLog keeps the reason + diagnostics (perm, attempts, online, in-app) for the next investigation");
+  ok(logOf("8100")[0].detail === "reason=PERMISSION_DENIED;perm=denied;att=2;online=0;inapp=1;noprompt=?", "AttFlagLog keeps the reason + diagnostics (perm, attempts, online, in-app) for the next investigation");
   reg(G, gsid, "8200", "Old Client", "q");
   const old = att(G, gsid, "8200", "q", { denied: true });
   ok(old.ok && crow(G.D, gsid, "8200").flags === "GEO_DENIED" && crow(G.D, gsid, "8200").geo_reason === "PERMISSION_DENIED" && logOf("8200")[0].detail === "reason=PERMISSION_DENIED;diag=none", "old payload {denied:true} without reason/diag: still accepted, treated as PERMISSION_DENIED");
   reg(G, gsid, "8201", "Injector", "r");
   att(G, gsid, "8201", "r", { denied: true, reason: "TIMEOUT;owner=9999" }, { diag: { perm: "x;owner=99", attempts: "abc", online: "maybe", inapp: 7 } });
-  ok(crow(G.D, gsid, "8201").geo_reason === "PERMISSION_DENIED" && logOf("8201")[0].detail === "reason=PERMISSION_DENIED;perm=unknown;att=0;online=?;inapp=?" && !logOf("8201")[0].detail.includes("owner="), "an unknown reason and junk diagnostics are whitelisted: nothing can be injected into the log");
+  ok(crow(G.D, gsid, "8201").geo_reason === "PERMISSION_DENIED" && logOf("8201")[0].detail === "reason=PERMISSION_DENIED;perm=unknown;att=0;online=?;inapp=?;noprompt=?" && !logOf("8201")[0].detail.includes("owner="), "an unknown reason and junk diagnostics are whitelisted: nothing can be injected into the log");
   reg(G, gsid, "8203", "Skip", "k"); att(G, gsid, "8203", "k", { denied: true, reason: "USER_SKIPPED" }, { diag: { perm: "denied", attempts: 2, online: true, inapp: false, fail_reason: "TIMEOUT" } });
   ok(crow(G.D, gsid, "8203").flags === "GEO_SKIPPED" && /;fail=TIMEOUT$/.test(logOf("8203")[0].detail), "S1 diag.fail_reason (the real failure behind a skipped check-in) is kept in the flag log, whitelisted");
   reg(G, gsid, "8202", "Big", "s"); att(G, gsid, "8202", "s", { denied: true, reason: "TIMEOUT" }, { diag: { attempts: 500 } });

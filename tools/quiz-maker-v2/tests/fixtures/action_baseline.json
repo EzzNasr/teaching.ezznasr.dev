@@ -1,7 +1,7 @@
 {
   "_about": "Baseline for R-REF-2 (tests/test_ref_actions.js). Recorded 2026-11-16 at the start of the refactor. authz_only may only shrink; not_in_p4_actions changes only on purpose (teacher access is a decision).",
-  "min_total": 132,
-  "min_per_router": { "router": 88, "followup": 18, "attendance": 26 },
+  "min_total": 133,
+  "min_per_router": { "router": 88, "followup": 18, "attendance": 27 },
   "authz_list_files": [
     "tools/quiz-maker-v2/tests/fixtures/p4_matrix.json",
     "tools/quiz-maker-v2/tests/test_p4_s2_scope.js",

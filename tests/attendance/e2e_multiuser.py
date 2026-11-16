@@ -115,17 +115,17 @@ try:
         ok(tot["sessions"] == 2 and tot["present"] == 5 and ov["by_user"][0]["name"] in ("Admin", "Dr Alpha"), "admin overview: 2 sessions, 5 present")
 
         # ── dashboards in the browser ──
-        def dash(secret):
+        def dash(secret, uid=""):
             c = br.new_context(viewport=dict(width=1100, height=900)); c.route("https://script.google.com/**", fwd); pg = c.new_page(); errs = []
             pg.on("pageerror", lambda e: errs.append(str(e))); pg.goto(BASE + "/attend/admin/index.html"); pg.wait_for_selector("#login:not([hidden])")
-            pg.fill("#tok", secret); pg.click("#loginBtn"); pg.wait_for_selector("#panel:not([hidden])"); pg.errs = errs; return pg
-        da = dash(TA["pw"]); da.click("nav [data-tab=history]"); da.wait_for_selector("#hisTable table")
+            pg.fill("#uid", uid); pg.fill("#tok", secret); pg.click("#loginBtn"); pg.wait_for_selector("#panel:not([hidden])"); pg.errs = errs; return pg
+        da = dash(TA["pw"], TA["id"]); da.click("nav [data-tab=history]"); da.wait_for_selector("#hisTable table")
         txt = da.inner_text("#hisTable")
         ok("Computer Organization" in txt and "Networks" not in txt, "teacher A's dashboard History shows only A's session")
         da.click("#hisTable button"); da.wait_for_selector("#detTable table")
         dt = da.inner_text("#detTable")
         ok(all(x in dt for x in ("Mona Ali", "Omar Hassan", "Late Fix")) and "Far Away" not in dt, "...and A's three students, not B's")
-        ok("Skipped the location step" in dt and "USER_SKIPPED" in dt, "...with the skipped check-in visible (in plain words) and its reason")
+        ok("Checked in without location" in dt and "USER_SKIPPED" in dt, "...with the skipped check-in visible (in plain words) and its reason")
         da.fill("#detTable tr:has-text('Omar') input", "I saw him in class"); da.click("#detTable tr:has-text('Omar') button:has-text('Accept')")
         da.wait_for_selector("#detTable tr:has-text('Omar'):has-text('accepted')")
         r = [x for x in api("att_session_detail", token=TA["token"], session_id=TA["sid"])["checkins"] if x["student_id"] == "30002"][0]

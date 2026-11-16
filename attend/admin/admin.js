@@ -36,8 +36,9 @@
   }
 
   // ---------- login ----------
-  // One box: a teacher password OR the admin token. We ask att_me first (it never counts as a failed login), and only if the
-  // server says the value is not a valid token do we try it as a password (att_login: wrong ones count toward the global lock-out).
+  // A teacher signs in with their ID + password; the admin pastes the token and leaves the ID empty. We ask att_me first (it never
+  // counts as a failed login), and only if the server says the value is not a valid token do we try it as a password (att_login).
+  // Wrong passwords are counted per teacher ID (2026-11-16), so one person typing rubbish cannot lock every teacher out.
   function showLogin(text) { $("panel").hidden = true; $("proj").hidden = true; $("login").hidden = false; wait($("loginBtn"), false); msg("loginMsg", text, text ? "err" : ""); }
   function enter(user, tok) {
     S.tok = tok; S.user = user; S.role = user.role === "admin" ? "admin" : "teacher";
@@ -46,7 +47,7 @@
     initPanel();
   }
   function login(saved) {
-    var t = saved || $("tok").value.trim();
+    var t = saved || $("tok").value.trim(), uid = saved ? "" : $("uid").value.trim();
     if (!t) return msg("loginMsg", "Enter your password or the admin token.", "err");
     msg("loginMsg", "Checking\u2026"); wait($("loginBtn"), true);
     function fail(text) { S.tok = null; if (saved) ss("att_admin", null); showLogin(text); }
@@ -55,9 +56,10 @@
       if (r.code === "NETWORK") return fail("No connection.");
       if (r.code === "USER_DISABLED") return fail("This account is disabled.");
       if (saved) return fail("");   // a stale saved token is never sent to att_login as a password
-      return api.call("att_login", { password: t }).then(function (l) {
-        if (l.ok) return enter(l.user, l.token);
-        fail(l.code === "NETWORK" ? "No connection." : l.code === "LOCKED" ? (l.error || "Too many attempts. Wait a few minutes.") : l.code === "USER_DISABLED" ? "This account is disabled." : "Wrong password or token.");
+      if (!uid) return fail("Type your teacher ID as well (the admin gives it to you with the password).");
+      return api.call("att_login", { user_id: uid, password: t }).then(function (l) {
+        if (l.ok) { ls("att_uid", l.user.user_id); return enter(l.user, l.token); }
+        fail(l.code === "NETWORK" ? "No connection." : l.code === "LOCKED" ? (l.error || "Too many attempts. Wait a few minutes.") : l.code === "USER_DISABLED" ? "This account is disabled." : "Wrong ID or password.");
       });
     });
   }
@@ -138,11 +140,11 @@
     });
   }
   function showProjector() {
-    $("panel").hidden = true; $("proj").hidden = false; $("closeBtn").disabled = S.closed;
+    $("panel").hidden = true; $("proj").hidden = false; $("closeBtn").disabled = S.closed; $("extBtn").disabled = S.closed;
     $("pinfo").textContent = S.course + " · " + S.room;
     clearInterval(S.tickTimer); clearInterval(S.liveTimer);
     clearInterval(S.syncTimer);
-    S.tickTimer = setInterval(tick, 200); S.liveTimer = setInterval(poll, 4000); S.syncTimer = setInterval(syncClock, 30000);
+    S.tickTimer = setInterval(tick, 200); S.liveTimer = setInterval(poll, CFG.LIVE_POLL_MS || 8000);   // 8 s (was 4 s): each poll reads five tabs and competes with students' saves for Google's ~30 parallel requests S.syncTimer = setInterval(syncClock, 30000);
     tick(); poll(); syncClock(); wake();
   }
   // Refine clock offset with att_status.server_utc (spec 4); drives the QR window and countdown.
@@ -192,8 +194,12 @@
   function blankQR(text) { $("qr").hidden = true; $("prot").hidden = true; $("pinfo").textContent = text + " · " + S.course + " · " + S.room; }
 
   function poll() {
-    if (!S.sess) return;
+    if (!S.sess || S.polling) return;   // the last answer is not back yet (busy server during the rush): skip this round, never pile up
+    S.polling = true;
+    var done = function () { S.polling = false; };
+    setTimeout(done, 30000);   // safety: a lost answer never stops the counters for good
     A("att_live", { session_id: S.sess }).then(function (r) {
+      done();
       if (!r.ok) return;
       var feed = r.feed || [], nReg = 0, nBad = 0;
       feed.forEach(function (e) { if (e.k === "reg") nReg++; else if (e.k === "bad") nBad++; });
@@ -266,11 +272,24 @@
   Object.keys(mark.now).forEach(function (k) { seenEv[k] = 1; });
     if (fresh.length) arrive(fresh.slice().reverse());
   }
+  // "+2 minutes": the server moves the close time; the QR comes back if the time had just run out.
+  function extendSession() {
+    if (!S.sess || S.closed) return;
+    wait($("extBtn"), true);
+    A("att_extend_session", { session_id: S.sess }).then(function (r) {
+      wait($("extBtn"), false);
+      if (!r.ok) return alert(r.code === "MAX_REACHED" ? "Attendance cannot stay open any longer." : r.code === "SESSION_CLOSED" ? "This attendance has already ended. Start a new one." : "Could not add time: " + (r.code || "error"));
+      S.closeMs = Date.parse(r.close_utc); S.win = -1;
+      $("pinfo").textContent = S.course + " · " + S.room;
+      $("extBtn").disabled = r.can_extend === false;
+      tick();
+    });
+  }
   function closeSession() {
     if (!S.sess || S.closed || !confirm("End attendance now? New students can no longer check in (anyone already saving gets 2 more minutes).")) return;
     A("att_close_session", { session_id: S.sess }).then(function (r) {
       if (!r.ok) return alert("Could not close: " + (r.code || "error"));
-      S.closed = true; $("closeBtn").disabled = true; tick(); poll();
+      S.closed = true; $("closeBtn").disabled = true; $("extBtn").disabled = true; tick(); poll();
       var s = r.summary || {};
       hideProjector("session");
       $("summary").hidden = false;
@@ -308,7 +327,8 @@
       clear(box);
       if (!r.ok) return box.appendChild(mk("div", "Could not load: " + (r.error || r.code || "error"), "msg err"));
       var all = r.checkins || [], man = all.filter(function (c) { return /(^|,)MANUAL(,|$)/.test(c.flags || ""); });
-      $("manListTitle").textContent = "Entered by hand in this lecture: " + man.length + " (present in total: " + all.length + ")";
+      var present = all.filter(function (c) { return c.review_status !== "rejected"; }).length;
+      $("manListTitle").textContent = "Entered by hand in this lecture: " + man.length + " (present in total: " + present + ")";
       if (!man.length) return box.appendChild(mk("div", "Nobody entered by hand yet.", "msg"));
       var t = mk("table", null, "his"), h = mk("tr");
       ["Time", "Student", "Reason", "Entered by"].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
@@ -334,7 +354,8 @@
         return msg("manMsg", "Not saved: " + (r.error || r.code || "error"), "err");
       }
       var who = (r.name ? r.name + " (" + id + ")" : id), at = fTimeS.format(new Date(r.server_utc));
-      if (r.status === "already") msg("manMsg", who + " is already present (" + (r.manual ? "entered by hand" : "checked in by phone") + " at " + at + "). Nothing changed.", "ok");
+      if (r.overrode_reject) msg("manMsg", "\u2713 Marked present: " + who + ". Their phone check-in had been rejected; it now counts as present.", "ok");
+      else if (r.status === "already") msg("manMsg", who + " is already present (" + (r.manual ? "entered by hand" : "checked in by phone") + " at " + at + "). Nothing changed.", "ok");
       else msg("manMsg", "✓ Marked present: " + who + " at " + at + (r.new_student ? ". New student added to the roster." : "."), "ok");
       $("manId").value = ""; $("manName").value = ""; $("manNote").value = "";
       try { $("manId").focus(); } catch (e) {}
@@ -375,8 +396,8 @@
 
   // ---------- needs review: every flagged check-in, decided right here (Accept / Reject + note) ----------
   // Plain words for the flag codes (the codes stay in the CSV export).
-  var FLAG_TEXT = { GEO_FAR: "Outside the hall", GEO_DENIED: "Location was blocked on the phone", GEO_UNAVAILABLE: "The phone gave no location",
-    GEO_SKIPPED: "Skipped the location step", GEO_WEAK: "Weak location signal", SAME_PHONE_MULTI_ID: "Same phone as another student",
+  var FLAG_TEXT = { GEO_FAR: "Outside the hall", GEO_DENIED: "Location off or blocked on the phone", GEO_UNAVAILABLE: "The phone gave no location",
+    GEO_SKIPPED: "Checked in without location", GEO_WEAK: "Weak location signal", SAME_PHONE_MULTI_ID: "Same phone as another student",
     IDENTICAL_COORDS: "Exactly the same location as other students", REPEATED: "Flagged 3 or more times before", MANUAL: "Entered by hand" };
   function flagText(c) { return FLAG_TEXT[c] || c; }
   function setFlagBadge(n) { setBadge($("flagBadge"), n); }
@@ -402,7 +423,7 @@
         if (x.dist_m !== "" && x.dist_m != null) why.appendChild(mk("div", Math.round(Number(x.dist_m)) + " m from the hall", "msg"));
         tr.appendChild(why);
         var d = mk("td", null, "dec");
-        if (x.review_status) d.appendChild(mk("div", (x.review_status === "accepted" ? "Accepted" : "Rejected") + (x.review_note ? ": " + x.review_note : ""), "tag " + (x.review_status === "accepted" ? "good" : "bad")));
+        if (x.review_status) d.appendChild(mk("div", (x.review_status === "accepted" ? "Accepted" : "Rejected \u00b7 counted absent") + (x.review_note ? ": " + x.review_note : ""), "tag " + (x.review_status === "accepted" ? "good" : "bad")));
         var note = mk("input", null, "note"); note.setAttribute("placeholder", "note (optional)"); note.value = x.review_note || "";
         var ok = mk("button", "Accept", "ok"), no = mk("button", "Reject", "bad");
         ok.onclick = function () { decideFlag(x, "accepted", note, [ok, no]); }; no.onclick = function () { decideFlag(x, "rejected", note, [ok, no]); };
@@ -449,12 +470,13 @@
     });
     groups = groups.slice(-lim);
     var gOf = {}; groups.forEach(function (g, i) { Object.keys(g.ids).forEach(function (id) { gOf[id] = i; }); });
-    var here = {}; // "groupIndex|studentId" -> attended
+    var here = {}, rej = {}; // "groupIndex|studentId" -> attended / rejected by the teacher (counted absent, D20)
     d.marks.forEach(function (m) { if (m[0] in gOf) here[gOf[m[0]] + "|" + m[1]] = true; });
+    (d.rejected || []).forEach(function (m) { if (m[0] in gOf) rej[gOf[m[0]] + "|" + m[1]] = true; });
     var rows = d.students.filter(function (s) { return !q || String(s.student_id).toLowerCase().indexOf(q) >= 0 || String(s.name || "").toLowerCase().indexOf(q) >= 0; })
       .map(function (s) {
-        var cells = groups.map(function (g, i) { return !!here[i + "|" + s.student_id]; });
-        var n = cells.filter(Boolean).length;
+        var cells = groups.map(function (g, i) { var k = i + "|" + s.student_id; return here[k] ? true : rej[k] ? "rej" : false; });   // a same-day phone or hand check-in wins over a rejected one
+        var n = cells.filter(function (c) { return c === true; }).length;
         return { id: s.student_id, name: s.name || "", cells: cells, n: n, pct: groups.length ? Math.round(100 * n / groups.length) : 0 };
       }).sort(function (a, b) { return (a.name || "\uffff").localeCompare(b.name || "\uffff") || String(a.id).localeCompare(String(b.id)); });
     return { sessions: groups, rows: rows };
@@ -462,7 +484,7 @@
   function renderRoster() {
     var box = $("rosTable"); clear(box);
     var m = rosterModel();
-    msg("rosMsg", m.rows.length + " student" + (m.rows.length === 1 ? "" : "s") + " · " + m.sessions.length + " lecture" + (m.sessions.length === 1 ? "" : "s") + " · ✓ = present");
+    msg("rosMsg", m.rows.length + " student" + (m.rows.length === 1 ? "" : "s") + " · " + m.sessions.length + " lecture" + (m.sessions.length === 1 ? "" : "s") + " · ✓ = present · ✗ = rejected (counted absent)");
     if (!m.rows.length) return;
     var t = mk("table", null, "ros"), h = mk("tr");
     h.appendChild(mk("th", "Student", "l")); h.appendChild(mk("th", "Attended")); h.appendChild(mk("th", "%"));
@@ -474,7 +496,10 @@
       var tr = mk("tr"), td0 = mk("td", null, "l");
       td0.appendChild(mk("b", r.name || "(no name)")); td0.appendChild(mk("small", String(r.id))); tr.appendChild(td0);
       tr.appendChild(mk("td", r.n + " / " + m.sessions.length)); tr.appendChild(mk("td", r.pct + "%"));
-      r.cells.forEach(function (c) { tr.appendChild(c ? mk("td", "\u2713", "pre") : mk("td", "\u2013", "abs")); });
+      r.cells.forEach(function (c) {
+        if (c === "rej") { var x = mk("td", "\u2717", "abs rejc"); x.setAttribute("title", "Rejected by the teacher: counted absent"); tr.appendChild(x); }
+        else tr.appendChild(c ? mk("td", "\u2713", "pre") : mk("td", "\u2013", "abs"));
+      });
       t.appendChild(tr);
     });
     box.appendChild(t);
@@ -490,7 +515,7 @@
     var head = ["student_id", "name", "present", "total", "percent"].concat(m.sessions.map(function (x) { return fDate.format(new Date(x.start_utc)) + " " + (x.course || ""); }));
     var lines = [head.map(csvCell).join(",")];
     m.rows.forEach(function (r) {
-      lines.push([r.id, r.name, r.n, m.sessions.length, r.pct].concat(r.cells.map(function (c) { return c ? "Present" : "Absent"; })).map(csvCell).join(","));
+      lines.push([r.id, r.name, r.n, m.sessions.length, r.pct].concat(r.cells.map(function (c) { return c === true ? "Present" : c === "rej" ? "Absent (rejected)" : "Absent"; })).map(csvCell).join(","));
     });
     var blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
     var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -603,7 +628,7 @@
       var s = r.session, t = r.summary || {};
       H.rows = r.checkins || [];
       $("detTitle").textContent = (s.course || "") + " · " + (s.room_name || "") + " · " + when(s.start_utc) + (S.role === "admin" ? " · " + (s.owner_name || s.owner_user_id || "") : "");
-      $("detSummary").textContent = (t.present | 0) + " present · " + (t.flagged | 0) + " looked unusual · " + (t.unreviewed | 0) + " still to decide";
+      $("detSummary").textContent = (t.present | 0) + " present · " + (t.flagged | 0) + " looked unusual · " + (t.unreviewed | 0) + " still to decide" + ((t.rejected | 0) ? " · " + t.rejected + " rejected (counted absent)" : "");
       renderDetail();
     });
   }
@@ -623,7 +648,7 @@
       tr.appendChild(mk("td", r.dist_m == null ? "" : Math.round(r.dist_m) + " m", "n")); tr.appendChild(mk("td", r.acc == null ? "" : Math.round(r.acc) + " m", "n"));
       tr.appendChild(mk("td", r.geo_reason || ""));
       var rv = mk("td");
-      if (r.review_status) { rv.appendChild(mk("span", r.review_status, "tag " + (r.review_status === "accepted" ? "good" : "bad"))); if (r.review_note) rv.appendChild(mk("div", r.review_note, "msg")); if (r.reviewed_by_name || r.reviewed_at) rv.appendChild(mk("div", (r.reviewed_by_name || "") + (r.reviewed_at ? " · " + when(r.reviewed_at) : ""), "msg")); }
+      if (r.review_status) { rv.appendChild(mk("span", r.review_status === "rejected" ? "rejected \u00b7 counted absent" : r.review_status, "tag " + (r.review_status === "accepted" ? "good" : "bad"))); if (r.review_note) rv.appendChild(mk("div", r.review_note, "msg")); if (r.reviewed_by_name || r.reviewed_at) rv.appendChild(mk("div", (r.reviewed_by_name || "") + (r.reviewed_at ? " · " + when(r.reviewed_at) : ""), "msg")); }
       else rv.appendChild(mk("span", isFlagged(r) ? "to review" : "", "msg"));
       tr.appendChild(rv);
       var d = mk("td", null, "dec"), note = mk("input", null, "note"); note.setAttribute("placeholder", "note (optional)"); note.value = r.review_note || "";
@@ -687,10 +712,10 @@
       var box = $("userList"); clear(box);
       if (!r.users.length) return;
       var t = mk("table", null, "his"), h = mk("tr");
-      ["Name", "Status", "Created", "Last login", ""].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
+      ["Name", "ID", "Status", "Created", "Last login", ""].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
       r.users.forEach(function (u) {
         var on = u.status === "active", tr = mk("tr");
-        tr.appendChild(mk("td", u.name)); tr.appendChild(mk("td", on ? "active" : "disabled", on ? "" : "pill-off"));
+        tr.appendChild(mk("td", u.name)); tr.appendChild(mk("td", u.user_id)); tr.appendChild(mk("td", on ? "active" : "disabled", on ? "" : "pill-off"));
         tr.appendChild(mk("td", when(u.created_at))); tr.appendChild(mk("td", u.last_login ? when(u.last_login) : "never"));
         var td = mk("td"), ren = mk("button", "Rename"), tog = mk("button", on ? "Disable" : "Enable", on ? "bad" : "ok"), rst = mk("button", "Reset password");
         ren.onclick = function () { var n = prompt("New name for " + u.name, u.name); if (n && n.trim() && n.trim() !== u.name) userCall("att_user_update", { user_id: u.user_id, name: n.trim() }); };
@@ -704,7 +729,7 @@
   function userCall(action, payload, what) {
     A(action, payload).then(function (r) {
       if (!r.ok) return msg("userMsg", "Failed: " + (r.error || r.code || "error"), "err");
-      if (r.password) showSecret(r.user.name, r.password, what || "Account created");
+      if (r.password) showSecret(r.user.name + " · ID " + r.user.user_id, r.password, what || "Account created");
       else msg("userMsg", "Saved.", "ok");
       loadUsers();
     });
@@ -720,7 +745,7 @@
     A("att_user_create", { name: n }).then(function (r) {
       wait($("userCreate"), false);
       if (!r.ok) return msg("userMsg", "Failed: " + (r.error || r.code || "error"), "err");
-      $("userName").value = ""; showSecret(r.user.name, r.password, "Account created"); loadUsers();
+      $("userName").value = ""; showSecret(r.user.name + " · ID " + r.user.user_id, r.password, "Account created"); loadUsers();
     });
   }
   function copySecret() {
@@ -748,6 +773,7 @@
     $("startBtn").onclick = startSession;
     $("resumeBtn").onclick = function () { if (S.sess) showProjector(); };
     $("closeBtn").onclick = closeSession;
+    $("extBtn").onclick = extendSession;
     $("csvBtn").onclick = function () { exportCSV(); };
     $("calBtn").onclick = calibrate;
     $("manSave").onclick = saveManual;
@@ -769,6 +795,7 @@
     window.addEventListener("resize", function () { S.win = -1; });
     document.addEventListener("visibilitychange", function () { if (!document.hidden && !$("proj").hidden) wake(); });
     if (DEBUG) T.selfTest().then(function (ok) { console.assert(ok, "TOKEN VECTOR MISMATCH (spec section 2)"); if (ok) console.log("token vector OK"); });
+    $("uid").value = ls("att_uid") || "";   // the teacher types the ID once per device
     var saved = ss("att_admin");
     if (saved) login(saved); else showLogin("");
   }

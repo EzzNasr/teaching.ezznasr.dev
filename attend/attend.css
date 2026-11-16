@@ -30,13 +30,16 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #gate p,#done p{margin:0;color:var(--mut)}
 #gatePin{color:var(--pri)}
 #gateText{max-width:34ch}
+#gateTitleAr{font-size:20px;font-weight:700;color:var(--fg)}#gateTextAr{max-width:34ch}
+#gateHelp [dir=rtl]{text-align:right}#gateStepsAr{margin-top:10px;padding-right:20px;padding-left:0}#gateHelpTitleAr{margin-top:10px}
+#gateMsgAr:empty,#gateHelpTitleAr:empty{display:none}
 #gateBtn{width:100%;min-height:72px;font-size:22px;background:var(--pri);border-radius:18px}
 #gateHelp{width:100%;text-align:left;background:var(--card);border-radius:14px;padding:12px 16px}
 #gateHelp p{color:var(--fg);font-weight:600;margin-bottom:6px}
 #gateHelp p.fine{font-weight:400;color:var(--mut);margin:8px 0 0}
 #gateSteps{margin:0;padding-left:20px;text-align:left;color:var(--fg)}
 #gateSteps li{margin:4px 0}
-#gateMsg{min-height:1.4em;font-size:15px;color:#fecaca}
+#gateMsg,#gateMsgAr{min-height:1.4em;font-size:15px;color:#fecaca}
 #gateSkipBox{width:100%;display:flex;flex-direction:column;gap:10px}
 #gateSkipBox .fine,#gate .fine{font-size:13px}
 #gateSkip{width:100%;background:var(--card);border:1px solid #334155;font-size:16px}

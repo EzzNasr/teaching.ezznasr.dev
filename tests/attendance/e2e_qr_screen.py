@@ -17,7 +17,7 @@ def ok(c, m):
 
 srv = subprocess.Popen(["node", os.path.join(ROOT, "docs/attendance/screenshots/dashboard_backend.js")], cwd=ROOT, stdout=subprocess.PIPE, text=True)
 TOK = json.loads(srv.stdout.readline())["token"]
-BASE = "http://127.0.0.1:8767"
+BASE = "http://127.0.0.1:" + os.environ.get("ATT_DEMO_PORT", "8767")   # set ATT_DEMO_PORT when another session already runs the demo backend
 def post(path, body=b""): return urllib.request.urlopen(urllib.request.Request(BASE + path, data=body, method="POST")).read()
 def api(route): route.fulfill(status=200, content_type="application/json", body=post("/api", (route.request.post_data or "{}").encode()))
 def newest(): return json.loads(post("/api", json.dumps({"action": "att_sessions", "token": TOK, "limit": 1}).encode()))["sessions"][0]["session_id"]

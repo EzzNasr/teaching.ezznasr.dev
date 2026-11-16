@@ -33,4 +33,4 @@ http.createServer((req, res) => {
   if (req.method === "POST") { let b = ""; req.on("data", c => b += c); req.on("end", () => { res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" }); res.end(JSON.stringify(D(JSON.parse(b || "{}")))); }); return; }
   const f = path.join(ROOT, decodeURIComponent(req.url.split("?")[0]));
   fs.readFile(f, (e, d) => { if (e) { res.writeHead(404); return res.end(); } res.writeHead(200, { "content-type": TYPES[path.extname(f)] || "application/octet-stream" }); res.end(d); });
-}).listen(8767, "127.0.0.1", () => console.log(JSON.stringify({ token: tok })));
+}).listen(Number(process.env.ATT_DEMO_PORT) || 8767, "127.0.0.1", () => console.log(JSON.stringify({ token: tok })));

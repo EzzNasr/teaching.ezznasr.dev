@@ -29,6 +29,7 @@ lock is shared with quizzes), and the end of a semester when the check-in tab is
 
 `att_loadTest(n)` and `att_loadTestFirstDay(n)` in `AttendanceAll.gs`, run from the Apps Script editor:
 
+- Since 2026-11-16 (D21) each student first **scans**: an `att_ticket` call with the QR code on the screen at that moment. A "QR expired" answer is counted (`QR expired on scan N` in the result) and that student scans again. Runs before that date skipped this step.
 - They start a test lecture (course `ATT-TEST`) and send **all n requests at once** over HTTP to the students' `/exec` URL
   (`UrlFetchApp.fetchAll`), exactly what n phones tapping at the same second would send.
 - Every request that gets BUSY, a server error or a non-JSON answer (Google's "too many at once" page) is **sent again in the

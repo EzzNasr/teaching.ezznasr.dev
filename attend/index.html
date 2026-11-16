@@ -19,17 +19,23 @@
   <section id="gate" hidden aria-labelledby="gateTitle">
     <svg id="gatePin" viewBox="0 0 24 24" width="56" height="56" aria-hidden="true" focusable="false"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
     <h1 id="gateTitle">Turn on location to check in</h1>
+    <p id="gateTitleAr" class="ar-title" lang="ar" dir="rtl">شغّل الموقع لتسجيل الحضور</p>
     <p id="gateText"></p>
+    <p id="gateTextAr" class="ar-line" lang="ar" dir="rtl"></p>
     <button id="gateBtn" type="button">Allow location</button>
     <div id="gateHelp" hidden>
       <p id="gateHelpTitle"></p>
       <ol id="gateSteps"></ol>
+      <p id="gateHelpTitleAr" lang="ar" dir="rtl"></p>
+      <ol id="gateStepsAr" lang="ar" dir="rtl" hidden></ol>
       <p class="fine">If the page reloads and says the QR expired, scan the screen again.</p>
     </div>
     <div id="gateMsg" role="status" aria-live="polite"></div>
+    <div id="gateMsgAr" lang="ar" dir="rtl" aria-live="polite"></div>
     <div id="gateSkipBox" hidden>
       <p class="fine">Still not working? You can check in without location. The instructor will see this check-in marked for review.</p>
-      <button id="gateSkip" type="button">Continue without location</button>
+      <p class="fine" lang="ar" dir="rtl">ما زال لا يعمل؟ يمكنك تسجيل الحضور بدون موقع، وسيراه المحاضر للمراجعة.</p>
+      <button id="gateSkip" type="button">Continue without location · المتابعة بدون موقع</button>
     </div>
   </section>
 
