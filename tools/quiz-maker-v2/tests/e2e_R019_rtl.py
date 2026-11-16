@@ -6,6 +6,7 @@ grading.html runs in its built-in ?mock=1 mode (no network); the review list is 
 """
 import os, sys, mimetypes
 from playwright.sync_api import sync_playwright
+from _hermetic import seal   # no request leaves the machine (a slow Google Fonts load used to time the page out)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
 SITE = "https://site.test"
@@ -35,6 +36,7 @@ def main():
             ctx.route("https://script.google.com/**", lambda r: r.abort())
             ctx.route("https://fonts.googleapis.com/**", lambda r: r.fulfill(status=200, content_type="text/css", body=""))
             ctx.route("https://fonts.gstatic.com/**", lambda r: r.fulfill(status=200, body=""))
+            seal(ctx, (SITE,))
             pg = ctx.new_page(); pg.set_default_timeout(8000)
             pg.goto(SITE + "/dashboard/grading.html?mock=1")
             pg.wait_for_selector(".g-card")
@@ -52,7 +54,7 @@ def main():
                   pg.evaluate("[document.documentElement.scrollWidth, document.documentElement.clientWidth]"))
             ctx.close()
         # the review tree (student.html uses it with Arabic wording)
-        ctx = b.new_context(viewport={"width": 375, "height": 800}); ctx.route(SITE + "/**", serve)
+        ctx = b.new_context(viewport={"width": 375, "height": 800}); ctx.route(SITE + "/**", serve); seal(ctx, (SITE,))
         pg = ctx.new_page(); pg.goto(SITE + "/dashboard/grading.html?mock=1"); pg.wait_for_selector(".g-card")
         pg.add_script_tag(url=SITE + "/assets/dash-review.js")
         res = pg.evaluate("""() => {

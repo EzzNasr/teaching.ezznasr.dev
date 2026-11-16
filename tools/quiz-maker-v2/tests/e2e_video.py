@@ -25,6 +25,7 @@ import time
 import urllib.request
 
 from playwright.sync_api import sync_playwright
+from _hermetic import seal   # no request leaves the machine (an outside load used to time the page out)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 QM = os.path.dirname(HERE)                                   # tools/quiz-maker-v2
@@ -141,6 +142,7 @@ class Site:
         self.pages = pages or {}
         self.ctx.route(SITE + "/**", self._site)
         self.ctx.route("https://script.google.com/**", self._gas)
+        seal(self.ctx, (SITE, "https://script.google.com/"))
         if session:
             self.ctx.add_init_script(
                 "try{if(!localStorage.getItem('teaching_session'))localStorage.setItem('teaching_session', %s)}catch(e){}"
