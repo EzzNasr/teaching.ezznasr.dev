@@ -327,7 +327,7 @@
       clear(box);
       if (!r.ok) return box.appendChild(mk("div", "Could not load: " + (r.error || r.code || "error"), "msg err"));
       var all = r.checkins || [], man = all.filter(function (c) { return /(^|,)MANUAL(,|$)/.test(c.flags || ""); });
-      var present = all.filter(function (c) { return c.review_status !== "rejected"; }).length;
+      var present = all.filter(function (c) { return c.review_status !== "rejected" && !(c.status === "blocked" && c.review_status !== "accepted"); }).length;
       $("manListTitle").textContent = "Entered by hand in this lecture: " + man.length + " (present in total: " + present + ")";
       if (!man.length) return box.appendChild(mk("div", "Nobody entered by hand yet.", "msg"));
       var t = mk("table", null, "his"), h = mk("tr");
@@ -354,7 +354,7 @@
         return msg("manMsg", "Not saved: " + (r.error || r.code || "error"), "err");
       }
       var who = (r.name ? r.name + " (" + id + ")" : id), at = fTimeS.format(new Date(r.server_utc));
-      if (r.overrode_reject) msg("manMsg", "\u2713 Marked present: " + who + ". Their phone check-in had been rejected; it now counts as present.", "ok");
+      if (r.overrode_reject) msg("manMsg", "\u2713 Marked present: " + who + ". Their phone check-in had been rejected or blocked; it now counts as present.", "ok");
       else if (r.status === "already") msg("manMsg", who + " is already present (" + (r.manual ? "entered by hand" : "checked in by phone") + " at " + at + "). Nothing changed.", "ok");
       else msg("manMsg", "✓ Marked present: " + who + " at " + at + (r.new_student ? ". New student added to the roster." : "."), "ok");
       $("manId").value = ""; $("manName").value = ""; $("manNote").value = "";
@@ -398,7 +398,9 @@
   // Plain words for the flag codes (the codes stay in the CSV export).
   var FLAG_TEXT = { GEO_FAR: "Outside the hall", GEO_DENIED: "Location off or blocked on the phone", GEO_UNAVAILABLE: "The phone gave no location",
     GEO_SKIPPED: "Checked in without location", GEO_WEAK: "Weak location signal", SAME_PHONE_MULTI_ID: "Same phone as another student",
-    IDENTICAL_COORDS: "Exactly the same location as other students", REPEATED: "Flagged 3 or more times before", MANUAL: "Entered by hand" };
+    IDENTICAL_COORDS: "Exactly the same location as other students", REPEATED: "Flagged 3 or more times before", MANUAL: "Entered by hand",
+    DEVICE_UNKNOWN: "Phone not registered to this ID", ID_BOUND_OTHER_DEVICE: "This ID is registered to another phone",
+    DEVICE_ID_CONFLICT: "Phone registered to another student", DEVICE_BOUND_OTHER_ID: "Phone registered to another student" };
   function flagText(c) { return FLAG_TEXT[c] || c; }
   function setFlagBadge(n) { setBadge($("flagBadge"), n); }
   var F = { lect: {} };
@@ -412,6 +414,22 @@
       setFlagBadge(open.length);
       msg("flagMsg", open.length ? open.length + " check-in" + (open.length === 1 ? "" : "s") + " waiting for your decision." : "Nothing is waiting for a decision.", open.length ? "" : "ok");
       if (!list.length) return;
+      // "Accept all" per lecture (D22): for a lecture where the system misfired, accept every undecided row at once.
+      var per = {}; open.forEach(function (x) { per[x.session_id] = (per[x.session_id] || 0) + 1; });
+      Object.keys(per).filter(function (k) { return per[k] >= 2; }).forEach(function (k) {
+        var L = F.lect[k], line = mk("div", null, "row bulk");
+        line.appendChild(mk("span", (L ? (L.course || "") + " \u00b7 " + when(L.start_utc) : k) + ": " + per[k] + " waiting"));
+        var all = mk("button", "Accept all " + per[k], "ok");
+        all.onclick = function () {
+          if (!confirm("Accept all " + per[k] + " waiting check-ins of this lecture? They will count as present.")) return;
+          all.disabled = true;
+          A("att_review_bulk", { session_id: k }).then(function (r) {
+            if (!r.ok) { all.disabled = false; return msg("flagMsg", "Could not save: " + (r.error || r.code || "error"), "err"); }
+            loadFlagged().then(function () { msg("flagMsg", "Accepted " + (r.accepted | 0) + ". " + $("flagMsg").textContent, "ok"); });
+          });
+        };
+        line.appendChild(all); box.appendChild(line);
+      });
       var t = mk("table", null, "his"), h = mk("tr");
       ["Lecture", "Student", "What looked unusual", "Decision"].forEach(function (x) { h.appendChild(mk("th", x)); }); t.appendChild(h);
       list.forEach(function (x) {
@@ -421,6 +439,7 @@
         var why = mk("td", null, "dec");
         String(x.flags || "").split(/[\s,;|]+/).filter(Boolean).forEach(function (c) { why.appendChild(mk("span", flagText(c), "tag " + (WARN[c] ? "warn" : "bad"))); });
         if (x.dist_m !== "" && x.dist_m != null) why.appendChild(mk("div", Math.round(Number(x.dist_m)) + " m from the hall", "msg"));
+        if (x.status === "blocked" && !x.review_status) why.appendChild(mk("div", "Counted absent until you accept", "msg"));
         tr.appendChild(why);
         var d = mk("td", null, "dec");
         if (x.review_status) d.appendChild(mk("div", (x.review_status === "accepted" ? "Accepted" : "Rejected \u00b7 counted absent") + (x.review_note ? ": " + x.review_note : ""), "tag " + (x.review_status === "accepted" ? "good" : "bad")));
@@ -473,9 +492,10 @@
     var here = {}, rej = {}; // "groupIndex|studentId" -> attended / rejected by the teacher (counted absent, D20)
     d.marks.forEach(function (m) { if (m[0] in gOf) here[gOf[m[0]] + "|" + m[1]] = true; });
     (d.rejected || []).forEach(function (m) { if (m[0] in gOf) rej[gOf[m[0]] + "|" + m[1]] = true; });
+    var blk = {}; (d.blocked || []).forEach(function (m) { if (m[0] in gOf) blk[gOf[m[0]] + "|" + m[1]] = true; });
     var rows = d.students.filter(function (s) { return !q || String(s.student_id).toLowerCase().indexOf(q) >= 0 || String(s.name || "").toLowerCase().indexOf(q) >= 0; })
       .map(function (s) {
-        var cells = groups.map(function (g, i) { var k = i + "|" + s.student_id; return here[k] ? true : rej[k] ? "rej" : false; });   // a same-day phone or hand check-in wins over a rejected one
+        var cells = groups.map(function (g, i) { var k = i + "|" + s.student_id; return here[k] ? true : rej[k] ? "rej" : blk[k] ? "blk" : false; });   // a same-day phone or hand check-in wins over a rejected one
         var n = cells.filter(function (c) { return c === true; }).length;
         return { id: s.student_id, name: s.name || "", cells: cells, n: n, pct: groups.length ? Math.round(100 * n / groups.length) : 0 };
       }).sort(function (a, b) { return (a.name || "\uffff").localeCompare(b.name || "\uffff") || String(a.id).localeCompare(String(b.id)); });
@@ -484,7 +504,7 @@
   function renderRoster() {
     var box = $("rosTable"); clear(box);
     var m = rosterModel();
-    msg("rosMsg", m.rows.length + " student" + (m.rows.length === 1 ? "" : "s") + " · " + m.sessions.length + " lecture" + (m.sessions.length === 1 ? "" : "s") + " · ✓ = present · ✗ = rejected (counted absent)");
+    msg("rosMsg", m.rows.length + " student" + (m.rows.length === 1 ? "" : "s") + " · " + m.sessions.length + " lecture" + (m.sessions.length === 1 ? "" : "s") + " · ✓ = present · ✗ = rejected · ? = phone did not match, waiting in Needs review (both counted absent)");
     if (!m.rows.length) return;
     var t = mk("table", null, "ros"), h = mk("tr");
     h.appendChild(mk("th", "Student", "l")); h.appendChild(mk("th", "Attended")); h.appendChild(mk("th", "%"));
@@ -497,7 +517,8 @@
       td0.appendChild(mk("b", r.name || "(no name)")); td0.appendChild(mk("small", String(r.id))); tr.appendChild(td0);
       tr.appendChild(mk("td", r.n + " / " + m.sessions.length)); tr.appendChild(mk("td", r.pct + "%"));
       r.cells.forEach(function (c) {
-        if (c === "rej") { var x = mk("td", "\u2717", "abs rejc"); x.setAttribute("title", "Rejected by the teacher: counted absent"); tr.appendChild(x); }
+        if (c === "blk") { var y = mk("td", "?", "abs blkc"); y.setAttribute("title", "Phone did not match: counted absent until accepted in Needs review"); tr.appendChild(y); }
+        else if (c === "rej") { var x = mk("td", "\u2717", "abs rejc"); x.setAttribute("title", "Rejected by the teacher: counted absent"); tr.appendChild(x); }
         else tr.appendChild(c ? mk("td", "\u2713", "pre") : mk("td", "\u2013", "abs"));
       });
       t.appendChild(tr);
@@ -515,7 +536,7 @@
     var head = ["student_id", "name", "present", "total", "percent"].concat(m.sessions.map(function (x) { return fDate.format(new Date(x.start_utc)) + " " + (x.course || ""); }));
     var lines = [head.map(csvCell).join(",")];
     m.rows.forEach(function (r) {
-      lines.push([r.id, r.name, r.n, m.sessions.length, r.pct].concat(r.cells.map(function (c) { return c === true ? "Present" : c === "rej" ? "Absent (rejected)" : "Absent"; })).map(csvCell).join(","));
+      lines.push([r.id, r.name, r.n, m.sessions.length, r.pct].concat(r.cells.map(function (c) { return c === true ? "Present" : c === "rej" ? "Absent (rejected)" : c === "blk" ? "Absent (waiting for review)" : "Absent"; })).map(csvCell).join(","));
     });
     var blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
     var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -628,7 +649,7 @@
       var s = r.session, t = r.summary || {};
       H.rows = r.checkins || [];
       $("detTitle").textContent = (s.course || "") + " · " + (s.room_name || "") + " · " + when(s.start_utc) + (S.role === "admin" ? " · " + (s.owner_name || s.owner_user_id || "") : "");
-      $("detSummary").textContent = (t.present | 0) + " present · " + (t.flagged | 0) + " looked unusual · " + (t.unreviewed | 0) + " still to decide" + ((t.rejected | 0) ? " · " + t.rejected + " rejected (counted absent)" : "");
+      $("detSummary").textContent = (t.present | 0) + " present · " + (t.flagged | 0) + " looked unusual · " + (t.unreviewed | 0) + " still to decide" + ((t.rejected | 0) ? " · " + t.rejected + " rejected (counted absent)" : "") + ((t.blocked | 0) ? " · " + t.blocked + " phone did not match (absent until accepted)" : "");
       renderDetail();
     });
   }

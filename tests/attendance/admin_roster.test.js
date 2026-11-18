@@ -117,7 +117,7 @@ const find = (id) => rows().slice(1).find(r => r.children[0].textContent.include
   const omar2 = find("10002"), c19 = omar2.children[5];
   ok(cells(omar2)[1] === "1 / 3" && cells(omar2)[2] === "33%", "after the teacher rejects Omar's 19 Oct check-in: 1 / 3 = 33%");
   ok(c19.textContent === "\u2717" && /rejc/.test(c19.className) && /counted absent/.test(c19.attrs.title || ""), "that cell shows a red cross that says it was rejected and counts as absent");
-  ok(/rejected \(counted absent\)/.test(byId.rosMsg.textContent), "the legend explains the cross: " + byId.rosMsg.textContent);
+  ok(/rejected/.test(byId.rosMsg.textContent) && /counted absent/.test(byId.rosMsg.textContent), "the legend explains the cross: " + byId.rosMsg.textContent);
   byId.rosCsv.click();
   const csv2 = downloads[downloads.length - 1].text.replace(/^\ufeff/, "").split("\r\n");
   ok(csv2.some(l => l.startsWith("10002,Omar Hassan,1,3,33,") && /,Absent \(rejected\)$/.test(l)), "roster CSV: Omar 1 of 3, the 19 Oct column says Absent (rejected)");

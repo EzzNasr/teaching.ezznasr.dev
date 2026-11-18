@@ -764,6 +764,16 @@
       "owner": "att-prod"
     },
     {
+      "id": "R-A16",
+      "title": "Attendance: suspected cheating is saved in Needs review (absent until accepted, Accept all, replaced by the student's own phone); a scrambled phone list or lost leading zeros are detected and repaired; a lost lecture is recovered from the flag log",
+      "cmd": [
+        "node",
+        "../../tests/attendance/blocked_repair.test.js"
+      ],
+      "status": "active",
+      "owner": "att-prod"
+    },
+    {
       "id": "R-A10",
       "title": "Attendance live feed + two-mates cheating scenario (masked), legit re-registration not flagged",
       "cmd": [
