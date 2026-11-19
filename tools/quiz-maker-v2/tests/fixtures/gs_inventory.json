@@ -9,7 +9,7 @@
   "tools/quiz-maker-v2/apps_script/Requirements.gs",
   "tools/quiz-maker-v2/apps_script/Revenue.gs"
  ],
- "count": 1047,
+ "count": 1050,
  "items": {
   "ATTENDANCE_HEADERS": {
    "kind": "var",
@@ -2136,6 +2136,11 @@
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "8f68ea7331945cca"
   },
+  "att_addLeadingZero": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "ae82f088892d4883"
+  },
   "att_addTypedStudent_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
@@ -2154,7 +2159,7 @@
   "att_append_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "fb7040e821c207a8"
+   "hash": "51a57a341ed03e0c"
   },
   "att_applyDecision_": {
    "kind": "function",
@@ -2219,7 +2224,7 @@
   "att_checkDevices": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "56da13c3ed1c67cc"
+   "hash": "ca721f2e28cb4432"
   },
   "att_checkTicket_": {
    "kind": "function",
@@ -2524,7 +2529,7 @@
   "att_logFlag_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "2469b52c6cd0c409"
+   "hash": "f755b49ea4dba08b"
   },
   "att_loginById_": {
    "kind": "function",
@@ -2640,6 +2645,11 @@
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "3235a336e4a49a5c"
+  },
+  "att_renameStudents": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "388ca3afc629f6a2"
   },
   "att_repairDevices": {
    "kind": "function",
@@ -2844,7 +2854,7 @@
   "att_update_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "99844bf1440f6822"
+   "hash": "09e4c04d891075be"
   },
   "att_userCreate_": {
    "kind": "function",
@@ -2905,6 +2915,11 @@
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "1911963ddac2e543"
+  },
+  "att_writeRowText_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "407d1bee23498e71"
   },
   "attf_coordKey_": {
    "kind": "function",

@@ -105,13 +105,15 @@ console.log("a flagged check-in takes the project lock only once (flag queue use
 {
   const E = env(); E.signup("20240001", "a");
   const real = E.gas.ctx.LockService, calls = { script: 0, user: 0 };
-  E.gas.ctx.LockService = { getScriptLock: () => { calls.script++; return { tryLock: () => true, releaseLock() {} }; },
-    getUserLock: () => { calls.user++; return { tryLock: () => true, releaseLock() {} }; } };
+  // counts real acquisitions (tryLock); asking "do I hold it?" (hasLock, used by the text writes of D26) takes nothing
+  const mk = k => { const l = { held: 0, tryLock() { calls[k]++; l.held++; return true; }, releaseLock() { if (l.held) l.held--; }, hasLock() { return l.held > 0; } }; return l; };
+  const sl = mk("script"), ul = mk("user");
+  E.gas.ctx.LockService = { getScriptLock: () => sl, getUserLock: () => ul };
   const far = { lat: 31.3, lng: 30.0, acc: 10 };   // ~13 km away -> GEO_FAR, a real (review) flag -> queued for the Telegram digest
   const r = E.attend("20240001", "a", null, far);
   E.gas.ctx.LockService = real;
   ok(r.status === "recorded", "the far check-in is recorded");
-  ok(calls.script === 1 && calls.user === 1, "script lock once (the check-in), user lock once (the flag queue): " + JSON.stringify(calls));
+  ok(calls.script === 1 && calls.user === 2, "the project lock is taken once (the check-in); the separate user lock twice (the flag log line, D26, and the Telegram flag queue): " + JSON.stringify(calls));
   const q = JSON.parse(E.gas.run('CacheService.getScriptCache().get(ATTT_QUEUE_KEY)') || "[]");
   ok(q.length === 1 && q[0].f.indexOf("GEO_FAR") >= 0, "the flag is in the digest queue");
   E.gas.ctx.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }), getUserLock: () => { throw new Error("no user lock here"); } };

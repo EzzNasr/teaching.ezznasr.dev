@@ -774,6 +774,16 @@
       "owner": "att-prod"
     },
     {
+      "id": "R-A17",
+      "title": "Attendance 18 Nov incident: sheets that turn digit-only text into numbers lose a leading 0 and refused every such student; every write is now plain text; att_addLeadingZero / att_renameStudents repair the IDs",
+      "cmd": [
+        "node",
+        "../../tests/attendance/id_text.test.js"
+      ],
+      "status": "active",
+      "owner": "att-prod"
+    },
+    {
       "id": "R-A10",
       "title": "Attendance live feed + two-mates cheating scenario (masked), legit re-registration not flagged",
       "cmd": [

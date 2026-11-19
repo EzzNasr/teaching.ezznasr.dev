@@ -135,12 +135,29 @@ function att_rowAt_(name, rowNo) {
   keys.forEach(function (k, j) { o[k] = (j < cols && v[j] != null) ? String(v[j]) : ""; });
   return o;
 }
+/* Every value is written as PLAIN TEXT (2026-11-20, decisions D26). appendRow lets Google Sheets guess each cell's type: on a row the
+ * setup's plain-text format does not cover, "0600925004" becomes the number 600925004 (the zero is gone), so the phone registered
+ * seconds earlier no longer matched the ID the student typed. That refused all 22 students of the 18 Nov lecture (46 times) as
+ * "registered to another student". Now the row is formatted as text first and the values are written as strings.
+ * The write lands on getLastRow() + 1, which is only safe while one execution writes at a time: under the script lock (every
+ * att_withLock_ caller), or under the user lock (the flag log, see att_logFlag_). */
+function att_writeRowText_(sh, values) {
+  var r = sh.getLastRow() + 1, max = sh.getMaxRows();
+  if (r > max) sh.insertRowsAfter(max, Math.max(50, r - max));
+  sh.getRange(r, 1, 1, values.length).setNumberFormat("@").setValues([values.map(function (v) { return v == null ? "" : String(v); })]);
+}
 function att_append_(name, obj) {
-  att_sheet_(name).appendRow(ATT_HEADERS[name].map(function (k) { return obj[k] == null ? "" : obj[k]; }));
+  var sh = att_sheet_(name), values = ATT_HEADERS[name].map(function (k) { return obj[k] == null ? "" : obj[k]; });
+  var locked = false; try { locked = LockService.getScriptLock().hasLock(); } catch (e) { locked = false; }
+  if (locked) att_writeRowText_(sh, values);
+  else sh.appendRow(values.map(function (v) { return v == null ? "" : String(v); }));   // only a caller without any lock (should not happen); appendRow cannot overwrite another row
 }
 function att_update_(name, row, obj) {
   var sh = att_sheet_(name), h = ATT_HEADERS[name];
-  Object.keys(obj).forEach(function (k) { var c = h.indexOf(k); if (c >= 0) sh.getRange(row, c + 1).setValue(obj[k]); });
+  Object.keys(obj).forEach(function (k) {
+    var c = h.indexOf(k);
+    if (c >= 0) sh.getRange(row, c + 1).setNumberFormat("@").setValue(obj[k] == null ? "" : String(obj[k]));
+  });
 }
 function att_cget_(k) { try { var v = CacheService.getScriptCache().get(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
 function att_cput_(k, o) { try { CacheService.getScriptCache().put(k, JSON.stringify(o), ATT_C.CACHE_SEC); } catch (e) {} }
@@ -229,7 +246,15 @@ function att_haversine_(lat1, lng1, lat2, lng2) {
   return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 function att_logFlag_(sessionId, studentId, code, detail) {
-  try { att_append_("AttFlagLog", { ts_utc: att_iso_(), session_id: sessionId, student_id: studentId, code: code, detail: detail || "" }); } catch (e) { console.error("flaglog: " + e); }
+  // Outside the check-in lock (it is a log line); a short separate lock keeps two log lines from landing on the same row (D26).
+  try {
+    var row = ATT_HEADERS.AttFlagLog.map(function (k) { return { ts_utc: att_iso_(), session_id: sessionId, student_id: studentId, code: code, detail: detail || "" }[k]; });
+    var held = false; try { held = LockService.getScriptLock().hasLock(); } catch (e0) { held = false; }
+    if (held) return att_writeRowText_(att_sheet_("AttFlagLog"), row);
+    var ul = LockService.getUserLock();
+    if (!ul.tryLock(5000)) { att_sheet_("AttFlagLog").appendRow(row.map(String)); return; }   // never lose the line
+    try { att_writeRowText_(att_sheet_("AttFlagLog"), row); } finally { ul.releaseLock(); }
+  } catch (e) { console.error("flaglog: " + e); }
 }
 
 /* ───────── multi-user scoping (plan §4.7) ───────── */
@@ -1025,7 +1050,7 @@ function att_checkDevices() {
     var typed = String(l.student_id || ""), m = /owner=(\d+)/.exec(l.detail || ""), owner = m ? m[1] : "";
     if (ATT_HARD_FLAGS_[l.code] && /^0\d/.test(typed) && (owner === typed.replace(/^0+/, "") || known[typed.replace(/^0+/, "")]) && !seen[typed]) { seen[typed] = 1; out.lost_leading_zero.push({ typed: typed, stored: typed.replace(/^0+/, "") }); }
   });
-  ["AttStudents", "AttDevices", "AttCheckins"].forEach(function (tab) {
+  ["AttStudents", "AttDevices", "AttCheckins", "AttFlagLog", "AttRequests"].forEach(function (tab) {
     var sh = att_sheet_(tab), n = sh.getLastRow(), col = ATT_HEADERS[tab].indexOf("student_id") + 1, k = 0;
     if (n >= 2) sh.getRange(2, col, n - 1, 1).getValues().forEach(function (v) { if (typeof v[0] === "number") k++; });
     out.numeric_id_cells[tab] = k;
@@ -1085,6 +1110,37 @@ function att_repairLeadingZeros(apply) {
   }
   Logger.log((apply ? "Renamed " : "Would rename ") + changes.length + " cell(s) for " + found.length + " ID(s)" + (apply ? "." : ". Run att_repairLeadingZeros(true) to apply.") + "\n" + JSON.stringify(changes.slice(0, 80), null, 1));
   return { applied: !!apply, ids: found, changes: changes };
+}
+
+/** Renames student IDs everywhere they appear (AttStudents, AttDevices, AttCheckins, AttRequests, AttFlagLog), for IDs the sheet
+ *  stored wrongly (D26). map = {"600925004": "0600925004", ...}. Refuses an ID that already exists under the new name, and refuses
+ *  while the header rows are changed. Only reports unless apply is true. */
+function att_renameStudents(map, apply) {
+  map = map || {};
+  var tabs = ["AttStudents", "AttDevices", "AttCheckins", "AttRequests", "AttFlagLog"], hp = att_headerProblems_(tabs);
+  if (hp.length) { Logger.log("REFUSED: column headers changed in " + hp.map(function (x) { return x.tab; }).join(", ")); return { applied: false, refused: true, headers_changed: hp, changes: [] }; }
+  var have = {}; att_rows_("AttStudents").forEach(function (x) { have[x.student_id] = 1; });
+  var bad = Object.keys(map).filter(function (k) { return !ATT_C.ID_REGEX.test(String(map[k])) || (have[map[k]] && map[k] !== k); });
+  if (bad.length) { Logger.log("REFUSED: these new IDs are invalid or already taken: " + bad.map(function (k) { return k + " -> " + map[k]; }).join(", ")); return { applied: false, refused: true, bad: bad, changes: [] }; }
+  var changes = [];
+  tabs.forEach(function (tab) { att_rows_(tab).forEach(function (r) { if (att_has_(map, r.student_id)) changes.push({ tab: tab, row: r._row, from: r.student_id, to: map[r.student_id] }); }); });
+  if (apply && changes.length) {
+    att_withLock_(function () { changes.forEach(function (c) { att_update_(c.tab, c.row, { student_id: c.to }); att_cdel_("att:n:" + c.from); att_cdel_("att:n:" + c.to); }); return true; });
+    att_rows_("AttDevices").forEach(function (d) { if (d.secret_hash) att_cdel_("att:d:" + d.secret_hash); });
+  }
+  Logger.log((apply ? "Renamed " : "Would rename ") + Object.keys(map).length + " ID(s) in " + changes.length + " cell(s)" + (apply ? "." : ". Run again with true to apply.") + "\n" +
+    Object.keys(map).map(function (k) { return k + " -> " + map[k]; }).join("\n"));
+  return { applied: !!apply, map: map, changes: changes };
+}
+/** The likely repair for the 18 Nov lecture (D26): every student created on `day` (Cairo date, "2026-11-18") whose ID has `digits`
+ *  digits gets a leading 0 back. CONFIRM the real IDs first (ask the students or the faculty list). Only reports unless apply. */
+function att_addLeadingZero(day, digits, apply) {
+  var map = {}, d = String(day || ""), n = Number(digits) || 9;
+  att_rows_("AttStudents").forEach(function (x) {
+    var created = Date.parse(x.created_at), cairo = isFinite(created) ? Utilities.formatDate(new Date(created), "Africa/Cairo", "yyyy-MM-dd") : "";
+    if (cairo === d && new RegExp("^[1-9]\\d{" + (n - 1) + "}$").test(x.student_id)) map[x.student_id] = "0" + x.student_id;
+  });
+  return att_renameStudents(map, apply);
 }
 
 /** Turns the refusals of one lecture (flag log only, from before D22) into blocked check-ins in Needs review, so the teacher can
