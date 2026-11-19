@@ -6,7 +6,7 @@ main window stays usable. It calls the App's own methods, so behaviour is the sa
 import os
 import tkinter as tk
 
-from modules import background, common, drive_bridge, teacher_mode, test_runner, theme
+from modules import background, common, deploy_flow, deploy_window, drive_bridge, teacher_mode, test_runner, theme
 
 SHORTCUTS = (
     ("Ctrl+1 … Ctrl+4", "Switch section (Quiz, Assignment, Attachments, Lesson tags)"),
@@ -44,6 +44,7 @@ class SettingsWindow(tk.Toplevel):
 
         self._build_site(body)
         self._build_drive(body)
+        self._build_backend(body)
         self._build_tools(body)
         self._build_shortcuts(body)
 
@@ -158,6 +159,44 @@ class SettingsWindow(tk.Toplevel):
         self.drive_msg_var.set(text)
         self._drive_msg.configure(fg=theme.P["ink_dim"] if ok is None else
                                   theme.P["success"] if ok else theme.P["danger"])
+
+    # -- backend deploy ------------------------------------------------------------------------------------------
+
+    def _build_backend(self, body):
+        card = self._card(body, "Backend (Apps Script)")
+        tk.Label(card, text="Sends the backend code in this folder (tools/quiz-maker-v2/apps_script/) to your live "
+                            "Apps Script with scripts/deploy_backend.js: checks, test gate, push, a new version on "
+                            "the same /exec URL, a live smoke test, and an automatic rollback if anything fails. "
+                            "You see the exact file list before anything is sent. Never during a class or an open "
+                            "quiz window.",
+                 fg="gray30", font=("TkDefaultFont", 8), justify="left").pack(anchor="w", padx=8, pady=(0, 6))
+        self.backend_info_var = tk.StringVar()
+        tk.Label(card, textvariable=self.backend_info_var, anchor="w", justify="left", wraplength=560).pack(
+            fill="x", padx=8, pady=(0, 6))
+        row = tk.Frame(card)
+        row.pack(fill="x", padx=8, pady=(0, 8))
+        tk.Button(row, text="Check only (dry run)", command=lambda: deploy_window.start(self.app, True)).pack(side="left")
+        tk.Button(row, text="Deploy to live…", command=lambda: deploy_window.start(self.app, False),
+                  font=("TkDefaultFont", 10, "bold")).pack(side="left", padx=6)
+        term = tk.Menubutton(row, text="In a terminal ▾")
+        menu = tk.Menu(term, tearoff=0)
+        menu.add_command(label="Check only, in a terminal", command=lambda: self.app._deploy_backend("check"))
+        menu.add_command(label="Deploy, in a terminal (type DEPLOY there)", command=lambda: self.app._deploy_backend("deploy"))
+        term.configure(menu=menu)
+        term.pack(side="right")
+        self._show_backend()
+
+    def _show_backend(self):
+        site = self.app.site_root_var.get().strip()
+        try:
+            files = deploy_flow.files_to_sync(site)
+        except (ValueError, OSError) as e:
+            self.backend_info_var.set("⚠  " + str(e))
+            return
+        _sid, _dep, url = deploy_flow.deploy_target(site)
+        names = ", ".join(f["live"] for f in files if f["kind"] == "code")
+        self.backend_info_var.set("{} files: {}  (+ appsscript.json, Version.gs)\nLive web app: {}".format(
+            sum(1 for f in files if f["kind"] == "code"), names, url))
 
     # -- site tools ------------------------------------------------------------------------------------------
 
