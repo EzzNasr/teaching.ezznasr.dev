@@ -14,6 +14,8 @@ function mkEl(id, hidden, disabled) {
     classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
     addEventListener(t, f) { (h[t] = h[t] || []).push(f); }, focus() {}, appendChild(c) { e.children.push(c); return c; },
     click() { if (e.disabled || e.hidden) return; (h.click || []).forEach(f => f({})); }, fire(t, ev) { (h[t] || []).forEach(f => f(ev || {})); } };
+  Object.defineProperty(e, "innerHTML", { get() { return e._html || ""; }, set(v) { e._html = String(v); } });
+  Object.defineProperty(e, "firstChild", { get() { return e._html ? { html: true } : (e.children[0] || null); } });
   return e;
 }
 // opts: perm ('granted'|'prompt'|'denied'|undefined=no Permissions API), geo(call#, options) -> {ok,coords}|{code}|'hang', api(action,payload) -> object|Promise, cfg overrides, ls seed, ua
@@ -49,6 +51,7 @@ function boot(opts = {}) {
     if (a === "att_change_device") return { ok: true, status: "pending", req_id: "R1" };
     return { ok: false, code: "UNKNOWN_ACTION" };
   }
+  vm.runInContext(fs.readFileSync(path.join(site, "attend/location-help.js"), "utf8"), ctx, { filename: "location-help.js" });
   vm.runInContext(src, ctx, { filename: "attend.js" });
   const page = { els, ls, geoCalls, apiCalls, ctx, docH, winH,
     shown: () => ["gate", "form", "done"].filter(v => !els[v].hidden),
@@ -97,14 +100,14 @@ const timers = []; const origSI = global.setInterval;
   ok(p.geoCalls.length === 1, "granted: one silent fix, no tap needed");
   ok(!p.acts().includes("att_attend"), "granted: still no auto check-in");
 
-  console.log("gate: denied, then skip after 2 failures");
+  console.log("gate: denied -> continue after 1 failure, help after 2 (D24)");
   p = boot({ perm: "denied", geo: () => ({ code: 1 }) }); await until(() => p.shown().join() === "gate" && /blocked/i.test(p.els.gateTitle.textContent), "denied wording");
-  ok(p.els.gateSteps.children.length >= 2 && !p.els.gateHelp.hidden, "denied: how-to steps shown");
-  ok(p.els.gateSkipBox.hidden, "skip hidden before any failed attempt");
+  ok(p.els.gateHelp.hidden && p.els.gateGuide.hidden && p.els.gateSkipBox.hidden, "before any try: no help, no skip (the student taps Allow first)");
   p.els.gateBtn.click(); await until(() => p.els.gateMsg.textContent !== "" && !p.els.gateBtn.disabled, "first failure");
-  ok(p.els.gateSkipBox.hidden && p.geoCalls.length === 1, "1 failure: still no skip, and a denial does not retry with a second stage");
-  p.els.gateBtn.click(); await until(() => !p.els.gateSkipBox.hidden, "skip appears");
-  ok(p.shown().join() === "gate", "2 failures: skip offered, student still on the gate");
+  ok(!p.els.gateSkipBox.hidden && p.geoCalls.length === 1, "1 failure: 'Continue without location' is offered at once (never stuck), and a denial does not retry with a second stage");
+  ok(p.els.gateHelp.hidden && p.els.gateGuide.hidden, "1 failure: the help is not shown yet");
+  p.els.gateBtn.click(); await until(() => !p.els.gateHelp.hidden, "help appears");
+  ok(p.els.gateSteps.children.length >= 2 && p.shown().join() === "gate", "2 failures: the how-to steps appear, student still on the gate");
   p.els.gateSkip.click(); ok(p.shown().join() === "form", "skip -> form");
   p.els.sid.value = "20240001"; p.els.save.click(); await until(() => p.acts().includes("att_attend"), "attend sent");
   pl = p.last("att_attend").payload;
@@ -131,14 +134,18 @@ const timers = []; const origSI = global.setInterval;
   p = boot({ perm: undefined }); await until(() => p.shown().join() === "gate" && p.els.gateTitle.textContent.startsWith("Turn on"), "no Permissions API -> treated as 'ask'");
   ok(p.geoCalls.length === 0, "no Permissions API: still waits for a tap");
   p = boot({ perm: "prompt", ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari/604.1", geo: () => ({ code: 1 }) });
-  await until(() => p.shown().join() === "gate", "gate"); p.els.gateBtn.click(); await until(() => p.els.gateSteps.children.length > 0, "ios steps");
+  await until(() => p.shown().join() === "gate", "gate"); p.els.gateBtn.click(); await until(() => p.els.gateMsg.textContent !== "" && !p.els.gateBtn.disabled, "ios try 1");
+  ok(p.els.gateSteps.children.length === 0 || p.els.gateHelp.hidden, "one try: no help yet");
+  p.els.gateBtn.click(); await until(() => !p.els.gateHelp.hidden && p.els.gateSteps.children.length > 0, "ios steps");
   ok(/did not ask/.test(p.els.gateTitle.textContent) && /Location Services/.test(p.els.gateSteps.children[0].textContent), "refused at once without a question: the page says the phone did not ask, and starts with the phone's Location Services switch");
   ok(p.els.gateSteps.children.some(li => /aA/.test(li.textContent)), "...and still gives the aA / Website Settings step");
   ok(AR_RE.test(p.els.gateTitleAr.textContent) && p.els.gateStepsAr.children.length === p.els.gateSteps.children.length && p.els.gateStepsAr.children.every(li => AR_RE.test(li.textContent)) && !p.els.gateStepsAr.hidden,
     "the 'phone did not ask' title and every help step are also shown in Arabic");
   ok(/Try again/.test(p.els.gateBtn.textContent) && AR_RE.test(p.els.gateBtn.textContent) && AR_RE.test(p.els.gateHelpTitleAr.textContent), "the Try again button and the help heading are bilingual");
   p = boot({ perm: "denied", ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari/604.1", geo: () => ({ code: 1 }) });
-  await until(() => p.shown().join() === "gate" && p.els.gateSteps.children.length > 0, "blocked steps");
+  await until(() => p.shown().join() === "gate", "gate");
+  for (let i = 0; i < 2; i++) { p.els.gateBtn.click(); await until(() => p.geoCalls.length === i + 1 && !p.els.gateBtn.disabled, "try " + (i + 1)); }
+  await until(() => !p.els.gateHelp.hidden && p.els.gateSteps.children.length > 0, "blocked steps");
   ok(/Location is blocked/.test(p.els.gateTitle.textContent) && /aA/.test(p.els.gateSteps.children[0].textContent), "a site the browser has blocked gets the aA / Website Settings instructions first");
 
   console.log("checked in without location -> asked once more at save");
@@ -168,8 +175,41 @@ const timers = []; const origSI = global.setInterval;
   await until(() => /Attendance closed/.test(p.els.msg.textContent), "closed message", 3000);
   ok(p.acts().filter(a => a === "att_status").length === 1 && p.els.save.disabled, "no extra time: attendance closed, after ONE att_status question");
   p = boot({ perm: "prompt", ua: "Mozilla/5.0 (iPhone) Instagram 300.0", geo: () => ({ code: 1 }) });
-  await until(() => p.shown().join() === "gate", "gate"); p.els.gateBtn.click(); await until(() => p.els.gateSteps.children.length > 0, "inapp steps");
-  ok(/menu/i.test(p.els.gateSteps.children[0].textContent), "in-app browser is told to open in Chrome/Safari");
+  await until(() => p.shown().join() === "gate", "gate");
+  for (let i = 0; i < 2; i++) { p.els.gateBtn.click(); await until(() => p.geoCalls.length === i + 1 && !p.els.gateBtn.disabled, "inapp try " + (i + 1)); }
+  await until(() => p.els.gateSteps.children.length > 0, "inapp steps");
+  ok(/menu/i.test(p.els.gateSteps.children[0].textContent) && p.els.gateGuide.hidden, "in-app browser is told to open in Chrome/Safari (no drawn phone settings: they cannot help inside an app)");
+
+  console.log("drawn iPhone / Android guide (D24)");
+  for (const [ua, want, other] of [["Mozilla/5.0 (Linux; Android 14) Chrome/120", "android", "ios"], ["Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari/604.1", "ios", "android"]]) {
+    p = boot({ perm: "prompt", ua, geo: () => ({ code: 1 }) }); await until(() => p.shown().join() === "gate", "gate");
+    p.els.gateBtn.click(); await until(() => p.geoCalls.length === 1 && !p.els.gateBtn.disabled, "g1");
+    ok(p.els.gateGuide.hidden && !p.els.gateGuide.innerHTML, want + ": one try: no drawn guide yet");
+    p.els.gateBtn.click(); await until(() => !p.els.gateGuide.hidden, "guide");
+    const g = p.els.gateGuide.innerHTML;
+    ok(g.includes('data-lh="' + want + '" aria-selected="true"') && g.includes('data-lh="' + other + '" aria-selected="false"'), want + ": after two tries the guide opens on the student's own phone, the other tab is there too");
+    ok((g.match(/<svg/g) || []).length === 8 && (g.match(/<figcaption>/g) || []).length === 8 && AR_RE.test(g), want + ": 4 drawn screens per phone, every caption in English and Arabic");
+    ok(!p.els.gateSkipBox.hidden, want + ": 'Continue without location' stays available");
+  }
+  p = boot({ perm: "prompt", geo: () => ({ code: 2 }) }); await until(() => p.shown().join() === "gate", "gate");
+  for (let i = 0; i < 2; i++) { p.els.gateBtn.click(); await until(() => p.geoCalls.length === (i + 1) * 2 && !p.els.gateBtn.disabled, "weak " + (i + 1)); }
+  await until(() => !p.els.gateHelp.hidden, "weak help");
+  ok(p.els.gateGuide.hidden && /window/i.test(p.els.gateSteps.textContent + p.els.gateSteps.children.map(c => c.textContent).join(" ")), "a phone that simply finds no signal gets the 'move near a window' steps, not the permission screens");
+
+  console.log("never stuck: a browser that never answers (D24)");
+  p = boot({ perm: "prompt", geo: () => "hang", cfg: { SKIP_WHILE_WORKING_MS: 60, GEO_HIGH_TIMEOUT_MS: 40, GEO_LOW_TIMEOUT_MS: 40, GEO_PROMPT_SLACK_MS: 400 } });
+  await until(() => p.shown().join() === "gate", "gate"); p.els.gateBtn.click();
+  await until(() => !p.els.gateSkipBox.hidden && p.els.gateBtn.disabled, "skip while still waiting");
+  ok(/Finding/.test(p.els.gateBtn.textContent), "still 'Finding your location' with no answer: 'Continue without location' appears anyway");
+  await until(() => !p.els.gateBtn.disabled, "the try ends by itself", 3000);
+  ok(/Couldn't find/.test(p.els.gateTitle.textContent) && !p.els.gateSkipBox.hidden, "the try is stopped by the page itself (no endless wait) and the student can try again or continue");
+  p.els.gateSkip.click(); p.els.sid.value = "20240001"; p.els.save.click(); await until(() => p.acts().includes("att_attend"), "attend", 3000);
+  ok(p.last("att_attend").payload.geo.reason === "USER_SKIPPED" && p.last("att_attend").payload.diag.fail_reason === "TIMEOUT", "the check-in is sent (saved and flagged for review), with the reason TIMEOUT");
+  p = boot({ perm: "prompt", geo: () => "hang", cfg: { SKIP_WHILE_WORKING_MS: 60, GEO_HIGH_TIMEOUT_MS: 5000, GEO_PROMPT_SLACK_MS: 5000 } });
+  await until(() => p.shown().join() === "gate", "gate"); p.els.gateBtn.click(); await until(() => !p.els.gateSkipBox.hidden, "skip while waiting");
+  p.els.gateSkip.click(); ok(p.shown().join() === "form", "tapping 'Continue without location' DURING the wait goes straight to the form");
+  p.els.sid.value = "20240001"; p.els.save.click(); await until(() => p.acts().includes("att_attend"), "attend", 3000);
+  ok(p.last("att_attend").payload.diag.fail_reason === "TIMEOUT", "...and that check-in reports TIMEOUT (the browser never answered)");
 
   console.log("settings change while the gate is open");
   p = boot({ perm: "denied", geo: () => okGeo() }); await until(() => p.shown().join() === "gate", "gate");

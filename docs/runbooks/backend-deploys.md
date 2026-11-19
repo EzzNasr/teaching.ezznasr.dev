@@ -7,3 +7,4 @@ Older, hand-pasted deploys are recorded in `docs/attendance/decisions.md`.*
 | Date (Cairo) | Version | Commit | Previous version | Files changed | Result |
 |---|---|---|---|---|---|
 | 2026-11-16 13:34 | 70 | `1b53af0` | 69 | AttendanceAll, Code | smoke green |
+| 2026-11-19 15:34 | 71 | `ac091b4` | 70 | AttendanceAll | smoke green |

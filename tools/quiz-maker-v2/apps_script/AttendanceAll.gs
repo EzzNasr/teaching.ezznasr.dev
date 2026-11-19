@@ -33,7 +33,7 @@ var ATT_C = {
   // "+2 minutes" (2026-11-16, decisions D15): the lecturer or the admin can push the close time back, up to SESSION_MAX_MIN after the start.
   EXTEND_SEC: 120, SESSION_MAX_MIN: 15,
   // student page (plan section 3). The server does not use these; they are kept here so both sides stay identical (tests/attendance/multiuser.test.js compares them)
-  GEO_HIGH_TIMEOUT_MS: 20000, GEO_LOW_TIMEOUT_MS: 10000, GEO_MAX_AGE_MS: 60000, GEO_SKIP_AFTER_FAILS: 2, SUBMIT_WATCHDOG_MS: 30000,
+  GEO_HIGH_TIMEOUT_MS: 20000, GEO_LOW_TIMEOUT_MS: 10000, GEO_MAX_AGE_MS: 60000, GEO_SKIP_AFTER_FAILS: 1, SUBMIT_WATCHDOG_MS: 30000,
   // multi-user (plan section 4.5)
   ADMIN_ID: "ADMIN", ADMIN_NAME: "Admin", USER_TOKEN_TTL_SEC: 12 * 3600, LOGIN_MAX_FAILS: 10, LOGIN_WINDOW_SEC: 300, LOGIN_LOCK_SEC: 300,
 };
@@ -153,6 +153,13 @@ function att_withLock_(fn) {
 /** A check-in the teacher rejected (Needs review / History) counts as ABSENT everywhere: totals, roster, CSV, live counter, Telegram
  *  summary (2026-11-16, decisions D20). The row is kept, so the decision can still be changed back to Accepted. */
 function att_isRejected_(r) { return !!r && String(r.review_status || "") === "rejected"; }
+/** A check-in whose phone did not match the student (status "blocked", D22) counts as ABSENT until the teacher accepts it. */
+function att_isBlockedOpen_(r) { return !!r && String(r.status || "") === "blocked" && String(r.review_status || "") !== "accepted"; }
+/** Not counted as present: rejected, or blocked and not accepted yet. */
+function att_isAbsent_(r) { return att_isRejected_(r) || att_isBlockedOpen_(r); }
+/** Shown in Needs review: an unusual check-in (status review) or a blocked one. */
+function att_isFlaggedRow_(r) { return !!r && (r.status === "review" || r.status === "blocked"); }
+var ATT_HARD_FLAGS_ = { DEVICE_UNKNOWN: 1, ID_BOUND_OTHER_DEVICE: 1, DEVICE_ID_CONFLICT: 1, DEVICE_BOUND_OTHER_ID: 1 };
 function att_clean_(o) { var c = {}; Object.keys(o).forEach(function (k) { if (k !== "_row") c[k] = o[k]; }); return c; }
 
 function att_getSession_(id) {
@@ -263,7 +270,7 @@ function att_dispatch_(p) {
     // Signed-in callers (teacher or admin). Every one of these filters by owner inside (a teacher only ever gets their own rows).
     var SCOPED = { att_me: att_me_, att_start_session: att_startSession_, att_close_session: att_closeSession_, att_extend_session: att_extendSession_, att_live: att_live_, att_rooms: att_rooms_,
       att_calibrate_room: att_calibrateRoom_, att_requests: att_requests_, att_decide_request: att_decideRequest_, att_flagged: att_flagged_, att_export: att_export_, att_roster: att_roster_,
-      att_sessions: att_sessionsList_, att_session_detail: att_sessionDetail_, att_review: att_review_, att_manual_checkin: att_manualCheckin_ };
+      att_sessions: att_sessionsList_, att_session_detail: att_sessionDetail_, att_review: att_review_, att_review_bulk: att_reviewBulk_, att_manual_checkin: att_manualCheckin_ };
     var ADMIN_ONLY = { att_user_create: att_userCreate_, att_users: att_users_, att_user_update: att_userUpdate_, att_user_reset: att_userReset_, att_overview: att_overview_ };
     var fn = att_has_(SCOPED, a) ? SCOPED[a] : (att_has_(ADMIN_ONLY, a) ? ADMIN_ONLY[a] : null);
     if (!fn) return att_err_("UNKNOWN_ACTION");
@@ -328,10 +335,33 @@ function att_signup_(p) {
   if (res.ok) { att_cdel_("att:d:" + hash); att_cdel_("att:n:" + sid); }
   else if (res.code === "DEVICE_BOUND_OTHER_ID") {
     att_logFlag_(t.s, sid, "DEVICE_BOUND_OTHER_ID", "signup;owner=" + (res._owner || "") + ";n=" + name.charAt(0));
+    try {
+      var g0 = att_normGeo_(p.geo), s0 = att_getSession_(t.s), d0 = (s0 && !g0.denied && s0.hall_lat != null && s0.hall_lng != null) ? att_haversine_(g0.lat, g0.lng, s0.hall_lat, s0.hall_lng) : null;
+      att_saveBlocked_(t.s, sid, "DEVICE_BOUND_OTHER_ID", deviceId, g0, d0, String(p.fp || ""), name);
+    } catch (eB) { console.error("saveBlocked signup: " + eB); }
     att_safeNotify_("flag", { session_id: t.s, student_id: sid, flags: ["DEVICE_BOUND_OTHER_ID"], hard: true });
   }
   delete res._owner;
   return res;
+}
+
+/** Suspected cheating is SAVED (2026-11-18, decisions D22), not only logged: a check-in whose phone did not match the student
+ *  becomes an AttCheckins row with status "blocked" and the reason in flags. It shows in Needs review with the student's ID, counts as
+ *  ABSENT until the teacher accepts it, and is replaced by a normal check-in if the student then checks in from their own phone.
+ *  Nothing is written when this student already has a row in this lecture (the attempt stays in the flag log only).
+ *  typedName (sign-up only): kept in review_note so an accepted unregistered student can be added with their name. */
+function att_saveBlocked_(sessionId, sid, code, deviceId, geo, dist, fp, typedName) {
+  if (!sessionId || !ATT_C.ID_REGEX.test(String(sid || ""))) return null;
+  var g = geo || { denied: true, reason: "" };
+  return att_withLock_(function () {
+    var cur = att_rows_("AttCheckins").filter(function (r) { return r.session_id === sessionId && r.student_id === sid; })[0];
+    if (cur) return att_ok_({ saved: false });
+    att_append_("AttCheckins", { checkin_id: Utilities.getUuid(), session_id: sessionId, student_id: sid, device_id: deviceId || "UNKNOWN", server_utc: att_iso_(),
+      lat: g.denied ? "" : g.lat, lng: g.denied ? "" : g.lng, acc: g.denied ? "" : g.acc, dist_m: dist == null ? "" : Math.round(dist * 10) / 10,
+      fp_hash: fp || "", flags: code, status: "blocked", geo_reason: g.denied ? (g.reason || "") : "",
+      review_status: "", review_note: typedName ? ("Typed name: " + typedName).slice(0, 200) : "", reviewed_by: "", reviewed_at: "" });
+    return att_ok_({ saved: true });
+  });
 }
 
 /** A finite number within +-lim, else null ("" / null / booleans are NOT numbers). */
@@ -384,6 +414,10 @@ function att_attend_(p) {
   else if (dev.student_id !== sid) hard = "DEVICE_ID_CONFLICT";
   if (hard) {
     att_logFlag_(s.session_id, sid, hard, dev ? "device " + dev.device_id + ";owner=" + dev.student_id : "");
+    try {
+      var gH = att_normGeo_(p.geo), hH = (s.hall_lat != null && s.hall_lng != null) ? s : null, dH = (!gH.denied && hH) ? att_haversine_(gH.lat, gH.lng, hH.hall_lat, hH.hall_lng) : null;
+      att_saveBlocked_(s.session_id, sid, hard, dev ? dev.device_id : (secret ? "D-" + att_sha256Hex_(secret).slice(0, 16) : "UNKNOWN"), gH, dH, String(p.fp || ""), "");
+    } catch (eH) { console.error("saveBlocked attend: " + eH); }
     att_safeNotify_("flag", { session_id: s.session_id, student_id: sid, flags: [hard], hard: true });
     return att_err_(hard);
   }
@@ -421,6 +455,13 @@ function att_attend_(p) {
       }
       if (hit) cur = att_rowAt_("AttCheckins", hit);
     }
+    if (cur && cur.status === "blocked") {
+      // The student now checks in from their OWN phone: this replaces the suspect attempt (D22). Counted normally from now on.
+      att_update_("AttCheckins", cur._row, { device_id: dev.device_id, server_utc: serverUtc, lat: geo.denied ? "" : geo.lat, lng: geo.denied ? "" : geo.lng,
+        acc: geo.denied ? "" : geo.acc, dist_m: dist == null ? "" : Math.round(dist * 10) / 10, fp_hash: fp, flags: flags.join(","), status: status,
+        geo_reason: geo.denied ? geo.reason : "", review_status: "", review_note: "", reviewed_by: "", reviewed_at: "" });
+      return att_ok_({ status: "recorded", server_utc: serverUtc, replaced: true });
+    }
     if (cur) {
       // Upgrade rule (plan §4.3): a record WITHOUT coordinates is completed by a later attempt WITH valid coordinates, so one bad first
       // attempt can be corrected. A good fix is never downgraded; any other repeat changes nothing. The recorded time stays the first one.
@@ -441,7 +482,7 @@ function att_attend_(p) {
   if (!res.ok) return res;
   var outFlags = res.upgraded ? res._flags : flags, outStatus = res.upgraded ? res._status : status;
   if (res.upgraded) att_logFlag_(s.session_id, sid, "GEO_UPGRADED", "was=" + (res._was || "-") + ";dist_m=" + (dist == null ? "" : Math.round(dist)) + ";acc=" + Math.round(geo.acc));   // log only: not a check-in flag
-  if ((!res.dup || res.upgraded) && outFlags.length) {
+  if ((!res.dup || res.upgraded || res.replaced) && outFlags.length) {
     outFlags.forEach(function (f) { att_logFlag_(s.session_id, sid, f, att_flagDetail_(f, dist, geo, diag)); });
     att_safeNotify_("flag", { session_id: s.session_id, student_id: sid, flags: outFlags, status: outStatus, owner_name: s.owner_name || "" });
   }
@@ -522,8 +563,9 @@ function att_startSession_(p, u) {
 function att_counts_(sessionId, ownerId) {
   var rows = att_rows_("AttCheckins").filter(function (r) { return r.session_id === sessionId; });
   var pending = att_rows_("AttRequests").filter(function (r) { return r.status === "pending" && (ownerId == null || att_ownerOf_(r) === ownerId); }).length;
-  var rejected = rows.filter(att_isRejected_).length;
-  return { rows: rows, present: rows.length - rejected, rejected: rejected, flagged: rows.filter(function (r) { return r.status === "review"; }).length, pending: pending };
+  var rejected = rows.filter(att_isRejected_).length, absent = rows.filter(att_isAbsent_).length;
+  return { rows: rows, present: rows.length - absent, rejected: rejected, blocked: rows.filter(att_isBlockedOpen_).length,
+    flagged: rows.filter(att_isFlaggedRow_).length, pending: pending };
 }
 
 function att_closeSession_(p, u) {
@@ -572,16 +614,16 @@ function att_feed_(sessionId, u) {
   var names = {}; att_rows_("AttStudents").forEach(function (x) { names[x.student_id] = x; });
   var ev = [], here = {};
   att_rows_("AttCheckins").forEach(function (r) {
-    if (r.session_id !== sessionId || att_isRejected_(r)) return;
+    if (r.session_id !== sessionId || att_isAbsent_(r)) return;
     here[r.student_id] = 1;
     ev.push({ t: r.server_utc, k: "att", n: (names[r.student_id] || {}).name || "", id: r.student_id });
   });
   Object.keys(names).forEach(function (id) {
     var x = names[id];
     if (!x.created_at || x.created_at < s.start_utc) return;
-    // Registrations are not tied to a session in the sheet, so a teacher only sees the ones that also checked in HERE
-    // (otherwise they would see students who registered in another teacher's simultaneous session).
-    if (scoped && !here[id]) return;
+    // Registrations are not tied to a session in the sheet, so only the ones that also checked in HERE are shown, for teachers AND the
+    // admin (2026-11-19, D25): a projector left open used to count every sign-up made anywhere later that day as "New sign-ups".
+    if (!here[id]) return;
     ev.push({ t: x.created_at, k: "reg", n: x.name, id: id });
   });
   att_rows_("AttFlagLog").forEach(function (r) {
@@ -609,7 +651,7 @@ function att_live_(p, u) {
     registered = Object.keys(seen).length;
   }
   var recent = c.rows.slice(-10).reverse().map(function (r) { return { student_id: r.student_id, server_utc: r.server_utc, status: r.status }; });
-  return att_ok_({ registered: registered, present: c.present, rejected: c.rejected, flagged: c.flagged, pending: c.pending, recent: recent, feed: att_feed_(sid, u) });
+  return att_ok_({ registered: registered, present: c.present, rejected: c.rejected, blocked: c.blocked, flagged: c.flagged, pending: c.pending, recent: recent, feed: att_feed_(sid, u) });
 }
 
 function att_rooms_(p, u) {
@@ -700,7 +742,7 @@ function att_flagged_(p, u) {
   if (s0 && !att_canSee_(u, s0.owner_user_id)) return att_unauthorized_();
   var owner = att_effOwner_(p, u), vis = owner == null ? null : att_ownedSessionIds_(owner);
   var names = {}; att_rows_("AttStudents").forEach(function (s) { names[s.student_id] = s.name; });
-  var rows = att_rows_("AttCheckins").filter(function (r) { return r.status === "review" && (!sid || r.session_id === sid) && (!vis || vis[r.session_id]); })
+  var rows = att_rows_("AttCheckins").filter(function (r) { return att_isFlaggedRow_(r) && (!sid || r.session_id === sid) && (!vis || vis[r.session_id]); })
     .reverse().map(function (r) { var o = att_clean_(r); o.name = names[r.student_id] || ""; return o; });
   return att_ok_({ rows: rows });
 }
@@ -724,10 +766,12 @@ function att_roster_(p, u) {
   sessions = sessions.slice(Math.max(0, sessions.length - limit));
   var inSet = {}; sessions.forEach(function (x) { inSet[x.session_id] = 1; });
   var checkins = att_rows_("AttCheckins");
-  var marks = checkins.filter(function (r) { return inSet[r.session_id] && !att_isRejected_(r); })
+  var marks = checkins.filter(function (r) { return inSet[r.session_id] && !att_isAbsent_(r); })
     .map(function (r) { return [r.session_id, r.student_id, r.server_utc, r.status]; });
   var rejected = checkins.filter(function (r) { return inSet[r.session_id] && att_isRejected_(r); })
     .map(function (r) { return [r.session_id, r.student_id, r.server_utc, r.review_note || ""]; });
+  var blocked = checkins.filter(function (r) { return inSet[r.session_id] && att_isBlockedOpen_(r); })
+    .map(function (r) { return [r.session_id, r.student_id, r.server_utc, r.flags || ""]; });
   var known = null;
   if (owner != null) { known = {}; checkins.forEach(function (r) { if (scopeIds[r.session_id]) known[r.student_id] = 1; }); }
   var students = att_rows_("AttStudents").filter(function (x) { return x.status === "active" && (known === null || known[x.student_id]); })
@@ -735,7 +779,7 @@ function att_roster_(p, u) {
   return att_ok_({
     students: students,
     sessions: sessions.map(function (x) { return { session_id: x.session_id, course: x.course, room_id: x.room_id, start_utc: x.start_utc, status: x.status, owner_user_id: att_ownerOf_(x), owner_name: x.owner_name || "" }; }),
-    marks: marks, rejected: rejected, courses: courses });
+    marks: marks, rejected: rejected, blocked: blocked, courses: courses });
 }
 
 function att_csvCell_(v) {
@@ -750,7 +794,7 @@ function att_export_(p, u) {
   var names = {}; att_rows_("AttStudents").forEach(function (s) { names[s.student_id] = s.name; });
   var lines = [["student_id", "name", "server_utc", "status", "flags", "dist_m", "acc", "geo_reason", "review_status", "review_note", "attendance"].join(",")];
   att_rows_("AttCheckins").filter(function (r) { return r.session_id === sid; }).forEach(function (r) {
-    lines.push([r.student_id, names[r.student_id] || "", r.server_utc, r.status, r.flags, r.dist_m, r.acc, r.geo_reason, r.review_status, r.review_note, att_isRejected_(r) ? "absent (rejected)" : "present"].map(att_csvCell_).join(","));
+    lines.push([r.student_id, names[r.student_id] || "", r.server_utc, r.status, r.flags, r.dist_m, r.acc, r.geo_reason, r.review_status, r.review_note, att_isRejected_(r) ? "absent (rejected)" : att_isBlockedOpen_(r) ? "absent (phone did not match, waiting for review)" : "present"].map(att_csvCell_).join(","));
   });
   return att_ok_({ csv: lines.join("\r\n") });
 }
@@ -763,19 +807,19 @@ var ATT_GEO_FLAGS_ = ["GEO_DENIED", "GEO_UNAVAILABLE", "GEO_SKIPPED", "GEO_FAR",
 function att_tally_(rows) {
   var t = att_newBucket_(); delete t.sessions;
   rows.forEach(function (r) {
-    if (att_isRejected_(r)) t.rejected++; else t.present++;
-    if (r.status === "review") { t.flagged++; if (!r.review_status) t.unreviewed++; }
+    if (att_isRejected_(r)) t.rejected++; else if (att_isBlockedOpen_(r)) t.blocked++; else t.present++;
+    if (att_isFlaggedRow_(r)) { t.flagged++; if (!r.review_status) t.unreviewed++; }
     String(r.flags || "").split(",").forEach(function (c) { if (c && att_has_(t.geo, c)) t.geo[c]++; });
   });
   return t;
 }
 function att_newBucket_() {
-  var b = { sessions: 0, present: 0, rejected: 0, flagged: 0, unreviewed: 0, geo: {} };
+  var b = { sessions: 0, present: 0, rejected: 0, blocked: 0, flagged: 0, unreviewed: 0, geo: {} };
   ATT_GEO_FLAGS_.forEach(function (c) { b.geo[c] = 0; });
   return b;
 }
 function att_bucketAdd_(b, t) {
-  b.sessions++; b.present += t.present; b.rejected += t.rejected; b.flagged += t.flagged; b.unreviewed += t.unreviewed;
+  b.sessions++; b.present += t.present; b.rejected += t.rejected; b.blocked += t.blocked; b.flagged += t.flagged; b.unreviewed += t.unreviewed;
   ATT_GEO_FLAGS_.forEach(function (c) { b.geo[c] += t.geo[c]; });
 }
 function att_groupBySession_(rows) {
@@ -815,7 +859,7 @@ function att_sessionsList_(p, u) {
     sessions: page.map(function (s) {
       var t = att_tally_(by[s.session_id] || []), o = att_ownerOf_(s);
       return { session_id: s.session_id, course: s.course, room_id: s.room_id, room_name: rooms[s.room_id] || "", start_utc: s.start_utc, close_utc: s.close_utc, status: s.status,
-        owner_user_id: o, owner_name: names[o] || s.owner_name || "", present: t.present, rejected: t.rejected, flagged: t.flagged, unreviewed: t.unreviewed, geo: t.geo };
+        owner_user_id: o, owner_name: names[o] || s.owner_name || "", present: t.present, rejected: t.rejected, blocked: t.blocked, flagged: t.flagged, unreviewed: t.unreviewed, geo: t.geo };
     }),
     next_cursor: more ? att_sessKey_(page[page.length - 1]) : null });
 }
@@ -852,8 +896,34 @@ function att_review_(p, u) {
     var s = att_getSession_(r.session_id);
     if (!att_canSee_(u, s ? s.owner_user_id : ATT_C.ADMIN_ID)) return att_unauthorized_();   // an orphan check-in (no session row) is admin-only
     var now = att_iso_();
+    att_addTypedStudent_(r, dec);
     att_update_("AttCheckins", r._row, { review_status: dec, review_note: note, reviewed_by: u.user_id, reviewed_at: now });
     return att_ok_({ checkin_id: id, review_status: dec, review_note: note, reviewed_by: u.user_id, reviewed_by_name: u.name, reviewed_at: now });
+  });
+}
+
+/** Accepting a blocked attempt for an ID that never registered (a sign-up from a phone bound to someone else) adds that student,
+ *  with the name they typed and no phone, like a hand entry. Their own phone can still be signed up later. Call inside the lock. */
+function att_addTypedStudent_(r, dec) {
+  if (dec !== "accepted" || r.status !== "blocked" || att_studentExists_(r.student_id)) return;
+  var m = /^Typed name: (.+)$/.exec(String(r.review_note || "")), name = m ? m[1].slice(0, ATT_C.NAME_MAX) : "";
+  att_append_("AttStudents", { student_id: r.student_id, name: name, device_id: "", created_at: att_iso_(), status: "active" });
+  att_cdel_("att:n:" + r.student_id);
+}
+
+/** att_review_bulk {session_id}: "Accept all" for one lecture. Accepts every flagged or blocked check-in of that lecture that has no
+ *  decision yet (rows already decided are left as they are). For a lecture where the system misfired. */
+function att_reviewBulk_(p, u) {
+  u = u || att_adminUser_();
+  var sc = att_scopeSession_(u, String(p.session_id || "")); if (sc.err) return sc.err;
+  var sid = sc.s.session_id, note = String(p.note == null ? "" : p.note).replace(/\s+/g, " ").trim().slice(0, 500) || "Accepted with Accept all";
+  return att_withLock_(function () {
+    var rows = att_rows_("AttCheckins").filter(function (r) { return r.session_id === sid && att_isFlaggedRow_(r) && !r.review_status; }), now = att_iso_();
+    rows.forEach(function (r) {
+      att_addTypedStudent_(r, "accepted");
+      att_update_("AttCheckins", r._row, { review_status: "accepted", review_note: note, reviewed_by: u.user_id, reviewed_at: now });
+    });
+    return att_ok_({ accepted: rows.length });
   });
 }
 
@@ -877,8 +947,9 @@ function att_manualCheckin_(p, u) {
   var name = String(p.name == null ? "" : p.name).replace(/\s+/g, " ").trim().slice(0, ATT_C.NAME_MAX);
   var res = att_withLock_(function () {
     var cur = att_rows_("AttCheckins").filter(function (r) { return r.session_id === s.session_id && r.student_id === sid; })[0];
-    if (cur && att_isRejected_(cur)) {
-      var when = att_iso_(), was = cur.review_note ? " (was rejected: " + cur.review_note + ")" : " (was rejected)";
+    if (cur && att_isAbsent_(cur)) {
+      var what = att_isRejected_(cur) ? "rejected" : "blocked: phone did not match";
+      var when = att_iso_(), was = cur.review_note ? " (was " + what + ": " + cur.review_note + ")" : " (was " + what + ")";
       att_update_("AttCheckins", cur._row, { review_status: "accepted", reviewed_by: u.user_id, reviewed_at: when,
         review_note: ("Manual entry: " + ATT_MANUAL_REASONS_[reason] + (note ? " - " + note : "") + was).slice(0, 500) });
       return att_ok_({ status: "recorded", server_utc: cur.server_utc, name: att_studentName_(sid), overrode_reject: true });
@@ -917,6 +988,135 @@ function att_overview_(p) {
   byUser.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
   var byDay = Object.keys(days).sort().reverse().map(function (d) { var b = days[d]; b.day = d; return b; });
   return att_ok_({ range: { from: p.from || null, to: p.to || null }, totals: totals, by_user: byUser, by_day: byDay });
+}
+
+/* ───────── phone records: check and repair (2026-11-18, decisions D23). Run from the editor. ───────── */
+/** Read-only. Logs and returns what is wrong with the link between phones and student IDs:
+ *  - devices whose device_id does not match their own fingerprint (a column of AttDevices was sorted or shifted by hand)
+ *  - active devices whose owner differs from AttStudents (the student row says this device belongs to someone else)
+ *  - IDs that look like they lost a leading zero (AttStudents holds "212345" while phones send "0212345")
+ *  - ID cells the sheet turned into numbers (a column that is no longer plain text)
+ *  - for the last few lectures: check-ins, and the refusals in the flag log by reason. */
+/** Tabs whose header row is not exactly ATT_HEADERS (2026-11-19, D23): the code READS by header name but WRITES by column position,
+ *  so an edited, moved or sorted header row makes every write land in the wrong column. [{tab, expected, found}] */
+function att_headerProblems_(tabs) {
+  var out = [];
+  (tabs || Object.keys(ATT_HEADERS)).forEach(function (t) {
+    var sh = att_ss_().getSheetByName(t); if (!sh) { out.push({ tab: t, expected: ATT_HEADERS[t].join(","), found: "(tab missing)" }); return; }
+    var h = ATT_HEADERS[t], got = sh.getRange(1, 1, 1, h.length).getValues()[0].map(function (v) { return String(v == null ? "" : v).trim(); });
+    if (got.join(",") !== h.join(",")) out.push({ tab: t, expected: h.join(","), found: got.join(",") });
+  });
+  return out;
+}
+
+function att_checkDevices() {
+  var studs = att_rows_("AttStudents"), devs = att_rows_("AttDevices"), log = att_rows_("AttFlagLog"), sess = att_rows_("AttSessions"), chk = att_rows_("AttCheckins");
+  var ownerByDev = {}; studs.forEach(function (x) { if (x.device_id) ownerByDev[x.device_id] = x.student_id; });
+  var known = {}; studs.forEach(function (x) { known[x.student_id] = 1; });
+  var out = { headers_changed: att_headerProblems_(), students: studs.length, devices: devs.length, active_devices: 0, device_id_vs_fingerprint: [], owner_mismatch: [], lost_leading_zero: [], numeric_id_cells: {}, lectures: [] };
+  devs.forEach(function (d) {
+    if (d.status === "active") out.active_devices++;
+    if (d.secret_hash && d.device_id !== "D-" + String(d.secret_hash).slice(0, 16)) out.device_id_vs_fingerprint.push({ row: d._row, device_id: d.device_id, student_id: d.student_id });
+    var o = ownerByDev["D-" + String(d.secret_hash).slice(0, 16)];
+    if (d.status === "active" && o && o !== d.student_id) out.owner_mismatch.push({ row: d._row, device_says: d.student_id, students_tab_says: o });
+  });
+  var seen = {};
+  log.forEach(function (l) {
+    var typed = String(l.student_id || ""), m = /owner=(\d+)/.exec(l.detail || ""), owner = m ? m[1] : "";
+    if (ATT_HARD_FLAGS_[l.code] && /^0\d/.test(typed) && (owner === typed.replace(/^0+/, "") || known[typed.replace(/^0+/, "")]) && !seen[typed]) { seen[typed] = 1; out.lost_leading_zero.push({ typed: typed, stored: typed.replace(/^0+/, "") }); }
+  });
+  ["AttStudents", "AttDevices", "AttCheckins"].forEach(function (tab) {
+    var sh = att_sheet_(tab), n = sh.getLastRow(), col = ATT_HEADERS[tab].indexOf("student_id") + 1, k = 0;
+    if (n >= 2) sh.getRange(2, col, n - 1, 1).getValues().forEach(function (v) { if (typeof v[0] === "number") k++; });
+    out.numeric_id_cells[tab] = k;
+  });
+  sess.slice(-5).forEach(function (x) {
+    var refusals = {}, people = {};
+    log.forEach(function (l) { if (l.session_id === x.session_id && ATT_HARD_FLAGS_[l.code]) { refusals[l.code] = (refusals[l.code] || 0) + 1; people[l.student_id] = 1; } });
+    out.lectures.push({ session_id: x.session_id, course: x.course, start_utc: x.start_utc, owner: x.owner_name || att_ownerOf_(x),
+      checkins: chk.filter(function (r) { return r.session_id === x.session_id; }).length, refusals: refusals, refused_students: Object.keys(people).length });
+  });
+  var verdict = out.headers_changed.length ? "COLUMN HEADERS CHANGED in " + out.headers_changed.map(function (x) { return x.tab; }).join(", ") +
+      ": put row 1 of each back exactly as 'expected' below (do not move data), then run att_checkDevices() again. The repairs refuse to run until then."
+    : out.device_id_vs_fingerprint.length || out.owner_mismatch.length ? "PHONE RECORDS DAMAGED (run att_repairDevices() to see the repair, att_repairDevices(true) to apply it)"
+    : out.lost_leading_zero.length ? "IDS LOST THEIR LEADING ZERO (run att_repairLeadingZeros() to see the repair)" : "phone records look consistent";
+  out.verdict = verdict;
+  Logger.log(verdict + "\n" + JSON.stringify(out, null, 1));
+  return out;
+}
+
+/** Rebuilds the owner of every device from its fingerprint: device_id = "D-" + the first 16 characters of secret_hash (that is how
+ *  sign-up creates it), and student_id = the student whose AttStudents row names that device. Rows the students tab does not name
+ *  (old phones replaced by a phone change) are left alone. att_repairDevices() only reports; att_repairDevices(true) writes. */
+function att_repairDevices(apply) {
+  var hp = att_headerProblems_(["AttStudents", "AttDevices"]);
+  if (hp.length) { Logger.log("REFUSED: column headers changed in " + hp.map(function (x) { return x.tab; }).join(", ") + ". Run att_checkDevices() and fix the headers first. " + JSON.stringify(hp, null, 1)); return { applied: false, refused: true, headers_changed: hp, fixes: [] }; }
+  var studs = att_rows_("AttStudents"), devs = att_rows_("AttDevices"), ownerByDev = {}, fixes = [];
+  studs.forEach(function (x) { if (x.device_id) ownerByDev[x.device_id] = x.student_id; });
+  devs.forEach(function (d) {
+    if (!d.secret_hash) return;
+    var id = "D-" + String(d.secret_hash).slice(0, 16), owner = ownerByDev[id], upd = {};
+    if (d.device_id !== id) upd.device_id = id;
+    if (owner && d.student_id !== owner) upd.student_id = owner;
+    if (Object.keys(upd).length) fixes.push({ row: d._row, was: { device_id: d.device_id, student_id: d.student_id }, set: upd, hash: d.secret_hash });
+  });
+  if (apply && fixes.length) {
+    att_withLock_(function () { fixes.forEach(function (f) { att_update_("AttDevices", f.row, f.set); att_cdel_("att:d:" + f.hash); }); return true; });
+  }
+  var msg = (apply ? "Repaired " : "Would repair ") + fixes.length + " device row(s)" + (apply ? "." : ". Run att_repairDevices(true) to apply (take a copy of the sheet first: att_backupNow()).");
+  Logger.log(msg + "\n" + JSON.stringify(fixes.slice(0, 80), null, 1));
+  return { applied: !!apply, fixes: fixes };
+}
+
+/** IDs stored without their leading zero (seen in the flag log: phones sent "0212345", the sheet holds "212345"): renames the stored ID
+ *  everywhere (AttStudents, AttDevices, AttCheckins, AttRequests) and makes the ID columns plain text again. Only reports unless apply. */
+function att_repairLeadingZeros(apply) {
+  var hp = att_headerProblems_(["AttStudents", "AttDevices", "AttCheckins", "AttRequests"]);
+  if (hp.length) { Logger.log("REFUSED: column headers changed in " + hp.map(function (x) { return x.tab; }).join(", ") + ". Run att_checkDevices() and fix the headers first."); return { applied: false, refused: true, headers_changed: hp, ids: [], changes: [] }; }
+  var found = att_checkDevices().lost_leading_zero, map = {};
+  found.forEach(function (x) { map[x.stored] = x.typed; });
+  var changes = [];
+  ["AttStudents", "AttDevices", "AttCheckins", "AttRequests"].forEach(function (tab) {
+    att_rows_(tab).forEach(function (r) { if (map[r.student_id]) changes.push({ tab: tab, row: r._row, from: r.student_id, to: map[r.student_id] }); });
+  });
+  if (apply) {
+    att_ensureTabs_();   // ID columns back to plain text first, so the zero is kept
+    att_withLock_(function () { changes.forEach(function (c) { att_update_(c.tab, c.row, { student_id: c.to }); att_cdel_("att:n:" + c.from); att_cdel_("att:n:" + c.to); }); return true; });
+  }
+  Logger.log((apply ? "Renamed " : "Would rename ") + changes.length + " cell(s) for " + found.length + " ID(s)" + (apply ? "." : ". Run att_repairLeadingZeros(true) to apply.") + "\n" + JSON.stringify(changes.slice(0, 80), null, 1));
+  return { applied: !!apply, ids: found, changes: changes };
+}
+
+/** Turns the refusals of one lecture (flag log only, from before D22) into blocked check-ins in Needs review, so the teacher can
+ *  Accept them (one by one, or Accept all) instead of entering every student by hand. One row per student who has none yet.
+ *  sessionId: the lecture; leave it out for the most recent lecture that has refusals. Only reports unless apply is true. */
+function att_recoverRefused(sessionId, apply) {
+  var log = att_rows_("AttFlagLog"), sess = att_rows_("AttSessions");
+  if (!sessionId) {
+    var last = null; log.forEach(function (l) { if (ATT_HARD_FLAGS_[l.code]) last = l.session_id; });
+    sessionId = last;
+  }
+  var s = sess.filter(function (x) { return x.session_id === sessionId; })[0];
+  if (!s) { Logger.log("No lecture with refusals found" + (sessionId ? " for " + sessionId : "")); return { applied: false, students: [] }; }
+  var have = {}; att_rows_("AttCheckins").forEach(function (r) { if (r.session_id === sessionId) have[r.student_id] = 1; });
+  var todo = {}, list = [];
+  log.forEach(function (l) {
+    if (l.session_id !== sessionId || !ATT_HARD_FLAGS_[l.code] || have[l.student_id] || todo[l.student_id] || !ATT_C.ID_REGEX.test(String(l.student_id || ""))) return;
+    todo[l.student_id] = 1; list.push({ student_id: l.student_id, code: l.code, at: l.ts_utc });
+  });
+  if (apply && list.length) {
+    att_withLock_(function () {
+      list.forEach(function (x) {
+        att_append_("AttCheckins", { checkin_id: Utilities.getUuid(), session_id: sessionId, student_id: x.student_id, device_id: "UNKNOWN", server_utc: x.at,
+          lat: "", lng: "", acc: "", dist_m: "", fp_hash: "", flags: x.code, status: "blocked", geo_reason: "",
+          review_status: "", review_note: "Recovered from the flag log", reviewed_by: "", reviewed_at: "" });
+      });
+      return true;
+    });
+  }
+  Logger.log((apply ? "Recovered " : "Would recover ") + list.length + " student(s) of " + (s.course || "") + " " + s.start_utc + " (" + sessionId + ")" +
+    (apply ? ". They are in Needs review: Accept them, or use Accept all." : ". Run att_recoverRefused(\"" + sessionId + "\", true) to apply."));
+  return { applied: !!apply, session_id: sessionId, students: list };
 }
 
 /* ───────── nightly backup (2026-11-16, decisions D18) ───────── */
@@ -1548,7 +1748,7 @@ var ATTF_CFG = {
   IDENTICAL_DECIMALS: 6,    //                   identical to 6 decimals
   REPEATED_MIN: 3,          // REPEATED: >= 3 prior flagged (review) check-ins, ever
   // student page (plan section 3); not used by the engine, kept identical to ATT_C and contract/att_config.js
-  GEO_HIGH_TIMEOUT_MS: 20000, GEO_LOW_TIMEOUT_MS: 10000, GEO_MAX_AGE_MS: 60000, GEO_SKIP_AFTER_FAILS: 2, SUBMIT_WATCHDOG_MS: 30000
+  GEO_HIGH_TIMEOUT_MS: 20000, GEO_LOW_TIMEOUT_MS: 10000, GEO_MAX_AGE_MS: 60000, GEO_SKIP_AFTER_FAILS: 1, SUBMIT_WATCHDOG_MS: 30000
 };
 // Why a location fix is missing -> the flag it earns (plan §4.2). All of them are "review"; GEO_WEAK stays the only soft flag.
 var ATTF_GEO_REASON_FLAG = {
