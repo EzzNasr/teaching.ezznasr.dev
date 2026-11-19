@@ -250,8 +250,9 @@ class QuizTab(ttk.Frame):
         tk.Label(row5, text="Prompt text:", width=14, anchor="w").pack(side="left")
         self.assign_prompt_var = tk.StringVar(value="Paste your completed assignment below.")
         tk.Entry(row5, textvariable=self.assign_prompt_var).pack(side="left", fill="x", expand=True)
-        tk.Label(assign_frame, text="This creates a basic text-paste assignment page. For URL/file submission "
-                                     "modes, use the Assignment section after generating this lesson.",
+        tk.Label(assign_frame, text="A new assignment page uses graded questions (auto-marked) by default; an "
+                                     "existing one keeps its submission type. Add its questions, or switch to text / "
+                                     "link / file, in the Assignment section after generating this lesson.",
                  fg="gray30", font=("TkDefaultFont", 8)).pack(anchor="w", padx=8, pady=(0, 6))
 
         solution_frame = tk.LabelFrame(self, text="Solution video (shown on the quiz page itself)")
