@@ -33,6 +33,19 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #gateTitleAr{font-size:20px;font-weight:700;color:var(--fg)}#gateTextAr{max-width:34ch}
 #gateHelp [dir=rtl]{text-align:right}#gateStepsAr{margin-top:10px;padding-right:20px;padding-left:0}#gateHelpTitleAr{margin-top:10px}
 #gateMsgAr:empty,#gateHelpTitleAr:empty{display:none}
+/* Drawn "turn location on" guide (location-help.js, D24) */
+#gateGuide{width:100%;background:var(--card);border-radius:14px;padding:12px}
+.lh-title{margin:0 0 8px!important;color:var(--fg)!important;font-weight:700}
+.lh-tabs{display:flex;gap:6px;margin-bottom:10px}
+.lh-tabs button{flex:1;min-height:44px;border-radius:12px;background:transparent;border:1px solid var(--mut);color:var(--fg);font-size:16px}
+.lh-tabs button[aria-selected=true]{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:700}
+.lh-pane{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.lh-pane[hidden]{display:none}
+.lh-step{margin:0;display:flex;flex-direction:column;gap:6px}
+.lh-step svg{width:100%;height:auto;display:block}
+.lh-step figcaption{font-size:13px;line-height:1.35;color:var(--fg);text-align:left;display:flex;flex-direction:column;gap:3px}
+.lh-step figcaption b{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--pri);color:#fff;font-size:12px}
+.lh-step figcaption [dir=rtl]{text-align:right;color:var(--mut)}
 #gateBtn{width:100%;min-height:72px;font-size:22px;background:var(--pri);border-radius:18px}
 #gateHelp{width:100%;text-align:left;background:var(--card);border-radius:14px;padding:12px 16px}
 #gateHelp p{color:var(--fg);font-weight:600;margin-bottom:6px}

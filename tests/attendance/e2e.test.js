@@ -82,7 +82,7 @@ async function ticket(sid, key) {
   const codes = fl.rows.map(r => r.flags).join(",");
   ok(fl.ok && /GEO_FAR/.test(codes) && /GEO_DENIED/.test(codes), "flagged view lists GEO_FAR and GEO_DENIED: " + codes);
   const live = await api.call("att_live", { ...A, session_id: sid });
-  ok(live.ok && live.present >= 3 && live.flagged === 2 && typeof live.pending === "number", `live counters present=${live.present} flagged=${live.flagged}`);
+  ok(live.ok && live.present === 3 && live.flagged === 4 && live.blocked === 2 && typeof live.pending === "number", `live counters present=${live.present} flagged=${live.flagged} blocked=${live.blocked} (2 location flags + 2 phone mismatches saved as blocked, D22; 20240001's blocked attempt was replaced by the approved phone)`);
   console.log("roster");
   const ro = await api.call("att_roster", { ...A });
   ok(ro.ok && ro.sessions.some(x => x.session_id === sid) && ro.courses.includes("CS101"), "att_roster returns sessions + course list");
@@ -93,7 +93,7 @@ async function ticket(sid, key) {
   ok((await api.call("att_roster", { ...A, course: "NOPE" })).sessions.length === 0, "course filter works");
   console.log("close + export");
   const cl = await api.call("att_close_session", { ...A, session_id: sid });
-  ok(cl.ok && cl.summary.present >= 3 && cl.summary.flagged === 2, "close summary");
+  ok(cl.ok && cl.summary.present === 3 && cl.summary.flagged === 4, "close summary");
   const late = await ticket(sid, key); ok(late.code === "SESSION_CLOSED", "closed session rejects new tickets");
   const ex = await api.call("att_export", { ...A, session_id: sid });
   ok(ex.ok && /^student_id,name,server_utc/.test(ex.csv), "CSV export");

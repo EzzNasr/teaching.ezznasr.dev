@@ -9,7 +9,7 @@
   "tools/quiz-maker-v2/apps_script/Requirements.gs",
   "tools/quiz-maker-v2/apps_script/Revenue.gs"
  ],
- "count": 1035,
+ "count": 1047,
  "items": {
   "ATTENDANCE_HEADERS": {
    "kind": "var",
@@ -120,6 +120,11 @@
    "kind": "var",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "7029ef331d26d954"
+  },
+  "ATT_HARD_FLAGS_": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "412fbbd97496b65b"
   },
   "ATT_HEADERS": {
    "kind": "var",
@@ -2131,6 +2136,11 @@
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "8f68ea7331945cca"
   },
+  "att_addTypedStudent_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "cee92b3d312c138e"
+  },
   "att_adminToken_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
@@ -2154,7 +2164,7 @@
   "att_attend_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "ab1408d17c2c74a1"
+   "hash": "2f1d8a378fdf2af8"
   },
   "att_auth_": {
    "kind": "function",
@@ -2179,7 +2189,7 @@
   "att_bucketAdd_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "d8a526dadf34832f"
+   "hash": "07412c7a18eddfba"
   },
   "att_calibrateRoom_": {
    "kind": "function",
@@ -2205,6 +2215,11 @@
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "962ee19b88a339f1"
+  },
+  "att_checkDevices": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "56da13c3ed1c67cc"
   },
   "att_checkTicket_": {
    "kind": "function",
@@ -2244,7 +2259,7 @@
   "att_counts_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "a03b1913a0f92594"
+   "hash": "7bc885af28918f22"
   },
   "att_cput_": {
    "kind": "function",
@@ -2289,7 +2304,7 @@
   "att_dispatch_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "11d4bdf1d98ed6e2"
+   "hash": "4f6e8921617e57a8"
   },
   "att_effOwner_": {
    "kind": "function",
@@ -2319,7 +2334,7 @@
   "att_export_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "b2318458806f7af1"
+   "hash": "f6c7f1614c86083d"
   },
   "att_extendSession_": {
    "kind": "function",
@@ -2329,7 +2344,7 @@
   "att_feed_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "d96510676011273f"
+   "hash": "e0f489c4cf8a6032"
   },
   "att_flagDetail_": {
    "kind": "function",
@@ -2339,7 +2354,7 @@
   "att_flagged_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "165961fc857e1d80"
+   "hash": "bbaf4a8550f83322"
   },
   "att_flagsToStatus_": {
    "kind": "function",
@@ -2406,6 +2421,11 @@
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "6151cb9eca141eeb"
   },
+  "att_headerProblems_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "b68c9be0ff1a698c"
+  },
   "att_hex_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
@@ -2431,6 +2451,16 @@
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "7c7e5a1ee8296116"
   },
+  "att_isAbsent_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "32af5e6813051d16"
+  },
+  "att_isBlockedOpen_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "d7ca485a887a8344"
+  },
   "att_isDemoEvent_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
@@ -2445,6 +2475,11 @@
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "b30db5f423ef0804"
+  },
+  "att_isFlaggedRow_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "d4656cd636215869"
   },
   "att_isOpen_": {
    "kind": "function",
@@ -2464,7 +2499,7 @@
   "att_live_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "5ab0c9d3b748cc24"
+   "hash": "b1b98f3ff36e6e44"
   },
   "att_loadRun_": {
    "kind": "function",
@@ -2519,7 +2554,7 @@
   "att_manualCheckin_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "2e40add3a83b7c98"
+   "hash": "9dca0d66fee03cce"
   },
   "att_masterSecret_": {
    "kind": "function",
@@ -2539,7 +2574,7 @@
   "att_newBucket_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "98775f775e208a8f"
+   "hash": "24bc5f28de203de4"
   },
   "att_normDiag_": {
    "kind": "function",
@@ -2601,6 +2636,21 @@
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "7c89555eebbc3616"
   },
+  "att_recoverRefused": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "3235a336e4a49a5c"
+  },
+  "att_repairDevices": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "c01d9c9ab5a29450"
+  },
+  "att_repairLeadingZeros": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "c23a6e26759f2a75"
+  },
   "att_requests_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
@@ -2611,10 +2661,15 @@
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "b01de9bf844f1002"
   },
+  "att_reviewBulk_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "962d5b42d36cbc42"
+  },
   "att_review_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "aaa9d84b92a08861"
+   "hash": "b98d391f745b2929"
   },
   "att_rooms_": {
    "kind": "function",
@@ -2624,7 +2679,7 @@
   "att_roster_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "95e9340b0ba02c38"
+   "hash": "47023645cb03fcf6"
   },
   "att_route_": {
    "kind": "function",
@@ -2655,6 +2710,11 @@
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "fd89cb8a7c102515"
+  },
+  "att_saveBlocked_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "c5d84437e7f8f7d6"
   },
   "att_scopeSession_": {
    "kind": "function",
@@ -2694,7 +2754,7 @@
   "att_sessionsList_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "81b66824c258ecf2"
+   "hash": "ad8401af96cd2a2c"
   },
   "att_setWebhook": {
    "kind": "function",
@@ -2724,7 +2784,7 @@
   "att_signup_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "56ab5c9d57a0080a"
+   "hash": "b3a76611df6ff42a"
   },
   "att_ss_": {
    "kind": "function",
@@ -2754,7 +2814,7 @@
   "att_tally_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
-   "hash": "24845716e9043cbe"
+   "hash": "870638dfe390d3cc"
   },
   "att_testTelegram": {
    "kind": "function",

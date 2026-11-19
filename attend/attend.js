@@ -9,7 +9,10 @@
     GEO_HIGH_TIMEOUT_MS: CFG.GEO_HIGH_TIMEOUT_MS || 20000,
     GEO_LOW_TIMEOUT_MS: CFG.GEO_LOW_TIMEOUT_MS || 10000,
     GEO_MAX_AGE_MS: CFG.GEO_MAX_AGE_MS || 60000,
-    GEO_SKIP_AFTER_FAILS: CFG.GEO_SKIP_AFTER_FAILS || 2,
+    GEO_SKIP_AFTER_FAILS: CFG.GEO_SKIP_AFTER_FAILS || 1,   // 2026-11-19 (D24): one try that brings no location is enough to continue without it
+    HELP_AFTER_FAILS: 2,          // the help (text + drawn iPhone / Android screens) appears after this many tries with no location
+    SKIP_WHILE_WORKING_MS: CFG.SKIP_WHILE_WORKING_MS || 12000,   // "Continue without location" also appears if one try is still running after this long
+    PROMPT_SLACK_MS: CFG.GEO_PROMPT_SLACK_MS || 25000,          // extra time before the hard stop while the browser's question may be on screen
     SUBMIT_WATCHDOG_MS: CFG.SUBMIT_WATCHDOG_MS || 30000,
     // Automatic retry (2026-11-04): waits between tries (then the last value repeats), each spread +-25 % at random. The page keeps
     // trying until the server's late grace runs out (LATE_GRACE_SEC after the QR ticket expires / the session closes), minus a margin.
@@ -154,6 +157,7 @@
     signup: $("signup"), change: $("change"), msg: $("msg"), name: $("name"), namebox: $("namebox"),
     gate: $("gate"), gateTitle: $("gateTitle"), gateText: $("gateText"), gateTitleAr: $("gateTitleAr"), gateTextAr: $("gateTextAr"), gateStepsAr: $("gateStepsAr"),
     gateHelpTitleAr: $("gateHelpTitleAr"), gateMsgAr: $("gateMsgAr"), gateBtn: $("gateBtn"), gateHelp: $("gateHelp"),
+    gateGuide: $("gateGuide"),
     gateHelpTitle: $("gateHelpTitle"), gateSteps: $("gateSteps"), gateMsg: $("gateMsg"), gateSkipBox: $("gateSkipBox"), gateSkip: $("gateSkip"),
     form: $("form"), done: $("done"), doneName: $("doneName"), doneTime: $("doneTime"), doneNote: $("doneNote"),
     busy: $("busy"), spin: $("spin"), busyStep: $("busyStep"), busyWarn: $("busyWarn"), busyErr: $("busyErr"), busyRetry: $("busyRetry"),
@@ -264,15 +268,16 @@
     return Promise.resolve("unknown");
   }
   // One getCurrentPosition call -> {ok:true,pos} | {ok:false,reason}.
-  // `guard` adds a hard stop for the case where permission is already granted but the browser never answers.
-  // It is NOT used while a permission prompt may still be open (the student could be reading it).
+  // Every try has a hard stop (2026-11-19, D24): some browsers (in-app browsers, a dismissed or hidden question) never answer at all,
+  // and the page must never wait forever. guard = permission already granted: stop shortly after the browser's own timeout;
+  // otherwise allow extra time, because the student may still be reading the browser's question.
   function getFix(o, guard) {
     return new Promise(function (res) {
       if (window.isSecureContext === false) return res({ ok: false, reason: "INSECURE_CONTEXT" });
       if (!navigator.geolocation) return res({ ok: false, reason: "UNSUPPORTED" });
       var done = false, gt = null;
       function fin(r) { if (done) return; done = true; if (gt) clearTimeout(gt); res(r); }
-      if (guard) gt = setTimeout(function () { fin({ ok: false, reason: "TIMEOUT" }); }, o.timeout + 5000);
+      gt = setTimeout(function () { fin({ ok: false, reason: "TIMEOUT" }); }, o.timeout + (guard ? 5000 : K.PROMPT_SLACK_MS));
       try {
         navigator.geolocation.getCurrentPosition(function (p) {
           fin({ ok: true, pos: { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, ts: Date.now() } });
@@ -372,7 +377,10 @@
   }
   // mode: ask | working | denied | weak | unsupported
   function gateUi(mode) {
-    var p = platform(), help = mode === "denied" || mode === "weak", device = mode === "denied" && st.noPrompt;
+    var p = platform(), device = mode === "denied" && st.noPrompt;
+    // Help only once the student has tried several times with nothing back (they are not seeing the question or it is blocked).
+    var help = (mode === "denied" || mode === "weak") && st.geoFails >= K.HELP_AFTER_FAILS;
+    var guide = help && (p === "ios" || p === "android") && (mode === "denied" || (st.geoFail && st.geoFail.reason === "TIMEOUT"));
     var T = { ask: [MESSAGES.GATE_ASK_T, MESSAGES.GATE_ASK], working: [MESSAGES.GATE_WORK_T, MESSAGES.GATE_WORK],
       denied: device ? [MESSAGES.GATE_DEVICE_T, MESSAGES.GATE_DEVICE] : [MESSAGES.GATE_DENIED_T, MESSAGES.GATE_DENIED], weak: [MESSAGES.GATE_WEAK_T, MESSAGES.GATE_WEAK],
       unsupported: [MESSAGES.GATE_UNSUP_T, MESSAGES.GATE_UNSUP] }[mode];
@@ -390,9 +398,16 @@
       el.gateHelpTitleAr.textContent = mode === "denied" ? AR.HELP_BLOCKED : AR.HELP_WEAK;
       setSteps(STEPS[kind][p], STEPS_AR[kind][p]);
     }
+    showGuide(guide, p);
     var failed = (mode === "denied" || mode === "weak") && st.geoFails > 0;
     el.gateMsg.textContent = failed ? MESSAGES.GATE_FAIL_1 : ""; el.gateMsgAr.textContent = failed ? AR.GATE_FAIL_1 : "";
-    el.gateSkipBox.hidden = !(st.geoFails >= K.GEO_SKIP_AFTER_FAILS || mode === "unsupported");
+    el.gateSkipBox.hidden = !(st.geoFails >= K.GEO_SKIP_AFTER_FAILS || mode === "unsupported" || st.longTry);
+  }
+  // The drawn iPhone / Android screens (location-help.js). Built once; the tab of the student's own phone is open first.
+  function showGuide(on, p) {
+    if (!el.gateGuide) return;
+    if (on && !el.gateGuide.firstChild && window.ATT_LOC_HELP) { el.gateGuide.innerHTML = window.ATT_LOC_HELP.html(p); window.ATT_LOC_HELP.bind(el.gateGuide); }
+    el.gateGuide.hidden = !(on && el.gateGuide.firstChild);
   }
   function enterForm() {
     view("form"); render(); el.save.disabled = st.dead; say("", "info"); tick();
@@ -408,11 +423,13 @@
   // A tap (or a silent attempt when permission is already granted).
   function gateAttempt(guard) {
     if (st.dead || st.acquiring || st.view !== "gate") return Promise.resolve();
-    st.acquiring = true; st.geoAttempts++;
+    st.acquiring = true; st.geoAttempts++; st.longTry = false;
     var t0 = Date.now(), before = st.perm;
     gateUi("working");
+    // Still waiting after a while (no question on screen, no answer): let the student continue without location (D24).
+    var lt = setTimeout(function () { if (st.acquiring && st.view === "gate") { st.longTry = true; el.gateSkipBox.hidden = false; } }, K.SKIP_WHILE_WORKING_MS);
     return acquire(guard).then(function (r) {
-      st.acquiring = false;
+      st.acquiring = false; clearTimeout(lt); st.longTry = false;
       // Refused in under a second while the browser had NOT recorded a "Block" for this site: the student was never asked.
       // Location is off for the browser itself (phone settings). Show how to turn it on; it is reported as such, not as a refusal.
       st.noPrompt = !r.ok && r.reason === "PERMISSION_DENIED" && before !== "denied" && Date.now() - t0 < 1000;
@@ -425,6 +442,7 @@
   }
   function skipLocation() {
     if (st.dead || st.view !== "gate") return;
+    if (st.acquiring && !st.geoFail) st.geoFail = { reason: "TIMEOUT" };   // skipped while a try was still waiting for the browser
     st.skipped = true; enterForm();
   }
   // If the student flips the setting (or comes back from the settings screen) while the gate is open, continue by itself.
