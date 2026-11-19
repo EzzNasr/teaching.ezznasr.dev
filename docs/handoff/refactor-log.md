@@ -62,7 +62,8 @@ attendance fixes D22-D25, `ac091b4`). **Live backend: Version 71 = `ac091b4`**, 
 
 | Next | Status / needs |
 |---|---|
-| Phase 3: staging project, then split `Code.gs` | briefed in its own session, waiting for the owner's approval (paused for the attendance demo). Contributor files and the staging click list are drafted on its branch |
+| **Phase 2.5 (new, approved 2026-11-20): ready for a second teacher** | next. Security gate first, a test that one teacher can never reach another's data, Integrated Science and Math subjects, a three-subject home page (English below), teacher publishing through checked pull requests (owner approval by default, auto-merge once the checks are trusted), and a read-only teacher Revenue page with one downloadable report. Runs in its own session |
+| Phase 3: staging project, then split `Code.gs` | after Phase 2.5.  briefed in its own session, waiting for the owner's approval (paused for the attendance demo). Contributor files and the staging click list are drafted on its branch |
 | Phase 1 remainder: ESLint baseline, Prettier, `@ts-check` | not started; the owner decides in the Phase 3 session whether to fold them in |
 | Phase 8 (brought forward): Quiz Maker no longer freezes | done on branch `claude/priceless-solomon-1720d8`; its CI needs a virtual display (`xvfb-run`) for the new window tests, then a PR |
 | Branch protection on `main`; rotate `ADMIN_TOKEN` (SEC-01) | the owner |
