@@ -33,7 +33,7 @@ var ATT_C = {
   // "+2 minutes" (2026-11-16, decisions D15): the lecturer or the admin can push the close time back, up to SESSION_MAX_MIN after the start.
   EXTEND_SEC: 120, SESSION_MAX_MIN: 15,
   // student page (plan section 3). The server does not use these; they are kept here so both sides stay identical (tests/attendance/multiuser.test.js compares them)
-  GEO_HIGH_TIMEOUT_MS: 20000, GEO_LOW_TIMEOUT_MS: 10000, GEO_MAX_AGE_MS: 60000, GEO_SKIP_AFTER_FAILS: 2, SUBMIT_WATCHDOG_MS: 30000,
+  GEO_HIGH_TIMEOUT_MS: 20000, GEO_LOW_TIMEOUT_MS: 10000, GEO_MAX_AGE_MS: 60000, GEO_SKIP_AFTER_FAILS: 1, SUBMIT_WATCHDOG_MS: 30000,
   // multi-user (plan section 4.5)
   ADMIN_ID: "ADMIN", ADMIN_NAME: "Admin", USER_TOKEN_TTL_SEC: 12 * 3600, LOGIN_MAX_FAILS: 10, LOGIN_WINDOW_SEC: 300, LOGIN_LOCK_SEC: 300,
 };
@@ -621,9 +621,9 @@ function att_feed_(sessionId, u) {
   Object.keys(names).forEach(function (id) {
     var x = names[id];
     if (!x.created_at || x.created_at < s.start_utc) return;
-    // Registrations are not tied to a session in the sheet, so a teacher only sees the ones that also checked in HERE
-    // (otherwise they would see students who registered in another teacher's simultaneous session).
-    if (scoped && !here[id]) return;
+    // Registrations are not tied to a session in the sheet, so only the ones that also checked in HERE are shown, for teachers AND the
+    // admin (2026-11-19, D25): a projector left open used to count every sign-up made anywhere later that day as "New sign-ups".
+    if (!here[id]) return;
     ev.push({ t: x.created_at, k: "reg", n: x.name, id: id });
   });
   att_rows_("AttFlagLog").forEach(function (r) {
@@ -997,11 +997,23 @@ function att_overview_(p) {
  *  - IDs that look like they lost a leading zero (AttStudents holds "212345" while phones send "0212345")
  *  - ID cells the sheet turned into numbers (a column that is no longer plain text)
  *  - for the last few lectures: check-ins, and the refusals in the flag log by reason. */
+/** Tabs whose header row is not exactly ATT_HEADERS (2026-11-19, D23): the code READS by header name but WRITES by column position,
+ *  so an edited, moved or sorted header row makes every write land in the wrong column. [{tab, expected, found}] */
+function att_headerProblems_(tabs) {
+  var out = [];
+  (tabs || Object.keys(ATT_HEADERS)).forEach(function (t) {
+    var sh = att_ss_().getSheetByName(t); if (!sh) { out.push({ tab: t, expected: ATT_HEADERS[t].join(","), found: "(tab missing)" }); return; }
+    var h = ATT_HEADERS[t], got = sh.getRange(1, 1, 1, h.length).getValues()[0].map(function (v) { return String(v == null ? "" : v).trim(); });
+    if (got.join(",") !== h.join(",")) out.push({ tab: t, expected: h.join(","), found: got.join(",") });
+  });
+  return out;
+}
+
 function att_checkDevices() {
   var studs = att_rows_("AttStudents"), devs = att_rows_("AttDevices"), log = att_rows_("AttFlagLog"), sess = att_rows_("AttSessions"), chk = att_rows_("AttCheckins");
   var ownerByDev = {}; studs.forEach(function (x) { if (x.device_id) ownerByDev[x.device_id] = x.student_id; });
   var known = {}; studs.forEach(function (x) { known[x.student_id] = 1; });
-  var out = { students: studs.length, devices: devs.length, active_devices: 0, device_id_vs_fingerprint: [], owner_mismatch: [], lost_leading_zero: [], numeric_id_cells: {}, lectures: [] };
+  var out = { headers_changed: att_headerProblems_(), students: studs.length, devices: devs.length, active_devices: 0, device_id_vs_fingerprint: [], owner_mismatch: [], lost_leading_zero: [], numeric_id_cells: {}, lectures: [] };
   devs.forEach(function (d) {
     if (d.status === "active") out.active_devices++;
     if (d.secret_hash && d.device_id !== "D-" + String(d.secret_hash).slice(0, 16)) out.device_id_vs_fingerprint.push({ row: d._row, device_id: d.device_id, student_id: d.student_id });
@@ -1024,7 +1036,9 @@ function att_checkDevices() {
     out.lectures.push({ session_id: x.session_id, course: x.course, start_utc: x.start_utc, owner: x.owner_name || att_ownerOf_(x),
       checkins: chk.filter(function (r) { return r.session_id === x.session_id; }).length, refusals: refusals, refused_students: Object.keys(people).length });
   });
-  var verdict = out.device_id_vs_fingerprint.length || out.owner_mismatch.length ? "PHONE RECORDS DAMAGED (run att_repairDevices() to see the repair, att_repairDevices(true) to apply it)"
+  var verdict = out.headers_changed.length ? "COLUMN HEADERS CHANGED in " + out.headers_changed.map(function (x) { return x.tab; }).join(", ") +
+      ": put row 1 of each back exactly as 'expected' below (do not move data), then run att_checkDevices() again. The repairs refuse to run until then."
+    : out.device_id_vs_fingerprint.length || out.owner_mismatch.length ? "PHONE RECORDS DAMAGED (run att_repairDevices() to see the repair, att_repairDevices(true) to apply it)"
     : out.lost_leading_zero.length ? "IDS LOST THEIR LEADING ZERO (run att_repairLeadingZeros() to see the repair)" : "phone records look consistent";
   out.verdict = verdict;
   Logger.log(verdict + "\n" + JSON.stringify(out, null, 1));
@@ -1035,6 +1049,8 @@ function att_checkDevices() {
  *  sign-up creates it), and student_id = the student whose AttStudents row names that device. Rows the students tab does not name
  *  (old phones replaced by a phone change) are left alone. att_repairDevices() only reports; att_repairDevices(true) writes. */
 function att_repairDevices(apply) {
+  var hp = att_headerProblems_(["AttStudents", "AttDevices"]);
+  if (hp.length) { Logger.log("REFUSED: column headers changed in " + hp.map(function (x) { return x.tab; }).join(", ") + ". Run att_checkDevices() and fix the headers first. " + JSON.stringify(hp, null, 1)); return { applied: false, refused: true, headers_changed: hp, fixes: [] }; }
   var studs = att_rows_("AttStudents"), devs = att_rows_("AttDevices"), ownerByDev = {}, fixes = [];
   studs.forEach(function (x) { if (x.device_id) ownerByDev[x.device_id] = x.student_id; });
   devs.forEach(function (d) {
@@ -1055,6 +1071,8 @@ function att_repairDevices(apply) {
 /** IDs stored without their leading zero (seen in the flag log: phones sent "0212345", the sheet holds "212345"): renames the stored ID
  *  everywhere (AttStudents, AttDevices, AttCheckins, AttRequests) and makes the ID columns plain text again. Only reports unless apply. */
 function att_repairLeadingZeros(apply) {
+  var hp = att_headerProblems_(["AttStudents", "AttDevices", "AttCheckins", "AttRequests"]);
+  if (hp.length) { Logger.log("REFUSED: column headers changed in " + hp.map(function (x) { return x.tab; }).join(", ") + ". Run att_checkDevices() and fix the headers first."); return { applied: false, refused: true, headers_changed: hp, ids: [], changes: [] }; }
   var found = att_checkDevices().lost_leading_zero, map = {};
   found.forEach(function (x) { map[x.stored] = x.typed; });
   var changes = [];
@@ -1730,7 +1748,7 @@ var ATTF_CFG = {
   IDENTICAL_DECIMALS: 6,    //                   identical to 6 decimals
   REPEATED_MIN: 3,          // REPEATED: >= 3 prior flagged (review) check-ins, ever
   // student page (plan section 3); not used by the engine, kept identical to ATT_C and contract/att_config.js
-  GEO_HIGH_TIMEOUT_MS: 20000, GEO_LOW_TIMEOUT_MS: 10000, GEO_MAX_AGE_MS: 60000, GEO_SKIP_AFTER_FAILS: 2, SUBMIT_WATCHDOG_MS: 30000
+  GEO_HIGH_TIMEOUT_MS: 20000, GEO_LOW_TIMEOUT_MS: 10000, GEO_MAX_AGE_MS: 60000, GEO_SKIP_AFTER_FAILS: 1, SUBMIT_WATCHDOG_MS: 30000
 };
 // Why a location fix is missing -> the flag it earns (plan §4.2). All of them are "review"; GEO_WEAK stays the only soft flag.
 var ATTF_GEO_REASON_FLAG = {

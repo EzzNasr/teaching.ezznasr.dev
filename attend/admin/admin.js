@@ -193,7 +193,11 @@
   }
   function blankQR(text) { $("qr").hidden = true; $("prot").hidden = true; $("pinfo").textContent = text + " · " + S.course + " · " + S.room; }
 
+  // The lecture is over (its close time plus the late grace, plus a margin): one last poll, then stop asking (D25). A projector tab left
+  // open no longer keeps calling the server all day. "+2 minutes" (only possible before this point) starts the polling again.
+  function lectureOver() { return S.closeMs > 0 && srvNow() > S.closeMs + ((CFG.LATE_GRACE_SEC || 120) + 30) * 1000; }
   function poll() {
+    if (S.sess && lectureOver() && S.liveTimer) { clearInterval(S.liveTimer); clearInterval(S.syncTimer); S.liveTimer = S.syncTimer = null; }
     if (!S.sess || S.polling) return;   // the last answer is not back yet (busy server during the rush): skip this round, never pile up
     S.polling = true;
     var done = function () { S.polling = false; };
@@ -280,6 +284,7 @@
       wait($("extBtn"), false);
       if (!r.ok) return alert(r.code === "MAX_REACHED" ? "Attendance cannot stay open any longer." : r.code === "SESSION_CLOSED" ? "This attendance has already ended. Start a new one." : "Could not add time: " + (r.code || "error"));
       S.closeMs = Date.parse(r.close_utc); S.win = -1;
+      if (!S.liveTimer) { S.liveTimer = setInterval(poll, CFG.LIVE_POLL_MS || 8000); S.syncTimer = setInterval(syncClock, 30000); }
       $("pinfo").textContent = S.course + " · " + S.room;
       $("extBtn").disabled = r.can_extend === false;
       tick();
@@ -289,7 +294,7 @@
     if (!S.sess || S.closed || !confirm("End attendance now? New students can no longer check in (anyone already saving gets 2 more minutes).")) return;
     A("att_close_session", { session_id: S.sess }).then(function (r) {
       if (!r.ok) return alert("Could not close: " + (r.code || "error"));
-      S.closed = true; $("closeBtn").disabled = true; $("extBtn").disabled = true; tick(); poll();
+      S.closed = true; S.closeMs = Math.min(S.closeMs || Infinity, srvNow()); $("closeBtn").disabled = true; $("extBtn").disabled = true; tick(); poll();   // ended early: the late grace counts from now
       var s = r.summary || {};
       hideProjector("session");
       $("summary").hidden = false;

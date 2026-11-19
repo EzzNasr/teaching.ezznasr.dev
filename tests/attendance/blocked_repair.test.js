@@ -154,4 +154,27 @@ console.log("D23: IDs that lost their leading zero");
   ok(E.attend(E.start(), 1, "0212345").status === "recorded", "the student checks in again");
 }
 
+console.log("D23: a changed header row (the screen with 22 sign-ups and 0 attended)");
+{
+  const E = env(), s = E.start();
+  // Someone swaps two header labels in AttDevices (row 1 only; the data stays where it is).
+  const h = E.gas.sheets.AttDevices._g[0]; [h[0], h[1]] = [h[1], h[0]];   // "device_id" <-> "student_id"
+  const s2 = E.start(), res = [];
+  for (let i = 1; i <= 5; i++) res.push([E.signup(s2, i).ok, E.attend(s2, i).code]);
+  ok(res.every(r => r[0] === true && r[1] === "DEVICE_ID_CONFLICT"), "brand-new students: the sign-up works, then the check-in seconds later is refused as 'registered to another student'");
+  const L = E.live(s2);
+  ok(L.present === 0 && L.blocked === 5, "0 attended (and, since D22, the 5 attempts are saved in Needs review)");
+  const chk = E.gas.run("att_checkDevices()");
+  ok(/COLUMN HEADERS CHANGED in AttDevices/.test(chk.verdict) && chk.headers_changed.length === 1 && chk.headers_changed[0].found.startsWith("student_id,device_id"), "att_checkDevices: 'COLUMN HEADERS CHANGED in AttDevices', with what row 1 should be");
+  const before = JSON.stringify(E.gas.sheets.AttDevices._g);
+  const r = E.gas.run("att_repairDevices(true)");
+  ok(r.refused === true && r.applied === false && JSON.stringify(E.gas.sheets.AttDevices._g) === before, "att_repairDevices(true) REFUSES and writes nothing while the headers are wrong (it would write into the wrong columns)");
+  ok(E.gas.run("att_repairLeadingZeros(true)").refused === true, "att_repairLeadingZeros refuses too");
+  [h[0], h[1]] = [h[1], h[0]];   // the headers are put back
+  for (let i = 1; i <= 5; i++) E.gas.run(`att_cdel_("att:d:" + att_sha256Hex_(${JSON.stringify(E.sec(i))}))`);
+  ok(E.gas.run("att_checkDevices()").verdict === "phone records look consistent", "headers back: the check says consistent (no data had to change)");
+  for (let i = 1; i <= 5; i++) E.attend(s2, i);
+  ok(E.live(s2).present === 5 && E.live(s2).blocked === 0, "...and the same students now check in (their own phone replaces each blocked attempt)");
+}
+
 console.log(`\n${pass} blocked / repair checks passed`);

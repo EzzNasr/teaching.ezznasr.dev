@@ -211,7 +211,7 @@ const crow = (D, sid, id) => detail(D, sid).checkins.find(c => c.student_id === 
   const lv1 = D({ action: "att_live", token: t1.token, session_id: s1.session_id }), lvA = D({ action: "att_live", token: A, session_id: s1.session_id });
   ok(lv1.registered === 2 && lv1.present === 2 && lv1.flagged === 1 && lvA.registered === 5, "att_live: registered = the teacher's own students (admin: everyone)");
   const reasonsOf = f => f.filter(e => e.k === "reg").map(e => e.id).join();
-  ok(!reasonsOf(lv1.feed).includes("3003") && !reasonsOf(D({ action: "att_live", token: t2.token, session_id: s2.session_id }).feed).includes("3003") && reasonsOf(lvA.feed).includes("3003"), "live feed: a teacher does not see registrations that belong to someone else's session");
+  ok(!reasonsOf(lv1.feed).includes("3003") && !reasonsOf(D({ action: "att_live", token: t2.token, session_id: s2.session_id }).feed).includes("3003") && !reasonsOf(lvA.feed).includes("3003"), "live feed: nobody (teacher or admin, D25) sees registrations that belong to another lecture in this lecture's feed");
   ok(!JSON.stringify(lv1).includes("Stu Three") && !JSON.stringify(lv1).includes("2001"), "teacher one's live payload mentions no student of teacher two");
   console.log("decisions");
   ok(D({ action: "att_decide_request", token: t1.token, req_id: cd1.req_id, decision: "approve" }).ok, "teacher one approves the request routed to them");
