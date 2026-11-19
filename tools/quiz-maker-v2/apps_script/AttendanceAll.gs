@@ -1143,6 +1143,30 @@ function att_addLeadingZero(day, digits, apply) {
   return att_renameStudents(map, apply);
 }
 
+/* ── Editor buttons (the Run button cannot pass arguments). They act on the MOST RECENT lecture that has refusals in the flag log,
+ *    and log which lecture that is before doing anything: run them right after a misfired lecture, not weeks later. ── */
+/** The lecture behind them: {session_id, course, start_utc, owner_name, day (Cairo date)} or null. */
+function att_latestRefusedLecture_() {
+  var last = null; att_rows_("AttFlagLog").forEach(function (l) { if (ATT_HARD_FLAGS_[l.code]) last = l.session_id; });
+  var s = last ? att_rows_("AttSessions").filter(function (x) { return x.session_id === last; })[0] : null;
+  if (!s) return null;
+  return { session_id: s.session_id, course: s.course, start_utc: s.start_utc, owner_name: s.owner_name || "", day: Utilities.formatDate(new Date(Date.parse(s.start_utc)), "Africa/Cairo", "yyyy-MM-dd") };
+}
+/** Recovers the refusals of the latest such lecture into Needs review AND accepts them (a lecture where the system misfired, D26).
+ *  Each student counts as present in that lecture; the review note says why. Safe to run twice (nothing is added the second time). */
+function att_recoverAndAcceptLatest() {
+  var L = att_latestRefusedLecture_();
+  if (!L) { Logger.log("No lecture with refusals."); return null; }
+  var rec = att_recoverRefused(L.session_id, true);
+  var acc = att_reviewBulk_({ session_id: L.session_id, note: "Accepted: refused by a system fault (IDs stored as numbers, D26), recovered from the flag log" }, att_adminUser_());
+  Logger.log("Lecture: " + L.course + " · " + L.owner_name + " · " + L.start_utc + " (" + L.session_id + ")\nRecovered " + rec.students.length + " student(s); accepted " + (acc.ok ? acc.accepted : "0 (" + acc.code + ")") + ".");
+  return { lecture: L, recovered: rec.students.length, accepted: acc.ok ? acc.accepted : 0 };
+}
+/** Preview: which IDs created on that lecture's day (9 digits, no leading 0) would get their 0 back. Writes nothing. */
+function att_addLeadingZeroPreview() { var L = att_latestRefusedLecture_(); if (!L) { Logger.log("No lecture with refusals."); return null; } Logger.log("Lecture day " + L.day + " (" + L.course + ")"); return att_addLeadingZero(L.day, 9, false); }
+/** Apply the same. Only after the real IDs were confirmed to start with 0. */
+function att_addLeadingZeroApply() { var L = att_latestRefusedLecture_(); if (!L) { Logger.log("No lecture with refusals."); return null; } Logger.log("Lecture day " + L.day + " (" + L.course + ")"); return att_addLeadingZero(L.day, 9, true); }
+
 /** Turns the refusals of one lecture (flag log only, from before D22) into blocked check-ins in Needs review, so the teacher can
  *  Accept them (one by one, or Accept all) instead of entering every student by hand. One row per student who has none yet.
  *  sessionId: the lecture; leave it out for the most recent lecture that has refusals. Only reports unless apply is true. */

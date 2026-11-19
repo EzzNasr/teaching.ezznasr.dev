@@ -95,4 +95,28 @@ console.log("the repair for the 22 students of 18 Nov");
   ok(E2.gas.run('att_renameStudents({"0600925013": "0600925004"})').refused === true, "renaming onto an ID that already exists is refused");
 }
 
+console.log("editor buttons: recover + accept the latest misfired lecture, then the ID repair (D26)");
+{
+  const E = env(); E.gas.run(OLD_APPEND); E.unformatFutureRows();
+  const s = E.start(), ids = ["0600925004", "0600925013"];
+  ids.forEach(id => { E.signup(s, id); E.attend(s, id); });
+  const ck = E.gas.sheets.AttCheckins, st = E.gas.run("ATT_HEADERS.AttCheckins").indexOf("status");
+  ck._g = [ck._g[0]].concat(ck._g.slice(1).filter(r => r[st] !== "blocked"));   // as on 18 Nov: refusals only logged
+  E.gas.run(require("fs").readFileSync(require("path").join(__dirname, "..", "..", "tools", "quiz-maker-v2", "apps_script", "AttendanceAll.gs"), "utf8"));
+  E.gas.ctx.Logger = { log() {} };
+  E.gas.ctx.Utilities.formatDate = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  const r = E.gas.run("att_recoverAndAcceptLatest()");
+  ok(r && r.lecture.session_id === s.session_id && r.recovered === 2 && r.accepted === 2, "att_recoverAndAcceptLatest(): finds the misfired lecture, recovers and accepts both students");
+  const L = E.D({ action: "att_live", token: A, session_id: s.session_id });
+  ok(L.present === 2 && L.blocked === 0, "...they count as present in that lecture");
+  ok(E.D({ action: "att_session_detail", token: A, session_id: s.session_id }).checkins.every(c => /system fault/.test(c.review_note) && c.reviewed_by === "ADMIN"), "...each row says why it was accepted, and by whom");
+  const again = E.gas.run("att_recoverAndAcceptLatest()");
+  ok(again.recovered === 0 && again.accepted === 0 && E.D({ action: "att_live", token: A, session_id: s.session_id }).present === 2, "running it twice changes nothing");
+  const pv = E.gas.run("att_addLeadingZeroPreview()");
+  ok(!pv.applied && Object.keys(pv.map).length === 2, "att_addLeadingZeroPreview(): lists the 2 IDs, writes nothing");
+  ok(E.gas.run("att_addLeadingZeroApply()").applied && ids.every(id => E.cell("AttCheckins", id).every(v => v === id)), "att_addLeadingZeroApply(): the IDs get their 0 back, the accepted check-ins follow them");
+  const s2 = E.start();
+  ok(ids.every(id => E.attend(s2, id).status === "recorded"), "and the students check in normally afterwards");
+}
+
 console.log(`\n${pass} plain-text ID checks passed`);

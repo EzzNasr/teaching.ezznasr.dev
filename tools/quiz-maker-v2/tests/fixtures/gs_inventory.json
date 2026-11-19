@@ -9,7 +9,7 @@
   "tools/quiz-maker-v2/apps_script/Requirements.gs",
   "tools/quiz-maker-v2/apps_script/Revenue.gs"
  ],
- "count": 1050,
+ "count": 1054,
  "items": {
   "ATTENDANCE_HEADERS": {
    "kind": "var",
@@ -2141,6 +2141,16 @@
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "ae82f088892d4883"
   },
+  "att_addLeadingZeroApply": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "4b980625c8aaaa75"
+  },
+  "att_addLeadingZeroPreview": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "aaf734d9825dff7f"
+  },
   "att_addTypedStudent_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
@@ -2501,6 +2511,11 @@
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "1cec04e2e74db75b"
   },
+  "att_latestRefusedLecture_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "6a3ded004dc57303"
+  },
   "att_live_": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
@@ -2640,6 +2655,11 @@
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
    "hash": "7c89555eebbc3616"
+  },
+  "att_recoverAndAcceptLatest": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/AttendanceAll.gs",
+   "hash": "ae40498225cdf932"
   },
   "att_recoverRefused": {
    "kind": "function",
