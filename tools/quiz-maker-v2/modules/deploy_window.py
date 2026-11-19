@@ -88,7 +88,7 @@ class DeployConfirmDialog(tk.Toplevel):
         tk.Button(foot, text="Cancel", command=self.destroy).pack(side="right", padx=(0, 6))
         self._refresh()
         self.transient(parent)
-        self.grab_set()
+        common.safe_grab(self)
         self.bind("<Escape>", lambda _e: self.destroy())
 
     def _refresh(self):

@@ -276,6 +276,20 @@ def fit_geometry(win, want_w, want_h, min_w=480, min_h=360, margin=80):
     win.minsize(min(min_w, w), min(min_h, h))
 
 
+def safe_grab(win, tries=20):
+    """Make `win` modal without crashing when it is not viewable yet. On X11 (Linux, and CI under xvfb) grab_set
+    raises "grab failed: window not viewable" until the window is mapped; Windows never does. Retry briefly,
+    then give up quietly: the dialog still works, it is just not modal."""
+    try:
+        win.grab_set()
+    except tk.TclError:
+        if tries > 0:
+            try:
+                win.after(50, lambda: safe_grab(win, tries - 1))
+            except tk.TclError:
+                pass
+
+
 def lock_min_width_to_content(win, extra=24):
     """Call once, after all of a window's widgets are built, to raise its
     minimum width to whatever its content actually needs. fit_geometry()
