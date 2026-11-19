@@ -15,12 +15,11 @@ from tkinter import messagebox, ttk
 
 from modules import background, common, deploy_flow, theme
 
-CONFIRM_WORD = "DEPLOY"
 
 
 class DeployConfirmDialog(tk.Toplevel):
     """Shows the source folder, every file and its Apps Script name, the commit, and anything that will make the
-    deploy stop. Deploying needs DEPLOY typed in; a dry run (Check only) needs nothing."""
+    deploy stop. One click once nothing would make the script stop (dirty tree, unpushed commit, not main)."""
 
     def __init__(self, parent, site_root, dry_run):
         super().__init__(parent)
@@ -87,13 +86,6 @@ class DeployConfirmDialog(tk.Toplevel):
                                 fg=None if dry_run else "#8a1f1f")
         self.go_btn.pack(side="right")
         tk.Button(foot, text="Cancel", command=self.destroy).pack(side="right", padx=(0, 6))
-        self.word_var = tk.StringVar()
-        if not dry_run:
-            tk.Label(foot, text="Type {} to confirm:".format(CONFIRM_WORD)).pack(side="left")
-            e = tk.Entry(foot, textvariable=self.word_var, width=12)
-            e.pack(side="left", padx=(8, 0))
-            e.focus_set()
-            self.word_var.trace_add("write", lambda *_a: self._refresh())
         self._refresh()
         self.transient(parent)
         self.grab_set()
@@ -103,7 +95,7 @@ class DeployConfirmDialog(tk.Toplevel):
         probs = deploy_flow.problems(self.facts, self.allow_branch_var.get())
         self.warn_var.set("\n".join("⚠  " + p for p in probs) +
                           ("\n(The check still runs and shows exactly where it stops.)" if probs and self.dry_run else ""))
-        ok = self.dry_run or (not probs and self.word_var.get().strip() == CONFIRM_WORD)
+        ok = self.dry_run or not probs      # a real deploy only when nothing would make the script stop
         self.go_btn.configure(state="normal" if ok else "disabled")
 
     def _go(self):

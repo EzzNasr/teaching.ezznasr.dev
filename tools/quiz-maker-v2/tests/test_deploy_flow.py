@@ -161,13 +161,12 @@ else:
           and w.rows["dry"][0].cget("text") == "✓", w.head_var.get())
     w.destroy()
 
-    # the confirmation dialog: DEPLOY must be typed, warnings shown
+    # the confirmation dialog: one click on clean pushed main (no typing), blocked with reasons otherwise
     dlg = deploy_window.DeployConfirmDialog(_r, SITE, dry_run=False)
     dlg.facts = dict(good)
     dlg._refresh()
-    check("confirm: Deploy disabled until DEPLOY is typed", str(dlg.go_btn.cget("state")) == "disabled")
-    dlg.word_var.set("DEPLOY")
-    check("confirm: enabled once DEPLOY is typed on clean pushed main", str(dlg.go_btn.cget("state")) == "normal")
+    check("confirm: Deploy enabled at once on clean pushed main (nothing to type)",
+          str(dlg.go_btn.cget("state")) == "normal" and not hasattr(dlg, "word_var"))
     dlg.facts = dict(good, dirty=True)
     dlg._refresh()
     check("confirm: a dirty tree blocks it and says why", str(dlg.go_btn.cget("state")) == "disabled"

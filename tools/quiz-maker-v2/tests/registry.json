@@ -1572,7 +1572,7 @@
     },
     {
       "id": "R-QM-DEPLOY",
-      "title": "Desktop tool: Settings > Deploy backend lists the files from deploy.json, warns before confirming, needs DEPLOY typed, and its progress window ticks the script steps (fake script, never Google)",
+      "title": "Desktop tool: Settings > Deploy backend lists the files from deploy.json, warns before confirming, deploys with one click when nothing blocks it, and its progress window ticks the script steps (fake script, never Google)",
       "status": "active",
       "needs": "python",
       "owner": "quiz-maker",

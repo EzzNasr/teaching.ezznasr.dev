@@ -189,7 +189,7 @@ repo, so R-E23 to R-E26 are reserved and unused.
 | R-QM-BG | Desktop tool: slow work runs off the Tk thread; results and errors come back on the main thread; a double-click never starts two jobs | active | python | `tests/test_background_runner.py` |
 | R-QM-BG-2 | Desktop tool: the real window keeps responding while it checks the token, generates (double-clicked: one job), loads for editing (cancellable) and syncs assets, against a slow fake backend | active | python | `tests/test_app_responsive.py` |
 | R-QM-QLIST | Desktop tool: question list operations behind multi-select (remove many, keep only, duplicate with a fresh written qid, move as a block, set chapter, summary) | active | python | `tests/test_question_list.py` |
-| R-QM-DEPLOY | Desktop tool: Settings > Deploy backend lists the files from deploy.json, warns before confirming, needs DEPLOY typed, and its progress window ticks the script steps (fake script, never Google) | active | python | `tests/test_deploy_flow.py` |
+| R-QM-DEPLOY | Desktop tool: Settings > Deploy backend lists the files from deploy.json, warns before confirming, deploys with one click when nothing blocks it, and its progress window ticks the script steps (fake script, never Google) | active | python | `tests/test_deploy_flow.py` |
 | R-FU2-ONEGROUP | One group per student: in_other_group, move:true, all-or-nothing bulk, audit, atomic under the lock | active |  | `tests/test_one_group.js` |
 | R-FU2-MONTHLY | Monthly report requirements section + sent/closed snapshot | active |  | `tests/test_monthly_requirements.js` |
 | R-FU2-E2E-GROUP | access.html: confirm before moving, current group in picker, two-groups banner (real Code.gs + FollowupRouter.gs, Chromium) | active | playwright | `tests/e2e_one_group.py` |
