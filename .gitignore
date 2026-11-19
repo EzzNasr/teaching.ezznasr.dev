@@ -6,3 +6,12 @@ __pycache__/
 *.log
 *.patch
 tools/quiz-maker-v2/quiz_maker_config.json
+
+# Screenshots written by the browser tests on every run (generated output, not source)
+tools/quiz-maker-v2/tests/_shots/
+
+# Dependencies installed from package-lock.json (npm ci)
+node_modules/
+
+# clasp sign-in tokens (clasp keeps them in the home folder; never commit one that lands here)
+.clasprc.json

@@ -1282,9 +1282,12 @@ function _slugName(s) {
 }
 
 // -- doGet: no longer serves files, just a health check --------------------
+// version: APP_VERSION from Version.gs, which scripts/deploy_backend.js generates at deploy time (commit + time; public,
+// the repo is public). null when the code was pasted by hand. The live smoke test checks it after every scripted deploy.
 
 function doGet(e) {
-  return _json({ ok: true, message: "Drive bridge is running. POST an action to use it." });
+  return _json({ ok: true, message: "Drive bridge is running. POST an action to use it.",
+    version: (typeof APP_VERSION !== "undefined") ? APP_VERSION : null });
 }
 
 // -- doPost: uploads --------------------------------------------------------

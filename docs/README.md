@@ -7,6 +7,7 @@ new feature follows.
 
 | Folder / file | What is in it |
 |---|---|
+| [handoff/](handoff/README.md) | **For a developer taking over:** reading order, system diagrams, every feature, every backend action / tab / property, the security model |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System map, data flow, design principles, the checklist for a new feature |
 | [TESTING.md](TESTING.md) | The test gate (`scripts/test_all.sh`) and what GitHub Actions runs |
 | [REGRESSION.md](REGRESSION.md) | Every registered test (generated from `tools/quiz-maker-v2/tests/registry.json`: do not edit by hand) |

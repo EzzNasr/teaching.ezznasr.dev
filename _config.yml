@@ -3,3 +3,7 @@
 exclude:
   - tools
   - README.md
+  - package.json
+  - package-lock.json
+  - requirements-dev.txt
+  - node_modules

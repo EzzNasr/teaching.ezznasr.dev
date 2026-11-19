@@ -1,0 +1,20 @@
+{
+  "name": "teaching-ezznasr-dev",
+  "private": true,
+  "description": "Development tooling for the site and the Apps Script backend. Nothing here is shipped: the site has no build step. See docs/TESTING.md.",
+  "scripts": {
+    "test": "bash scripts/test_all.sh",
+    "test:all": "bash scripts/test_all.sh --strict --e2e --require-all",
+    "test:live": "bash scripts/test_all.sh --live",
+    "inventory": "node scripts/gs_inventory.js",
+    "actions": "node scripts/action_inventory.js",
+    "deploy:backend": "node scripts/deploy_backend.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@google/clasp": "3.4.1",
+    "jsdom": "24.1.3"
+  }
+}
