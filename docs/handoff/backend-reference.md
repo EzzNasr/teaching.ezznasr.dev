@@ -99,8 +99,9 @@ session or token, decided by `p4_gate` and the handler's own check; **own** = ow
 |---|---|---|
 | `att_ticket`, `att_signup`, `att_attend`, `att_change_device`, `att_status` | pub (QR token / ticket / device secret) | Student flow |
 | `att_login` | pub | Teacher password to a 12 h token |
-| `att_me`, `att_start_session`, `att_close_session`, `att_live`, `att_rooms`, `att_calibrate_room`, `att_requests`, `att_decide_request`, `att_flagged`, `att_review`, `att_manual_checkin`, `att_roster`, `att_sessions`, `att_session_detail`, `att_export` | attendance token (own rows only) | Teacher dashboard |
+| `att_me`, `att_start_session`, `att_close_session`, `att_live`, `att_rooms`, `att_calibrate_room`, `att_requests`, `att_decide_request`, `att_flagged`, `att_review`, `att_review_bulk`, `att_manual_checkin`, `att_extend_session`, `att_roster`, `att_sessions`, `att_session_detail`, `att_export` | attendance token (own rows only) | Teacher dashboard. `att_extend_session` = "+2 minutes" (D15); `att_review_bulk` = decide many flagged check-ins at once. A check-in can have status `blocked` (suspected cheating saved for review, D22-D25) |
 | `att_user_create`, `att_users`, `att_user_update`, `att_user_reset`, `att_overview` | attendance admin | Accounts and the all-teachers view |
+| `att_installBackup`, `att_checkDevices`, `att_repairDevices(apply)`, `att_repairLeadingZeros(apply)`, `att_recoverRefused(sessionId, apply)` | run by the owner in the Apps Script editor (not actions) | Nightly backup trigger; check and repair phone and device records. The repairs only report unless `apply` is true |
 
 Error codes: `BUSY`, `UNAUTHORIZED`, `FORBIDDEN`, `USER_DISABLED`, `LOCKED`, `BAD_PASSWORD`, `BAD_REQUEST`,
 `TICKET_EXPIRED`, `ID_TAKEN`, `UNKNOWN_ACTION`, `SERVER_ERROR` and others in the file. Pages map codes to wording.

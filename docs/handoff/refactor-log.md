@@ -51,20 +51,22 @@ between deploys would change the live reminders and the message queue at once. D
 | 2.5b | **Quiz Maker "Deploy backend" menu** next to "Run tests": *Check only* (dry run) and *Deploy backend to live* (asks in the app, then the terminal window needs `DEPLOY` typed). `modules/deploy_runner.py` opens a terminal running the deploy script, like `test_runner.py`. Test R-DEP-2 (12 checks, nothing really runs) | The owner deploys from the app he already uses | see `git log` |
 | fix | Removed `programming/baccalaureate/grade-2-secondary/chapter-2-general-exam/` (only `base.css` and `forms.css`, no lesson page, nothing linked to it; came in with `87f3f6d` on `main`). It failed R-G01 on `main` and on this branch. The owner will create that lesson properly with the Quiz Maker. Fast strict gate ALL GREEN after | Owner decision, 2026-11-16 | see `git log` |
 | 2.6 | **First scripted deploy: Version 70 = `1b53af0`** (2026-11-16 13:33 Cairo, with the owner). It ships the attendance work D15-D21 (`6288a32`, `752efb2`, `43880ad`) and the version stamp. The first try stopped twice, live safe both times: (1) the Apps Script API was off on the account (push refused; the owner switched it on); (2) after a successful push, `clasp create-version` ran from the repo root and failed ("Project settings not found"), leaving the saved code new and the web app on Version 69 for about two minutes. Fixed in `1b53af0`: those steps run in the push folder and any failure after the push rolls back; R-DEP-1 now fakes that clasp rule (proven: the old script fails it). The re-run used `--allow-drift` for its own half-finished push. Checked after: every live file of Version 70 equals the repo, saved code = Version 70, smoke 14 of 14 incl. "health check names 1b53af0", probes `check_session`, `report_photos`, `att_login`, `att_extend_session` answer as expected. Deployed from this branch (`--allow-branch`, `--skip-gate`: the only red test is R-G01, a site lesson list from `main`) | Rollback: Version 69 (`32436a7`): `git checkout 32436a7`, then the deploy script with `--allow-branch` | `docs/runbooks/backend-deploys.md` |
+| 2.7 | **Second scripted deploy: Version 71 = `ac091b4`** from `main` (2026-11-19 15:33 Cairo), the first one without `--allow-branch`. Ships the attendance fixes D22-D25 (`att_review_bulk`, the `blocked` status, device and phone repairs). Order: fast gate ALL GREEN on `main` (129) > push `main` (merges PR #1) > dry run (only `AttendanceAll` changes) > deploy, smoke 14 of 14 > every live file equals `main`, saved code = Version 71, `att_review_bulk` refuses without a token | Rollback: Version 70 | `docs/runbooks/backend-deploys.md` |
 | merge | `main` merged into this branch (brings in the attendance work above and two page commits). R-REF-1 flagged only attendance names (8 added, 21 changed, all `att_*` / `ATT_*`): recorded with `node scripts/gs_inventory.js --write` (now 1,035 names). R-REF-2 floor raised to 133 actions (27 attendance) for the new attendance action. Full gate after the merge: 151 pass, 2 fail. **R-G01 is inherited from `main`** (red there since `87f3f6d`/`e5057bb`): `programming/baccalaureate/grade-2-secondary/chapter-2-general-exam/` holds only `base.css` and `forms.css`, no lesson page, so the grade page does not list it; the owner decides (finish the lesson or remove the folder). R-REQ4 timed out once under load and passed 3 of 3 alone (a race after an async save; noted below) | Keeps the pull request current. The backend files on this branch now equal `main` exactly | see `git log` |
 
-## Where it stands (2026-11-16, morning)
+## Where it stands (2026-11-19)
 
-Phase 0 and the first part of Phase 1 are done: 7 commits after the handoff docs, all local, nothing pushed or
-deployed, no change to backend or page behaviour. Next in the frozen order:
+**Phases 0 and 2 are done; Phase 1 mostly.** PR #1 is merged into `main` (pushed 2026-11-19 together with the
+attendance fixes D22-D25, `ac091b4`). **Live backend: Version 71 = `ac091b4`**, deployed from `main` with
+`npm run deploy:backend`, every live file checked against `main`. Rollback: Version 70 (`1b53af0`).
 
-| Next | Needs |
+| Next | Status / needs |
 |---|---|
-| Push the branch and let GitHub Actions run once (first run of the pinned installs in CI) | the owner |
-| Branch protection on `main` (the CI plan, stage 1) | the owner, GitHub settings |
-| Phase 2: clasp, a staging Apps Script project with demo sheets, the `version` action | the owner signs in to Google for clasp and creates the staging project |
-| Phase 1 remainder: ESLint with a baseline file, type checks through JSDoc | can be done unattended; deferred because a lint config for 8 `.gs` files sharing one global scope needs a reviewed list of globals first |
-| Merge the attendance branch `claude/gracious-hertz-419012`, then `node scripts/gs_inventory.js --write` and update `backend-reference.md` | the owner decides the merge order |
+| Phase 3: staging project, then split `Code.gs` | briefed in its own session, waiting for the owner's approval (paused for the attendance demo). Contributor files and the staging click list are drafted on its branch |
+| Phase 1 remainder: ESLint baseline, Prettier, `@ts-check` | not started; the owner decides in the Phase 3 session whether to fold them in |
+| Phase 8 (brought forward): Quiz Maker no longer freezes | done on branch `claude/priceless-solomon-1720d8`; its CI needs a virtual display (`xvfb-run`) for the new window tests, then a PR |
+| Branch protection on `main`; rotate `ADMIN_TOKEN` (SEC-01) | the owner |
+| Phases 4-9 | after Phase 3, in the frozen order (5 before 4) |
 
 ## Notes and follow-ups found along the way
 
