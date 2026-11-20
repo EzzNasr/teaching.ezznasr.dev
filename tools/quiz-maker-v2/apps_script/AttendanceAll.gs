@@ -334,6 +334,10 @@ function att_signup_(p) {
   // Both tabs are read OUTSIDE the lock; inside it only the rows added since are read (keeps the critical section short when a
   // whole class signs up at once). Both checks are append-only facts, so rows added later are all that can change the answer.
   var devs0 = att_rows_("AttDevices"), studs0 = att_rows_("AttStudents");
+  var b0 = devs0.filter(function (x) { return x.secret_hash === hash && x.status === "active"; })[0];
+  if (b0 && b0.student_id !== sid && att_sameIdButZeros_(b0.student_id, sid)) {   // D27, see att_attend_
+    try { if (att_healId_(t.s, b0.student_id, sid)) { devs0 = att_rows_("AttDevices"); studs0 = att_rows_("AttStudents"); } } catch (eHeal) { console.error("healId: " + eHeal); }
+  }
   var devFrom = devs0.length + 2 - 20, studFrom = studs0.length + 2 - 20;   // 20-row margin in case rows were deleted meanwhile
   var res = att_withLock_(function () {
     var devs = devs0.filter(function (x) { return x._row < devFrom; }).concat(att_rowsFrom_("AttDevices", devFrom));
@@ -368,6 +372,22 @@ function att_signup_(p) {
   }
   delete res._owner;
   return res;
+}
+
+/** D27 (2026-11-20): the stored ID is the typed one minus its leading zeros, which only the D26 damage produces ("0600925004" stored
+ *  as 600925004). */
+function att_sameIdButZeros_(stored, typed) {
+  stored = String(stored || ""); typed = String(typed || "");
+  return ATT_C.ID_REGEX.test(typed) && typed.charAt(0) === "0" && stored !== "" && stored.charAt(0) !== "0" && typed.replace(/^0+/, "") === stored;
+}
+/** Gives the full ID back everywhere when the student's OWN registered phone (proved by its secret) sends the ID with its leading
+ *  zeros and nobody else holds that ID. Logged as ID_HEALED (a log line, never a flag). Returns true when healed. */
+function att_healId_(sessionId, from, to) {
+  if (att_studentExists_(to)) return false;
+  var r = att_renameStudents((function () { var m = {}; m[from] = to; return m; })(), true);
+  if (!r || !r.applied) return false;
+  att_logFlag_(sessionId, to, "ID_HEALED", "from=" + from);
+  return true;
 }
 
 /** Suspected cheating is SAVED (2026-11-18, decisions D22), not only logged: a check-in whose phone did not match the student
@@ -433,6 +453,10 @@ function att_attend_(p) {
   var dev = secret ? att_getDevice_(att_sha256Hex_(secret)) : null;
   var hard = null;
   // A student who never registered is simply new: tell the page to register, no flag, no log, no Telegram.
+  // D27: this phone's record lost the leading zeros of the ID the student types (D26 damage): heal it, then check as usual.
+  if (dev && dev.status === "active" && dev.student_id !== sid && att_sameIdButZeros_(dev.student_id, sid)) {
+    try { if (att_healId_(s.session_id, dev.student_id, sid)) dev = att_getDevice_(att_sha256Hex_(secret)); } catch (eHeal) { console.error("healId: " + eHeal); }
+  }
   if (!dev && sid && !att_studentExists_(sid)) return att_err_("UNKNOWN_STUDENT");
   if (!dev) hard = "DEVICE_UNKNOWN";
   else if (dev.status !== "active") hard = (dev.student_id === sid) ? "ID_BOUND_OTHER_DEVICE" : "DEVICE_UNKNOWN";
@@ -652,7 +676,7 @@ function att_feed_(sessionId, u) {
     ev.push({ t: x.created_at, k: "reg", n: x.name, id: id });
   });
   att_rows_("AttFlagLog").forEach(function (r) {
-    if (r.session_id !== sessionId || r.code === "GEO_WEAK" || r.code === "GEO_UPGRADED") return;   // GEO_UPGRADED is a log line, not an incident
+    if (r.session_id !== sessionId || r.code === "GEO_WEAK" || r.code === "GEO_UPGRADED" || r.code === "ID_HEALED") return;   // log lines, not incidents   // GEO_UPGRADED is a log line, not an incident
     var m = /owner=(\d+)/.exec(r.detail || ""), who = m ? m[1] : r.student_id, nm = (names[who] || {}).name || "";
     if (!nm) { var n2 = /;n=(.)/.exec(r.detail || ""); nm = n2 ? n2[1] : ""; }
     ev.push({ t: r.ts_utc, k: "bad", l: nm ? nm.charAt(0).toUpperCase() : "?", d: String(who).slice(-2) });
@@ -1315,7 +1339,8 @@ function att_scriptedRun() {
   var live = D({ action: "att_live", token: A, session_id: s.session_id });
   chk("live present=2 (no duplicate row)", live.ok && live.present === 2 && live.registered >= 2);
   chk("status open", D({ action: "att_status", session_id: s.session_id }).status === "open");
-  chk("export", D({ action: "att_export", token: A, session_id: s.session_id }).csv.split("\r\n").length === 3);
+  var exp = D({ action: "att_export", token: A, session_id: s.session_id }).csv.split("\r\n");
+  chk("export", exp.length === 4 && exp.some(function (l) { return /^99990003,.*,blocked,/.test(l); }));   // A, B, and the saved attempt of the phone bound to another student (D22)
   chk("flagged ok", D({ action: "att_flagged", token: A, session_id: s.session_id }).ok);
   var cl = D({ action: "att_close_session", token: A, session_id: s.session_id });
   chk("close", cl.ok && cl.summary.present === 2);

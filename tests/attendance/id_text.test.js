@@ -29,7 +29,8 @@ function env() {
 }
 // The write the live backend used until D26.
 const OLD_APPEND = 'att_append_ = function (name, obj) { att_sheet_(name).appendRow(ATT_HEADERS[name].map(function (k) { return obj[k] == null ? "" : obj[k]; })); };' +
-  'att_logFlag_ = function (sessionId, studentId, code, detail) { att_append_("AttFlagLog", { ts_utc: att_iso_(), session_id: sessionId, student_id: studentId, code: code, detail: detail || "" }); };';
+  'att_logFlag_ = function (sessionId, studentId, code, detail) { att_append_("AttFlagLog", { ts_utc: att_iso_(), session_id: sessionId, student_id: studentId, code: code, detail: detail || "" }); };' +
+  'att_sameIdButZeros_ = function () { return false; };';   // the live code of 18 Nov had no self-heal (D27)
 
 console.log("reproduction: the old write loses the leading zero");
 {
@@ -117,6 +118,32 @@ console.log("editor buttons: recover + accept the latest misfired lecture, then 
   ok(E.gas.run("att_addLeadingZeroApply()").applied && ids.every(id => E.cell("AttCheckins", id).every(v => v === id)), "att_addLeadingZeroApply(): the IDs get their 0 back, the accepted check-ins follow them");
   const s2 = E.start();
   ok(ids.every(id => E.attend(s2, id).status === "recorded"), "and the students check in normally afterwards");
+}
+
+console.log("D27: the student's own phone heals the lost zero on the next check-in");
+{
+  const E = env(); E.gas.run(OLD_APPEND); E.unformatFutureRows();
+  const s = E.start();
+  ["0600925004", "0600925013", "0600925021"].forEach(id => { E.signup(s, id); E.attend(s, id); });   // the damaged state of 18 Nov
+  E.gas.run(require("fs").readFileSync(require("path").join(__dirname, "..", "..", "tools", "quiz-maker-v2", "apps_script", "AttendanceAll.gs"), "utf8"));
+  E.gas.ctx.Logger = { log() {} };
+  ok(E.cell("AttStudents", "0600925004")[0] === 600925004, "before: the record holds 600925004 (zero lost)");
+  const s2 = E.start(), r = E.attend(s2, "0600925004");
+  ok(r.status === "recorded", "next lecture: the student types 0600925004 on their own phone and is RECORDED (no refusal)");
+  ok(TABS.slice(0, 3).every(t => E.cell(t, "0600925004").every(v => v === "0600925004")), "their stored ID is now exactly what they typed, in every tab");
+  const L = E.D({ action: "att_live", token: A, session_id: s2.session_id });
+  ok(L.present === 1 && L.blocked === 0 && !L.feed.some(e => e.k === "bad"), "counts as present; the projector shows no 'cheating' for it");
+  ok(E.gas.sheets.AttFlagLog._g.slice(1).some(x => x[3] === "ID_HEALED" && x[2] === "0600925004" && /from=600925004/.test(x[4])), "the heal is logged (ID_HEALED, from the 9-digit value)");
+  ok(E.attend(s2, "0600925004").status === "recorded" && E.D({ action: "att_session_detail", token: A, session_id: s2.session_id }).checkins.length === 1, "a repeat check-in: no second row");
+  // a sign-up retry from the same phone heals too
+  const sg = E.signup(s2, "0600925013");
+  ok(sg.ok && sg.dup === true && E.cell("AttDevices", "0600925013").every(v => v === "0600925013") && E.attend(s2, "0600925013").status === "recorded", "a student who taps Sign up again: healed, 'already registered', then recorded");
+  // never when someone else holds the full ID
+  E.D({ action: "att_signup", ticket: E.tk(s2), student_id: "0600925021", name: "Someone Else", secret: "another-phone-xxxxxxxxx", fp: "z", geo: HALL });
+  ok(E.cell("AttStudents", "0600925021").filter(v => v === "0600925021").length === 1, "(another phone registered the full ID 0600925021 meanwhile)");
+  const c = E.attend(s2, "0600925021");
+  ok(c.code === "DEVICE_ID_CONFLICT" && E.cell("AttStudents", "0600925021").includes(600925021), "then the damaged phone is NOT healed onto that ID: refused and saved for review, as a real conflict");
+  ok(E.D({ action: "att_attend", ticket: E.tk(s2), student_id: "600925099", secret: ("phone-0600925004").padEnd(24, "x"), fp: "f", geo: HALL }).code === "DEVICE_ID_CONFLICT", "a different number is never 'healed' (only lost leading zeros are)");
 }
 
 console.log(`\n${pass} plain-text ID checks passed`);

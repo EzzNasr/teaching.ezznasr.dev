@@ -143,15 +143,20 @@ console.log("D23: IDs that lost their leading zero");
   // what a sheet column that is no longer plain text does: "0212345" becomes the number 212345
   ["AttStudents", "AttDevices"].forEach(t => { const c = E.gas.run(`ATT_HEADERS.${t}`).indexOf("student_id"); E.gas.sheets[t]._g.forEach((r, k) => { if (k > 0) r[c] = Number(r[c]); }); });
   for (let i = 1; i <= 2; i++) E.gas.run(`att_cdel_("att:d:" + att_sha256Hex_(${JSON.stringify(E.sec(i))}))`);
+  const pre = E.gas.run("att_checkDevices()");
+  ok(pre.numeric_id_cells.AttStudents === 2, "att_checkDevices sees the 2 IDs stored as numbers");
   const s2 = E.start();
-  ok(E.attend(s2, 1, "0212345").code === "DEVICE_ID_CONFLICT", "the student's own phone is refused as 'registered to another student' (the stored ID lost its zero)");
+  ok(E.attend(s2, 1, "0212345").status === "recorded", "the student's own phone: the lost zero is healed and the check-in recorded (D27; it used to be refused)");
+  ok(E.gas.sheets.AttStudents._g.some(r => r[0] === "0212345") && E.gas.sheets.AttFlagLog._g.some(r => r[3] === "ID_HEALED"), "the stored ID has its zero back, and the heal is logged");
+  // the editor repair still works for the other one, without waiting for their next check-in (needs the typed ID in the flag log)
+  E.gas.run("att_sameIdButZeros_ = function () { return false; };");   // as if the heal did not exist
   E.attend(s2, 2, "0212346");
   const chk = E.gas.run("att_checkDevices()");
-  ok(/LEADING ZERO/.test(chk.verdict) && chk.lost_leading_zero.length === 2 && chk.numeric_id_cells.AttStudents === 2, "att_checkDevices: 'IDS LOST THEIR LEADING ZERO', 2 IDs, 2 number cells");
+  ok(/LEADING ZERO/.test(chk.verdict) && chk.lost_leading_zero.length === 1, "att_checkDevices: 'IDS LOST THEIR LEADING ZERO' for the one still damaged");
   const fix = E.gas.run("att_repairLeadingZeros(true)");
-  ok(fix.applied && fix.ids.length === 2 && E.gas.sheets.AttStudents._g.some(r => r[0] === "0212345"), "att_repairLeadingZeros(true): the stored IDs get their zero back");
+  ok(fix.applied && fix.ids.length === 1 && E.gas.sheets.AttStudents._g.some(r => r[0] === "0212346"), "att_repairLeadingZeros(true): its stored ID gets its zero back");
   for (let i = 1; i <= 2; i++) E.gas.run(`att_cdel_("att:d:" + att_sha256Hex_(${JSON.stringify(E.sec(i))}))`);
-  ok(E.attend(E.start(), 1, "0212345").status === "recorded", "the student checks in again");
+  ok(E.attend(E.start(), 2, "0212346").status === "recorded", "that student checks in again");
 }
 
 console.log("D23: a changed header row (the screen with 22 sign-ups and 0 attended)");
