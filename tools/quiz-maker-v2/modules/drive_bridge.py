@@ -6,9 +6,11 @@ Stdlib only (urllib), so no extra pip installs are needed for the exe.
 """
 
 import base64
+import http.client
 import json
 import mimetypes
 import os
+import socket
 import urllib.error
 import urllib.request
 
@@ -28,7 +30,18 @@ def _guard(subject_or_lesson):
         raise DriveBridgeError(str(e))
 
 
-def _post_json(web_app_url, payload, timeout=30):
+# Seconds to wait for an answer. Apps Script can be slow (cold start, a big sheet), so these are generous,
+# but finite: a dead connection now ends in a clear message instead of a job that never finishes.
+DEFAULT_TIMEOUT = 30
+UPLOAD_TIMEOUT = 120      # a file upload sends the whole file base64-encoded in one request
+
+
+def _timeout_message(timeout):
+    return ("The Drive bridge didn't answer within {} seconds. Check your internet connection and try again "
+            "(Apps Script is sometimes slow for a minute after a deploy).".format(timeout))
+
+
+def _post_json(web_app_url, payload, timeout=DEFAULT_TIMEOUT):
     if not web_app_url:
         raise DriveBridgeError("Drive bridge isn't configured yet. Set the Web App URL first.")
 
@@ -45,7 +58,13 @@ def _post_json(web_app_url, payload, timeout=30):
     except urllib.error.HTTPError as e:
         raise DriveBridgeError("Drive bridge returned HTTP {}: {}".format(e.code, e.read().decode("utf-8", "ignore")))
     except urllib.error.URLError as e:
+        if isinstance(e.reason, (socket.timeout, TimeoutError)):
+            raise DriveBridgeError(_timeout_message(timeout))
         raise DriveBridgeError("Couldn't reach the Drive bridge URL: {}".format(e.reason))
+    except (socket.timeout, TimeoutError):   # the answer itself was too slow (read timeout)
+        raise DriveBridgeError(_timeout_message(timeout))
+    except (OSError, http.client.HTTPException) as e:   # connection reset / dropped mid-answer
+        raise DriveBridgeError("The connection to the Drive bridge failed: {}".format(e or e.__class__.__name__))
 
     try:
         data = json.loads(raw)
@@ -76,7 +95,7 @@ def upload_attachment(web_app_url, admin_token, subject, lesson, file_path, titl
         "title": title or filename,
         "data_base64": data_b64,
     }
-    return _post_json(web_app_url, payload)
+    return _post_json(web_app_url, payload, timeout=UPLOAD_TIMEOUT)
 
 
 def delete_attachment(web_app_url, admin_token, file_id):

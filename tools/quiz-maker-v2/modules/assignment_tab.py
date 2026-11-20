@@ -20,7 +20,10 @@ import re
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from modules import common, drive_bridge
+import copy
+
+from modules import common, drive_bridge, background, theme
+from modules.question_panel import QuestionPanel
 from modules.common import (
     GRADED_BULK_HELP,
     parse_bulk_graded_questions,
@@ -37,8 +40,11 @@ class AssignmentTab(ttk.Frame):
         self.site_root_var = site_root_var
         self.status_var = status_var
         self._group_map = {}
+        self.graded_items = []
+        self._undo_stack, self._redo_stack = [], []
         common.enable_clipboard_shortcuts(self)
         self._build_form()
+        self._bind_undo_redo()
 
     def _build_form(self):
         pad = {"padx": 10, "pady": 6}
@@ -65,7 +71,7 @@ class AssignmentTab(ttk.Frame):
         tk.Label(pick_frame,
                  text="Where the lesson lives inside the subject \u2014 e.g. \u201c(subject root)\u201d for flat "
                       "subjects, or a nested folder like \u201cBaccalaureate / Grade 1 Secondary\u201d. Must "
-                      "match what the lesson was actually generated under (Quiz Maker tab) or it won't show "
+                      "match what the lesson was actually generated under (Quiz & lesson section) or it won't show "
                       "up below.",
                  fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=560).pack(anchor="w", padx=8, pady=(0, 6))
 
@@ -76,7 +82,8 @@ class AssignmentTab(ttk.Frame):
         self.lesson_combo = ttk.Combobox(row2, textvariable=self.lesson_var, state="readonly", values=[])
         self.lesson_combo.pack(side="left", fill="x", expand=True)
         tk.Button(row2, text="Refresh", command=self._refresh_lessons).pack(side="left", padx=6)
-        tk.Button(row2, text="Load current settings", command=self._load_current).pack(side="left")
+        self.load_btn = tk.Button(row2, text="Load current settings", command=self._load_current)
+        self.load_btn.pack(side="left")
 
         video_frame = tk.LabelFrame(self, text="Video")
         video_frame.pack(fill="x", **pad)
@@ -85,7 +92,8 @@ class AssignmentTab(ttk.Frame):
         tk.Label(vrow, text="Video URL:", width=14, anchor="w").pack(side="left")
         self.video_url_var = tk.StringVar()
         tk.Entry(vrow, textvariable=self.video_url_var).pack(side="left", fill="x", expand=True)
-        tk.Button(vrow, text="Update video", command=self._update_video).pack(side="left", padx=6)
+        self.video_btn = tk.Button(vrow, text="Update video", command=self._update_video)
+        self.video_btn.pack(side="left", padx=6)
         tk.Label(video_frame,
                  text="Paste any YouTube link (watch/share/shorts URL, or an embed URL directly) — it's "
                       "converted automatically. Leave blank and click Update video to remove the video and "
@@ -100,7 +108,8 @@ class AssignmentTab(ttk.Frame):
         tk.Label(srow, text="Video URL:", width=14, anchor="w").pack(side="left")
         self.solution_video_url_var = tk.StringVar()
         tk.Entry(srow, textvariable=self.solution_video_url_var).pack(side="left", fill="x", expand=True)
-        tk.Button(srow, text="Update solution video", command=self._update_solution_video).pack(side="left", padx=6)
+        self.solution_btn = tk.Button(srow, text="Update solution video", command=self._update_solution_video)
+        self.solution_btn.pack(side="left", padx=6)
         tk.Label(solution_frame,
                  text="A homework-solving/walkthrough video embedded directly on this lesson's assignment.html "
                       "page \u2014 separate from the video above, which lives on the lesson's main page instead. "
@@ -156,23 +165,18 @@ class AssignmentTab(ttk.Frame):
         tk.Button(graded_btn_row, text="+ Matching", command=self._add_match).pack(side="left")
         tk.Button(graded_btn_row, text="+ Written (photo)", command=self._add_written).pack(side="left", padx=6)
         tk.Button(graded_btn_row, text="+ Bulk paste...", command=self._bulk_add_graded).pack(side="left", padx=6)
-        tk.Button(graded_btn_row, text="Edit selected", command=self._edit_graded).pack(side="left", padx=6)
-        tk.Button(graded_btn_row, text="Remove selected", command=self._remove_graded).pack(side="left")
-
-        graded_list_frame = tk.Frame(graded_frame)
-        graded_list_frame.pack(fill="both", expand=True, padx=8, pady=(0, 4))
-        self.graded_listbox = tk.Listbox(graded_list_frame)
-        self.graded_listbox.pack(side="left", fill="both", expand=True)
-        graded_scrollbar = tk.Scrollbar(graded_list_frame, command=self.graded_listbox.yview)
-        graded_scrollbar.pack(side="right", fill="y")
-        self.graded_listbox.config(yscrollcommand=graded_scrollbar.set)
-        self.graded_listbox.bind("<Double-Button-1>", lambda e: self._edit_graded())
+        # multi-select list (modules/question_panel.py): edit, duplicate, move, re-chapter, remove many at once
+        self.gpanel = QuestionPanel(graded_frame, get_items=lambda: self.graded_items,
+                                    set_items=self._set_graded, on_edit=self._edit_graded_at,
+                                    before_change=self._snapshot, status_var=self.status_var,
+                                    new_qid=common.new_written_qid, chapters=self._chapter_choices())
+        self.gpanel.pack(fill="both", expand=True, padx=8, pady=(0, 6))
 
         tk.Label(graded_frame,
                  text="Multiple choice: check every correct box (checking more than one makes it a "
                       "\u201cselect all that apply\u201d question). Matching: type each row's term and its "
                       "correct match \u2014 students see a dropdown per row built from every row's answers. "
-                      "Double-click a question below to edit it. Note: existing questions aren't reloaded by "
+                      "Double-click a question above to edit it. Note: existing questions aren't reloaded by "
                       "\u201cLoad current settings\u201d (only the generated JSON is stored on the page) \u2014 "
                       "keep this list open if you'll need to edit it later, or re-add from a saved bulk-paste "
                       "copy.",
@@ -180,10 +184,10 @@ class AssignmentTab(ttk.Frame):
 
         gen_row = tk.Frame(self)
         gen_row.pack(fill="x", padx=10, pady=12)
-        tk.Button(gen_row, text="Update assignment page", command=self._update,
-                  font=("TkDefaultFont", 10, "bold"), height=2).pack(fill="x")
+        self.update_btn = tk.Button(gen_row, text="Update assignment page", command=self._update,
+                                    font=("TkDefaultFont", 10, "bold"), height=2)
+        self.update_btn.pack(fill="x")
 
-        self.graded_items = []
         self._refresh_groups()
 
     # -- graded questions list ---------------------------------------------
@@ -197,58 +201,102 @@ class AssignmentTab(ttk.Frame):
     def _chapter_choices(self):
         return list(range(1, 21))
 
-    def _refresh_graded_listbox(self):
-        self.graded_listbox.delete(0, "end")
-        labels = {"mcq": "MCQ", "truefalse": "T/F", "match": "Match", "written": "Written"}
-        for i, item in enumerate(self.graded_items):
-            preview = item["prompt"][:70].replace("\n", " ")
-            chapter = item.get("chapter")
-            ch_label = "Ch{} ".format(chapter) if chapter is not None else ""
-            self.graded_listbox.insert("end", "{:>2}. {}[{}] {}".format(
-                i + 1, ch_label, labels.get(item["type"], "?"), preview))
+    def _refresh_graded_listbox(self, select=None):
+        self.gpanel.refresh(select=select)
+
+    def _set_graded(self, items):
+        self.graded_items = items
+
+    # -- undo / redo for the graded list (Ctrl+Z / Ctrl+Y), same rules as the Quiz page's ---------------------
+
+    def _bind_undo_redo(self):
+        top = self.winfo_toplevel()
+        for seq, fn in (("<Control-z>", self._handle_undo), ("<Control-y>", self._handle_redo),
+                        ("<Control-Shift-Z>", self._handle_redo), ("<Control-Shift-z>", self._handle_redo)):
+            top.bind_all(seq, fn, add="+")      # add: the Quiz page binds the same keys for its own list
+
+    def _is_active_tab(self):
+        try:
+            return self.master.select() == str(self)
+        except Exception:
+            return False
+
+    def _snapshot(self):
+        self._undo_stack.append(copy.deepcopy(self.graded_items))
+        del self._undo_stack[:-50]
+        self._redo_stack.clear()
+
+    def _undo_redo(self, src, dst, done):
+        if not self._is_active_tab():
+            return None
+        focus = self.focus_get()
+        if isinstance(focus, (tk.Text, tk.Entry, ttk.Entry, ttk.Combobox, tk.Spinbox)):
+            return None
+        if not src:
+            self.status_var.set("Nothing to {}.".format(done))
+            return "break"
+        dst.append(copy.deepcopy(self.graded_items))
+        self.graded_items = src.pop()
+        self._refresh_graded_listbox()
+        self.status_var.set("{} last graded-question change.".format("Undid" if done == "undo" else "Redid"))
+        return "break"
+
+    def _handle_undo(self, event=None):
+        return self._undo_redo(self._undo_stack, self._redo_stack, "undo")
+
+    def _handle_redo(self, event=None):
+        return self._undo_redo(self._redo_stack, self._undo_stack, "redo")
 
     def _add_mcq(self):
         dlg = MCQItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
         self.wait_window(dlg)
         if dlg.result:
+            self._snapshot()
             self.graded_items.append(dlg.result)
-            self._refresh_graded_listbox()
+            self._refresh_graded_listbox(select=[len(self.graded_items) - 1])
 
     def _add_truefalse(self):
         dlg = TrueFalseItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
         self.wait_window(dlg)
         if dlg.result:
+            self._snapshot()
             self.graded_items.append(dlg.result)
-            self._refresh_graded_listbox()
+            self._refresh_graded_listbox(select=[len(self.graded_items) - 1])
 
     def _add_match(self):
         dlg = MatchItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
         self.wait_window(dlg)
         if dlg.result:
+            self._snapshot()
             self.graded_items.append(dlg.result)
-            self._refresh_graded_listbox()
+            self._refresh_graded_listbox(select=[len(self.graded_items) - 1])
 
     def _add_written(self):
         dlg = WrittenItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
         self.wait_window(dlg)
         if dlg.result:
+            self._snapshot()
             self.graded_items.append(dlg.result)
-            self._refresh_graded_listbox()
+            self._refresh_graded_listbox(select=[len(self.graded_items) - 1])
 
     def _bulk_add_graded(self):
         dlg = GradedBulkDialog(self, current_chapter=self._current_chapter())
         self.wait_window(dlg)
         if dlg.result:
+            self._snapshot()
             self.graded_items.extend(dlg.result)
-            self._refresh_graded_listbox()
+            self._refresh_graded_listbox(
+                select=list(range(len(self.graded_items) - len(dlg.result), len(self.graded_items))))
             self.status_var.set("Added {} question(s) from bulk paste.".format(len(dlg.result)))
 
     def _edit_graded(self):
-        sel = self.graded_listbox.curselection()
-        if not sel:
-            messagebox.showinfo("No selection", "Select a question to edit.")
+        sel = self.gpanel.selection()
+        if len(sel) != 1:
+            messagebox.showinfo("No selection", "Select one question to edit." if sel else "Select a question to edit.")
             return
-        idx = sel[0]
+        self._edit_graded_at(sel[0])
+
+    def _edit_graded_at(self, idx):
         item = self.graded_items[idx]
         dialog_cls = {"mcq": MCQItemDialog, "truefalse": TrueFalseItemDialog, "match": MatchItemDialog,
                       "written": WrittenItemDialog}[item["type"]]
@@ -256,16 +304,16 @@ class AssignmentTab(ttk.Frame):
                           default_chapter=self._current_chapter())
         self.wait_window(dlg)
         if dlg.result:
+            self._snapshot()
             self.graded_items[idx] = dlg.result
-            self._refresh_graded_listbox()
+            self._refresh_graded_listbox(select=[idx])
 
     def _remove_graded(self):
-        sel = self.graded_listbox.curselection()
-        if not sel:
-            messagebox.showinfo("No selection", "Select a question to remove.")
+        """Remove every selected question (one undo step)."""
+        if not self.gpanel.selection():
+            messagebox.showinfo("No selection", "Select one or more questions to remove.")
             return
-        del self.graded_items[sel[0]]
-        self._refresh_graded_listbox()
+        self.gpanel.remove_selected()
 
     # -- helpers ----------------------------------------------------------
 
@@ -329,31 +377,31 @@ class AssignmentTab(ttk.Frame):
 
         drive_cfg = common.get_drive_config(common.load_config())
         lesson_key = self._lesson_key()
+        lesson_name = self.lesson_var.get()
 
-        index_path = os.path.join(lesson_dir, "index.html")
-        if os.path.exists(index_path):
-            self.video_url_var.set(common.get_lesson_video_url(
-                drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "lesson", index_path))
-
-        assignment_path = os.path.join(lesson_dir, "assignment.html")
-        if os.path.exists(assignment_path):
+        # Backend reads (videos, model answers) run off the Tk thread and may be cancelled; the form is only
+        # filled in afterwards, on the main thread, by apply().
+        def fetch(job):
+            out = {"video_url": None, "assignment": None}
+            index_path = os.path.join(lesson_dir, "index.html")
+            if os.path.exists(index_path):
+                out["video_url"] = common.get_lesson_video_url(
+                    drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "lesson", index_path)
+            assignment_path = os.path.join(lesson_dir, "assignment.html")
+            if not os.path.exists(assignment_path) or job.cancelled:
+                return out
             with open(assignment_path, "r", encoding="utf-8") as f:
                 content = f.read()
-            self.solution_video_url_var.set(common.get_lesson_video_url(
-                drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "assignment", assignment_path))
+            a = {"solution_url": common.get_lesson_video_url(
+                     drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "assignment", assignment_path),
+                 "prompt": None, "mode_slug": None, "graded_items": [], "models_error": None}
             prompt_match = re.search(r'<p class="lede">(.*?)</p>', content, re.DOTALL)
             if prompt_match:
-                prompt = prompt_match.group(1).strip()
-                self.prompt_text.delete("1.0", "end")
-                self.prompt_text.insert("1.0", prompt)
+                a["prompt"] = prompt_match.group(1).strip()
             mode_match = re.search(r'data-mode="([a-z]+)"', content)
             if mode_match:
-                mode_slug = mode_match.group(1)
-                for slug, label in common.SUBMIT_MODES:
-                    if slug == mode_slug:
-                        self.mode_label_var.set(label)
-                        break
-            self.graded_items = []
+                a["mode_slug"] = mode_match.group(1)
+            graded_items = []
             if mode_match and mode_match.group(1) == "graded":
                 q_match = re.search(r'id="assign-questions">\s*(\{.*?\})\s*</script>', content, re.DOTALL)
                 if q_match:
@@ -361,31 +409,60 @@ class AssignmentTab(ttk.Frame):
                         loaded = json.loads(q_match.group(1)).get("items", [])
                         # Strip the generation-time "id" field — it's reassigned
                         # fresh on every Update, so it's not part of the editable shape.
-                        self.graded_items = [{k: v for k, v in item.items() if k != "id"} for item in loaded]
+                        graded_items = [{k: v for k, v in item.items() if k != "id"} for item in loaded]
                         # A written question's id IS its stable question id (the grading page pairs
                         # photos, model answer and marks by it), so it must survive a reload.
-                        for src, item in zip(loaded, self.graded_items):
+                        for src, item in zip(loaded, graded_items):
                             if item.get("type") == "written":
                                 item["qid"] = src.get("id") or item.get("qid") or common.new_written_qid()
                     except Exception:
-                        self.graded_items = []
-                if any(i.get("type") == "written" for i in self.graded_items) and drive_cfg["web_app_url"] and drive_cfg["admin_token"]:
+                        graded_items = []
+                if any(i.get("type") == "written" for i in graded_items) and drive_cfg["web_app_url"] and drive_cfg["admin_token"]:
                     try:   # model answers live on the server (WrittenModels), never in the page
-                        common.merge_written_models(self.graded_items, drive_bridge.get_written_models(
+                        common.merge_written_models(graded_items, drive_bridge.get_written_models(
                             drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key))
                     except drive_bridge.DriveBridgeError as e:
-                        messagebox.showwarning("Model answers not loaded",
-                                               "Couldn't read the written questions' model answers:\n{}".format(e))
-            self._refresh_graded_listbox()
-            self.status_var.set("Loaded current assignment settings for " + self.lesson_var.get())
-        else:
-            self.prompt_text.delete("1.0", "end")
-            self.prompt_text.insert("1.0", "Paste your completed assignment below.")
-            self.mode_label_var.set(common.submit_mode_label(common.DEFAULT_SUBMIT_MODE))
-            self.solution_video_url_var.set("")
-            self.graded_items = []
-            self._refresh_graded_listbox()
-            self.status_var.set("No assignment.html yet for this lesson — fill in the form and click Update.")
+                        a["models_error"] = str(e)
+            a["graded_items"] = graded_items
+            out["assignment"] = a
+            return out
+
+        def apply(out):
+            if out["video_url"] is not None:
+                self.video_url_var.set(out["video_url"])
+            a = out["assignment"]
+            if a is not None:
+                self.solution_video_url_var.set(a["solution_url"])
+                if a["prompt"] is not None:
+                    self.prompt_text.delete("1.0", "end")
+                    self.prompt_text.insert("1.0", a["prompt"])
+                if a["mode_slug"] is not None:
+                    for slug, label in common.SUBMIT_MODES:
+                        if slug == a["mode_slug"]:
+                            self.mode_label_var.set(label)
+                            break
+                self.graded_items = a["graded_items"]
+                if a["models_error"] is not None:
+                    messagebox.showwarning("Model answers not loaded",
+                                           "Couldn't read the written questions' model answers:\n{}".format(a["models_error"]))
+                self._refresh_graded_listbox()
+                self.status_var.set("Loaded current assignment settings for " + lesson_name)
+            else:
+                self.prompt_text.delete("1.0", "end")
+                self.prompt_text.insert("1.0", "Paste your completed assignment below.")
+                self.mode_label_var.set(common.submit_mode_label(common.DEFAULT_SUBMIT_MODE))
+                self.solution_video_url_var.set("")
+                self.graded_items = []
+                self._refresh_graded_listbox()
+                self.status_var.set("No assignment.html yet for this lesson — fill in the form and click Update.")
+
+        def failed(e):
+            self.status_var.set("Couldn't load the assignment settings.")
+            messagebox.showerror("Couldn't load the assignment settings", "{}: {}".format(e.__class__.__name__, e))
+
+        background.run_in_background(self, fetch, apply, failed,
+                                     name="Loading assignment settings for " + lesson_name,
+                                     disable=[self.load_btn], cancellable=True)
 
     # Kept as aliases for backwards compatibility (some older code paths /
     # muscle memory may reach for these); the real implementations now
@@ -402,43 +479,50 @@ class AssignmentTab(ttk.Frame):
         lesson_dir = self._lesson_dir()
         if not lesson_dir or not os.path.isdir(lesson_dir):
             messagebox.showerror("No lesson selected", "Pick a subject and lesson first (generate it in the "
-                                                         "Quiz Maker tab if it doesn't exist yet).")
+                                                         "Quiz & lesson section if it doesn't exist yet).")
             return
 
         index_path = os.path.join(lesson_dir, "index.html")
         lesson_title = self._lesson_title(lesson_dir)
         raw_url = self.video_url_var.get().strip()
         drive_cfg = common.get_drive_config(common.load_config())
+        lesson_key = self._lesson_key()
+        done_status = "Updated video for {}/{}".format(self._subject_slug(), self.lesson_var.get())
 
-        try:
-            embed_url, used_backend = common.set_lesson_video(
-                drive_cfg["web_app_url"], drive_cfg["admin_token"], self._lesson_key(), "lesson",
-                raw_url, lesson_title, index_path)
-        except FileNotFoundError:
-            messagebox.showerror("No lesson page found", "This lesson has no index.html to update.")
-            return
-        except ValueError:
-            messagebox.showerror("Couldn't find the video area",
-                                  "This lesson's index.html doesn't have the expected media-slot section — "
-                                  "it may have been hand-edited or use an older template.")
-            return
-        except drive_bridge.DriveBridgeError as e:
-            messagebox.showerror("Couldn't reach the Drive bridge", str(e))
-            return
+        def failed(e):
+            self.status_var.set("Video not updated.")
+            if isinstance(e, FileNotFoundError):
+                messagebox.showerror("No lesson page found", "This lesson has no index.html to update.")
+            elif isinstance(e, ValueError):
+                messagebox.showerror("Couldn't find the video area",
+                                      "This lesson's index.html doesn't have the expected media-slot section — "
+                                      "it may have been hand-edited or use an older template.")
+            elif isinstance(e, drive_bridge.DriveBridgeError):
+                messagebox.showerror("Couldn't reach the Drive bridge", str(e))
+            else:
+                messagebox.showerror("Video not updated", "{}: {}".format(e.__class__.__name__, e))
 
-        if embed_url and embed_url != raw_url:
-            self.video_url_var.set(embed_url)
+        def done(result):
+            embed_url, used_backend = result
+            if embed_url and embed_url != raw_url:
+                self.video_url_var.set(embed_url)
 
-        self.status_var.set("Updated video for {}/{}".format(self._subject_slug(), self.lesson_var.get()))
-        if not embed_url:
-            messagebox.showinfo("Done", "Video removed — back to a placeholder box.")
-        elif used_backend:
-            messagebox.showinfo("Done", "Video embed updated (starts locked if new — unlock it from the "
-                                         "dashboard once you're ready).")
-        else:
-            messagebox.showinfo("Done", "Video embed updated.\n\nNote: the Drive bridge Web App URL/admin token "
-                                         "aren't set (top of the window), so this video was baked in as a plain, "
-                                         "unprotected embed — configure the Drive bridge to make it lockable.")
+            self.status_var.set(done_status)
+            if not embed_url:
+                theme.notify(self, "Done", "Video removed — back to a placeholder box.")
+            elif used_backend:
+                theme.notify(self, "Done", "Video embed updated (starts locked if new — unlock it from the "
+                                             "dashboard once you're ready).")
+            else:
+                theme.notify(self, "Done", "Video embed updated.\n\nNote: the Drive bridge Web App URL/admin token "
+                                             "aren't set (Settings → Drive bridge), so this video was baked in as a plain, "
+                                             "unprotected embed — configure the Drive bridge to make it lockable.")
+
+        background.run_in_background(
+            self, lambda job: common.set_lesson_video(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "lesson",
+                raw_url, lesson_title, index_path),
+            done, failed, name="Updating the lesson video", disable=[self.video_btn])
 
     def _update_solution_video(self):
         """Update the solution/walkthrough video embedded directly on
@@ -447,47 +531,54 @@ class AssignmentTab(ttk.Frame):
         lesson_dir = self._lesson_dir()
         if not lesson_dir or not os.path.isdir(lesson_dir):
             messagebox.showerror("No lesson selected", "Pick a subject and lesson first (generate it in the "
-                                                         "Quiz Maker tab if it doesn't exist yet).")
+                                                         "Quiz & lesson section if it doesn't exist yet).")
             return
 
         assignment_path = os.path.join(lesson_dir, "assignment.html")
         lesson_title = self._lesson_title(lesson_dir)
         raw_url = self.solution_video_url_var.get().strip()
         drive_cfg = common.get_drive_config(common.load_config())
+        lesson_key = self._lesson_key()
+        done_status = "Updated solution video for {}/{} assignment page".format(
+            self._subject_slug(), self.lesson_var.get())
 
-        try:
-            embed_url, used_backend = common.set_lesson_video(
-                drive_cfg["web_app_url"], drive_cfg["admin_token"], self._lesson_key(), "assignment",
-                raw_url, lesson_title, assignment_path)
-        except FileNotFoundError:
-            messagebox.showerror("No assignment page found",
-                                  "This lesson has no assignment.html yet — click \u201cUpdate assignment page\u201d "
-                                  "below at least once first (with a submission type chosen) to create it.")
-            return
-        except ValueError:
-            messagebox.showerror("Couldn't find the video area",
-                                  "This lesson's assignment.html doesn't have the expected media-slot section — "
-                                  "it may have been hand-edited or use an older template.")
-            return
-        except drive_bridge.DriveBridgeError as e:
-            messagebox.showerror("Couldn't reach the Drive bridge", str(e))
-            return
+        def failed(e):
+            self.status_var.set("Solution video not updated.")
+            if isinstance(e, FileNotFoundError):
+                messagebox.showerror("No assignment page found",
+                                      "This lesson has no assignment.html yet — click \u201cUpdate assignment page\u201d "
+                                      "below at least once first (with a submission type chosen) to create it.")
+            elif isinstance(e, ValueError):
+                messagebox.showerror("Couldn't find the video area",
+                                      "This lesson's assignment.html doesn't have the expected media-slot section — "
+                                      "it may have been hand-edited or use an older template.")
+            elif isinstance(e, drive_bridge.DriveBridgeError):
+                messagebox.showerror("Couldn't reach the Drive bridge", str(e))
+            else:
+                messagebox.showerror("Solution video not updated", "{}: {}".format(e.__class__.__name__, e))
 
-        if embed_url and embed_url != raw_url:
-            self.solution_video_url_var.set(embed_url)
+        def done(result):
+            embed_url, used_backend = result
+            if embed_url and embed_url != raw_url:
+                self.solution_video_url_var.set(embed_url)
 
-        self.status_var.set("Updated solution video for {}/{} assignment page".format(
-            self._subject_slug(), self.lesson_var.get()))
-        if not embed_url:
-            messagebox.showinfo("Done", "Video removed — back to a placeholder box.")
-        elif used_backend:
-            messagebox.showinfo("Done", "Assignment solution video updated (starts locked if new — unlock it "
-                                         "from the dashboard once you're ready).")
-        else:
-            messagebox.showinfo("Done", "Assignment solution video updated.\n\nNote: the Drive bridge Web App "
-                                         "URL/admin token aren't set (top of the window), so this video was "
-                                         "baked in as a plain, unprotected embed — configure the Drive bridge "
-                                         "to make it lockable.")
+            self.status_var.set(done_status)
+            if not embed_url:
+                theme.notify(self, "Done", "Video removed — back to a placeholder box.")
+            elif used_backend:
+                theme.notify(self, "Done", "Assignment solution video updated (starts locked if new — unlock it "
+                                             "from the dashboard once you're ready).")
+            else:
+                theme.notify(self, "Done", "Assignment solution video updated.\n\nNote: the Drive bridge Web App "
+                                             "URL/admin token aren't set (Settings → Drive bridge), so this video was "
+                                             "baked in as a plain, unprotected embed — configure the Drive bridge "
+                                             "to make it lockable.")
+
+        background.run_in_background(
+            self, lambda job: common.set_lesson_video(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "assignment",
+                raw_url, lesson_title, assignment_path),
+            done, failed, name="Updating the assignment solution video", disable=[self.solution_btn])
 
     def _lesson_title(self, lesson_dir):
         index_path = os.path.join(lesson_dir, "index.html")
@@ -505,13 +596,13 @@ class AssignmentTab(ttk.Frame):
     def _update(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
 
         lesson_dir = self._lesson_dir()
         if not lesson_dir or not os.path.isdir(lesson_dir):
             messagebox.showerror("No lesson selected", "Pick a subject and lesson first (generate it in the "
-                                                         "Quiz Maker tab if it doesn't exist yet).")
+                                                         "Quiz & lesson section if it doesn't exist yet).")
             return
 
         drive_cfg = common.get_drive_config(common.load_config())
@@ -520,8 +611,8 @@ class AssignmentTab(ttk.Frame):
             if not drive_cfg["web_app_url"]:
                 if not messagebox.askyesno(
                         "Drive bridge not configured",
-                        "This submission type needs the Drive bridge Web App URL (set it at the top of the "
-                        "window) or student links/files won't be able to reach your Drive.\n\n"
+                        "This submission type needs the Drive bridge Web App URL (set it in Settings → Drive bridge)"
+                        " or student links/files won't be able to reach your Drive.\n\n"
                         "Continue anyway and set it up later?"):
                     return
 
@@ -553,57 +644,78 @@ class AssignmentTab(ttk.Frame):
         location_label = common.lesson_url_path(subject_slug, group_relpath, lesson_slug)
         track_class = common.track_class_for_group(subject_slug, group_relpath)
 
-        # Preserve a solution video already set on this assignment page
-        # (via the "Solution video" control above) across updates — editing
-        # the prompt/mode/questions shouldn't wipe it out. If it's backend-
-        # managed (Videos sheet), always write the placeholder — video.js
-        # renders the real thing client-side, so baking it back into raw
-        # HTML here would defeat any lock on it. Otherwise preserve
-        # whatever's already baked into the page (legacy/unmigrated, or none).
-        assignment_path = os.path.join(lesson_dir, "assignment.html")
-        video_block = common.video_block_for_regen(
-            drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, "assignment",
-            assignment_path, lesson_title)
+        mode_label = self.mode_label_var.get()
 
-        assignment_html = common.load_template("assignment.html")
-        assignment_html = (assignment_html
-                            .replace("{{SUBJECT_SLUG}}", subject_slug)
-                            .replace("{{LESSON_SLUG}}", lesson_slug)
-                            .replace("{{LESSON_TITLE}}", lesson_title)
-                            .replace("{{SUBMIT_MODE}}", mode_slug)
-                            .replace("{{ASSIGN_PROMPT}}", prompt)
-                            .replace("{{VIDEO_BLOCK}}", video_block)
-                            .replace("{{TRACK_CLASS}}", track_class)
-                            .replace("{{LESSON_URL_PATH}}", location_label)
-                            .replace("{{ASSIGN_QUESTIONS_JSON}}", json.dumps({"items": graded_items_out})))
-        with open(assignment_path, "w", encoding="utf-8") as f:
-            f.write(assignment_html)
+        # The backend calls, the page writes and the SEO build run off the Tk thread (modules/background.py).
+        def write(job):
+            res = {"models_error": None, "models_unconfigured": False}
+            # Preserve a solution video already set on this assignment page
+            # (via the "Solution video" control above) across updates — editing
+            # the prompt/mode/questions shouldn't wipe it out. If it's backend-
+            # managed (Videos sheet), always write the placeholder — video.js
+            # renders the real thing client-side, so baking it back into raw
+            # HTML here would defeat any lock on it. Otherwise preserve
+            # whatever's already baked into the page (legacy/unmigrated, or none).
+            assignment_path = os.path.join(lesson_dir, "assignment.html")
+            video_block = common.video_block_for_regen(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, "assignment",
+                assignment_path, lesson_title)
 
-        if written_models:
-            if drive_cfg["web_app_url"] and drive_cfg["admin_token"]:
-                try:
-                    drive_bridge.set_written_models(drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, written_models)
-                except drive_bridge.DriveBridgeError as e:
-                    messagebox.showerror(
-                        "Model answers not saved",
-                        "assignment.html was written, but the written questions' model answers could not be "
-                        "sent to the server, so the grading page won't show them. Click Update again once the "
-                        "Drive bridge works:\n{}".format(e))
-            else:
+            assignment_html = common.load_template("assignment.html")
+            assignment_html = (assignment_html
+                                .replace("{{SUBJECT_SLUG}}", subject_slug)
+                                .replace("{{LESSON_SLUG}}", lesson_slug)
+                                .replace("{{LESSON_TITLE}}", lesson_title)
+                                .replace("{{SUBMIT_MODE}}", mode_slug)
+                                .replace("{{ASSIGN_PROMPT}}", prompt)
+                                .replace("{{VIDEO_BLOCK}}", video_block)
+                                .replace("{{TRACK_CLASS}}", track_class)
+                                .replace("{{LESSON_URL_PATH}}", location_label)
+                                .replace("{{ASSIGN_QUESTIONS_JSON}}", json.dumps({"items": graded_items_out})))
+            with open(assignment_path, "w", encoding="utf-8") as f:
+                f.write(assignment_html)
+
+            if written_models:
+                if drive_cfg["web_app_url"] and drive_cfg["admin_token"]:
+                    try:
+                        drive_bridge.set_written_models(drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, written_models)
+                    except drive_bridge.DriveBridgeError as e:
+                        res["models_error"] = str(e)
+                else:
+                    res["models_unconfigured"] = True
+
+            # Make sure the lesson's index.html actually links to the assignment
+            # page (in case this lesson was generated with "include assignment"
+            # unchecked, or this is the first time an assignment is being added).
+            self._ensure_assignment_link(lesson_dir, location_label)
+            common.run_seo_build(site_root)  # keeps robots/meta on the assignment page consistent
+            return res
+
+        def done(res):
+            if res["models_error"] is not None:
+                messagebox.showerror(
+                    "Model answers not saved",
+                    "assignment.html was written, but the written questions' model answers could not be "
+                    "sent to the server, so the grading page won't show them. Click Update again once the "
+                    "Drive bridge works:\n{}".format(res["models_error"]))
+            elif res["models_unconfigured"]:
                 messagebox.showwarning("Model answers not saved",
                                        "The Drive bridge isn't configured, so the written questions' model answers "
                                        "were not saved anywhere. Set it up and click Update again.")
+            self.status_var.set("Updated assignment.html for {}/{} (mode: {})".format(
+                location_label, lesson_slug, mode_slug))
+            theme.notify(self, "Done", "assignment.html updated for {}/{}.\n\nSubmission mode: {}".format(
+                subject_slug, lesson_slug, mode_label))
 
-        # Make sure the lesson's index.html actually links to the assignment
-        # page (in case this lesson was generated with "include assignment"
-        # unchecked, or this is the first time an assignment is being added).
-        self._ensure_assignment_link(lesson_dir, location_label)
-        common.run_seo_build(site_root)  # keeps robots/meta on the assignment page consistent
+        def failed(e):
+            self.status_var.set("Updating assignment.html for {} failed: {}".format(location_label, e))
+            messagebox.showerror("Update assignment page failed",
+                                 "Something went wrong while updating {}:\n\n{}: {}".format(
+                                     location_label, e.__class__.__name__, e))
 
-        self.status_var.set("Updated assignment.html for {}/{} (mode: {})".format(
-            location_label, lesson_slug, mode_slug))
-        messagebox.showinfo("Done", "assignment.html updated for {}/{}.\n\nSubmission mode: {}".format(
-            subject_slug, lesson_slug, self.mode_label_var.get()))
+        background.run_in_background(self, write, done, failed,
+                                     name="Updating the assignment page for " + location_label,
+                                     disable=[self.update_btn])
 
     def _ensure_assignment_link(self, lesson_dir, location_label):
         index_path = os.path.join(lesson_dir, "index.html")

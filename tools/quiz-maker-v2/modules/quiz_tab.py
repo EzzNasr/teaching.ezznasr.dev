@@ -21,7 +21,8 @@ import tkinter as tk
 import webbrowser
 from tkinter import ttk, messagebox, filedialog
 
-from modules import common, drive_bridge
+from modules import common, drive_bridge, background, theme
+from modules.question_panel import QuestionPanel
 from modules.common import (
     GRADED_BULK_HELP,
     parse_bulk_graded_questions,
@@ -184,6 +185,13 @@ class QuizTab(ttk.Frame):
         common.enable_clipboard_shortcuts(self)
         self._build_form()
         self._bind_undo_redo()
+        # "Unsaved changes": any edit to the form or the question list since the last load / generate / clear
+        self.dirty = False
+        self._dirty_rev = 0
+        self.on_dirty_changed = None          # app_main shows the marker in the header
+        for var in (self.lesson_name_var, self.lesson_desc_var, self.video_url_var, self.include_assignment_var,
+                    self.assign_prompt_var):
+            var.trace_add("write", lambda *_a: self._mark_dirty())
 
     def _build_form(self):
         pad = {"padx": 10, "pady": 6}
@@ -242,8 +250,9 @@ class QuizTab(ttk.Frame):
         tk.Label(row5, text="Prompt text:", width=14, anchor="w").pack(side="left")
         self.assign_prompt_var = tk.StringVar(value="Paste your completed assignment below.")
         tk.Entry(row5, textvariable=self.assign_prompt_var).pack(side="left", fill="x", expand=True)
-        tk.Label(assign_frame, text="This creates a basic text-paste assignment page. For URL/file submission "
-                                     "modes, use the Assignment Maker tab after generating this lesson.",
+        tk.Label(assign_frame, text="A new assignment page uses graded questions (auto-marked) by default; an "
+                                     "existing one keeps its submission type. Add its questions, or switch to text / "
+                                     "link / file, in the Assignment section after generating this lesson.",
                  fg="gray30", font=("TkDefaultFont", 8)).pack(anchor="w", padx=8, pady=(0, 6))
 
         solution_frame = tk.LabelFrame(self, text="Solution video (shown on the quiz page itself)")
@@ -253,7 +262,8 @@ class QuizTab(ttk.Frame):
         tk.Label(row_sol, text="Video URL:", width=14, anchor="w").pack(side="left")
         self.quiz_solution_video_var = tk.StringVar()
         tk.Entry(row_sol, textvariable=self.quiz_solution_video_var).pack(side="left", fill="x", expand=True)
-        tk.Button(row_sol, text="Update", command=self._update_quiz_solution_video).pack(side="left", padx=6)
+        self.solution_update_btn = tk.Button(row_sol, text="Update", command=self._update_quiz_solution_video)
+        self.solution_update_btn.pack(side="left", padx=6)
         tk.Label(solution_frame,
                  text="A homework-solving/walkthrough video embedded directly on this lesson's quiz.html page "
                       "(separate from the intro video above, which lives on the lesson's main page). Paste any "
@@ -262,7 +272,7 @@ class QuizTab(ttk.Frame):
                       "This only touches the quiz page's video, nothing else.",
                  fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=640).pack(anchor="w", padx=8, pady=(0, 6))
 
-        del_frame = tk.LabelFrame(self, text="Existing lessons")
+        del_frame = tk.LabelFrame(self, text="Open an existing lesson")
         del_frame.pack(fill="x", **pad)
         row_del = tk.Frame(del_frame)
         row_del.pack(fill="x", padx=8, pady=4)
@@ -275,15 +285,19 @@ class QuizTab(ttk.Frame):
 
         btn_row_del = tk.Frame(del_frame)
         btn_row_del.pack(fill="x", padx=8, pady=(0, 4))
-        tk.Button(btn_row_del, text="Load for editing", command=self._load_lesson_for_edit,
-                  font=("TkDefaultFont", 9, "bold")).pack(side="left")
+        self.load_btn = tk.Button(btn_row_del, text="Load for editing", command=self._load_lesson_for_edit,
+                                  font=("TkDefaultFont", 9, "bold"))
+        self.load_btn.pack(side="left")
         tk.Button(btn_row_del, text="Preview in browser", command=self._preview_lesson).pack(side="left", padx=6)
-        tk.Button(btn_row_del, text="Delete lesson...", command=self._delete_lesson,
+        tk.Button(btn_row_del, text="New lesson / clear form", command=self._new_lesson).pack(side="right")
+        # the destructive / recovery actions on their own row, away from the everyday ones
+        btn_row_del2 = tk.Frame(del_frame)
+        btn_row_del2.pack(fill="x", padx=8, pady=(2, 4))
+        tk.Button(btn_row_del2, text="Delete lesson...", command=self._delete_lesson,
                   fg="#8a1f1f").pack(side="left")
-        tk.Button(btn_row_del, text="Recover deleted lesson...", command=self._recover_lesson).pack(side="left", padx=6)
-        tk.Button(btn_row_del, text="Empty trash...", command=self._empty_trash,
-                  fg="#8a1f1f").pack(side="right")
-        tk.Button(btn_row_del, text="New lesson / clear form", command=self._new_lesson).pack(side="right", padx=6)
+        tk.Button(btn_row_del2, text="Recover deleted lesson...", command=self._recover_lesson).pack(side="left", padx=6)
+        tk.Button(btn_row_del2, text="Empty trash...", command=self._empty_trash,
+                  fg="#8a1f1f").pack(side="left")
         tk.Label(del_frame,
                  text="Preview/Load/Delete use the Subject selected above. \u201cLoad for editing\u201d pulls that "
                       "lesson's questions, chapters, name, description, video and assignment prompt back into "
@@ -305,7 +319,9 @@ class QuizTab(ttk.Frame):
         self.chapter_combo.pack(side="left")
         tk.Label(chapter_row,
                  text="Applies to new questions added below (bulk paste can override per-block with \"Ch: N\").",
-                 fg="gray30", font=("TkDefaultFont", 8)).pack(side="left", padx=8)
+                 fg="gray30", font=("TkDefaultFont", 8), wraplength=330, justify="left").pack(side="left", padx=8)
+        tk.Button(chapter_row, text="Save draft...", command=self._save_draft).pack(side="right", padx=(6, 0))
+        tk.Button(chapter_row, text="Load draft...", command=self._load_draft).pack(side="right")
 
         btn_row = tk.Frame(q_frame)
         btn_row.pack(fill="x", padx=8, pady=6)
@@ -314,24 +330,26 @@ class QuizTab(ttk.Frame):
         tk.Button(btn_row, text="+ Matching", command=self._add_match).pack(side="left")
         tk.Button(btn_row, text="+ Written (photo)", command=self._add_written).pack(side="left", padx=6)
         tk.Button(btn_row, text="+ Bulk paste...", command=self._bulk_add).pack(side="left", padx=6)
-        tk.Button(btn_row, text="Edit selected", command=self._edit_question).pack(side="left", padx=6)
-        tk.Button(btn_row, text="Remove selected", command=self._remove_question).pack(side="left")
-        tk.Button(btn_row, text="Save draft...", command=self._save_draft).pack(side="right", padx=6)
-        tk.Button(btn_row, text="Load draft...", command=self._load_draft).pack(side="right")
-
-        list_frame = tk.Frame(q_frame)
-        list_frame.pack(fill="both", expand=True, padx=8, pady=4)
-        self.q_listbox = tk.Listbox(list_frame)
-        self.q_listbox.pack(side="left", fill="both", expand=True)
-        scrollbar = tk.Scrollbar(list_frame, command=self.q_listbox.yview)
-        scrollbar.pack(side="right", fill="y")
-        self.q_listbox.config(yscrollcommand=scrollbar.set)
-        self.q_listbox.bind("<Double-Button-1>", lambda e: self._edit_question())
+        # the list: select several (Shift/Ctrl+click, Ctrl+A) and edit, duplicate, move, re-chapter or
+        # remove them together (modules/question_panel.py); every change is one Ctrl+Z step
+        self.qpanel = QuestionPanel(q_frame, get_items=lambda: self.questions, set_items=self._set_questions,
+                                    on_edit=self._edit_question_at, before_change=self._snapshot,
+                                    status_var=self.status_var, new_qid=common.new_written_qid)
+        self.qpanel.pack(fill="both", expand=True, padx=8, pady=(4, 8))
 
         gen_row = tk.Frame(self)
         gen_row.pack(fill="x", padx=10, pady=12)
-        tk.Button(gen_row, text="Generate lesson files", command=self._generate,
-                  font=("TkDefaultFont", 10, "bold"), height=2).pack(fill="x")
+        self.generate_btn = tk.Button(gen_row, text="Generate lesson files", command=self._generate,
+                                      font=("TkDefaultFont", 10, "bold"), height=2)
+        self.generate_btn.pack(fill="x")
+
+        # Page order, top to bottom, the way a lesson is made: open (or start) a lesson, its details, the
+        # questions, the assignment, the quiz-page video, then Generate.
+        for frame in (del_frame, info_frame, q_frame, assign_frame, solution_frame, gen_row):
+            info = frame.pack_info()
+            info.pop("in", None)
+            frame.pack_forget()
+            frame.pack(**info)
 
         self._refresh_groups()
 
@@ -369,7 +387,7 @@ class QuizTab(ttk.Frame):
     def _delete_lesson(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
         lesson_slug = self.delete_lesson_var.get().strip()
         if not lesson_slug:
@@ -396,7 +414,7 @@ class QuizTab(ttk.Frame):
         self._refresh_lessons()
         self.status_var.set("Deleted lesson {}/{}/{} — moved to {}".format(
             subject_slug, group_relpath, lesson_slug, moved_to))
-        messagebox.showinfo("Deleted", "Removed {}/{}/{} from the site.\n\nMoved to:\n{}".format(
+        theme.notify(self, "Deleted", "Removed {}/{}/{} from the site.\n\nMoved to:\n{}".format(
             subject_slug, group_relpath, lesson_slug, moved_to))
         if self.on_lessons_changed:
             self.on_lessons_changed()
@@ -404,7 +422,7 @@ class QuizTab(ttk.Frame):
     def _preview_lesson(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
         lesson_slug = self.delete_lesson_var.get().strip()
         if not lesson_slug:
@@ -432,10 +450,10 @@ class QuizTab(ttk.Frame):
         """Embed (or clear) a video directly on this lesson's quiz.html
         page — independent of the lesson's intro video and independent
         of regenerating the questions. Targets whichever lesson is
-        selected in the 'Existing lessons' combo above."""
+        selected in the 'Open an existing lesson' combo."""
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
         lesson_slug = self.delete_lesson_var.get().strip()
         if not lesson_slug:
@@ -447,42 +465,51 @@ class QuizTab(ttk.Frame):
         quiz_path = os.path.join(lesson_dir, "quiz.html")
         lesson_key = common.lesson_url_path(subject_slug, group_relpath, lesson_slug)
         drive_cfg = common.get_drive_config(common.load_config())
+        video_url = self.quiz_solution_video_var.get()
 
-        try:
-            embed_url, used_backend = common.set_lesson_video(
+        # The backend call (and the page write after it) runs off the Tk thread; see modules/background.py.
+        def task(job):
+            return common.set_lesson_video(
                 drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "quiz",
-                self.quiz_solution_video_var.get(), lesson_slug.replace("-", " ").title(), quiz_path)
-        except FileNotFoundError:
-            messagebox.showerror("No quiz page found",
-                                  "{}/quiz.html doesn't exist yet \u2014 generate this lesson first.".format(lesson_slug))
-            return
-        except ValueError:
-            messagebox.showerror("Couldn't find the video area",
-                                  "This lesson's quiz.html doesn't have the expected media-slot section \u2014 "
-                                  "it may have been hand-edited or use an older template.")
-            return
-        except drive_bridge.DriveBridgeError as e:
-            messagebox.showerror("Couldn't reach the Drive bridge", str(e))
-            return
+                video_url, lesson_slug.replace("-", " ").title(), quiz_path)
 
-        if embed_url != self.quiz_solution_video_var.get().strip():
-            self.quiz_solution_video_var.set(embed_url)
-        self.status_var.set("Updated solution video for {}/{} quiz page".format(subject_slug, lesson_slug))
-        if not embed_url:
-            messagebox.showinfo("Done", "Quiz solution video cleared.")
-        elif used_backend:
-            messagebox.showinfo("Done", "Quiz solution video updated (starts locked if new \u2014 unlock it from "
-                                         "the dashboard once you're ready).")
-        else:
-            messagebox.showinfo("Done", "Quiz solution video updated.\n\nNote: the Drive bridge Web App URL/admin "
-                                         "token aren't set (top of the window), so this video was baked in as a "
-                                         "plain, unprotected embed \u2014 configure the Drive bridge to make it "
-                                         "lockable.")
+        def failed(e):
+            self.status_var.set("Solution video not updated.")
+            if isinstance(e, FileNotFoundError):
+                messagebox.showerror("No quiz page found",
+                                      "{}/quiz.html doesn't exist yet \u2014 generate this lesson first.".format(lesson_slug))
+            elif isinstance(e, ValueError):
+                messagebox.showerror("Couldn't find the video area",
+                                      "This lesson's quiz.html doesn't have the expected media-slot section \u2014 "
+                                      "it may have been hand-edited or use an older template.")
+            elif isinstance(e, drive_bridge.DriveBridgeError):
+                messagebox.showerror("Couldn't reach the Drive bridge", str(e))
+            else:
+                messagebox.showerror("Solution video not updated", "{}: {}".format(e.__class__.__name__, e))
+
+        def done(result):
+            embed_url, used_backend = result
+            if embed_url != self.quiz_solution_video_var.get().strip():
+                self.quiz_solution_video_var.set(embed_url)
+            self.status_var.set("Updated solution video for {}/{} quiz page".format(subject_slug, lesson_slug))
+            if not embed_url:
+                theme.notify(self, "Done", "Quiz solution video cleared.")
+            elif used_backend:
+                theme.notify(self, "Done", "Quiz solution video updated (starts locked if new \u2014 unlock it from "
+                                             "the dashboard once you're ready).")
+            else:
+                theme.notify(self, "Done", "Quiz solution video updated.\n\nNote: the Drive bridge Web App URL/admin "
+                                             "token aren't set (Settings → Drive bridge), so this video was baked in as a "
+                                             "plain, unprotected embed \u2014 configure the Drive bridge to make it "
+                                             "lockable.")
+
+        background.run_in_background(self, task, done, failed, name="Updating the quiz solution video",
+                                     disable=[self.solution_update_btn])
 
     def _load_lesson_for_edit(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
         lesson_slug = self.delete_lesson_var.get().strip()
         if not lesson_slug:
@@ -522,29 +549,57 @@ class QuizTab(ttk.Frame):
         # the Drive-bridge Videos sheet over whatever's baked in the page --
         lesson_key = common.lesson_url_path(subject_slug, group_relpath, lesson_slug)
         drive_cfg = common.get_drive_config(common.load_config())
+        index_path = os.path.join(lesson_dir, "index.html")
 
-        # Once a lesson's quiz content has been synced (set_quiz_content, in
-        # _generate() below), quiz.html itself may only carry meta (title/
-        # subject/lesson) — the questions live server-side instead, same as
-        # a synced video's URL isn't baked into the page either. Prefer that
-        # stored copy here so re-opening a synced lesson for editing doesn't
-        # show an empty question list; falls back to whatever's already in
-        # the page (legacy pages, or no Drive bridge configured) otherwise.
-        if drive_cfg["web_app_url"] and drive_cfg["admin_token"]:
-            try:
-                synced_quiz = drive_bridge.get_quiz_content(
-                    drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key)
-            except drive_bridge.DriveBridgeError:
-                synced_quiz = None
-            if synced_quiz and isinstance(synced_quiz.get("questions"), list):
-                questions = synced_quiz["questions"]
-                if any(isinstance(q, dict) and q.get("type") == "written" for q in questions):
-                    try:   # model answers live in WrittenModels, not in the quiz content
-                        common.merge_written_models(questions, drive_bridge.get_written_models(
-                            drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key))
-                    except drive_bridge.DriveBridgeError as e:
-                        messagebox.showwarning("Model answers not loaded",
-                                               "Couldn't read the written questions' model answers:\n{}".format(e))
+        # Everything that asks the backend runs off the Tk thread (modules/background.py); only reads, so the
+        # user may cancel it. The form is only touched afterwards, in _apply_loaded_lesson().
+        def fetch(job):
+            out = {"questions": questions, "models_error": None}
+            # Once a lesson's quiz content has been synced (set_quiz_content, in
+            # _generate() below), quiz.html itself may only carry meta (title/
+            # subject/lesson) — the questions live server-side instead, same as
+            # a synced video's URL isn't baked into the page either. Prefer that
+            # stored copy here so re-opening a synced lesson for editing doesn't
+            # show an empty question list; falls back to whatever's already in
+            # the page (legacy pages, or no Drive bridge configured) otherwise.
+            if drive_cfg["web_app_url"] and drive_cfg["admin_token"]:
+                try:
+                    synced_quiz = drive_bridge.get_quiz_content(
+                        drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key)
+                except drive_bridge.DriveBridgeError:
+                    synced_quiz = None
+                if synced_quiz and isinstance(synced_quiz.get("questions"), list):
+                    out["questions"] = synced_quiz["questions"]
+                    if any(isinstance(q, dict) and q.get("type") == "written" for q in out["questions"]):
+                        try:   # model answers live in WrittenModels, not in the quiz content
+                            common.merge_written_models(out["questions"], drive_bridge.get_written_models(
+                                drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key))
+                        except drive_bridge.DriveBridgeError as e:
+                            out["models_error"] = str(e)
+            if job.cancelled:
+                return out
+            out["video_url"] = common.get_lesson_video_url(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "lesson", index_path)
+            out["quiz_solution_video_url"] = common.get_lesson_video_url(
+                drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "quiz", quiz_path)
+            return out
+
+        def failed(e):
+            self.status_var.set("Couldn't load {}.".format(lesson_slug))
+            messagebox.showerror("Couldn't load the lesson", "{}: {}".format(e.__class__.__name__, e))
+
+        background.run_in_background(
+            self, fetch,
+            lambda out: self._apply_loaded_lesson(out, quiz_json, subject_slug, group_relpath, lesson_slug,
+                                                  lesson_dir, index_path),
+            failed, name="Loading {} for editing".format(lesson_slug), disable=[self.load_btn], cancellable=True)
+
+    def _apply_loaded_lesson(self, out, quiz_json, subject_slug, group_relpath, lesson_slug, lesson_dir, index_path):
+        """Main thread: the second half of _load_lesson_for_edit, once the backend has answered."""
+        questions = out["questions"]
+        if out["models_error"] is not None:
+            messagebox.showwarning("Model answers not loaded",
+                                   "Couldn't read the written questions' model answers:\n{}".format(out["models_error"]))
 
         if self.questions or self.lesson_name_var.get().strip():
             if not messagebox.askyesno(
@@ -553,12 +608,12 @@ class QuizTab(ttk.Frame):
                     "list currently in the form below with {}'s saved content.\n\n"
                     "Anything you've typed here that hasn't been generated yet will be lost. Continue?".format(
                         lesson_slug)):
+                self.status_var.set("Load cancelled \u2014 the form was left as it was.")
                 return
 
         # -- description, from index.html (best-effort; quiz.html alone
         # doesn't carry it) --------------------------------------------
         lesson_desc = ""
-        index_path = os.path.join(lesson_dir, "index.html")
         if os.path.isfile(index_path):
             with open(index_path, "r", encoding="utf-8") as f:
                 index_content = f.read()
@@ -566,12 +621,8 @@ class QuizTab(ttk.Frame):
             if desc_match:
                 lesson_desc = desc_match.group(1).strip()
 
-        # -- video (lesson page) and solution video (quiz.html), preferring
-        # the Drive-bridge Videos sheet over whatever's baked in the page --
-        video_url = common.get_lesson_video_url(
-            drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "lesson", index_path)
-        quiz_solution_video_url = common.get_lesson_video_url(
-            drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, "quiz", quiz_path)
+        video_url = out["video_url"]
+        quiz_solution_video_url = out["quiz_solution_video_url"]
 
         # -- assignment prompt + whether one exists, from assignment.html --
         # (submission mode itself is left alone here — see _generate(),
@@ -605,6 +656,7 @@ class QuizTab(ttk.Frame):
         self.status_var.set(
             "Loaded {} for editing ({} question(s)). Make your changes, then Generate lesson files to "
             "save them in place.".format(lesson_slug, len(self.questions)))
+        self._clear_dirty()
 
     def _new_lesson(self):
         if self.questions or self.lesson_name_var.get().strip():
@@ -622,12 +674,13 @@ class QuizTab(ttk.Frame):
         self.questions = []
         self._refresh_listbox()
         self._editing = None
+        self._clear_dirty()
         self.status_var.set("Form cleared \u2014 ready for a new lesson.")
 
     def _recover_lesson(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
 
         dlg = RecoverDialog(self, site_root)
@@ -647,14 +700,14 @@ class QuizTab(ttk.Frame):
 
         self._refresh_lessons()
         self.status_var.set("Recovered {}/{} from trash.".format(subject_slug, lesson_slug))
-        messagebox.showinfo("Recovered", "{}/{} is back on the site.".format(subject_slug, lesson_slug))
+        theme.notify(self, "Recovered", "{}/{} is back on the site.".format(subject_slug, lesson_slug))
         if self.on_lessons_changed:
             self.on_lessons_changed()
 
     def _empty_trash(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
 
         dlg = EmptyTrashDialog(self, site_root)
@@ -664,7 +717,7 @@ class QuizTab(ttk.Frame):
 
         removed = common.purge_deleted_lessons(site_root)
         self.status_var.set("Emptied trash — permanently removed {} lesson(s).".format(len(removed)))
-        messagebox.showinfo("Trash emptied",
+        theme.notify(self, "Trash emptied",
                              "Permanently removed {} lesson(s) from _deleted-lessons/.".format(len(removed)))
 
     # -- question list --------------------------------------------------
@@ -699,16 +752,28 @@ class QuizTab(ttk.Frame):
             "chapter": q.get("chapter", 1),
         }
 
-    def _refresh_listbox(self):
-        self.q_listbox.delete(0, "end")
-        for i, q in enumerate(self.questions):
-            qtype = q.get("type", "mcq")
-            text = q.get("prompt", q.get("q", ""))
-            preview = text[:60].replace("\n", " ")
-            chapter = q.get("chapter")
-            ch_label = "Ch{} ".format(chapter) if chapter is not None else ""
-            self.q_listbox.insert("end", "{:>2}. {}[{}] {}".format(
-                i + 1, ch_label, self._TYPE_LABELS.get(qtype, "?"), preview))
+    def _refresh_listbox(self, select=None):
+        self.qpanel.refresh(select=select)
+        if hasattr(self, "_mark_dirty"):
+            self._mark_dirty()
+
+    def _mark_dirty(self):
+        self._dirty_rev = getattr(self, "_dirty_rev", 0) + 1
+        if not getattr(self, "dirty", True):
+            self.dirty = True
+            if self.on_dirty_changed:
+                self.on_dirty_changed(True)
+
+    def _clear_dirty(self, if_rev=None):
+        """Mark the form saved; with if_rev, only when nothing changed since that revision."""
+        if if_rev is not None and if_rev != self._dirty_rev:
+            return
+        self.dirty = False
+        if self.on_dirty_changed:
+            self.on_dirty_changed(False)
+
+    def _set_questions(self, items):
+        self.questions = items
 
     def _add_mcq(self):
         dlg = MCQItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
@@ -716,7 +781,7 @@ class QuizTab(ttk.Frame):
         if dlg.result:
             self._snapshot()
             self.questions.append(dlg.result)
-            self._refresh_listbox()
+            self._refresh_listbox(select=[len(self.questions) - 1])
 
     def _add_truefalse(self):
         dlg = TrueFalseItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
@@ -724,7 +789,7 @@ class QuizTab(ttk.Frame):
         if dlg.result:
             self._snapshot()
             self.questions.append(dlg.result)
-            self._refresh_listbox()
+            self._refresh_listbox(select=[len(self.questions) - 1])
 
     def _add_match(self):
         dlg = MatchItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
@@ -732,7 +797,7 @@ class QuizTab(ttk.Frame):
         if dlg.result:
             self._snapshot()
             self.questions.append(dlg.result)
-            self._refresh_listbox()
+            self._refresh_listbox(select=[len(self.questions) - 1])
 
     def _add_written(self):
         dlg = WrittenItemDialog(self, chapter_choices=self._chapter_choices(), default_chapter=self._current_chapter())
@@ -740,7 +805,7 @@ class QuizTab(ttk.Frame):
         if dlg.result:
             self._snapshot()
             self.questions.append(dlg.result)
-            self._refresh_listbox()
+            self._refresh_listbox(select=[len(self.questions) - 1])
 
     def _bulk_add(self):
         dlg = GradedBulkDialog(self, current_chapter=self._current_chapter())
@@ -748,15 +813,17 @@ class QuizTab(ttk.Frame):
         if dlg.result:
             self._snapshot()
             self.questions.extend(dlg.result)
-            self._refresh_listbox()
+            self._refresh_listbox(select=list(range(len(self.questions) - len(dlg.result), len(self.questions))))
             self.status_var.set("Added {} question(s) from bulk paste.".format(len(dlg.result)))
 
     def _edit_question(self):
-        sel = self.q_listbox.curselection()
-        if not sel:
-            messagebox.showinfo("No selection", "Select a question to edit.")
+        sel = self.qpanel.selection()
+        if len(sel) != 1:
+            messagebox.showinfo("No selection", "Select one question to edit." if sel else "Select a question to edit.")
             return
-        idx = sel[0]
+        self._edit_question_at(sel[0])
+
+    def _edit_question_at(self, idx):
         existing = self._normalize_legacy(self.questions[idx])
         dialog_cls = {"mcq": MCQItemDialog, "truefalse": TrueFalseItemDialog, "match": MatchItemDialog,
                       "written": WrittenItemDialog}[existing["type"]]
@@ -766,17 +833,14 @@ class QuizTab(ttk.Frame):
         if dlg.result:
             self._snapshot()
             self.questions[idx] = dlg.result
-            self._refresh_listbox()
+            self._refresh_listbox(select=[idx])
 
     def _remove_question(self):
-        sel = self.q_listbox.curselection()
-        if not sel:
-            messagebox.showinfo("No selection", "Select a question to remove.")
+        """Remove every selected question (one undo step)."""
+        if not self.qpanel.selection():
+            messagebox.showinfo("No selection", "Select one or more questions to remove.")
             return
-        idx = sel[0]
-        self._snapshot()
-        del self.questions[idx]
-        self._refresh_listbox()
+        self.qpanel.remove_selected()
 
     # -- undo / redo for the question list --------------------------------
     # Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) undo/redo add/edit/remove/bulk-paste
@@ -885,7 +949,7 @@ class QuizTab(ttk.Frame):
     def _generate(self):
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
-            messagebox.showerror("Site location missing", "Pick a valid site root folder first (top of the window).")
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
             return
 
         lesson_name = self.lesson_name_var.get().strip()
@@ -914,10 +978,40 @@ class QuizTab(ttk.Frame):
             if not messagebox.askyesno("Folder exists",
                                         "{}  already exists. Overwrite its files?".format(location_label)):
                 return
+
+        # Everything the files are made from, read from the form NOW: the writing (and the backend calls in
+        # between) runs in a worker thread, which must never touch a widget (modules/background.py).
+        inp = {
+            "site_root": site_root, "lesson_name": lesson_name, "subject_slug": subject_slug,
+            "subject_title": subject_title, "group_relpath": group_relpath, "lesson_slug": lesson_slug,
+            "lesson_dir": lesson_dir, "location_label": location_label,
+            "include_assignment": self.include_assignment_var.get(),
+            "questions": copy.deepcopy(self.questions),
+            "lesson_desc": self.lesson_desc_var.get().strip(),
+            "assign_prompt": self.assign_prompt_var.get().strip(),
+            "video_url": self.video_url_var.get(),
+            "rev": self._dirty_rev,            # edits made while it generates stay "unsaved"
+        }
+        background.run_in_background(
+            self, lambda job: self._write_lesson_files(inp),
+            lambda res: self._on_generated(inp, res), lambda e: self._on_generate_failed(inp, e),
+            name="Generating {}".format(location_label), disable=[self.generate_btn])
+
+    @staticmethod
+    def _write_lesson_files(inp):
+        """Worker thread: write the lesson's files and call the backend. Same steps, same output as before
+        this ran in the background; dialogs are collected in `res` and shown by _on_generated."""
+        site_root, lesson_name = inp["site_root"], inp["lesson_name"]
+        subject_slug, subject_title = inp["subject_slug"], inp["subject_title"]
+        group_relpath, lesson_slug = inp["group_relpath"], inp["lesson_slug"]
+        lesson_dir, location_label = inp["lesson_dir"], inp["location_label"]
+        questions = inp["questions"]
+        res = {"sync_error": None, "new_video_url": None, "video_warning": None, "card_error": None,
+               "include_assignment": inp["include_assignment"]}
         os.makedirs(lesson_dir, exist_ok=True)
         common.write_lesson_stylesheets(lesson_dir)
 
-        include_assignment = self.include_assignment_var.get()
+        include_assignment = inp["include_assignment"]
 
         # Determined once, used both when (re)writing assignment.html below
         # and for the lesson-card link's description text further down.
@@ -944,7 +1038,7 @@ class QuizTab(ttk.Frame):
         # ---- quiz.html ----
         # Written questions: the model answer goes to the WrittenModels tab, never into the
         # quiz JSON (get_quiz serves that to every student) or the page.
-        public_questions, written_models = common.split_written_models(self.questions)
+        public_questions, written_models = common.split_written_models(questions)
         quiz_json = {
             "title": lesson_name,
             "subject": subject_slug,
@@ -975,10 +1069,7 @@ class QuizTab(ttk.Frame):
                     drive_bridge.set_written_models(
                         drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, written_models)
             except drive_bridge.DriveBridgeError as e:
-                messagebox.showerror(
-                    "Couldn't reach the Drive bridge",
-                    "The quiz's questions weren't synced to the server, so they've been kept "
-                    "in the page itself for now instead (same as before this feature):\n{}".format(e))
+                res["sync_error"] = str(e)      # shown by _on_generated, before the "Done" message
 
         quiz_meta = {"title": lesson_name, "subject": subject_slug, "lesson": lesson_slug}
         if not content_synced:
@@ -1000,7 +1091,7 @@ class QuizTab(ttk.Frame):
                      .replace("{{SUBJECT_SLUG}}", subject_slug)
                      .replace("{{LESSON_SLUG}}", lesson_slug)
                      .replace("{{LESSON_TITLE}}", lesson_name)
-                     .replace("{{QUESTION_COUNT}}", str(len(self.questions)))
+                     .replace("{{QUESTION_COUNT}}", str(len(questions)))
                      .replace("{{QUIZ_JSON}}", json.dumps(quiz_meta, indent=2))
                      .replace("{{VIDEO_BLOCK}}", quiz_video_block)
                      .replace("{{TRACK_CLASS}}", track_class)
@@ -1028,7 +1119,7 @@ class QuizTab(ttk.Frame):
                                 .replace("{{LESSON_SLUG}}", lesson_slug)
                                 .replace("{{LESSON_TITLE}}", lesson_name)
                                 .replace("{{SUBMIT_MODE}}", submit_mode)
-                                .replace("{{ASSIGN_PROMPT}}", self.assign_prompt_var.get().strip() or
+                                .replace("{{ASSIGN_PROMPT}}", inp["assign_prompt"] or
                                          "Paste your completed assignment below.")
                                 .replace("{{VIDEO_BLOCK}}", assign_video_block)
                                 .replace("{{TRACK_CLASS}}", track_class)
@@ -1066,9 +1157,9 @@ class QuizTab(ttk.Frame):
                               .replace("{{SUBJECT_TITLE}}", subject_title)
                               .replace("{{LESSON_SLUG}}", lesson_slug)
                               .replace("{{LESSON_TITLE}}", lesson_name)
-                              .replace("{{LESSON_DESC}}", self.lesson_desc_var.get().strip())
+                              .replace("{{LESSON_DESC}}", inp["lesson_desc"])
                               .replace("{{VIDEO_BLOCK}}", video_block)
-                              .replace("{{QUESTION_COUNT}}", str(len(self.questions)))
+                              .replace("{{QUESTION_COUNT}}", str(len(questions)))
                               .replace("{{ASSIGNMENT_LINK_BLOCK}}", assign_link_block)
                               .replace("{{TRACK_CLASS}}", track_class)
                      .replace("{{LESSON_URL_PATH}}", location_label))
@@ -1084,17 +1175,17 @@ class QuizTab(ttk.Frame):
         try:
             video_url, video_used_backend = common.set_lesson_video(
                 drive_cfg["web_app_url"], drive_cfg["admin_token"], location_label, "lesson",
-                self.video_url_var.get(), lesson_name, lesson_index_path)
+                inp["video_url"], lesson_name, lesson_index_path)
         except drive_bridge.DriveBridgeError as e:
-            video_url, video_used_backend = self.video_url_var.get().strip(), False
+            video_url, video_used_backend = inp["video_url"].strip(), False
             video_warning = ("The lesson's video couldn't be saved: {}\n\nEverything else was generated "
                               "normally \u2014 fix the Drive bridge connection and click Generate again, or "
                               "paste the video URL again once it's reachable.".format(e))
         else:
-            if video_url and video_url != self.video_url_var.get().strip():
-                self.video_url_var.set(video_url)
+            if video_url and video_url != inp["video_url"].strip():
+                res["new_video_url"] = video_url     # put back into the form by _on_generated
             if video_url and not video_used_backend:
-                video_warning = ("Drive bridge Web App URL/admin token aren't set (top of the window), so the "
+                video_warning = ("Drive bridge Web App URL/admin token aren't set (Settings → Drive bridge), so the "
                                   "lesson video was baked in as a plain, unprotected embed \u2014 configure the "
                                   "Drive bridge to make it lockable.")
 
@@ -1104,34 +1195,69 @@ class QuizTab(ttk.Frame):
             with open(attachments_path, "w", encoding="utf-8") as f:
                 json.dump([], f)
 
+        res["video_warning"] = video_warning
+
         # ---- group/subject index.html: create or update the lesson's card ----
         index_path = common.group_index_path(site_root, subject_slug, group_relpath)
+        res["index_path"] = index_path
         try:
             style_used = common.upsert_lesson_card(
                 site_root, subject_slug, group_relpath, lesson_slug,
-                lesson_name, self.lesson_desc_var.get().strip(), len(self.questions))
+                lesson_name, inp["lesson_desc"], len(questions))
         except ValueError as e:
+            res["card_error"] = str(e)
+            return res
+        res["style_used"] = style_used
+
+        common.run_seo_build(site_root)  # titles / meta / sitemap for the new lesson
+        return res
+
+    def _on_generate_failed(self, inp, e):
+        """Main thread: an unexpected error while writing (disk full, permission denied...)."""
+        self.status_var.set("Generating {} failed: {}".format(inp["location_label"], e))
+        messagebox.showerror("Generate lesson files failed",
+                             "Something went wrong while writing {}:\n\n{}: {}\n\nSome of its files may "
+                             "already have been written; fix the problem and click Generate again.".format(
+                                 inp["lesson_dir"], e.__class__.__name__, e))
+
+    def _on_generated(self, inp, res):
+        """Main thread: show what the worker collected, then refresh the lesson lists."""
+        subject_slug, group_relpath, lesson_slug = inp["subject_slug"], inp["group_relpath"], inp["lesson_slug"]
+        lesson_dir, location_label = inp["lesson_dir"], inp["location_label"]
+        index_path = res["index_path"]
+        if res["sync_error"] is not None:
+            messagebox.showerror(
+                "Couldn't reach the Drive bridge",
+                "The quiz's questions weren't synced to the server, so they've been kept "
+                "in the page itself for now instead (same as before this feature):\n{}".format(res["sync_error"]))
+        if res["new_video_url"] and self.video_url_var.get() == inp["video_url"]:
+            self.video_url_var.set(res["new_video_url"])
+
+        if res["card_error"] is not None:
+            self.status_var.set("Generated {}/ but couldn't update the listing page.".format(location_label))
             messagebox.showerror("Couldn't update the listing page",
                                   "Lesson files were generated at:\n{}\n\nBut inserting the card into\n{}\n"
-                                  "failed:\n\n{}".format(lesson_dir, index_path, e))
+                                  "failed:\n\n{}".format(lesson_dir, index_path, res["card_error"]))
             self._editing = {"subject_slug": subject_slug, "group_relpath": group_relpath, "lesson_slug": lesson_slug}
+            self._clear_dirty(if_rev=inp["rev"])
             self._refresh_lessons()
             if self.on_lessons_changed:
                 self.on_lessons_changed()
             return
 
-        common.run_seo_build(site_root)  # titles / meta / sitemap for the new lesson
+        video_warning = res["video_warning"]
         status = "Generated {}/ ({} files) and updated {} ({} style)".format(
-            location_label, 3 if include_assignment else 2, index_path, style_used)
+            location_label, 3 if res["include_assignment"] else 2, index_path, res["style_used"])
         self.status_var.set(status + (" \u2014 video not saved, see popup" if video_warning else ""))
         done_msg = ("Lesson files created at:\n{}\n\nListing page updated:\n{}\n\n"
-                     "Tip: switch to the Attachment Maker or Assignment Maker tabs to "
-                     "add files or change the submission mode for this lesson.".format(lesson_dir, index_path))
+                     "Tip: the Attachments and Assignment sections add files or change how students "
+                     "submit for this lesson.".format(lesson_dir, index_path))
         if video_warning:
             messagebox.showwarning("Done, with a video issue", done_msg + "\n\n" + video_warning)
         else:
-            messagebox.showinfo("Done", done_msg)
+            theme.notify(self, "Done", done_msg)
         self._editing = {"subject_slug": subject_slug, "group_relpath": group_relpath, "lesson_slug": lesson_slug}
+        self._clear_dirty(if_rev=inp["rev"])
         self._refresh_lessons()
         if lesson_slug in self.delete_lesson_combo["values"]:
             self.delete_lesson_var.set(lesson_slug)

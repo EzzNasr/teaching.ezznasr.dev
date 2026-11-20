@@ -1558,6 +1558,50 @@
       ]
     },
     {
+      "id": "R-QM-BG",
+      "title": "Desktop tool: slow work runs off the Tk thread; results and errors come back on the main thread; a double-click never starts two jobs",
+      "status": "active",
+      "needs": "python",
+      "owner": "quiz-maker",
+      "cmd": [
+        "python",
+        "tests/test_background_runner.py"
+      ]
+    },
+    {
+      "id": "R-QM-BG-2",
+      "title": "Desktop tool: the real window keeps responding while it checks the token, generates (double-clicked: one job), loads for editing (cancellable) and syncs assets, against a slow fake backend",
+      "status": "active",
+      "needs": "python",
+      "owner": "quiz-maker",
+      "cmd": [
+        "python",
+        "tests/test_app_responsive.py"
+      ]
+    },
+    {
+      "id": "R-QM-QLIST",
+      "title": "Desktop tool: question list operations behind multi-select (remove many, keep only, duplicate with a fresh written qid, move as a block, set chapter, summary)",
+      "status": "active",
+      "needs": "python",
+      "owner": "quiz-maker",
+      "cmd": [
+        "python",
+        "tests/test_question_list.py"
+      ]
+    },
+    {
+      "id": "R-QM-DEPLOY",
+      "title": "Desktop tool: Settings > Deploy backend lists the files from deploy.json, warns before confirming, deploys with one click when nothing blocks it, and its progress window ticks the script steps (fake script, never Google)",
+      "status": "active",
+      "needs": "python",
+      "owner": "quiz-maker",
+      "cmd": [
+        "python",
+        "tests/test_deploy_flow.py"
+      ]
+    },
+    {
       "id": "R-FU2-ONEGROUP",
       "title": "One group per student: in_other_group, move:true, all-or-nothing bulk, audit, atomic under the lock",
       "status": "active",

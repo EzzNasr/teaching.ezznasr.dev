@@ -66,7 +66,13 @@ def main():
         # --- rule validation (client) then a good save
         pg.fill("#rq-rule-watch", "150"); pg.press("#rq-rule-watch", "Tab")
         check("pct 150 shows an inline error and nothing saved", pg.is_visible("#rq-rule-watch-err"))
-        pg.fill("#rq-rule-watch", "70"); pg.press("#rq-rule-watch", "Tab")
+        pg.fill("#rq-rule-watch", "70")
+        # The save is async (write() in assets/requirements.js) and ends with a full re-render that replaces this
+        # input. Mark the input before Tab starts the save, then wait for the fresh one: opening the new-requirement
+        # form while that save was still in flight let its re-render swallow the new card (R-REQ4 race, CI under load).
+        pg.evaluate("document.querySelector('#rq-rule-watch').dataset.stale = '1'")
+        pg.press("#rq-rule-watch", "Tab")
+        pg.wait_for_function("(() => { const e = document.querySelector('#rq-rule-watch'); return e && !e.dataset.stale; })()")
         pg.wait_for_function("!document.querySelector('#rq-rule-watch-err') || document.querySelector('#rq-rule-watch-err').hidden")
         check("pct 70 accepted", pg.input_value("#rq-rule-watch") == "70")
 

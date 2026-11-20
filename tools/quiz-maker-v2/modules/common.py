@@ -276,6 +276,20 @@ def fit_geometry(win, want_w, want_h, min_w=480, min_h=360, margin=80):
     win.minsize(min(min_w, w), min(min_h, h))
 
 
+def safe_grab(win, tries=20):
+    """Make `win` modal without crashing when it is not viewable yet. On X11 (Linux, and CI under xvfb) grab_set
+    raises "grab failed: window not viewable" until the window is mapped; Windows never does. Retry briefly,
+    then give up quietly: the dialog still works, it is just not modal."""
+    try:
+        win.grab_set()
+    except tk.TclError:
+        if tries > 0:
+            try:
+                win.after(50, lambda: safe_grab(win, tries - 1))
+            except tk.TclError:
+                pass
+
+
 def lock_min_width_to_content(win, extra=24):
     """Call once, after all of a window's widgets are built, to raise its
     minimum width to whatever its content actually needs. fit_geometry()
@@ -428,6 +442,13 @@ class ScrollableFrame(tk.Frame):
             return
         w = widget_under
         while w is not None and w is not self:
+            # over a list / table / text box that can scroll itself: let it scroll, not the whole page
+            if w.winfo_class() in ("Treeview", "Listbox", "Text"):
+                try:
+                    if tuple(round(f, 3) for f in w.yview()) != (0.0, 1.0):
+                        return
+                except (tk.TclError, AttributeError):
+                    pass
             w = w.master
         if w is not self:
             return  # pointer is over a different window (e.g. a dialog) — ignore
@@ -1441,7 +1462,7 @@ def sync_site_assets(site_root, drive_web_app_url):
 
 GRADED_BULK_HELP = """Bulk paste format for graded questions \u2014 one block per question:
 
-MCQ (same syntax as the Quiz Maker tab):
+MCQ (same syntax on the Quiz & lesson and Assignment pages):
 Q: What does the def keyword do?
 A) Deletes a variable
 B) Starts a function definition *
@@ -1487,7 +1508,7 @@ literal star at the very end of an option, write \\* instead of *. In a question
 prompt (it is HTML) write \\lt and \\gt instead of < and >. Math is not rendered
 inside the answer dropdowns of a MATCH question.
 
-In both the Quiz Maker and Assignment Maker tabs, a "Ch: N" line on its
+In both the Quiz & lesson and Assignment sections, a "Ch: N" line on its
 own sets the chapter for every question after it, until the next "Ch:"
 line \u2014 same convention in both places. Questions before the first
 "Ch:" line use the chapter selected in the dropdown above this box."""
@@ -2067,35 +2088,126 @@ class WrittenItemDialog(tk.Toplevel):
         self.destroy()
 
 
+BULK_EXAMPLES = (
+    ("Multiple choice", "Q: What does the def keyword do?\nA) Deletes a variable\nB) Starts a function definition *\n"
+                        "C) Defines a class\nD) Imports a module\nE: def marks the start of a function definition.\n"),
+    ("True/False", "TF: Python is a compiled language.\nCorrect: False\nE: Python is interpreted, not compiled.\n"),
+    ("Matching", "MATCH: Match each term to its definition\n- Variable -> Stores a value\n- Loop -> Repeats code\n"
+                 "- Function -> Named block of code\n"),
+    ("Written", "WRITTEN: Explain the difference between a list and a tuple.\nMarks: 4\n"
+                "Model: A list is mutable, a tuple is not.\n"),
+    ("Chapter line", "Ch: 2\n"),
+)
+
+
 class GradedBulkDialog(tk.Toplevel):
-    """Same idea as quiz_tab.py's BulkDialog \u2014 for pasting several
-    questions at once instead of clicking through one at a time. Results
-    land in the same list the +Multiple choice / +True-False / +Matching
-    buttons populate, so it's a shortcut into the visual editor, not a
-    separate storage format."""
+    """Paste several questions at once instead of clicking through one at a time. Results land in the same list
+    the +Multiple choice / +True-False / +Matching / +Written buttons fill, so it is a shortcut into the visual
+    editor, not a separate storage format.
+
+    Layout: the paste box on the left; the format help on the right in its own scrolling panel (it is long, and
+    used to run off the bottom of the screen) that can be hidden; "insert an example" buttons; and a live line
+    that says what will be added as you type."""
 
     def __init__(self, parent, current_chapter=None):
         super().__init__(parent)
-        self.title("Bulk paste graded questions")
+        self.title("Bulk paste questions")
         self.result = None
         self.current_chapter = current_chapter
-        fit_geometry(self, 640, 560, min_w=420, min_h=400)
+        fit_geometry(self, 1060, 680, min_w=640, min_h=420)
         self.resizable(True, True)
 
-        pad = {"padx": 10, "pady": 6}
-        tk.Label(self, text=GRADED_BULK_HELP, justify="left", anchor="w",
-                 fg="gray30", font=("TkDefaultFont", 8), wraplength=600).pack(fill="x", **pad)
-        self.text = tk.Text(self, height=16, wrap="word", undo=True, autoseparators=True, maxundo=-1)
-        self.text.pack(fill="both", expand=True, **pad)
+        head = tk.Frame(self)
+        head.pack(fill="x", padx=14, pady=(12, 4))
+        tk.Label(head, text="Paste your questions", font=("TkDefaultFont", 12, "bold"), anchor="w").pack(side="left")
+        self.help_btn = tk.Button(head, text="Hide format help \u25b8", command=self._toggle_help)
+        self.help_btn.pack(side="right")
 
-        btn_row = tk.Frame(self)
-        btn_row.pack(fill="x", pady=12)
-        tk.Button(btn_row, text="Add questions", command=self._on_add).pack(side="right", padx=10)
-        tk.Button(btn_row, text="Cancel", command=self.destroy).pack(side="right")
+        body = tk.Frame(self)
+        body.pack(fill="both", expand=True, padx=14)
+        self.left = tk.Frame(body)
+        self.left.pack(side="left", fill="both", expand=True)
+        tk.Label(self.left, text="One block per question, separated by a blank line. Questions before the first "
+                                 "\u201cCh: N\u201d line get the chapter chosen on the page.",
+                 fg="gray30", font=("TkDefaultFont", 8), anchor="w", justify="left", wraplength=560).pack(fill="x",
+                                                                                                  pady=(0, 4))
+        box = tk.Frame(self.left)
+        box.pack(fill="both", expand=True)
+        self.text = tk.Text(box, height=16, wrap="word", undo=True, autoseparators=True, maxundo=-1,
+                            font=("Consolas", 10))
+        sb = ttk.Scrollbar(box, orient="vertical", command=self.text.yview)
+        self.text.configure(yscrollcommand=sb.set)
+        self.text.pack(side="left", fill="both", expand=True)
+        sb.pack(side="right", fill="y")
+        ex = tk.Frame(self.left)
+        ex.pack(fill="x", pady=(6, 0))
+        tk.Label(ex, text="Insert an example:", fg="gray30", font=("TkDefaultFont", 8)).pack(side="left", padx=(0, 6))
+        for label, snippet in BULK_EXAMPLES:
+            tk.Button(ex, text=label, command=lambda t=snippet: self._insert_example(t)).pack(side="left", padx=(0, 4))
 
-        lock_min_width_to_content(self)
+        self.right = tk.Frame(body, width=420)
+        self.right.pack(side="right", fill="y", padx=(14, 0))
+        self.right.pack_propagate(False)
+        tk.Label(self.right, text="Format help", font=("TkDefaultFont", 10, "bold"), anchor="w").pack(fill="x",
+                                                                                                    pady=(0, 4))
+        hbox = tk.Frame(self.right)
+        hbox.pack(fill="both", expand=True)
+        help_text = tk.Text(hbox, wrap="word", font=("TkDefaultFont", 9), height=10, cursor="arrow")
+        hsb = ttk.Scrollbar(hbox, orient="vertical", command=help_text.yview)
+        help_text.configure(yscrollcommand=hsb.set)
+        help_text.insert("1.0", GRADED_BULK_HELP)
+        help_text.configure(state="disabled")
+        help_text.pack(side="left", fill="both", expand=True)
+        hsb.pack(side="right", fill="y")
+        self.help_text = help_text
+
+        foot = tk.Frame(self)
+        foot.pack(fill="x", padx=14, pady=12)
+        self.preview_var = tk.StringVar(value="Nothing recognised yet.")
+        tk.Label(foot, textvariable=self.preview_var, anchor="w", font=("TkDefaultFont", 9, "bold")).pack(side="left")
+        tk.Button(foot, text="Add questions", command=self._on_add).pack(side="right", padx=(6, 0))
+        tk.Button(foot, text="Cancel", command=self.destroy).pack(side="right")
+
+        self._preview_job = None
+        self.text.bind("<KeyRelease>", lambda _e: self._schedule_preview())
+        self.text.bind("<<Paste>>", lambda _e: self.after(50, self._schedule_preview))
+        self.text.focus_set()
+
         self.transient(parent)
         self.grab_set()
+
+    def _toggle_help(self):
+        if self.right.winfo_manager():
+            self.right.pack_forget()
+            self.help_btn.configure(text="Show format help \u25c2")
+        else:
+            self.right.pack(side="right", fill="y", padx=(14, 0))
+            self.help_btn.configure(text="Hide format help \u25b8")
+
+    def _insert_example(self, snippet):
+        current = self.text.get("1.0", "end").rstrip("\n")
+        sep = "\n\n" if current.strip() else ""
+        self.text.insert("end", sep + snippet if current else snippet)
+        self.text.see("end")
+        self._schedule_preview()
+
+    def _schedule_preview(self):
+        if self._preview_job:
+            self.after_cancel(self._preview_job)
+        self._preview_job = self.after(350, self._update_preview)
+
+    def _update_preview(self):
+        self._preview_job = None
+        try:
+            items = parse_bulk_graded_questions(self.text.get("1.0", "end"), current_chapter=self.current_chapter)
+        except Exception:                      # half-typed text: say nothing rather than fail
+            items = []
+        if not items:
+            self.preview_var.set("Nothing recognised yet — see the format help for the shapes it reads."
+                                 if self.text.get("1.0", "end").strip() else "Nothing recognised yet.")
+            return
+        from modules import qlist
+        self.preview_var.set("Will add: " + qlist.summary(items))
 
     def _on_add(self):
         items = parse_bulk_graded_questions(self.text.get("1.0", "end"), current_chapter=self.current_chapter)
