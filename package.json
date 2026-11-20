@@ -8,7 +8,8 @@
     "test:live": "bash scripts/test_all.sh --live",
     "inventory": "node scripts/gs_inventory.js",
     "actions": "node scripts/action_inventory.js",
-    "deploy:backend": "node scripts/deploy_backend.js"
+    "deploy:backend": "node scripts/deploy_backend.js",
+    "make:pepper": "node scripts/make_pepper.js"
   },
   "engines": {
     "node": ">=22"

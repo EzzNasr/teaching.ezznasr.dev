@@ -9,7 +9,7 @@
   "tools/quiz-maker-v2/apps_script/Requirements.gs",
   "tools/quiz-maker-v2/apps_script/Revenue.gs"
  ],
- "count": 1056,
+ "count": 1068,
  "items": {
   "ATTENDANCE_HEADERS": {
    "kind": "var",
@@ -726,6 +726,16 @@
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
    "hash": "fd78cab685c7fd89"
   },
+  "PW_ROUNDS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "fe1f4a0f166410bd"
+  },
+  "PW_STRONG_PREFIX": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2295d1760a1d4d4c"
+  },
   "QUIZ_ACCESS_HEADERS": {
    "kind": "var",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
@@ -820,6 +830,11 @@
    "kind": "var",
    "file": "tools/quiz-maker-v2/apps_script/Revenue.gs",
    "hash": "74a6620317738e8b"
+  },
+  "RICH_TEXT_TAGS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "c3d424adfb5d8e6c"
   },
   "STUDENT_CORE_COLS": {
    "kind": "var",
@@ -1084,7 +1099,7 @@
   "_findStudentRow": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "f0fec2c1701a57c8"
+   "hash": "c7901d4afd518a61"
   },
   "_findVideoRow": {
    "kind": "function",
@@ -1315,6 +1330,11 @@
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
    "hash": "71db11dac3d1959e"
+  },
+  "_isStaffRow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "a6b1124ef9362b08"
   },
   "_isTruthyFlag": {
    "kind": "function",
@@ -1866,6 +1886,36 @@
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
    "hash": "b693c8e8d7a587be"
   },
+  "_pwDerive": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "696989334cfcaff8"
+  },
+  "_pwHex": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "82525af82b345bba"
+  },
+  "_pwIsStrong": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "8d9f6710456e53df"
+  },
+  "_pwMakeStrong": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "dc81e4a712eea5f7"
+  },
+  "_pwMatches": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2eabdfca98ffd4e8"
+  },
+  "_pwPepper": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "94aad5009235737f"
+  },
   "_quizAccessIndex": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
@@ -1955,6 +2005,16 @@
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
    "hash": "b77f49515fa1642f"
+  },
+  "_safeQuizContentJson": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "1f487adc087fbd5a"
+  },
+  "_safeRichText": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "cf73581c9b051080"
   },
   "_scanTextColumns": {
    "kind": "function",
@@ -3709,7 +3769,7 @@
   "handleAdminSetQuizContent": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "09ad10d1c8cb1b14"
+   "hash": "7749b6fb9791a186"
   },
   "handleAdminSetQuizLock": {
    "kind": "function",
@@ -3774,7 +3834,7 @@
   "handleLoginStudent": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "d754a29f45a98913"
+   "hash": "477b5c4a71b29b4c"
   },
   "handleRecordWatch": {
    "kind": "function",
@@ -3804,7 +3864,7 @@
   "handleResetPassword": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "0e7721fdcc120b42"
+   "hash": "fca305edc1931abf"
   },
   "handleTelegramUpdate": {
    "kind": "function",

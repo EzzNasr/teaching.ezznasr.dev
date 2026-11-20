@@ -873,8 +873,8 @@
           parentInput.focus();
           return;
         }
-        if (!val || val.length < 4) {
-          error.textContent = "Choose a password (4+ characters).";
+        if (!val || val.length < 8) {   // new passwords only; sign-in accepts any older, shorter one
+          error.textContent = "Choose a password (8+ characters).";
           pw.input.focus();
           return;
         }
@@ -975,8 +975,8 @@
           return;
         }
         parentPhone = parentCheck.phone;
-        if (!val || val.length < 4) {
-          error.textContent = "Choose a password (4+ characters).";
+        if (!val || val.length < 8) {   // new passwords only; sign-in accepts any older, shorter one
+          error.textContent = "Choose a password (8+ characters).";
           pw.input.focus();
           return;
         }
@@ -1380,8 +1380,8 @@
           parentInput.focus();
           return;
         }
-        if (!val || val.length < 4) {
-          errorMsg.textContent = "Choose a password (4+ characters).";
+        if (!val || val.length < 8) {   // new passwords only; sign-in accepts any older, shorter one
+          errorMsg.textContent = "Choose a password (8+ characters).";
           pw.input.focus();
           return;
         }
@@ -1487,8 +1487,8 @@
           return;
         }
         parentPhone = parentCheck.phone;
-        if (!val || val.length < 4) {
-          errorMsg.textContent = "Choose a password (4+ characters).";
+        if (!val || val.length < 8) {   // new passwords only; sign-in accepts any older, shorter one
+          errorMsg.textContent = "Choose a password (8+ characters).";
           pw.input.focus();
           return;
         }

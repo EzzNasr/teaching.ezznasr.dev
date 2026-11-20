@@ -49,6 +49,7 @@ function load(codeGsPath, opts = {}) {
   }
   const props = { STUDENTS_SHEET_ID: 'STU', DATA_SHEET_ID: 'DATA', ADMIN_TOKEN: 'tok', SUBMISSIONS_FOLDER_ID: 'f', QUIZ_RESULTS_FOLDER_ID: 'f', ...(opts.props || {}) };
   const cache = {};
+  const hmacCalls = { n: 0 };
   const drive = { files: [], n: 0, createdWhileLocked: 0, onCreate: null };
   const lockState = { held: false, busy: false, waits: [] };
   const getSS = id => { if (!spreadsheets[id]) { const ss = new Spreadsheet(id); if (id === 'STU') ss.insertSheet('Students'); spreadsheets[id] = ss; } return spreadsheets[id]; };
@@ -82,6 +83,8 @@ function load(codeGsPath, opts = {}) {
       getUuid: () => crypto.randomUUID(),
       DigestAlgorithm: { MD5: 'md5' }, Charset: { UTF_8: 1 },
       computeDigest: (alg, s) => [...crypto.createHash('md5').update(String(s)).digest()].map(b => (b > 127 ? b - 256 : b)),
+      // (String value, String key) overload, signed bytes like Apps Script. Counts calls so tests can see the rounds.
+      computeHmacSha256Signature: (v, k) => { hmacCalls.n++; return [...crypto.createHmac('sha256', String(k)).update(String(v)).digest()].map(b => (b > 127 ? b - 256 : b)); },
       newBlob: (b, m, n) => ({ b, m, n, setName() {} }),
       base64Decode: s => Buffer.from(s, 'base64'),
       base64Encode: b => Buffer.from(b).toString('base64'),
@@ -119,6 +122,6 @@ function load(codeGsPath, opts = {}) {
   if (typeof ctx.att_route_ !== 'function') vm.runInContext('function att_route_() { return null; }', ctx);
   const post = payload => JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify(payload) } }).text);
   const setNow = iso => { if (!opts.clock) throw new Error("load(..., { clock: true }) is needed before setNow"); nowMs = iso === null ? null : new Date(iso).getTime(); };
-  return { ctx, post, getSS, props, cache, drive, lockState, setNow, files };
+  return { ctx, post, getSS, props, cache, drive, lockState, setNow, files, hmacCalls };
 }
 module.exports = { load };

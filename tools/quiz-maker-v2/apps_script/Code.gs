@@ -1047,6 +1047,7 @@ function _findStudentRow(sheet, phone) {
         is_admin: _isTruthyFlag(get("is_admin")),
         year: get("year") || null,
         parent_phone: get("parent_phone") || null,
+        role: String(get("role") == null ? "" : get("role")).trim().toLowerCase(),
       };
     }
   }
@@ -1164,16 +1165,81 @@ function _reserveLoginAttempt(phone) {
   return key;
 }
 
+// A staff row: the owner (is_admin), a teacher or an assistant (any role other than blank / "student").
+function _isStaffRow(found) {
+  if (!found) return false;
+  if (found.is_admin) return true;
+  var role = String(found.role == null ? "" : found.role).trim().toLowerCase();
+  return role !== "" && role !== "student";
+}
+
+// -- Staff password storage (R-SEC02) -----------------------------------------------------------------------
+// The browser still sends SHA-256(password) as before (nothing changes for cached pages). For a staff row the
+// server stores "s2$<rounds>$<salt>$<hex>", where hex = HMAC-SHA256 with the PASSWORD_PEPPER script property,
+// applied <rounds> times to "<salt>:<browser hash>". So the stored cell is no longer something you can sign in
+// with, and a copy of the sheet without the pepper cannot be checked offline cheaply.
+// - A staff row with the old plain value signs in once with it and is upgraded at that moment.
+// - Without PASSWORD_PEPPER (fewer than 16 characters) nothing is upgraded, so deploying before the property is
+//   set is harmless. Never change or delete the pepper once rows are upgraded: those staff could not sign in.
+// - A staff password set by hand in the sheet (the browser hash, as before) is upgraded at the next sign-in.
+var PW_STRONG_PREFIX = "s2$";
+var PW_ROUNDS = 2000;
+
+function _pwPepper() {
+  var p = _props().getProperty("PASSWORD_PEPPER");
+  return p && String(p).length >= 16 ? String(p) : "";
+}
+
+function _pwHex(bytes) {
+  var s = "";
+  for (var i = 0; i < bytes.length; i++) s += ("0" + ((bytes[i] + 256) % 256).toString(16)).slice(-2);
+  return s;
+}
+
+function _pwDerive(clientHash, salt, rounds, pepper) {
+  var h = salt + ":" + String(clientHash);
+  for (var i = 0; i < rounds; i++) h = _pwHex(Utilities.computeHmacSha256Signature(h, pepper));
+  return h;
+}
+
+function _pwIsStrong(stored) {
+  return String(stored).indexOf(PW_STRONG_PREFIX) === 0;
+}
+
+// The strong form of a browser hash, or "" when no pepper is set.
+function _pwMakeStrong(clientHash) {
+  var pepper = _pwPepper();
+  if (!pepper) return "";
+  var salt = Utilities.getUuid().replace(/-/g, "");
+  return PW_STRONG_PREFIX + PW_ROUNDS + "$" + salt + "$" + _pwDerive(clientHash, salt, PW_ROUNDS, pepper);
+}
+
+function _pwMatches(stored, clientHash) {
+  stored = String(stored == null ? "" : stored);
+  if (!stored) return false;
+  if (!_pwIsStrong(stored)) return p4_safeEq_(stored, String(clientHash));
+  var parts = stored.split("$");
+  var rounds = parseInt(parts[1], 10);
+  if (parts.length !== 4 || !(rounds > 0 && rounds <= 100000) || !parts[2]) return false;
+  var pepper = _pwPepper();
+  if (!pepper) throw new Error("Sign-in for this account is not available right now. Please tell the teacher.");
+  return p4_safeEq_(parts[3], _pwDerive(clientHash, parts[2], rounds, pepper));
+}
+
 function handleLoginStudent(payload) {
   if (!payload.phone || !payload.password_hash) throw new Error("Missing phone or password.");
   var sheet = _students();
   var found = _findStudentRow(sheet, payload.phone);
   if (!found) throw new Error("No account found for that phone number — register first.");
   var attemptKey = _reserveLoginAttempt(found.phone);
-  if (String(found.password_hash) !== String(payload.password_hash)) {
+  if (!_pwMatches(found.password_hash, payload.password_hash)) {
     throw new Error("Incorrect password.");
   }
   CacheService.getScriptCache().remove(attemptKey);
+  if (_isStaffRow(found) && !_pwIsStrong(found.password_hash)) {
+    var strong = _pwMakeStrong(payload.password_hash);
+    if (strong) sheet.getRange(found.row, found.cols.password_hash).setNumberFormat("@").setValue(strong);
+  }
   // ONE ACTIVE SESSION PER ACCOUNT: every student login issues a fresh token, which
   // signs out whatever device held the old one (its next call fails the token check
   // and video.js shows "signed in on another device"). This is what stops one paid
@@ -1236,9 +1302,10 @@ function handleResetPassword(payload) {
     var sheet = _students();
     var found = _findStudentRow(sheet, payload.phone);
 
-    // Admin accounts are never resettable this way: the dashboard exposes
-    // every student's data, so it needs a stronger check than a phone number.
-    if (found && found.is_admin) throw new Error("This account can't be reset here.");
+    // Staff accounts (the owner, teachers, assistants: any row with is_admin or a role) are never
+    // resettable this way: they see other students' data, so they need a stronger check than a
+    // phone number. The owner resets a staff password by hand. (R-SEC04)
+    if (found && _isStaffRow(found)) throw new Error("This account can't be reset here.");
 
     var stored = found ? _phoneKey(found.parent_phone) : "";
     var hasParent = stored.length === 10 && stored !== _phoneKey(found.phone);
@@ -4077,12 +4144,48 @@ function handleGetQuiz(payload) {
 // correct answers) as a JSON string. Kept in sync by the desktop Quiz Maker the
 // same way admin_set_video keeps a video's URL in sync — called every time a
 // lesson's quiz is generated or edited, so this is always what get_quiz reads.
+// R-SEC07: question text is HTML (for example <code>def</code>). Only plain formatting tags are kept, with no
+// attributes; whole blocks such as <script> or <svg> are removed with their content; any other tag is removed and
+// its text kept; a "<" left over that could start a tag becomes "&lt;". The pages run their own allow-list too
+// (safeHtml in quiz.js / assign.js): this copy keeps the stored content clean for every reader.
+var RICH_TEXT_TAGS = ["b", "strong", "i", "em", "u", "s", "code", "pre", "kbd", "sub", "sup", "br", "p", "span",
+  "small", "mark", "ul", "ol", "li", "blockquote"];
+
+function _safeRichText(s) {
+  var t = String(s == null ? "" : s);
+  t = t.replace(/<!--[\s\S]*?(-->|$)/g, "");
+  t = t.replace(/<(script|style|iframe|frame|object|embed|template|noscript|textarea|svg|math|title|xmp|noembed|noframes|select|head)\b[\s\S]*?(<\/\1\s*>|$)/gi, "");
+  t = t.replace(/<(\/?)([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g, function (all, close, name) {
+    name = name.toLowerCase();
+    return RICH_TEXT_TAGS.indexOf(name) === -1 ? "" : "<" + close + name + ">";
+  });
+  var keep = new RegExp("<(?!\\/?(?:" + RICH_TEXT_TAGS.join("|") + ")>)(?=[a-zA-Z\\/!?])", "g");
+  return t.replace(keep, "&lt;");
+}
+
+// The quiz fields the pages show as HTML: an MCQ's "q" and every other type's "prompt". Returns the JSON text,
+// re-written only when something had to be removed (so ordinary saves keep the Quiz Maker's exact text).
+function _safeQuizContentJson(json) {
+  var obj = JSON.parse(json);
+  var changed = false;
+  if (obj && Array.isArray(obj.questions)) {
+    obj.questions.forEach(function (q) {
+      if (!q || typeof q !== "object") return;
+      ["q", "prompt"].forEach(function (k) {
+        if (typeof q[k] !== "string") return;
+        var clean = _safeRichText(q[k]);
+        if (clean !== q[k]) { q[k] = clean; changed = true; }
+      });
+    });
+  }
+  return changed ? JSON.stringify(obj) : json;
+}
+
 function handleAdminSetQuizContent(payload) {
   _requireAdminAny(payload);
   var lesson = _lessonPath(payload.lesson);
   if (!payload.content_json) throw new Error("Missing content_json.");
-  var json = String(payload.content_json);
-  JSON.parse(json); // throws on malformed input, before anything is written
+  var json = _safeQuizContentJson(String(payload.content_json)); // throws on malformed input, before anything is written
 
   var result = _withLock(function () {
     var ss = _ss();

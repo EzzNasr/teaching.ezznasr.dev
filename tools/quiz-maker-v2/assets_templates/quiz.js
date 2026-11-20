@@ -36,12 +36,37 @@
     if (slot) slot.setAttribute("data-manual-mount", "1");
   })();
 
+  // Question text written by staff is HTML (for example <code>def</code>), but only plain formatting tags
+  // survive: no attributes, no script, no images or frames. It is parsed in an inert <template>, then rebuilt
+  // from fresh elements, so nothing in it can run. Keep this function identical in quiz.js and assign.js
+  // (test R-SEC07 checks both).
+  var SAFE_TAGS = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, S: 1, CODE: 1, PRE: 1, KBD: 1, SUB: 1, SUP: 1, BR: 1, P: 1,
+    SPAN: 1, SMALL: 1, MARK: 1, UL: 1, OL: 1, LI: 1, BLOCKQUOTE: 1 };
+  var DROP_TAGS = { SCRIPT: 1, STYLE: 1, IFRAME: 1, FRAME: 1, OBJECT: 1, EMBED: 1, TEMPLATE: 1, NOSCRIPT: 1,
+    TEXTAREA: 1, SVG: 1, MATH: 1, TITLE: 1, XMP: 1, NOEMBED: 1, NOFRAMES: 1, SELECT: 1, HEAD: 1 };
+  function safeHtml(html) {
+    var tpl = document.createElement("template");
+    tpl.innerHTML = String(html == null ? "" : html);
+    var out = document.createDocumentFragment();
+    (function copy(from, to) {
+      for (var n = from.firstChild; n; n = n.nextSibling) {
+        if (n.nodeType === 3) to.appendChild(document.createTextNode(n.nodeValue));
+        else if (n.nodeType === 1) {
+          var tag = String(n.nodeName).toUpperCase();
+          if (DROP_TAGS[tag]) continue;
+          if (SAFE_TAGS[tag]) { var e = document.createElement(tag.toLowerCase()); to.appendChild(e); copy(n, e); }
+          else copy(n, to);
+        }
+      }
+    })(tpl.content || tpl, out);
+    return out;
+  }
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     attrs = attrs || {};
     Object.keys(attrs).forEach(function (k) {
       if (k === "class") node.className = attrs[k];
-      else if (k === "html") node.innerHTML = attrs[k];
+      else if (k === "rich") node.appendChild(safeHtml(attrs[k]));
       else node.setAttribute(k, attrs[k]);
     });
     (children || []).forEach(function (c) {
@@ -654,7 +679,7 @@
 
         root.appendChild(el("div", { class: "qz-progress" }, ["Question " + (st.index + 1) + " of " + qs.length]));
         root.appendChild(card([
-          el("p", { class: "qz-question", html: q.prompt }),
+          el("p", { class: "qz-question", rich: q.prompt }),
           body,
           st.error ? el("div", { class: "qz-error" }, [st.error]) : null,
           nav,
@@ -816,7 +841,7 @@
           }
           if (it.explain) lines.push(el("span", { class: "qz-verdict__explain" }, [it.explain]));
           kids.push(el("div", { class: "qz-review__item" }, [
-            el("p", { class: "qz-question", html: (k + 1) + ". " + it.question }),
+            el("p", { class: "qz-question", rich: (k + 1) + ". " + it.question }),
             el("span", { class: "qz-verdict__tag qz-verdict__tag--" + tagClass }, [tagText]),
           ].concat(lines)));
         });
@@ -1055,7 +1080,7 @@
           "  \u00b7  Score " + state.score + "/" + state.index,
         ]);
 
-        var questionEl = el("p", { class: "qz-question", html: q.prompt });
+        var questionEl = el("p", { class: "qz-question", rich: q.prompt });
         var optionsWrap = el("div", { class: "qz-options" });
         var actions = el("div", { class: "qz-actions" });
 

@@ -1789,6 +1789,28 @@
         "python",
         "tests/test_deploy_runner.py"
       ]
+    },
+    {
+      "id": "R-SEC07",
+      "title": "Phase 2.5 A: quiz question text keeps formatting but never script: the server cleans q/prompt on admin_set_quiz_content; the pages rebuild it through safeHtml() (identical in quiz.js and assign.js), el() has no raw-HTML key",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "cmd": [
+        "node",
+        "tests/test_sec07_rich_text.js",
+        "apps_script/Code.gs"
+      ]
+    },
+    {
+      "id": "R-SEC04-02",
+      "title": "Phase 2.5 A: staff rows (owner, teacher, assistant) cannot be reset by parent phone; staff password cells are upgraded to the salted, iterated form at the next sign-in, the stored cell does not sign in, students unchanged, no pepper = no upgrade; new passwords need 8+ characters while older short ones still sign in; scripts/make_pepper.js makes a usable pepper",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "cmd": [
+        "node",
+        "tests/test_sec_staff_accounts.js",
+        "apps_script/Code.gs"
+      ]
     }
   ]
 }
