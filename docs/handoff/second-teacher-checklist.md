@@ -20,7 +20,8 @@ npm run deploy:backend          # dry run
 npm run deploy:backend -- --yes # the deploy
 ```
 
-This ships steps A (security), B (separation fix), C (science subject) and F (teacher revenue report) together.
+This ships steps A (security), B (separation fix), C (science subject), F (teacher revenue report) and G (his
+browser page «دروسي»: quiz questions and files from a signed-in session, the lesson file list) together.
 Commit the new row the script adds to `docs/runbooks/backend-deploys.md`.
 
 ## 3. Make him a teacher
@@ -32,21 +33,22 @@ Commit the new row the script adds to `docs/runbooks/backend-deploys.md`.
       then shows Science only.
 - [ ] Optional: he links Telegram on «فريقي» so payment requests for Science reach him.
 
-## 4. GitHub (for his lesson pages)
+## 4. GitHub (optional: only if he will send files by pull request)
 
 - [ ] Invite his GitHub account (Settings > Collaborators, role Write).
 - [ ] In `.github/teachers.json` on `main`: put his account in `"github"`, his name in `"name"`, and rename the handle
       `science-teacher` if you like (his branches are `teacher/<handle>/...`). Keep `"auto_merge": false`.
 - [ ] Ruleset on `main` and the Actions settings: `teacher-publishing.md`, "One-time setup".
 
-## 5. Live trial (plan step G, together with Claude)
+## 5. Live trial (together with Claude)
 
-A demo teacher account and demo data on the live site: sign in, publish one lesson with a video through a pull
-request, check «إيراداتي» and the downloaded report, check what he cannot see (another subject, your students,
-your revenue page), then remove the demo account, demo rows and demo lesson.
+A demo teacher account on the live site: sign in, open «دروسي», add a video, a quiz question and a file to one seeded
+lesson, check the lesson page shows them, check «إيراداتي», check what he cannot do (another subject, rename or add a
+lesson, your students, your revenue page), then remove the demo account, the demo video, question and file.
 
 ## 6. His lessons
 
-The Science pages are ready and empty: `science/preparatory/grade-3-preparatory/` (3rd Prep) and
-`science/secondary/grade-1-secondary/` (1st Secondary, Integrated Science). Each shows "Lessons coming soon" until the
-first lesson is generated with the Quiz Maker.
+You seed them; he fills them in. 3rd Prep has the teacher's list (2026-11-23): 4 units, each with شرح, تجميعات المعاصر, حل and امتحانين شاملين (only the exams have a quiz; no assignments), titled "Unit 1 | شرح" and so on. 1st Secondary keeps 9 numbered placeholders until its list comes (then edit the seed file and run it with `--rewrite secondary/grade-1-secondary`). The lessons of both grades (`science/preparatory/grade-3-preparatory/`, 3rd Prep,
+and `science/secondary/grade-1-secondary/`, 1st Secondary, Integrated Science) come from
+`tools/quiz-maker-v2/seeds/science.json` (`teacher-publishing.md`, "Seeding lessons"). He cannot rename, add or
+delete a lesson; he adds the videos, quiz questions and files on «دروسي» in his browser.

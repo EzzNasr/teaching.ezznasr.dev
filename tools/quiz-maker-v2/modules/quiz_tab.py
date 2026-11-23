@@ -224,19 +224,23 @@ class QuizTab(ttk.Frame):
         row2.pack(fill="x", padx=8, pady=4)
         tk.Label(row2, text="Lesson name:", width=14, anchor="w").pack(side="left")
         self.lesson_name_var = tk.StringVar()
-        tk.Entry(row2, textvariable=self.lesson_name_var).pack(side="left", fill="x", expand=True)
+        self.lesson_name_entry = tk.Entry(row2, textvariable=self.lesson_name_var)
+        self.lesson_name_entry.pack(side="left", fill="x", expand=True)
 
         row3 = tk.Frame(info_frame)
         row3.pack(fill="x", padx=8, pady=4)
         tk.Label(row3, text="Description:", width=14, anchor="w").pack(side="left")
         self.lesson_desc_var = tk.StringVar()
-        tk.Entry(row3, textvariable=self.lesson_desc_var).pack(side="left", fill="x", expand=True)
+        self.lesson_desc_entry = tk.Entry(row3, textvariable=self.lesson_desc_var)
+        self.lesson_desc_entry.pack(side="left", fill="x", expand=True)
 
         row4 = tk.Frame(info_frame)
         row4.pack(fill="x", padx=8, pady=4)
         tk.Label(row4, text="Video embed URL:", width=14, anchor="w").pack(side="left")
         self.video_url_var = tk.StringVar()
         tk.Entry(row4, textvariable=self.video_url_var).pack(side="left", fill="x", expand=True)
+        self.video_update_btn = tk.Button(row4, text="Update", command=self._update_lesson_video)
+        self.video_update_btn.pack(side="left", padx=6)
         tk.Label(info_frame, text="Leave blank to keep a placeholder box (YouTube embed URL, e.g. https://www.youtube.com/embed/VIDEO_ID)",
                  fg="gray30", font=("TkDefaultFont", 8)).pack(anchor="w", padx=8, pady=(0, 6))
 
@@ -289,23 +293,26 @@ class QuizTab(ttk.Frame):
                                   font=("TkDefaultFont", 9, "bold"))
         self.load_btn.pack(side="left")
         tk.Button(btn_row_del, text="Preview in browser", command=self._preview_lesson).pack(side="left", padx=6)
-        tk.Button(btn_row_del, text="New lesson / clear form", command=self._new_lesson).pack(side="right")
+        self.new_lesson_btn = tk.Button(btn_row_del, text="New lesson / clear form", command=self._new_lesson)
+        self.new_lesson_btn.pack(side="right")
         # the destructive / recovery actions on their own row, away from the everyday ones
-        btn_row_del2 = tk.Frame(del_frame)
+        btn_row_del2 = self.lesson_admin_row = tk.Frame(del_frame)
         btn_row_del2.pack(fill="x", padx=8, pady=(2, 4))
-        tk.Button(btn_row_del2, text="Delete lesson...", command=self._delete_lesson,
-                  fg="#8a1f1f").pack(side="left")
+        self.delete_lesson_btn = tk.Button(btn_row_del2, text="Delete lesson...", command=self._delete_lesson,
+                                           fg="#8a1f1f")
+        self.delete_lesson_btn.pack(side="left")
         tk.Button(btn_row_del2, text="Recover deleted lesson...", command=self._recover_lesson).pack(side="left", padx=6)
         tk.Button(btn_row_del2, text="Empty trash...", command=self._empty_trash,
                   fg="#8a1f1f").pack(side="left")
-        tk.Label(del_frame,
+        self.open_help = tk.Label(del_frame,
                  text="Preview/Load/Delete use the Subject selected above. \u201cLoad for editing\u201d pulls that "
                       "lesson's questions, chapters, name, description, video and assignment prompt back into "
                       "the form below \u2014 change what you need, then Generate lesson files to save it in place "
                       "(existing files are overwritten, its listing card is updated, nothing is duplicated). "
                       "Deleted lessons move to _deleted-lessons/ next to your site (not published, recoverable) "
                       "until emptied.",
-                 fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=640).pack(anchor="w", padx=8, pady=(0, 6))
+                 fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=640)
+        self.open_help.pack(anchor="w", padx=8, pady=(0, 6))
 
         q_frame = tk.LabelFrame(self, text="Questions")
         q_frame.pack(fill="both", expand=True, **pad)
@@ -342,6 +349,16 @@ class QuizTab(ttk.Frame):
         self.generate_btn = tk.Button(gen_row, text="Generate lesson files", command=self._generate,
                                       font=("TkDefaultFont", 10, "bold"), height=2)
         self.generate_btn.pack(fill="x")
+        # Teacher mode only (apply_teacher_lock): sends the questions to the server, writes no page.
+        self.save_questions_btn = tk.Button(gen_row, text="Save quiz questions", command=self._save_questions,
+                                            font=("TkDefaultFont", 10, "bold"), height=2)
+        self.teacher_note = tk.Label(gen_row, fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=640,
+                                     text="Teacher mode: the owner makes the lessons and their names. Open a "
+                                          "lesson above, then add its videos (Update), its quiz questions (Save quiz "
+                                          "questions) and its files (Attachment section). Nothing here changes the "
+                                          "lesson pages.")
+        self.teacher_locked = False
+        self._frames = {"info": info_frame, "assign": assign_frame, "gen": gen_row}
 
         # Page order, top to bottom, the way a lesson is made: open (or start) a lesson, its details, the
         # questions, the assignment, the quiz-page video, then Generate.
@@ -385,6 +402,8 @@ class QuizTab(ttk.Frame):
             self.delete_lesson_var.set("")
 
     def _delete_lesson(self):
+        if self._teacher_refuses("Deleting a lesson"):
+            return
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
             messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
@@ -658,7 +677,141 @@ class QuizTab(ttk.Frame):
             "save them in place.".format(lesson_slug, len(self.questions)))
         self._clear_dirty()
 
+    # -- teacher mode (Phase 2.5 step G): the owner makes lessons, the teacher fills them in --------------
+
+    def apply_teacher_lock(self, locked):
+        """Restricted teacher: no renaming (name/description read-only), no new/deleted/recovered lessons, no
+        assignment settings and no Generate (they write lesson pages). Videos (Update buttons, backend only) and
+        quiz questions (Save quiz questions, backend only) stay. Owner: everything as before."""
+        locked = bool(locked)
+        if locked == self.teacher_locked:
+            return
+        self.teacher_locked = locked
+        state = "readonly" if locked else "normal"
+        if not hasattr(self, "_owner_help"):
+            self._owner_help = self.open_help.cget("text")
+        self.open_help.configure(text=(
+            "Pick one of the owner's lessons and click “Load for editing”: its name, videos and quiz "
+            "questions come into the form below. The name is fixed. Change a video and click its Update button; "
+            "change the questions and click Save quiz questions. Files go in the Attachment section."
+        ) if locked else self._owner_help)
+        self.lesson_name_entry.configure(state=state)
+        self.lesson_desc_entry.configure(state=state)
+        if locked:
+            self._saved_pack = {w: w.pack_info() for w in (self.new_lesson_btn, self.lesson_admin_row,
+                                                           self._frames["assign"], self.generate_btn)}
+            for w in self._saved_pack:
+                w.pack_forget()
+            self.save_questions_btn.pack(fill="x")
+            self.teacher_note.pack(anchor="w", pady=(6, 0))
+        else:
+            self.save_questions_btn.pack_forget()
+            self.teacher_note.pack_forget()
+            for w, info in self._saved_pack.items():
+                info.pop("in", None)
+                w.pack(**info)
+
+    def _teacher_refuses(self, what):
+        if self.teacher_locked:
+            messagebox.showinfo("Made by the owner", "{} is done by the owner. In teacher mode you add a lesson's "
+                                "videos, quiz questions and files.".format(what))
+            return True
+        return False
+
+    def _selected_lesson(self):
+        """(site_root, subject_slug, group_relpath, lesson_slug, lesson_dir) of the lesson picked in "Open an
+        existing lesson", or None after telling the user what is missing."""
+        site_root = self.site_root_var.get().strip()
+        if not site_root or not os.path.isdir(site_root):
+            messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings \u2192 Site folder, Ctrl+,).")
+            return None
+        lesson_slug = self.delete_lesson_var.get().strip()
+        if not lesson_slug:
+            messagebox.showinfo("No lesson selected", "Pick a lesson in \u201cOpen an existing lesson\u201d first.")
+            return None
+        subject_slug, group_relpath = self._subject_slug(), self._group_relpath()
+        return (site_root, subject_slug, group_relpath, lesson_slug,
+                os.path.join(common.group_dir(site_root, subject_slug, group_relpath), lesson_slug))
+
+    def _update_lesson_video(self):
+        """Set (or clear) the video on the lesson's main page without regenerating anything. For a teacher it only
+        goes to the backend (common.set_lesson_video); the owner's page gets the usual placeholder."""
+        sel = self._selected_lesson()
+        if not sel:
+            return
+        _site, subject_slug, group_relpath, lesson_slug, lesson_dir = sel
+        index_path = os.path.join(lesson_dir, "index.html")
+        lesson_key = common.lesson_url_path(subject_slug, group_relpath, lesson_slug)
+        drive_cfg = common.get_drive_config(common.load_config())
+        video_url = self.video_url_var.get()
+        title = self.lesson_name_var.get().strip() or lesson_slug.replace("-", " ").title()
+
+        def failed(e):
+            self.status_var.set("Lesson video not updated.")
+            if isinstance(e, FileNotFoundError):
+                messagebox.showerror("No lesson page found", "{}/index.html doesn't exist.".format(lesson_slug))
+            elif isinstance(e, drive_bridge.DriveBridgeError):
+                messagebox.showerror("Couldn't reach the Drive bridge", str(e))
+            else:
+                messagebox.showerror("Lesson video not updated", "{}: {}".format(e.__class__.__name__, e))
+
+        def done(result):
+            embed_url, _used_backend = result
+            if embed_url != self.video_url_var.get().strip():
+                self.video_url_var.set(embed_url)
+            self.status_var.set("Updated the lesson video for {}".format(lesson_key))
+            theme.notify(self, "Done", "Lesson video cleared." if not embed_url else
+                         "Lesson video saved (starts locked if new \u2014 unlock it from the dashboard when ready).")
+
+        background.run_in_background(
+            self, lambda job: common.set_lesson_video(drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key,
+                                                      "lesson", video_url, title, index_path),
+            done, failed, name="Updating the lesson video", disable=[self.video_update_btn])
+
+    def _save_questions(self):
+        """Teacher mode: send the question list to the server (get_quiz serves it), write no page."""
+        sel = self._selected_lesson()
+        if not sel:
+            return
+        _site, subject_slug, group_relpath, lesson_slug, lesson_dir = sel
+        if self._editing != {"subject_slug": subject_slug, "group_relpath": group_relpath, "lesson_slug": lesson_slug}:
+            messagebox.showinfo("Load the lesson first", "Click \u201cLoad for editing\u201d on {} first, so its "
+                                "saved questions are not replaced by mistake.".format(lesson_slug))
+            return
+        if not os.path.isfile(os.path.join(lesson_dir, "quiz.html")):
+            messagebox.showerror("Not a lesson", "{} has no quiz page; the owner adds lessons.".format(lesson_slug))
+            return
+        drive_cfg = common.get_drive_config(common.load_config())
+        if not (drive_cfg["web_app_url"] and drive_cfg["admin_token"]):
+            messagebox.showerror("Drive bridge not set", "Set the Drive bridge URL and your token in Settings first.")
+            return
+        lesson_key = common.lesson_url_path(subject_slug, group_relpath, lesson_slug)
+        public, models = common.split_written_models(copy.deepcopy(self.questions))
+        quiz_json = {"title": self.lesson_name_var.get().strip() or lesson_slug, "subject": subject_slug,
+                     "lesson": lesson_slug, "questions": public}
+        rev = self._dirty_rev
+
+        def task(job):
+            drive_bridge.set_quiz_content(drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, quiz_json)
+            if models:
+                drive_bridge.set_written_models(drive_cfg["web_app_url"], drive_cfg["admin_token"], lesson_key, models)
+            return len(public)
+
+        def done(n):
+            self._clear_dirty(if_rev=rev)
+            self.status_var.set("Saved {} quiz question(s) for {}".format(n, lesson_key))
+            theme.notify(self, "Done", "Saved {} quiz question(s). Students see them on the quiz page now.".format(n))
+
+        def failed(e):
+            self.status_var.set("Quiz questions not saved.")
+            messagebox.showerror("Quiz questions not saved", "{}: {}".format(e.__class__.__name__, e))
+
+        background.run_in_background(self, task, done, failed, name="Saving quiz questions for " + lesson_key,
+                                     disable=[self.save_questions_btn])
+
     def _new_lesson(self):
+        if self._teacher_refuses("Starting a new lesson"):
+            return
         if self.questions or self.lesson_name_var.get().strip():
             if not messagebox.askyesno("Clear form?",
                                         "This clears the lesson name, description, video, assignment prompt, "
@@ -678,6 +831,8 @@ class QuizTab(ttk.Frame):
         self.status_var.set("Form cleared \u2014 ready for a new lesson.")
 
     def _recover_lesson(self):
+        if self._teacher_refuses("Recovering a lesson"):
+            return
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
             messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
@@ -705,6 +860,8 @@ class QuizTab(ttk.Frame):
             self.on_lessons_changed()
 
     def _empty_trash(self):
+        if self._teacher_refuses("Emptying the trash"):
+            return
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
             messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
@@ -947,6 +1104,8 @@ class QuizTab(ttk.Frame):
         return common.slugify(label)
 
     def _generate(self):
+        if self._teacher_refuses("Generating lesson pages"):
+            return
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
             messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")
@@ -965,6 +1124,11 @@ class QuizTab(ttk.Frame):
         subject_title = self.subject_var.get()
         group_relpath = self._group_relpath()
         lesson_slug = common.slugify(lesson_name)
+        # A loaded lesson keeps its folder when its name changes (Phase 2.5 step G): the owner's seeded lessons live
+        # in neutral folders (chapter-1-lesson-2) under a topic name, and a new name must not fork a second lesson.
+        if (self._editing and self._editing["subject_slug"] == self._subject_slug()
+                and self._editing["group_relpath"] == self._group_relpath()):
+            lesson_slug = self._editing["lesson_slug"]
         if not lesson_slug:
             messagebox.showerror("Invalid lesson name", "Lesson name must contain at least one letter or number.")
             return
@@ -1096,6 +1260,8 @@ class QuizTab(ttk.Frame):
                      .replace("{{VIDEO_BLOCK}}", quiz_video_block)
                      .replace("{{TRACK_CLASS}}", track_class)
                      .replace("{{LESSON_URL_PATH}}", location_label))
+        if not questions:   # only the owner's seeded lessons (seed_lessons.py) start empty; the teacher adds them later
+            quiz_html = quiz_html.replace("0 questions. Instant feedback.", "Instant feedback.")
         with open(quiz_path, "w", encoding="utf-8") as f:
             f.write(quiz_html)
 
@@ -1163,6 +1329,13 @@ class QuizTab(ttk.Frame):
                               .replace("{{ASSIGNMENT_LINK_BLOCK}}", assign_link_block)
                               .replace("{{TRACK_CLASS}}", track_class)
                      .replace("{{LESSON_URL_PATH}}", location_label))
+        if not questions:
+            lesson_index_html = lesson_index_html.replace("0 questions &middot; instant feedback", "Instant feedback")
+        if not inp.get("include_quiz", True):
+            # A seeded lesson with no quiz (seed_lessons.py "quiz": false): no Quiz link. quiz.html is still written,
+            # because a lesson folder is recognised by it (list_existing_lessons, the teacher publish check).
+            lesson_index_html = re.sub(r'\n\s*<a class="lesson-link frame" href="/' + re.escape(location_label) +
+                                       r'/quiz\.html">.*?</a>', "", lesson_index_html, count=1, flags=re.DOTALL)
         lesson_index_path = os.path.join(lesson_dir, "index.html")
         with open(lesson_index_path, "w", encoding="utf-8") as f:
             f.write(lesson_index_html)

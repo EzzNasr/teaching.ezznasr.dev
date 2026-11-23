@@ -187,8 +187,32 @@ class AssignmentTab(ttk.Frame):
         self.update_btn = tk.Button(gen_row, text="Update assignment page", command=self._update,
                                     font=("TkDefaultFont", 10, "bold"), height=2)
         self.update_btn.pack(fill="x")
+        # Teacher mode (apply_teacher_lock): the assignment's text, type and questions live in the lesson's page,
+        # which the owner makes; only the two video controls above stay.
+        self._page_frames = (prompt_frame, mode_frame, graded_frame, gen_row)
+        self.teacher_locked = False
+        self.teacher_note = tk.Label(self, fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=640,
+                                     text="Teacher mode: the assignment page (its text, submission type and questions) "
+                                          "is made by the owner. You can set its two videos above.")
 
         self._refresh_groups()
+
+    def apply_teacher_lock(self, locked):
+        """Restricted teacher (Phase 2.5 step G): hide everything that writes assignment.html; videos stay."""
+        locked = bool(locked)
+        if locked == self.teacher_locked:
+            return
+        self.teacher_locked = locked
+        if locked:
+            self._saved_pack = [(w, w.pack_info()) for w in self._page_frames]
+            for w, _ in self._saved_pack:
+                w.pack_forget()
+            self.teacher_note.pack(anchor="w", padx=10, pady=12)
+        else:
+            self.teacher_note.pack_forget()
+            for w, info in self._saved_pack:
+                info.pop("in", None)
+                w.pack(**info)
 
     # -- graded questions list ---------------------------------------------
 
@@ -594,6 +618,10 @@ class AssignmentTab(ttk.Frame):
     # -- update -------------------------------------------------------------
 
     def _update(self):
+        if self.teacher_locked:
+            messagebox.showinfo("Made by the owner", "The assignment page is made by the owner. In teacher mode you "
+                                "set its videos.")
+            return
         site_root = self.site_root_var.get().strip()
         if not site_root or not os.path.isdir(site_root):
             messagebox.showerror("Site location missing", "Pick a valid site folder first (Settings → Site folder, Ctrl+,).")

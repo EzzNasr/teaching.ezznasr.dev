@@ -1441,6 +1441,14 @@ function doPost(e) {
       case "delete_attachment":
         return _json(handleDeleteAttachment(payload));
 
+      // Phase 2.5 step G: a lesson's file list kept on the server (the teacher's browser page "My lessons"),
+      // shown by attachments.js next to the lesson's attachments.json.
+      case "get_attachments":
+        return _json(handleGetAttachments(payload));
+
+      case "admin_set_attachments":
+        return _json(handleAdminSetAttachments(payload));
+
       case "upload_submission":
         return _json(handleUploadSubmission(payload));
 
@@ -1651,7 +1659,7 @@ function doPost(e) {
 }
 
 function handleUploadAttachment(payload) {
-  _requireAdmin(payload);
+  _requireAdminAny(payload);
   if (!payload.data_base64 || !payload.filename) {
     throw new Error("Missing file data.");
   }
@@ -1670,7 +1678,7 @@ function handleUploadAttachment(payload) {
 }
 
 function handleDeleteAttachment(payload) {
-  _requireAdmin(payload);
+  _requireAdminAny(payload);
   if (!payload.file_id) throw new Error("Missing file_id.");
   // P4-S1 (plan 0.2): the admin token alone no longer trashes ANY Drive file it is handed. The file
   // must sit inside the attachments folder (ATTACHMENTS_FOLDER_ID, the folder handleUploadAttachment
@@ -1700,6 +1708,100 @@ function handleDeleteAttachment(payload) {
   if (!inside) throw new Error("Not authorized.");
   file.setTrashed(true);
   return { ok: true };
+}
+
+// ---- A lesson's file list on the server (Phase 2.5 step G) -------------------------------------------------------
+// One row per lesson in the "Attachments" tab: items_json = [{title, drive_file_id, type, section}], the shape of a
+// lesson's attachments.json plus section = the page that shows the file: "lesson" (default), "quiz" or "assignment". The teacher's browser page (dashboard/my-lessons.html) uploads a file
+// (upload_attachment) and saves the new list here; the lesson page (assets/attachments.js) shows the
+// attachments.json entries first, then these. get_attachments is public: titles and Drive ids are what the page shows
+// anyway (the files are "anyone with the link").
+var ATTACH_LIST_HEADERS = ["lesson", "items_json", "updated_at", "updated_by"];
+var ATTACH_LIST_MAX = 40;
+var ATTACH_SECTIONS = ["lesson", "quiz", "assignment"];
+function _attachListCacheKey(lesson) { return "atl:" + _md5(lesson); }
+
+function _findAttachListRow(sheet, lesson) {
+  var last = sheet.getLastRow();
+  if (last < 2) return null;
+  var c = _needCols(sheet, "Attachments", ["lesson", "items_json"]);
+  var values = sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (_canonKey(String(values[i][c.lesson - 1]).trim().toLowerCase()) === lesson) {
+      return { row: i + 2, cols: c, items_json: String(values[i][c.items_json - 1] || "") };
+    }
+  }
+  return null;
+}
+
+function _attachListOf(lesson) {
+  var sheet = _ss().getSheetByName("Attachments");
+  var found = sheet ? _findAttachListRow(sheet, lesson) : null;
+  if (!found || !found.items_json) return [];
+  try { var v = JSON.parse(found.items_json); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+}
+
+// The Quiz Maker's attachments.json shape, checked item by item. Throws on anything else.
+function _cleanAttachItems(items) {
+  if (!Array.isArray(items)) throw new Error("items must be a list.");
+  if (items.length > ATTACH_LIST_MAX) throw new Error("At most " + ATTACH_LIST_MAX + " files per lesson.");
+  return items.map(function (it) {
+    var title = it && typeof it.title === "string" ? it.title.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 200) : "";
+    var id = it && typeof it.drive_file_id === "string" ? it.drive_file_id.trim() : "";
+    var type = it && typeof it.type === "string" ? it.type.trim().toLowerCase() : "";
+    if (!/^[A-Za-z0-9_-]{10,200}$/.test(id)) throw new Error("A file has an invalid Drive id.");
+    if (!/^[a-z0-9]{0,10}$/.test(type)) throw new Error("A file has an invalid type.");
+    var section = it && it.section != null && it.section !== "" ? String(it.section) : "lesson";   // which page shows it
+    if (ATTACH_SECTIONS.indexOf(section) === -1) throw new Error("A file has an invalid section.");
+    return { title: title || "Untitled", drive_file_id: id, type: type, section: section };
+  });
+}
+
+function handleGetAttachments(payload) {
+  var lesson = _lessonPath(payload.lesson);
+  var cache = CacheService.getScriptCache(), key = _attachListCacheKey(lesson), hit = cache.get(key);
+  if (hit) { try { return { ok: true, lesson: lesson, items: JSON.parse(hit) }; } catch (e) { /* read again */ } }
+  var items = _attachListOf(lesson);
+  try { cache.put(key, JSON.stringify(items), 30); } catch (e) { /* too big for the cache: fine */ }
+  return { ok: true, lesson: lesson, items: items };
+}
+
+// Replace a lesson's list. A teacher (or his assistant) may only add files that sit in the attachments folder and were
+// uploaded for one of his subjects (the same test delete_attachment uses); files already on the list may stay.
+function handleAdminSetAttachments(payload) {
+  _requireAdminAny(payload);
+  var lesson = _lessonPath(payload.lesson);
+  var items = _cleanAttachItems(payload.items);
+  var ctx = (typeof P4_GATE_RAN_ !== "undefined" && P4_GATE_RAN_ && P4_CTX_) ? P4_CTX_ : null;
+  if (ctx && typeof p4_isScoped_ === "function" && p4_isScoped_(ctx)) {
+    var had = {};
+    _attachListOf(lesson).forEach(function (it) { if (it && it.drive_file_id) had[it.drive_file_id] = true; });
+    items.forEach(function (it) {
+      if (had[it.drive_file_id]) return;
+      var res = p4_resolveAttachment_({ file_id: it.drive_file_id });
+      if (!res || !res.lessons.every(function (l) { return p4_teacherCovers(ctx, l); })) throw new Error("Not authorized.");
+    });
+  }
+  var json = JSON.stringify(items);
+  var by = String(payload.student_id || (payload.token ? "token" : "")).slice(0, 40);
+  var result = _withLock(function () {
+    var ss = _ss();
+    var sheet = _sheetByName(ss, "Attachments", ATTACH_LIST_HEADERS);
+    _ensureColumns(sheet, ATTACH_LIST_HEADERS);
+    var found = _findAttachListRow(sheet, lesson);
+    var now = _fmt(new Date(), TZ, true);
+    if (found) {
+      sheet.getRange(found.row, found.cols.items_json).setValue(json);
+      var c = _needCols(sheet, "Attachments", ATTACH_LIST_HEADERS);
+      sheet.getRange(found.row, c.updated_at).setNumberFormat("@").setValue(now);
+      sheet.getRange(found.row, c.updated_by).setNumberFormat("@").setValue(by);
+    } else {
+      _appendByHeader(sheet, { lesson: lesson, items_json: json, updated_at: now, updated_by: by });
+    }
+    return { ok: true, lesson: lesson, items: items };
+  });
+  CacheService.getScriptCache().remove(_attachListCacheKey(lesson));
+  return result;
 }
 
 // ---- Upload handlers: slow work OUTSIDE the lock ----------------------------
@@ -8062,14 +8164,16 @@ var P4_ACTIONS = (function () {
       t[n] = r;
     });
   }
-  // Attachments (desktop token only)
-  add("upload_attachment", { rule: "LW", needs: ["LW"], L: ["subject"], Lsoft: ["lesson"], tok: true });
-  add("delete_attachment", { rule: "LW", needs: ["LW"], res: "attachment", tok: true });
+  // Attachments (desktop token, and since Phase 2.5 step G the dashboard session: the teacher's "My lessons" page)
+  add("upload_attachment", { rule: "LW", needs: ["LW"], L: ["subject"], Lsoft: ["lesson"], tok: true, ses: true });
+  add("delete_attachment", { rule: "LW", needs: ["LW"], res: "attachment", tok: true, ses: true });
+  add("admin_set_attachments", { rule: "LW", needs: ["LW"], L: ["lesson"], tok: true, ses: true });
+  add("get_attachments", { rule: "PUB", needs: [] });
   // Videos
   add("admin_set_video", { rule: "LW", needs: ["LW"], L: ["lesson"], tok: true, ses: true });
   add("admin_list_videos", { rule: "LF", needs: [], tok: true, ses: true, filter: "p4f_admin_list_videos" });
   // Quiz content and written models
-  add("admin_set_quiz_content admin_get_quiz_content admin_set_written_models", { rule: "LW", needs: ["LW"], L: ["lesson"], tok: true });
+  add("admin_set_quiz_content admin_get_quiz_content admin_set_written_models", { rule: "LW", needs: ["LW"], L: ["lesson"], tok: true, ses: true });
   add("admin_get_written_models", { rule: "LW", needs: ["LW"], L: ["lesson"], tok: true, ses: true });
   // Locks and tags (dashboard)
   add("admin_set_lesson_lock admin_set_quiz_lock admin_set_lesson_tags", { rule: "LW", needs: ["LW"], L: ["lesson"], ses: true });
@@ -8465,7 +8569,11 @@ function p4_selfTest() {
   t("unknown plain action passes", !denied(teacher(), { action: "something_new" }));
   t("student and legacy assistant fall through", !denied({ kind: "student", via: "session", id: "s", subjects: [], principal: "" }, { action: "admin_get_all" }) && !denied(legacy(), { action: "admin_get_all" }));
   t("token on a session-only row denied", denied(teacher("token"), { action: "admin_set_lesson_lock", lesson: "math/x" }));
-  t("session on a token-only row denied", denied(teacher("session"), { action: "upload_attachment", subject: "math", lesson: "x" }));
+  // No real token-only row is left since Phase 2.5 G (quiz content and files are session rows too): a temporary test row.
+  P4_ACTIONS.admin_selftest_token_only = { rule: "LW", needs: ["LW"], L: ["lesson"], tok: true };
+  try { t("session on a token-only row denied", denied(teacher("session"), { action: "admin_selftest_token_only", lesson: "math/x" })); }
+  finally { delete P4_ACTIONS.admin_selftest_token_only; }
+  t("session may upload a file in its subject (Phase 2.5 G)", !denied(teacher("session"), { action: "upload_attachment", subject: "math", lesson: "x" }));
   t("covered lesson passes", !denied(teacher(), { action: "admin_set_lesson_lock", lesson: "math/sat/x" }));
   t("foreign lesson denied", denied(teacher(), { action: "admin_set_lesson_lock", lesson: "programming/x/y" }));
   t("missing lesson denied", denied(teacher(), { action: "admin_set_lesson_lock" }));

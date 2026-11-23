@@ -1834,7 +1834,7 @@
     },
     {
       "id": "R-P25-C-QM",
-      "title": "Phase 2.5 C: the Quiz Maker knows science: SUBJECTS, teacher mode, the two grade folders found as groups with their accents, the first lesson card replaces the coming-soon note, a science token shows only Science",
+      "title": "Phase 2.5 C+G: the Quiz Maker knows science (SUBJECTS, teacher mode, the two grade folders as groups with their accents, the first card replaces the coming-soon note, a science token shows only Science); the owner's seeded lessons (seeds/science.json) are found in both grades with their titles and pages, seeding again keeps them; a teacher's videos go to the server only; in the real tabs a teacher cannot rename, add or delete lessons, Generate or update the assignment page, while videos, quiz questions and files stay; the owner keeps everything",
       "status": "active",
       "owner": "refactor-2026-11",
       "needs": "python",
@@ -1856,7 +1856,7 @@
     },
     {
       "id": "R-P25-E",
-      "title": "Phase 2.5 E: teacher publishing check (scripts/check_teacher_pr.js + .github/workflows/teacher-publish.yml): rule examples; every owner lesson page passes; the workflow runs from main on pull_request_target, reads the pull request as data, no pull-request text in shell lines, auto-merge only by config; teachers.json valid with auto-merge off; end to end in a temp git repo a lesson branch passes and branches touching dashboard, another subject, workflows, the rules, engines, the front page or adding a script are refused with reasons",
+      "title": "Phase 2.5 E+G: teacher publishing check (scripts/check_teacher_pr.js + .github/workflows/teacher-publish.yml): rule examples; every lesson folder on main is found and every attachments.json passes; the workflow runs from main on pull_request_target, reads the pull request as data, no pull-request text in shell lines, auto-merge only by config; teachers.json valid with auto-merge off; end to end in a temp git repo files added to an existing lesson pass, and renaming a lesson, a new, moved or deleted lesson, a lesson-page edit, the grade page, sitemap, lesson titles, dashboard, another subject, workflows, the rules, engines or a bad file list are refused with reasons",
       "status": "active",
       "owner": "refactor-2026-11",
       "cmd": [
@@ -1872,6 +1872,38 @@
       "cmd": [
         "node",
         "tests/test_p25_revenue.js"
+      ]
+    },
+    {
+      "id": "R-P25-G",
+      "title": "Phase 2.5 G: the teacher fills in lessons from his browser, through the real doPost: a teacher dashboard session saves and reads quiz questions and written models, uploads and deletes files and saves a lesson's file list on the server (admin_set_attachments) only in his subjects; get_attachments is public; the list keeps the attachments.json shape (bad ids, types, more than 40 refused, titles trimmed); a teacher may only add files uploaded for his subjects, files already listed may stay; students, scoped assistants and anonymous callers cannot write; a second (science) teacher never reaches math",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "cmd": [
+        "node",
+        "tests/test_p25_lessons_browser.js"
+      ]
+    },
+    {
+      "id": "R-P25-G-BULK",
+      "title": "Phase 2.5 G: the browser's bulk-paste parser (assets/bulk-parse.js) gives exactly the Quiz Maker's questions (parse_bulk_graded_questions) on 17 blocks: multiple choice (stars, select-all, math stars, escaped star), true/false, matching, written (marks, model on several lines), Ch: lines, --- separators, CRLF, Arabic, junk; the AI instructions name the lesson and every keyword and their examples parse to one question of each kind",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "needs": "python",
+      "cmd": [
+        "node",
+        "tests/test_p25_bulk_parse.js"
+      ]
+    },
+    {
+      "id": "R-P25-G-PAGE",
+      "title": "Phase 2.5 G: dashboard/my-lessons.html (?mock=1) in a browser: only his subjects' lessons, grouped by grade, fixed names shown as text, no add/rename/delete; per lesson the three videos are saved (watch link to embed), cleared, a bad link refused; quiz questions added (multiple choice, true/false), checked before saving, moved, deleted and saved; bulk paste in the Quiz Maker format (instructions fold out and copy exactly to the clipboard for an AI agent) adds every kind, written model answers go to the grading models, never into the quiz; files uploaded for the lesson, quiz or assignment page, listed under that page, deleted after a confirm; outside his subjects refused; unique ids; 390 and 1280 px, light and dark, English with nothing untranslated, no sideways scroll",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "needs": "playwright",
+      "cmd": [
+        "python",
+        "tests/e2e_p25_my_lessons.py"
       ]
     },
     {

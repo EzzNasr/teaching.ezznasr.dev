@@ -79,6 +79,14 @@ def reset():
     _STATE.update(restricted=False, allowed=None, identity=None)
 
 
+def locks_lessons():
+    """True for a restricted teacher (Phase 2.5 step G): the owner makes every lesson (folder, name, pages, place on
+    the grade page); the teacher only fills it in: the three videos (backend only, never the page), the files
+    (attachments.json) and the quiz questions (backend only). So the app hides everything that writes or renames
+    lesson pages, and its teacher pull requests pass scripts/check_teacher_pr.js."""
+    return bool(_STATE["restricted"])
+
+
 def current_identity():
     return _STATE["identity"]
 

@@ -38,6 +38,7 @@
     "master": WORK,
     "access": WORK,
     "my-team": ["teacher"],
+    "my-lessons": ["teacher", "admin"],   // Phase 2.5 G: a teacher fills in the owner's lessons (videos, quiz, files)
     "my-revenue": ["teacher", "admin"],   // Phase 2.5 F: a teacher's own numbers (the owner may look too)
     "team": ["admin"],
     "teacher-stats": ["admin"],

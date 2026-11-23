@@ -234,6 +234,10 @@ class App(tk.Tk):
         self._build_top_bar()
         self._install_busy_indicator()     # before the tabs: the Tags tab starts loading as it is built
         self._build_notebook()
+        # Teacher mode (Phase 2.5 step G): a teacher fills in the owner's lessons; nothing that renames, adds,
+        # deletes or rewrites a lesson page is offered.
+        self.quiz_tab.apply_teacher_lock(teacher_mode.locks_lessons())
+        self.assignment_tab.apply_teacher_lock(teacher_mode.locks_lessons())
         theme.skin(self.content)
         self.quiz_tab.on_dirty_changed = self._show_dirty
         last = self.config_data.get("ui_last_section", 0)
@@ -463,6 +467,8 @@ class App(tk.Tk):
         self.bind_all("<F5>", lambda _e: self._on_tab_changed())
 
     def _page_action(self):
+        if teacher_mode.locks_lessons():
+            return          # Generate / Update assignment page write lesson pages: the owner's job
         tab = self.notebook.nametowidget(self.notebook.select())
         if tab is self.quiz_tab:
             self.quiz_tab._generate()
@@ -595,6 +601,8 @@ class App(tk.Tk):
         self.notebook.configure(height=page.winfo_reqheight())
         action = {0: ("Generate lesson files", "Write this lesson's files and send its quiz (Ctrl+G)"),
                   1: ("Update assignment page", "Write assignment.html for the selected lesson (Ctrl+G)")}.get(index)
+        if teacher_mode.locks_lessons():
+            action = None
         if action:
             self.page_action_btn.configure(text=action[0])
             self._page_action_tip = action[1]

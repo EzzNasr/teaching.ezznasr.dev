@@ -42,13 +42,14 @@
         "L"
       ],
       "via": [
-        "tok"
+        "tok",
+        "ses"
       ],
       "filter": null,
       "fields": {
         "lesson": "lesson"
       },
-      "note": "subject also sent as `subject`"
+      "note": "subject also sent as `subject`; session too since Phase 2.5 G (the teacher page my-lessons.html)"
     },
     {
       "action": "delete_attachment",
@@ -57,12 +58,37 @@
         "L"
       ],
       "via": [
-        "tok"
+        "tok",
+        "ses"
       ],
       "filter": null,
       "fields": {},
       "resolve": "file_id",
-      "note": "lesson resolved from the file's folder; unresolvable = deny"
+      "note": "lesson resolved from the file's folder; unresolvable = deny; session too since Phase 2.5 G (the teacher page my-lessons.html)"
+    },
+    {
+      "action": "admin_set_attachments",
+      "rule": "TEAM",
+      "needs": [
+        "L"
+      ],
+      "via": [
+        "tok",
+        "ses"
+      ],
+      "filter": null,
+      "fields": {
+        "lesson": "lesson"
+      },
+      "note": "Phase 2.5 G: a lesson's file list on the server; new files must be uploads for the caller's subjects"
+    },
+    {
+      "action": "get_attachments",
+      "rule": "PUB",
+      "needs": [],
+      "via": [],
+      "filter": null,
+      "fields": {}
     },
     {
       "action": "admin_set_video",
@@ -98,12 +124,14 @@
         "L"
       ],
       "via": [
-        "tok"
+        "tok",
+        "ses"
       ],
       "filter": null,
       "fields": {
         "lesson": "lesson"
-      }
+      },
+      "note": "session too since Phase 2.5 G (the teacher page my-lessons.html)"
     },
     {
       "action": "admin_get_quiz_content",
@@ -112,12 +140,14 @@
         "L"
       ],
       "via": [
-        "tok"
+        "tok",
+        "ses"
       ],
       "filter": null,
       "fields": {
         "lesson": "lesson"
-      }
+      },
+      "note": "session too since Phase 2.5 G (the teacher page my-lessons.html)"
     },
     {
       "action": "admin_set_written_models",
@@ -126,12 +156,14 @@
         "L"
       ],
       "via": [
-        "tok"
+        "tok",
+        "ses"
       ],
       "filter": null,
       "fields": {
         "lesson": "lesson"
-      }
+      },
+      "note": "session too since Phase 2.5 G (the teacher page my-lessons.html)"
     },
     {
       "action": "admin_get_written_models",
