@@ -4504,7 +4504,7 @@
   "p4_selfTest": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "9235a6305547ebdd"
+   "hash": "8981ab5e1b834605"
   },
   "p4_selfTest_people": {
    "kind": "function",

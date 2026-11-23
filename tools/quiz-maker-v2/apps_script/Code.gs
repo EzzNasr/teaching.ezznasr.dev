@@ -8566,7 +8566,11 @@ function p4_selfTest() {
   t("unknown plain action passes", !denied(teacher(), { action: "something_new" }));
   t("student and legacy assistant fall through", !denied({ kind: "student", via: "session", id: "s", subjects: [], principal: "" }, { action: "admin_get_all" }) && !denied(legacy(), { action: "admin_get_all" }));
   t("token on a session-only row denied", denied(teacher("token"), { action: "admin_set_lesson_lock", lesson: "math/x" }));
-  t("session on a token-only row denied", denied(teacher("session"), { action: "upload_attachment", subject: "math", lesson: "x" }));
+  // No real token-only row is left since Phase 2.5 G (quiz content and files are session rows too): a temporary test row.
+  P4_ACTIONS.admin_selftest_token_only = { rule: "LW", needs: ["LW"], L: ["lesson"], tok: true };
+  try { t("session on a token-only row denied", denied(teacher("session"), { action: "admin_selftest_token_only", lesson: "math/x" })); }
+  finally { delete P4_ACTIONS.admin_selftest_token_only; }
+  t("session may upload a file in its subject (Phase 2.5 G)", !denied(teacher("session"), { action: "upload_attachment", subject: "math", lesson: "x" }));
   t("covered lesson passes", !denied(teacher(), { action: "admin_set_lesson_lock", lesson: "math/sat/x" }));
   t("foreign lesson denied", denied(teacher(), { action: "admin_set_lesson_lock", lesson: "programming/x/y" }));
   t("missing lesson denied", denied(teacher(), { action: "admin_set_lesson_lock" }));

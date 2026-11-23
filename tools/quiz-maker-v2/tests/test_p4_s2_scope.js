@@ -292,7 +292,11 @@ const A = ctx => ctx.P4_ACTIONS;
   t('hand: assistant cannot call any p4_ action but p4_session_scope', ['p4_tg_status', 'p4_teacher_update_student', 'p4_teacher_set_assistant', 'p4_admin_list_teachers'].every(a => den(g({ action: a, student: 'OWNED' }, AS))) && !den(g({ action: 'p4_session_scope' }, AS)));
   t('hand: teacher passes T rows, never O rows', !den(g({ action: 'p4_tg_status' }, S)) && !den(g({ action: 'p4_teacher_update_student', student: 'OWNED' }, S)) && den(g({ action: 'p4_teacher_update_student', student: 'STRANGER' }, S)) && den(g({ action: 'p4_admin_list_teachers' }, S)) && den(g({ action: 'p3_admin_set_role' }, S)));
   t('hand: teacher token cannot use session-only or T rows', den(g({ action: 'p4_tg_status' }, T)) && den(g({ action: 'admin_grading_queue' }, T)) && den(g({ action: 'admin_list_payments' }, T)));
-  t('hand: teacher session cannot use token-only rows', den(g({ action: 'upload_attachment', subject: 'math', lesson: 'x' }, S)) && den(g({ action: 'admin_set_quiz_content', lesson: MATH }, S)));
+  // Phase 2.5 G: quiz content and files are session rows too now (the teacher's browser page). No real token-only row is
+  // left, so the token-only rule is checked on a temporary test row.
+  c.P4_ACTIONS.admin_test_token_only = { rule: 'LW', needs: ['LW'], L: ['lesson'], tok: true };
+  t('hand: teacher session cannot use token-only rows', den(g({ action: 'admin_test_token_only', lesson: MATH }, S)) && !den(g({ action: 'admin_test_token_only', lesson: MATH }, T)));
+  t('hand: teacher session may upload files and save quiz content in his subject only (Phase 2.5 G)', !den(g({ action: 'upload_attachment', subject: 'math', lesson: 'x' }, S)) && !den(g({ action: 'admin_set_quiz_content', lesson: MATH }, S)) && den(g({ action: 'admin_set_quiz_content', lesson: PROG }, S)) && den(g({ action: 'upload_attachment', subject: 'programming', lesson: 'x' }, S)));
   t('hand: unknown admin_/p3_admin_/p4_admin_ actions denied for teacher and assistant', ['admin_x', 'p3_admin_x', 'p4_admin_x'].every(a => den(g({ action: a }, S)) && den(g({ action: a }, T)) && den(g({ action: a }, AS))));
   t('hand: unknown non-admin actions pass (att_*, future student actions)', ['att_login', 'att_anything', 'get_something_new', ''].every(a => !den(g({ action: a }, S))));
   t('hand: missing action passes (the router answers Unknown action)', !den(g({}, S)));
@@ -369,7 +373,8 @@ const A = ctx => ctx.P4_ACTIONS;
   t('H2 true for the teacher\'s own row on a ses row after the gate', c.p4_teacherAllows(rowVals(3), cols, sessionP('admin_grading_queue', S)) === true);
   t('H2 false for another person\'s row', c.p4_teacherAllows(rowVals(5), cols, sessionP('admin_grading_queue', S)) === false);
   t('H2 false for a wrong session token', c.p4_teacherAllows(rowVals(3), cols, sessionP('admin_grading_queue', { student_id: S.student_id, session_token: 'x' })) === false);
-  t('H2 false on an O row and on a token-only row', c.p4_teacherAllows(rowVals(3), cols, sessionP('p3_admin_set_role', S)) === false && c.p4_teacherAllows(rowVals(3), cols, sessionP('upload_attachment', S)) === false);
+  t('H2 false on an O row and on a token-only row', c.p4_teacherAllows(rowVals(3), cols, sessionP('p3_admin_set_role', S)) === false && c.p4_teacherAllows(rowVals(3), cols, sessionP('admin_test_token_only', S)) === false);
+  delete c.P4_ACTIONS.admin_test_token_only;
   t('H2 false once the role was removed after the gate', (() => { g(sessionP('admin_grading_queue', S)); api.setRow('01000000002', 'student', 'math'); const r = c.p4_teacherAllows(rowVals(3), cols, sessionP('admin_grading_queue', S)); api.setRow('01000000002', 'teacher', 'math'); return r === false; })());
   t('H2 false for a scoped assistant (the P3 line handles them)', (() => { g(sessionP('admin_grading_queue', api.S('omar'))); return c.p4_teacherAllows(rowVals(4), cols, sessionP('admin_grading_queue', api.S('omar'))) === false; })());
   t('H2 false after a denied gate', (() => { const r = g(sessionP('p3_admin_set_role', S)); return !!r.deny && c.p4_teacherAllows(rowVals(3), cols, sessionP('admin_grading_queue', S)) === false; })());
