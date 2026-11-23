@@ -304,14 +304,15 @@ class QuizTab(ttk.Frame):
         tk.Button(btn_row_del2, text="Recover deleted lesson...", command=self._recover_lesson).pack(side="left", padx=6)
         tk.Button(btn_row_del2, text="Empty trash...", command=self._empty_trash,
                   fg="#8a1f1f").pack(side="left")
-        tk.Label(del_frame,
+        self.open_help = tk.Label(del_frame,
                  text="Preview/Load/Delete use the Subject selected above. \u201cLoad for editing\u201d pulls that "
                       "lesson's questions, chapters, name, description, video and assignment prompt back into "
                       "the form below \u2014 change what you need, then Generate lesson files to save it in place "
                       "(existing files are overwritten, its listing card is updated, nothing is duplicated). "
                       "Deleted lessons move to _deleted-lessons/ next to your site (not published, recoverable) "
                       "until emptied.",
-                 fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=640).pack(anchor="w", padx=8, pady=(0, 6))
+                 fg="gray30", font=("TkDefaultFont", 8), justify="left", wraplength=640)
+        self.open_help.pack(anchor="w", padx=8, pady=(0, 6))
 
         q_frame = tk.LabelFrame(self, text="Questions")
         q_frame.pack(fill="both", expand=True, **pad)
@@ -687,6 +688,13 @@ class QuizTab(ttk.Frame):
             return
         self.teacher_locked = locked
         state = "readonly" if locked else "normal"
+        if not hasattr(self, "_owner_help"):
+            self._owner_help = self.open_help.cget("text")
+        self.open_help.configure(text=(
+            "Pick one of the owner's lessons and click “Load for editing”: its name, videos and quiz "
+            "questions come into the form below. The name is fixed. Change a video and click its Update button; "
+            "change the questions and click Save quiz questions. Files go in the Attachment section."
+        ) if locked else self._owner_help)
         self.lesson_name_entry.configure(state=state)
         self.lesson_desc_entry.configure(state=state)
         if locked:
