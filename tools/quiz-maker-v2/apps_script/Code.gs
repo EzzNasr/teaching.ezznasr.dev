@@ -9531,7 +9531,25 @@ function p4t_countAssistants_(values, c, tPhone) {
   return n;
 }
 
-// {phone}. Always {ok:true, registered:bool}; only a plain student actually changes.
+// R-P25-B: true when the student is linked to anyone else's teaching: a group this teacher does not own (the owner's
+// groups included), or access, a quiz result, a submission or a payment for a lesson outside his subjects. Such a
+// student belongs (also) to someone else, so a teacher must not turn him into his own assistant.
+function p4t_linkedElsewhere_(ctx, phone) {
+  var k = _phoneKey(phone);
+  if (!k) return true;
+  var ss = _ss(), ds = _dataSs(), me = p4_principalKey_(ctx), owners = p4_ownersMap_(ctx), hit = false;
+  var mine = function (r, f) { return _phoneKey(r[f]) === k; };
+  p4_rows_(ss, "Groups").forEach(function (r) { if (!hit && mine(r, "phone") && owners[_groupKey(r.group)] !== me) hit = true; });
+  [[ss, "Entitlements", "phone", "scope"], [ss, "QuizAccess", "phone", "lesson"], [ds, "QuizResults", "student_id", "lesson"],
+   [ds, "Submissions", "student_id", "lesson"], [ss, "Payments", "phone", "scope"]].forEach(function (t) {
+    if (hit) return;
+    p4_rows_(t[0], t[1]).forEach(function (r) { if (!hit && mine(r, t[2]) && !p4_inSubjects_(ctx, r[t[3]])) hit = true; });
+  });
+  return hit;
+}
+
+// {phone}. Always {ok:true, registered:bool}; only a plain student who is not linked to another teacher (or the
+// owner) actually changes.
 function p4_teacher_set_assistant(payload) {
   payload = payload || {};
   var T = p4t_teacher_(payload);
@@ -9542,7 +9560,7 @@ function p4_teacher_set_assistant(payload) {
   try {
     var R0 = p4t_studentsRead_();
     registered = !!phone && p4t_findIdx_(R0.values, R0.c, phone) >= 0;
-    if (registered) {
+    if (registered && !p4t_linkedElsewhere_(T.ctx, phone)) {
       _withLock(function () {
         var S = p4t_studentsForWrite_();
         var values = S.sheet.getDataRange().getValues(), c = S.c;

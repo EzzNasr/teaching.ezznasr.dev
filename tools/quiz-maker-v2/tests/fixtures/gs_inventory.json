@@ -9,7 +9,7 @@
   "tools/quiz-maker-v2/apps_script/Requirements.gs",
   "tools/quiz-maker-v2/apps_script/Revenue.gs"
  ],
- "count": 1068,
+ "count": 1069,
  "items": {
   "ATTENDANCE_HEADERS": {
    "kind": "var",
@@ -4534,7 +4534,7 @@
   "p4_teacher_set_assistant": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "434e988211370646"
+   "hash": "eb45f3ff7657db04"
   },
   "p4_teacher_update_student": {
    "kind": "function",
@@ -4800,6 +4800,11 @@
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
    "hash": "33bee15aa6a62ae9"
+  },
+  "p4t_linkedElsewhere_": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "592f31696658930a"
   },
   "p4t_lookup_": {
    "kind": "function",

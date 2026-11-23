@@ -1811,6 +1811,16 @@
         "tests/test_sec_staff_accounts.js",
         "apps_script/Code.gs"
       ]
+    },
+    {
+      "id": "R-P25-B",
+      "title": "Phase 2.5 B: teacher separation, generated from the routers: two real teachers (math, programming) with assistants, students, groups, payments, lessons, files and answers; every targeted action on the other teacher's things is Not authorized (token, session, assistant; both directions) with an own-things control; filtered lists never mention the other teacher; owner-only and unlisted actions refused; the owner unchanged; assistants and templates by hand; a teacher cannot turn another teacher's student into his assistant",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "cmd": [
+        "node",
+        "tests/test_p25_separation.js"
+      ]
     }
   ]
 }
