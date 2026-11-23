@@ -4,7 +4,10 @@
 HTML) and no way to add, rename or delete a lesson. On a lesson: the three videos are saved (a watch link becomes an
 embed link), cleared, and say they start locked; quiz questions are added (multiple choice and true/false), checked
 before saving (empty text, missing answer, empty choice), moved, deleted and saved; questions made in the teacher app
-stay as they are; files are uploaded (title, type), listed and deleted after a confirm. A lesson outside his subjects
+stay as they are; a block in the Quiz Maker's bulk format is pasted (instructions unfold and copy exactly to the
+clipboard, for an AI agent) and adds every kind of question, a written question's model answer going to the grading
+models, never into the quiz; files are uploaded for the lesson, quiz or assignment page, listed under that page and
+deleted after a confirm. A lesson outside his subjects
 says so. 390 px and 1280 px, light and dark, Arabic and English (nothing left untranslated), no sideways scroll."""
 import json, os, sys, tempfile, threading
 from functools import partial
@@ -47,7 +50,7 @@ with sync_playwright() as p:
     for width, dark in ((390, False), (390, True), (1280, False)):
         tag = "%dpx %s: " % (width, "dark" if dark else "light")
         full = width == 1280
-        ctx = browser.new_context(viewport={"width": width, "height": 900}, color_scheme="dark" if dark else "light")
+        ctx = browser.new_context(viewport={"width": width, "height": 900}, color_scheme="dark" if dark else "light", permissions=["clipboard-read", "clipboard-write"])
         seal(ctx, allow=(base,))
         pg = ctx.new_page()
         errors, dialogs = [], []
@@ -120,30 +123,62 @@ with sync_playwright() as p:
         check(tag + "saved: the app's question unchanged", saved["questions"][2] == {"type": "written", "id": "w1", "prompt": "Explain why ice floats.", "max_marks": 2})
         check(tag + "saved: title and lesson are the owner's", saved["title"] == "Chapter 1 Lesson 1 | Matter <b>&</b> its states" and saved["lesson"] == "chapter-1-lesson-1")
 
-        # ---- files
-        pg.wait_for_selector("#ml-flist .l-file")
-        check(tag + "the lesson's files are listed", "Worksheet 1" in pg.inner_text("#ml-flist"))
-        pg.click("#ml-upload")
-        check(tag + "upload without a file asks for one", "اختار ملف الأول" in pg.inner_text("#ml-files-msg"))
-        pg.set_input_files("#ml-file", pdf)
-        pg.fill("#ml-file-title", "Worksheet <2>")
-        pg.click("#ml-upload")
-        pg.wait_for_function("document.getElementById('ml-files-msg').className.indexOf('ok') > 0")
+        # ---- bulk paste, with the instructions to copy to an AI agent
+        check(tag + "the bulk panel starts closed", pg.locator("#ml-bulk").is_hidden())
+        pg.click("#ml-bulk-open")
+        check(tag + "the bulk panel opens; its instructions start folded", pg.locator("#ml-bulk").is_visible() and not pg.evaluate("document.getElementById('ml-bulk-help').open"))
+        pg.click("#ml-bulk-help summary")
+        ins = pg.inner_text("#ml-bulk-instructions")
+        check(tag + "the instructions unfold and name this lesson and every keyword",
+              "Chapter 1 Lesson 1 | Matter <b>&</b> its states" in ins and all(k in ins for k in ("Q:", "TF:", "Correct:", "MATCH:", "WRITTEN:", "Marks:", "Model:")), ins[:200])
+        pg.click("#ml-bulk-copy")
+        pg.wait_for_function("document.getElementById('ml-bulk-copy-msg').className.indexOf('ok') > 0")
+        check(tag + "Copy puts exactly the instructions on the clipboard", pg.evaluate("navigator.clipboard.readText()").replace(chr(13) + chr(10), chr(10)) == pg.evaluate("document.getElementById('ml-bulk-instructions').textContent"))   # Windows keeps CRLF
+        pg.click("#ml-bulk-add")
+        check(tag + "an empty paste is refused", "مفيش ولا سؤال اتفهم" in pg.inner_text("#ml-bulk-msg"))
+        before = pg.locator("#ml-qlist .l-q").count()
+        pg.fill("#ml-bulk-text", "Q: Which is a metal?\nA) Iron *\nB) Water\n\nTF: Air has mass.\nCorrect: True\n\nMATCH: Match them\n- Ice -> Solid\n- Steam -> Gas\n\nCh: 2\nWRITTEN: Why does ice float?\nMarks: 3\nModel: It is less dense\nthan water.")
+        pg.click("#ml-bulk-add")
+        check(tag + "a pasted block adds one question of each kind", pg.locator("#ml-qlist .l-q").count() == before + 4 and "اتضاف 4 سؤال (1 اختيار من متعدد، 1 صح وغلط، 1 توصيل، 1 مقالي)" in pg.inner_text("#ml-bulk-msg"), pg.inner_text("#ml-bulk-msg"))
+        check(tag + "the paste box is emptied after adding", pg.input_value("#ml-bulk-text") == "")
+        check(tag + "a written question shows its mark and model answer to the teacher", "Why does ice float?" in pg.inner_text("#ml-qlist") and "It is less dense" in pg.inner_text("#ml-qlist"))
+        pg.click("#ml-save-quiz")
+        pg.wait_for_function("document.getElementById('ml-quiz-msg').innerText.indexOf('8 سؤال') >= 0")
+        saved = pg.evaluate("window.__mlMock.quiz['%s']" % L1)["questions"]
+        check(tag + "saved: the pasted questions, chapter from the lesson (1) until a Ch: line",
+              [q["type"] for q in saved[4:]] == ["mcq", "truefalse", "match", "written"] and saved[4]["chapter"] == 1 and saved[7]["chapter"] == 2, saved[4:])
+        check(tag + "saved: the model answer is not in the quiz students get", "model_answer" not in saved[7] and saved[7]["max_marks"] == 3)
+        models = pg.evaluate("window.__mlMock.models")
+        check(tag + "saved: the model answer went to the grading models", models == [{"question_id": saved[7]["qid"], "max_marks": 3, "model_answer": "It is less dense\nthan water.", "prompt": "Why does ice float?"}], models)
+
+        # ---- files, one box per page of the lesson
+        pg.wait_for_selector("#ml-flist-lesson .l-file")
+        check(tag + "files: three boxes (lesson, quiz, assignment page)", all(pg.locator("#ml-sec-" + x).count() == 1 for x in ("lesson", "quiz", "assignment")))
+        check(tag + "files: each file is listed under its page", "Worksheet 1" in pg.inner_text("#ml-flist-lesson") and "Quiz answers sheet" in pg.inner_text("#ml-flist-quiz")
+              and "Quiz answers sheet" not in pg.inner_text("#ml-flist-lesson") and "لسه مفيش ملفات" in pg.inner_text("#ml-flist-assignment"))
+        pg.click("#ml-upload-assignment")
+        check(tag + "upload without a file asks for one", "اختار ملف الأول" in pg.inner_text("#ml-files-msg-assignment"))
+        pg.set_input_files("#ml-file-assignment", pdf)
+        pg.fill("#ml-file-title-assignment", "Worksheet <2>")
+        pg.click("#ml-upload-assignment")
+        pg.wait_for_function("document.getElementById('ml-files-msg-assignment').className.indexOf('ok') > 0")
         items = pg.evaluate("window.__mlMock.files['%s']" % L1)
-        check(tag + "uploaded and added to the list (title, Drive id, type)", len(items) == 2 and items[1]["title"] == "Worksheet <2>" and items[1]["type"] == "pdf" and items[1]["drive_file_id"].startswith("1mockUpload"), items)
+        check(tag + "uploaded for the assignment page (title, Drive id, type, section)", len(items) == 3 and items[2]["title"] == "Worksheet <2>" and items[2]["type"] == "pdf"
+              and items[2]["section"] == "assignment" and items[2]["drive_file_id"].startswith("1mockUpload") and [i["section"] for i in items[:2]] == ["lesson", "quiz"], items)
         up = [c for c in pg.evaluate("window.__mlMock.calls") if c["action"] == "upload_attachment"][-1]
         check(tag + "the upload names his subject and the lesson, with the file's bytes", up["subject"] == "science" and up["lesson"] == L1 and up["filename"] == "worksheet-2.pdf" and up["data_base64"], {k: up[k] for k in ("subject", "lesson", "filename")})
-        check(tag + "the new file shows as text", "Worksheet <2>" in pg.inner_text("#ml-flist"))
-        pg.locator("#ml-flist .l-file").nth(1).locator("button.danger").click()
-        pg.wait_for_function("document.getElementById('ml-files-msg').innerText.indexOf('اتمسح') >= 0")
-        check(tag + "delete asks first, then removes it from the list and Drive",
-              any("Worksheet <2>" in d for d in dialogs) and len(pg.evaluate("window.__mlMock.files['%s']" % L1)) == 1 and "delete_attachment" in calls())
+        check(tag + "the new file shows as text under the assignment page", "Worksheet <2>" in pg.inner_text("#ml-flist-assignment") and "Worksheet <2>" not in pg.inner_text("#ml-flist-lesson"))
+        pg.locator("#ml-flist-assignment .l-file").nth(0).locator("button.danger").click()
+        pg.wait_for_function("document.getElementById('ml-files-msg-assignment').innerText.indexOf('اتمسح') >= 0")
+        items = pg.evaluate("window.__mlMock.files['%s']" % L1)
+        check(tag + "delete asks first, then removes only that file from the list and Drive",
+              any("Worksheet <2>" in d for d in dialogs) and [i["title"] for i in items] == ["Worksheet 1", "Quiz answers sheet"] and "delete_attachment" in calls(), items)
         check(tag + "no sideways scroll (lesson)", pg.evaluate(NOSCROLL))
 
         # ---- an empty lesson, and one outside his subjects
         pg.goto(URL + "#/lesson/" + enc(L2))
-        pg.wait_for_function("document.getElementById('ml-qlist') && document.getElementById('ml-qlist').innerText.indexOf('لسه مفيش أسئلة') >= 0 && document.getElementById('ml-flist').innerText.indexOf('لسه مفيش ملفات') >= 0")
-        check(tag + "an empty lesson: no questions, no files yet", "لسه مفيش أسئلة" in pg.inner_text("#ml-qlist") and "لسه مفيش ملفات" in pg.inner_text("#ml-flist"))
+        pg.wait_for_function("document.getElementById('ml-qlist') && document.getElementById('ml-qlist').innerText.indexOf('لسه مفيش أسئلة') >= 0 && document.getElementById('ml-flist-lesson') && document.getElementById('ml-flist-quiz').innerText.indexOf('لسه مفيش ملفات') >= 0")
+        check(tag + "an empty lesson: no questions, no files yet", "لسه مفيش أسئلة" in pg.inner_text("#ml-qlist") and "لسه مفيش ملفات" in pg.inner_text("#ml-flist-lesson"))
         pg.goto(URL + "#/lesson/" + enc("math/test/lesson-1"))
         pg.wait_for_selector(".l-state.err")
         check(tag + "a lesson outside his subjects says so", "مش من موادك" in pg.inner_text("main"))

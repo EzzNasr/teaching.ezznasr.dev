@@ -56,6 +56,15 @@
   .l-file-new{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:8px; align-items:center; margin:12px 0 0; }
   .l-state{ font-size:14px; color:var(--ink-dim); padding:10px 0; } .l-state.err{ color:var(--status-fail); }
   .l-note{ font-size:12.5px; color:var(--ink-dim); margin:8px 0 0; line-height:1.7; }
+  .l-bulk{ border:1px dashed var(--line); border-radius:12px; padding:12px; margin:12px 0 0; }
+  .l-bulk[hidden]{ display:none; }
+  .l-bulk details{ margin:0 0 10px; }
+  .l-bulk summary{ cursor:pointer; font-weight:800; }
+  .l-bulk pre{ direction:ltr; text-align:left; white-space:pre-wrap; overflow-wrap:anywhere; font:12.5px/1.6 var(--mono); background:var(--panel-soft,var(--bg)); border:1px solid var(--line); border-radius:10px; padding:10px 12px; max-height:340px; overflow:auto; margin:8px 0; }
+  .l-bulk textarea{ width:100%; min-height:180px; box-sizing:border-box; direction:ltr; text-align:left; font:13.5px/1.6 var(--mono); padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--bg); color:var(--ink); resize:vertical; }
+  .l-sec{ border-top:1px dashed var(--line); padding:12px 0 4px; margin-top:6px; }
+  .l-sec:first-of-type{ border-top:0; margin-top:0; }
+  .l-sec h3{ margin:0 0 4px; font-size:15px; }
   @media (max-width:640px){
     .l-field{ grid-template-columns:minmax(0,1fr); }
     .l-file-new{ grid-template-columns:minmax(0,1fr); }
@@ -64,6 +73,7 @@
 <script src="/assets/theme.js" defer></script>
 <script src="/assets/i18n.js"></script>
 <script src="/assets/i18n/my-lessons.js"></script>
+<script src="/assets/bulk-parse.js"></script>
 </head>
 <body>
 <header>
@@ -155,7 +165,8 @@
       { type: "truefalse", prompt: "Water boils at 100 °C at sea level.", correct: true, explain: "" },
       { type: "written", id: "w1", prompt: "Explain why ice floats.", max_marks: 2 }
     ] } },
-    files: { "science/secondary/grade-1-secondary/chapter-1-lesson-1": [{ title: "Worksheet 1", drive_file_id: "1mockWorksheetAAAAAAAAAA", type: "pdf" }] },
+    files: { "science/secondary/grade-1-secondary/chapter-1-lesson-1": [{ title: "Worksheet 1", drive_file_id: "1mockWorksheetAAAAAAAAAA", type: "pdf", section: "lesson" },
+      { title: "Quiz answers sheet", drive_file_id: "1mockQuizSheetAAAAAAAAAA", type: "pdf", section: "quiz" }] },
     n: 0, calls: []
   };
   function mockCall(p) {
@@ -174,6 +185,7 @@
     }
     if (p.action === "admin_get_quiz_content") return { ok: true, quiz: db.quiz[p.lesson] || null };
     if (p.action === "admin_set_quiz_content") { db.quiz[p.lesson] = JSON.parse(p.content_json); return { ok: true }; }
+    if (p.action === "admin_set_written_models") { db.models = (db.models || []).concat(p.models); return { ok: true }; }
     if (p.action === "get_attachments") return { ok: true, items: (db.files[p.lesson] || []).slice() };
     if (p.action === "upload_attachment") return { ok: true, file_id: "1mockUpload" + (++db.n) + "AAAAAAAAAAAA" };
     if (p.action === "admin_set_attachments") { db.files[p.lesson] = p.items.slice(); return { ok: true, items: p.items }; }
@@ -275,10 +287,17 @@
     var quiz = null;
     var addMcq = el("button", { class: "l-btn ghost", type: "button", id: "ml-add-mcq", text: "+ اختيار من متعدد" });
     var addTf = el("button", { class: "l-btn ghost", type: "button", id: "ml-add-tf", text: "+ صح وغلط" });
+    var bulkBtn = el("button", { class: "l-btn ghost", type: "button", id: "ml-bulk-open", "aria-expanded": "false", text: "+ لصق مجموعة أسئلة" });
     var save = el("button", { class: "l-btn", type: "button", id: "ml-save-quiz", text: "احفظ الأسئلة" });
-    [addMcq, addTf, save].forEach(function (b) { b.disabled = true; });
+    [addMcq, addTf, bulkBtn, save].forEach(function (b) { b.disabled = true; });
     card.appendChild(list);
-    card.appendChild(el("div", { class: "l-actions" }, [addMcq, addTf, save, msg]));
+    card.appendChild(el("div", { class: "l-actions" }, [addMcq, addTf, bulkBtn, save, msg]));
+    var bulk = bulkPanel(key, function (items) { quiz.questions = quiz.questions.concat(items); draw(); });
+    card.appendChild(bulk);
+    bulkBtn.addEventListener("click", function () {
+      bulk.hidden = !bulk.hidden; bulkBtn.setAttribute("aria-expanded", bulk.hidden ? "false" : "true");
+      if (!bulk.hidden) bulk.querySelector("textarea").focus();
+    });
 
     function draw() {
       clear(list);
@@ -287,7 +306,7 @@
     }
     function move(i, d) { var j = i + d; if (j < 0 || j >= quiz.questions.length) return; var t = quiz.questions[i]; quiz.questions[i] = quiz.questions[j]; quiz.questions[j] = t; draw(); }
     function questionBox(q, i) {
-      var kind = q.type === "truefalse" ? tr("صح وغلط") : q.type === "mcq" ? tr("اختيار من متعدد") : tr("سؤال من نوع تاني");
+      var kind = q.type === "truefalse" ? tr("صح وغلط") : q.type === "mcq" ? tr("اختيار من متعدد") : q.type === "match" ? tr("توصيل") : q.type === "written" ? tr("مقالي") : tr("سؤال من نوع تاني");
       var tools = el("span", { class: "tools" }, [
         el("button", { class: "l-btn ghost small", type: "button", "aria-label": tr("لفوق"), text: "↑", on: { click: function () { move(i, -1); } } }),
         el("button", { class: "l-btn ghost small", type: "button", "aria-label": tr("لتحت"), text: "↓", on: { click: function () { move(i, 1); } } }),
@@ -295,8 +314,15 @@
       ]);
       var box = el("div", { class: "l-q", "data-type": q.type || "" }, [el("div", { class: "head" }, [el("span", { text: tr("سؤال {0}", [i + 1]) + " · " + kind }), tools])]);
       if (q.type !== "mcq" && q.type !== "truefalse") {
-        box.appendChild(el("p", {}, [data(String(q.prompt || q.q || ""))]));
-        box.appendChild(el("p", { class: "small", text: "السؤال ده اتعمل من برنامج المدرس؛ بيفضل زي ما هو. تقدر تمسحه أو تغيّر مكانه بس." }));
+        box.appendChild(el("p", { dir: "auto" }, [data(String(q.prompt || q.q || ""))]));
+        if (q.type === "match" && Array.isArray(q.rows)) {
+          box.appendChild(el("ul", { dir: "auto" }, q.rows.map(function (r) { return el("li", {}, [data(String(r.label) + "  \u2192  " + String(r.correct))]); })));
+        }
+        if (q.type === "written") {
+          box.appendChild(el("p", { class: "small", text: tr("مقالي: الطالب بيصوّر إجابته وإنت بتصححها. الدرجة: {0}", [q.max_marks || 1]) }));
+          if (q.model_answer) box.appendChild(el("p", { class: "small", dir: "auto" }, [tr("الإجابة النموذجية (مش بتظهر للطلاب): "), data(q.model_answer)]));
+        }
+        box.appendChild(el("p", { class: "small", text: "السؤال ده بيتغير من «لصق مجموعة أسئلة» بس؛ هنا تقدر تمسحه أو تغيّر مكانه." }));
         return box;
       }
       var prompt = el("textarea", { dir: "auto", "aria-label": tr("نص السؤال"), placeholder: tr("اكتب السؤال هنا") });
@@ -357,51 +383,76 @@
       if (p) { say(msg, p, "err"); return; }
       save.disabled = true; say(msg, tr("بنحفظ…"));
       quiz.title = lessonName(key); quiz.subject = key.split("/")[0]; quiz.lesson = key.split("/").pop();
-      api({ action: "admin_set_quiz_content", lesson: key, content_json: JSON.stringify(quiz) })
+      // A written question's model answer goes to the WrittenModels tab (the grading page), never into the quiz students get.
+      var models = [], pub = JSON.parse(JSON.stringify(quiz));
+      pub.questions.forEach(function (q) {
+        if (q.type === "written" && q.model_answer !== undefined) {
+          models.push({ question_id: q.qid, max_marks: q.max_marks || 1, model_answer: q.model_answer, prompt: q.prompt || "" });
+        }
+        if (q.type === "written") delete q.model_answer;
+      });
+      api({ action: "admin_set_quiz_content", lesson: key, content_json: JSON.stringify(pub) })
+        .then(function () { return models.length ? api({ action: "admin_set_written_models", lesson: key, models: models }) : null; })
         .then(function () { say(msg, tr("اتحفظ: {0} سؤال.", [quiz.questions.length]), "ok"); }, function (e) { say(msg, e.message, "err"); })
         .then(function () { save.disabled = false; });
     });
     api({ action: "admin_get_quiz_content", lesson: key }).then(function (r) {
       quiz = r.quiz && Array.isArray(r.quiz.questions) ? r.quiz : { title: lessonName(key), subject: key.split("/")[0], lesson: key.split("/").pop(), questions: [] };
-      draw(); [addMcq, addTf, save].forEach(function (b) { b.disabled = false; });
+      draw(); [addMcq, addTf, bulkBtn, save].forEach(function (b) { b.disabled = false; });
     }, function (e) { clear(list).appendChild(el("p", { class: "l-state err", text: e.message })); });
     return card;
   }
 
-  // files
+  // bulk paste: the Quiz Maker's format (assets/bulk-parse.js), with the instructions to copy to an AI agent
+  function chapterOf(key) { var m = /chapter-(\d+)-lesson-\d+$/.exec(key); return m ? parseInt(m[1], 10) : null; }
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    return new Promise(function (ok, bad) {
+      var ta = el("textarea", { style: "position:fixed;top:-1000px;opacity:0" }); ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy") ? ok() : bad(new Error("copy")); } catch (e) { bad(e); } finally { ta.remove(); }
+    });
+  }
+  function bulkPanel(key, onAdd) {
+    var text = window.BulkParse ? window.BulkParse.instructions({ title: lessonName(key), course: courseName(courseOf(key)) }) : "";
+    var pre = el("pre", { id: "ml-bulk-instructions", translate: "no", text: text });
+    var copyMsg = el("span", { class: "l-msg", role: "status", id: "ml-bulk-copy-msg" });
+    var copy = el("button", { class: "l-btn ghost small", type: "button", id: "ml-bulk-copy", text: "انسخ التعليمات" });
+    copy.addEventListener("click", function () {
+      copyText(text).then(function () { say(copyMsg, tr("اتنسخت. الصقها لمساعد الذكاء الاصطناعي، وانسخ رده هنا تحت."), "ok"); },
+        function () { say(copyMsg, tr("ما قدرناش ننسخ. علّم النص بالماوس وانسخه."), "err"); });
+    });
+    var details = el("details", { id: "ml-bulk-help" }, [
+      el("summary", { text: "التعليمات: الشكل اللي الأسئلة لازم تتكتب بيه (تقدر تبعتها لمساعد الذكاء الاصطناعي)" }),
+      el("p", { class: "l-note", text: "انسخ التعليمات وابعتها لأي مساعد ذكاء اصطناعي (زي ChatGPT أو Claude) مع شرح الدرس، وهو هيرد بالأسئلة في الشكل ده. انسخ رده والصقه في المربع اللي تحت." }),
+      pre, el("div", { class: "l-actions" }, [copy, copyMsg])
+    ]);
+    var box = el("textarea", { id: "ml-bulk-text", "aria-label": tr("الأسئلة بالشكل ده"), placeholder: "Q: ...\nA) ...\nB) ... *\n\nTF: ...\nCorrect: True" });
+    var msg = el("span", { class: "l-msg", role: "status", id: "ml-bulk-msg" });
+    var add = el("button", { class: "l-btn", type: "button", id: "ml-bulk-add", text: "ضيف الأسئلة دي" });
+    add.addEventListener("click", function () {
+      if (!window.BulkParse) { say(msg, tr("ما قدرناش نحمّل {0}", ["/assets/bulk-parse.js"]), "err"); return; }
+      var items = window.BulkParse.parse(box.value, chapterOf(key));
+      if (!items.length) { say(msg, tr("مفيش ولا سؤال اتفهم. راجع الشكل في التعليمات."), "err"); return; }
+      var n = { mcq: 0, truefalse: 0, match: 0, written: 0 };
+      items.forEach(function (q) { n[q.type] = (n[q.type] || 0) + 1; });
+      onAdd(items);
+      box.value = "";
+      say(msg, tr("اتضاف {0} سؤال ({1} اختيار من متعدد، {2} صح وغلط، {3} توصيل، {4} مقالي). راجعهم واضغط «احفظ الأسئلة».", [items.length, n.mcq, n.truefalse, n.match, n.written]), "ok");
+    });
+    return el("div", { class: "l-bulk", id: "ml-bulk", hidden: "" }, [details, box, el("div", { class: "l-actions" }, [add, msg])]);
+  }
+
+  // files: one box per page of the lesson (lesson, quiz, assignment); each file's section says where it shows
+  var SECTIONS = [["lesson", "صفحة الدرس", "تحت فيديو الدرس"], ["quiz", "صفحة الكويز", "تحت أسئلة الكويز"], ["assignment", "صفحة الواجب", "تحت الواجب"]];
   function filesCard(key) {
     var card = el("section", { class: "l-card", id: "ml-files" }, [el("h2", { text: "الملفات" }),
-      el("p", { class: "sub", text: tr("ملفات PDF أو صور أو Word أو PowerPoint (لحد {0} ميجا). بتظهر للطلاب تحت الدرس على طول.", [MAX_FILE_MB]) })]);
-    var list = el("div", { id: "ml-flist" }, [el("p", { class: "l-state", text: "بنجيب الملفات…" })]);
-    var msg = el("span", { class: "l-msg", role: "status", id: "ml-files-msg" });
-    var fileIn = el("input", { type: "file", id: "ml-file", accept: ".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt", "aria-label": tr("اختار ملف") });
-    var titleIn = el("input", { type: "text", dir: "auto", id: "ml-file-title", placeholder: tr("اسم الملف زي ما الطلاب هيشوفوه"), "aria-label": tr("اسم الملف") });
-    var up = el("button", { class: "l-btn", type: "button", id: "ml-upload", text: "ارفع" });
-    var items = [], owners = [];
-    card.appendChild(list);
-    card.appendChild(el("div", { class: "l-file-new" }, [fileIn, titleIn, up]));
-    card.appendChild(el("div", {}, [msg]));
+      el("p", { class: "sub", text: tr("ملفات PDF أو صور أو Word أو PowerPoint (لحد {0} ميجا) لكل صفحة من صفحات الدرس. بتظهر للطلاب على طول.", [MAX_FILE_MB]) })]);
+    var items = [], owners = [], parts = {};
+    var loading = el("p", { class: "l-state", text: "بنجيب الملفات…" });
+    card.appendChild(loading);
 
     function saveList(next) {
-      return api({ action: "admin_set_attachments", lesson: key, items: next }).then(function (r) { items = r.items || next; draw(); });
-    }
-    function draw() {
-      clear(list);
-      if (!owners.length && !items.length) list.appendChild(el("p", { class: "l-state", text: "لسه مفيش ملفات." }));
-      owners.forEach(function (it) {
-        list.appendChild(el("div", { class: "l-file" }, [el("span", { class: "t" }, [data(it.title || "Untitled")]), el("span", { class: "l-chip", text: tr("من صاحب الموقع") })]));
-      });
-      items.forEach(function (it, i) {
-        var del = el("button", { class: "l-btn danger small", type: "button", text: "امسح" });
-        del.addEventListener("click", function () {
-          if (!window.confirm(tr("تمسح «{0}»؟", [it.title]))) return;
-          del.disabled = true; say(msg, tr("بنمسح…"));
-          var next = items.filter(function (_x, j) { return j !== i; });
-          saveList(next).then(function () { return api({ action: "delete_attachment", file_id: it.drive_file_id }).catch(function () { /* already gone */ }); })
-            .then(function () { say(msg, tr("اتمسح."), "ok"); }, function (e) { del.disabled = false; say(msg, e.message, "err"); });
-        });
-        list.appendChild(el("div", { class: "l-file" }, [el("span", { class: "t" }, [data(it.title || "Untitled")]), el("span", { class: "l-chip", text: String(it.type || "").toUpperCase() || "FILE" }), del]));
-      });
+      return api({ action: "admin_set_attachments", lesson: key, items: next }).then(function (r) { items = r.items || next; drawAll(); });
     }
     function readB64(file) {
       return new Promise(function (ok, bad) {
@@ -411,26 +462,63 @@
         r.readAsDataURL(file);
       });
     }
-    up.addEventListener("click", function () {
-      var file = fileIn.files && fileIn.files[0];
-      if (!file) { say(msg, tr("اختار ملف الأول."), "err"); return; }
-      if (file.size > MAX_FILE_MB * 1048576) { say(msg, tr("الملف أكبر من {0} ميجا.", [MAX_FILE_MB]), "err"); return; }
-      var title = titleIn.value.trim() || file.name.replace(/\.[^.]+$/, "");
-      var type = (/\.([a-z0-9]{1,10})$/i.exec(file.name) || [, ""])[1].toLowerCase();
-      up.disabled = true; say(msg, tr("بنرفع «{0}»…", [title]));
-      readB64(file).then(function (b64) {
-        return api({ action: "upload_attachment", subject: key.split("/")[0], lesson: key, filename: file.name, mime_type: file.type || "application/octet-stream", data_base64: b64 });
-      }).then(function (r) {
-        return saveList(items.concat([{ title: title, drive_file_id: r.file_id, type: type }]));
-      }).then(function () {
-        fileIn.value = ""; titleIn.value = ""; say(msg, tr("اترفع «{0}».", [title]), "ok");
-      }, function (e) { say(msg, e.message, "err"); }).then(function () { up.disabled = false; });
-    });
+    function sectionBox(sec) {
+      var id = sec[0];
+      var list = el("div", { class: "ml-flist", id: "ml-flist-" + id });
+      var msg = el("span", { class: "l-msg", role: "status", id: "ml-files-msg-" + id });
+      var fileIn = el("input", { type: "file", id: "ml-file-" + id, accept: ".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt", "aria-label": tr("اختار ملف") + " · " + tr(sec[1]) });
+      var titleIn = el("input", { type: "text", dir: "auto", id: "ml-file-title-" + id, placeholder: tr("اسم الملف زي ما الطلاب هيشوفوه"), "aria-label": tr("اسم الملف") + " · " + tr(sec[1]) });
+      var up = el("button", { class: "l-btn", type: "button", id: "ml-upload-" + id, text: "ارفع" });
+      up.addEventListener("click", function () {
+        var file = fileIn.files && fileIn.files[0];
+        if (!file) { say(msg, tr("اختار ملف الأول."), "err"); return; }
+        if (file.size > MAX_FILE_MB * 1048576) { say(msg, tr("الملف أكبر من {0} ميجا.", [MAX_FILE_MB]), "err"); return; }
+        var title = titleIn.value.trim() || file.name.replace(/\.[^.]+$/, "");
+        var type = (/\.([a-z0-9]{1,10})$/i.exec(file.name) || [, ""])[1].toLowerCase();
+        up.disabled = true; say(msg, tr("بنرفع «{0}»…", [title]));
+        readB64(file).then(function (b64) {
+          return api({ action: "upload_attachment", subject: key.split("/")[0], lesson: key, filename: file.name, mime_type: file.type || "application/octet-stream", data_base64: b64 });
+        }).then(function (r) {
+          return saveList(items.concat([{ title: title, drive_file_id: r.file_id, type: type, section: id }]));
+        }).then(function () {
+          fileIn.value = ""; titleIn.value = ""; say(msg, tr("اترفع «{0}».", [title]), "ok");
+        }, function (e) { say(msg, e.message, "err"); }).then(function () { up.disabled = false; });
+      });
+      parts[id] = { list: list, msg: msg };
+      return el("div", { class: "l-sec", id: "ml-sec-" + id }, [el("h3", { text: sec[1] }), el("p", { class: "l-msg", text: tr(sec[2]) }), list,
+        el("div", { class: "l-file-new" }, [fileIn, titleIn, up]), el("div", {}, [msg])]);
+    }
+    function drawAll() {
+      SECTIONS.forEach(function (sec) {
+        var id = sec[0], list = clear(parts[id].list), msg = parts[id].msg;
+        var mineOwn = owners.filter(function (it) { return (it.section || "lesson") === id; });
+        var mine = items.map(function (it, i) { return [it, i]; }).filter(function (p) { return (p[0].section || "lesson") === id; });
+        if (!mineOwn.length && !mine.length) list.appendChild(el("p", { class: "l-state", text: "لسه مفيش ملفات." }));
+        mineOwn.forEach(function (it) {
+          list.appendChild(el("div", { class: "l-file" }, [el("span", { class: "t", dir: "auto" }, [data(it.title || "Untitled")]), el("span", { class: "l-chip", text: tr("من صاحب الموقع") })]));
+        });
+        mine.forEach(function (p) {
+          var it = p[0], i = p[1];
+          var del = el("button", { class: "l-btn danger small", type: "button", text: "امسح" });
+          del.addEventListener("click", function () {
+            if (!window.confirm(tr("تمسح «{0}»؟", [it.title]))) return;
+            del.disabled = true; say(msg, tr("بنمسح…"));
+            var next = items.filter(function (_x, j) { return j !== i; });
+            saveList(next).then(function () { return api({ action: "delete_attachment", file_id: it.drive_file_id }).catch(function () { /* already gone */ }); })
+              .then(function () { say(msg, tr("اتمسح."), "ok"); }, function (e) { del.disabled = false; say(msg, e.message, "err"); });
+          });
+          list.appendChild(el("div", { class: "l-file" }, [el("span", { class: "t", dir: "auto" }, [data(it.title || "Untitled")]), el("span", { class: "l-chip", text: String(it.type || "").toUpperCase() || "FILE" }), del]));
+        });
+      });
+    }
     var fromRepo = MOCK ? Promise.resolve([]) : fetch("/" + key + "/attachments.json", { cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : []; }).then(function (j) { return Array.isArray(j) ? j : []; }, function () { return []; });
     Promise.all([api({ action: "get_attachments", lesson: key }), fromRepo]).then(function (r) {
-      items = r[0].items || []; owners = r[1]; draw();
-    }, function (e) { clear(list).appendChild(el("p", { class: "l-state err", text: e.message })); });
+      items = r[0].items || []; owners = r[1];
+      loading.remove();
+      SECTIONS.forEach(function (sec) { card.appendChild(sectionBox(sec)); });
+      drawAll();
+    }, function (e) { loading.className = "l-state err"; loading.textContent = e.message; });
     return card;
   }
 
