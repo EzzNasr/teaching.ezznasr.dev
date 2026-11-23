@@ -7,8 +7,8 @@ before saving (empty text, missing answer, empty choice), moved, deleted and sav
 stay as they are; a block in the Quiz Maker's bulk format is pasted (instructions unfold and copy exactly to the
 clipboard, for an AI agent) and adds every kind of question, a written question's model answer going to the grading
 models, never into the quiz; files are uploaded for the lesson, quiz or assignment page, listed under that page and
-deleted after a confirm. A lesson outside his subjects
-says so. 390 px and 1280 px, light and dark, Arabic and English (nothing left untranslated), no sideways scroll."""
+deleted after a confirm. A lesson the owner made without a quiz or an
+assignment offers only the lesson video and files. A lesson outside his subjects says so. 390 px and 1280 px, light and dark, Arabic and English (nothing left untranslated), no sideways scroll."""
 import json, os, sys, tempfile, threading
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -39,6 +39,7 @@ base = "http://127.0.0.1:%d" % srv.server_address[1]
 URL = base + "/dashboard/my-lessons.html?mock=1"
 L1 = "science/secondary/grade-1-secondary/chapter-1-lesson-1"
 L2 = "science/preparatory/grade-3-preparatory/chapter-1-lesson-2"
+L0 = "science/preparatory/grade-3-preparatory/chapter-1-lesson-1"   # no quiz, no assignment (mock parts)
 enc = lambda k: k.replace("/", "%2F")
 NOSCROLL = "document.documentElement.scrollWidth <= window.innerWidth + 1"
 pdf = os.path.join(tempfile.mkdtemp(), "worksheet-2.pdf")
@@ -179,6 +180,13 @@ with sync_playwright() as p:
         pg.goto(URL + "#/lesson/" + enc(L2))
         pg.wait_for_function("document.getElementById('ml-qlist') && document.getElementById('ml-qlist').innerText.indexOf('لسه مفيش أسئلة') >= 0 && document.getElementById('ml-flist-lesson') && document.getElementById('ml-flist-quiz').innerText.indexOf('لسه مفيش ملفات') >= 0")
         check(tag + "an empty lesson: no questions, no files yet", "لسه مفيش أسئلة" in pg.inner_text("#ml-qlist") and "لسه مفيش ملفات" in pg.inner_text("#ml-flist-lesson"))
+        pg.goto(URL + "#/lesson/" + enc(L0))
+        pg.wait_for_selector("#ml-noquiz")
+        pg.wait_for_selector("#ml-sec-lesson")
+        check(tag + "a lesson with no quiz and no assignment: only the lesson video and lesson files, and a note about the quiz",
+              pg.locator("#ml-video-lesson").count() == 1 and pg.locator("#ml-video-quiz, #ml-video-assignment").count() == 0
+              and pg.locator("#ml-quiz").count() == 0 and "من غير كويز" in pg.inner_text("#ml-noquiz")
+              and pg.locator("#ml-sec-lesson").count() == 1 and pg.locator("#ml-sec-quiz, #ml-sec-assignment").count() == 0)
         pg.goto(URL + "#/lesson/" + enc("math/test/lesson-1"))
         pg.wait_for_selector(".l-state.err")
         check(tag + "a lesson outside his subjects says so", "مش من موادك" in pg.inner_text("main"))

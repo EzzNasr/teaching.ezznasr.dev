@@ -48,7 +48,7 @@ lesson, your students, your revenue page), then remove the demo account, the dem
 
 ## 6. His lessons
 
-You seed them; he fills them in. The lessons of both grades (`science/preparatory/grade-3-preparatory/`, 3rd Prep,
+You seed them; he fills them in. 3rd Prep has the teacher's list (2026-11-23): 4 units, each with شرح, تجميعات المعاصر, حل and امتحانين شاملين (only the exams have a quiz; no assignments), titled "Unit 1 | شرح" and so on. 1st Secondary keeps 9 numbered placeholders until its list comes (then edit the seed file and run it with `--rewrite secondary/grade-1-secondary`). The lessons of both grades (`science/preparatory/grade-3-preparatory/`, 3rd Prep,
 and `science/secondary/grade-1-secondary/`, 1st Secondary, Integrated Science) come from
 `tools/quiz-maker-v2/seeds/science.json` (`teacher-publishing.md`, "Seeding lessons"). He cannot rename, add or
 delete a lesson; he adds the videos, quiz questions and files on «دروسي» in his browser.

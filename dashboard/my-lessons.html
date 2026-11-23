@@ -153,7 +153,7 @@
   // ---------- API (real: AuthEngine.adminCall; mock: an in-memory server for the tests and screenshots) ----------
   var MOCK_DB = {
     titles: {
-      "science/preparatory/grade-3-preparatory/chapter-1-lesson-1": "Chapter 1 Lesson 1",
+      "science/preparatory/grade-3-preparatory/chapter-1-lesson-1": "Unit 1 | شرح",
       "science/preparatory/grade-3-preparatory/chapter-1-lesson-2": "Chapter 1 Lesson 2",
       "science/secondary/grade-1-secondary/chapter-1-lesson-1": "Chapter 1 Lesson 1 | Matter <b>&</b> its states",
       "science/secondary/grade-1-secondary/chapter-1-lesson-2": "Chapter 1 Lesson 2",
@@ -165,6 +165,7 @@
       { type: "truefalse", prompt: "Water boils at 100 °C at sea level.", correct: true, explain: "" },
       { type: "written", id: "w1", prompt: "Explain why ice floats.", max_marks: 2 }
     ] } },
+    parts: { "science/preparatory/grade-3-preparatory/chapter-1-lesson-1": { quiz: false, assignment: false } },
     files: { "science/secondary/grade-1-secondary/chapter-1-lesson-1": [{ title: "Worksheet 1", drive_file_id: "1mockWorksheetAAAAAAAAAA", type: "pdf", section: "lesson" },
       { title: "Quiz answers sheet", drive_file_id: "1mockQuizSheetAAAAAAAAAA", type: "pdf", section: "quiz" }] },
     n: 0, calls: []
@@ -247,15 +248,34 @@
     if (myLessons().indexOf(key) === -1) return [crumbs([{ text: "كل الدروس", href: "#/" }]), el("p", { class: "l-state err", text: "الدرس ده مش من موادك." })];
     var out = [crumbs([{ text: "كل الدروس", href: "#/" }, { text: courseName(courseOf(key)), data: true }, { text: lessonName(key), data: true }])];
     out.push(el("h2", { id: "ml-title", style: "margin:0 0 14px;font-size:22px" }, [data(lessonName(key))]));
-    out.push(videosCard(key), quizCard(key), filesCard(key));
+    // Which pages this lesson has (the owner decides when seeding: some lessons have no quiz or no assignment).
+    var holder = el("div", { id: "ml-parts" }, [el("p", { class: "l-state", text: "بنجيب الدرس…" })]);
+    out.push(holder);
+    partsOf(key).then(function (parts) {
+      if (!holder.isConnected) return;
+      clear(holder);
+      holder.appendChild(videosCard(key, parts));
+      if (parts.quiz) holder.appendChild(quizCard(key));
+      else holder.appendChild(el("section", { class: "l-card", id: "ml-noquiz" }, [el("h2", { text: "أسئلة الكويز" }),
+        el("p", { class: "sub", text: "الدرس ده من غير كويز (صاحب الموقع حدد كده). لو محتاج كويز هنا كلّمه." })]));
+      holder.appendChild(filesCard(key, parts));
+    });
     return out;
+  }
+  // The lesson's own page says whether it links a quiz and an assignment. If it cannot be read, everything is offered.
+  function partsOf(key) {
+    if (MOCK) return Promise.resolve(MOCK_DB.parts[key] || { quiz: true, assignment: true });
+    return fetch("/" + key + "/", { cache: "no-cache" }).then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.text(); })
+      .then(function (html) {
+        return { quiz: html.indexOf('href="/' + key + '/quiz.html"') !== -1, assignment: html.indexOf('href="/' + key + '/assignment.html"') !== -1 };
+      }, function () { return { quiz: true, assignment: true }; });
   }
 
   // videos
-  function videosCard(key) {
+  function videosCard(key, parts) {
     var card = el("section", { class: "l-card", id: "ml-videos" }, [el("h2", { text: "الفيديوهات" }),
       el("p", { class: "sub", text: "الصق لينك يوتيوب أو فيميو واضغط حفظ. الفيديو الجديد بيبدأ مقفول؛ افتحه للطلاب من «الوصول للدروس» لما تبقى جاهز. سيب الخانة فاضية واحفظ علشان تشيل الفيديو." })]);
-    SLOTS.forEach(function (s) {
+    SLOTS.filter(function (s) { return s[0] === "lesson" || (parts && parts[s[0]]); }).forEach(function (s) {
       var v = videoOf(key, s[0]);
       var input = el("input", { type: "url", id: "ml-video-" + s[0], placeholder: "https://www.youtube.com/watch?v=…", value: v ? v.embed_url : "", "aria-label": tr(s[1]) });
       var msg = el("span", { class: "l-msg", role: "status" });
@@ -444,10 +464,11 @@
 
   // files: one box per page of the lesson (lesson, quiz, assignment); each file's section says where it shows
   var SECTIONS = [["lesson", "صفحة الدرس", "تحت فيديو الدرس"], ["quiz", "صفحة الكويز", "تحت أسئلة الكويز"], ["assignment", "صفحة الواجب", "تحت الواجب"]];
-  function filesCard(key) {
+  function filesCard(key, parts) {
+    var sections = SECTIONS.filter(function (sec) { return sec[0] === "lesson" || !parts || parts[sec[0]]; });
     var card = el("section", { class: "l-card", id: "ml-files" }, [el("h2", { text: "الملفات" }),
       el("p", { class: "sub", text: tr("ملفات PDF أو صور أو Word أو PowerPoint (لحد {0} ميجا) لكل صفحة من صفحات الدرس. بتظهر للطلاب على طول.", [MAX_FILE_MB]) })]);
-    var items = [], owners = [], parts = {};
+    var items = [], owners = [], boxes = {};
     var loading = el("p", { class: "l-state", text: "بنجيب الملفات…" });
     card.appendChild(loading);
 
@@ -484,13 +505,13 @@
           fileIn.value = ""; titleIn.value = ""; say(msg, tr("اترفع «{0}».", [title]), "ok");
         }, function (e) { say(msg, e.message, "err"); }).then(function () { up.disabled = false; });
       });
-      parts[id] = { list: list, msg: msg };
+      boxes[id] = { list: list, msg: msg };
       return el("div", { class: "l-sec", id: "ml-sec-" + id }, [el("h3", { text: sec[1] }), el("p", { class: "l-msg", text: tr(sec[2]) }), list,
         el("div", { class: "l-file-new" }, [fileIn, titleIn, up]), el("div", {}, [msg])]);
     }
     function drawAll() {
-      SECTIONS.forEach(function (sec) {
-        var id = sec[0], list = clear(parts[id].list), msg = parts[id].msg;
+      sections.forEach(function (sec) {
+        var id = sec[0], list = clear(boxes[id].list), msg = boxes[id].msg;
         var mineOwn = owners.filter(function (it) { return (it.section || "lesson") === id; });
         var mine = items.map(function (it, i) { return [it, i]; }).filter(function (p) { return (p[0].section || "lesson") === id; });
         if (!mineOwn.length && !mine.length) list.appendChild(el("p", { class: "l-state", text: "لسه مفيش ملفات." }));
@@ -516,7 +537,7 @@
     Promise.all([api({ action: "get_attachments", lesson: key }), fromRepo]).then(function (r) {
       items = r[0].items || []; owners = r[1];
       loading.remove();
-      SECTIONS.forEach(function (sec) { card.appendChild(sectionBox(sec)); });
+      sections.forEach(function (sec) { card.appendChild(sectionBox(sec)); });
       drawAll();
     }, function (e) { loading.className = "l-state err"; loading.textContent = e.message; });
     return card;

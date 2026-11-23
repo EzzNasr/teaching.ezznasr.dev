@@ -33,6 +33,8 @@ window.I18n && window.I18n.add([
   ["سؤال {0}: محتاج اختيارين على الأقل، ومفيش اختيار فاضي.", "Question {0}: needs at least two choices, and no empty choice."],
   ["سؤال {0}: علّم الإجابة الصح.", "Question {0}: mark the correct answer."], ["اتحفظ: {0} سؤال.", "Saved: {0} questions."],
   ["الملفات", "Files"],
+  ["بنجيب الدرس…", "Loading the lesson…"],
+  ["الدرس ده من غير كويز (صاحب الموقع حدد كده). لو محتاج كويز هنا كلّمه.", "This lesson has no quiz (the site owner decided so). If you need one here, ask him."],
   ["+ لصق مجموعة أسئلة", "+ Paste many questions"], ["توصيل", "Matching"], ["مقالي", "Written"],
   ["مقالي: الطالب بيصوّر إجابته وإنت بتصححها. الدرجة: {0}", "Written: the student photographs the answer and you grade it. Full mark: {0}"],
   ["الإجابة النموذجية (مش بتظهر للطلاب): ", "Model answer (never shown to students): "],

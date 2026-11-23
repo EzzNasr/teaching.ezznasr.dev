@@ -1260,6 +1260,8 @@ class QuizTab(ttk.Frame):
                      .replace("{{VIDEO_BLOCK}}", quiz_video_block)
                      .replace("{{TRACK_CLASS}}", track_class)
                      .replace("{{LESSON_URL_PATH}}", location_label))
+        if not questions:   # only the owner's seeded lessons (seed_lessons.py) start empty; the teacher adds them later
+            quiz_html = quiz_html.replace("0 questions. Instant feedback.", "Instant feedback.")
         with open(quiz_path, "w", encoding="utf-8") as f:
             f.write(quiz_html)
 
@@ -1327,6 +1329,13 @@ class QuizTab(ttk.Frame):
                               .replace("{{ASSIGNMENT_LINK_BLOCK}}", assign_link_block)
                               .replace("{{TRACK_CLASS}}", track_class)
                      .replace("{{LESSON_URL_PATH}}", location_label))
+        if not questions:
+            lesson_index_html = lesson_index_html.replace("0 questions &middot; instant feedback", "Instant feedback")
+        if not inp.get("include_quiz", True):
+            # A seeded lesson with no quiz (seed_lessons.py "quiz": false): no Quiz link. quiz.html is still written,
+            # because a lesson folder is recognised by it (list_existing_lessons, the teacher publish check).
+            lesson_index_html = re.sub(r'\n\s*<a class="lesson-link frame" href="/' + re.escape(location_label) +
+                                       r'/quiz\.html">.*?</a>', "", lesson_index_html, count=1, flags=re.DOTALL)
         lesson_index_path = os.path.join(lesson_dir, "index.html")
         with open(lesson_index_path, "w", encoding="utf-8") as f:
             f.write(lesson_index_html)

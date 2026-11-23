@@ -62,10 +62,17 @@ from modules import drive_bridge as db   # noqa: E402
 
 with open(os.path.join(QM, "seeds", "science.json"), encoding="utf-8") as f:
     SEED = json.load(f)
-plan = sl.planned(SEED)
+PLAN = sl.planned(SEED)
+plan = [(x["group"], x["slug"], x["title"]) for x in PLAN]
 check("the science seed has lessons in both grades", SEED["subject"] == "science" and
       sorted({g for g, _s, _t in plan}) == sorted(GRADES), sorted({g for g, _s, _t in plan}))
 check("seeded folders are neutral (chapter-<n>-lesson-<m>)", all(re.fullmatch(r"chapter-\d+-lesson-\d+", s) for _g, s, _t in plan))
+prep = [x for x in PLAN if x["group"] == GRADES[0]]
+check("3rd Prep is the teacher's list: 4 units x (شرح, تجميعات المعاصر, حل, امتحانين شاملين)",
+      [x["title"] for x in prep[:4]] == ["Unit 1 | شرح", "Unit 1 | تجميعات المعاصر", "Unit 1 | حل", "Unit 1 | امتحانين شاملين"]
+      and len(prep) == 16 and prep[-1]["slug"] == "chapter-4-lesson-4", [x["title"] for x in prep[:4]])
+check("3rd Prep: only the exams have a quiz, no lesson has an assignment",
+      [x["quiz"] for x in prep] == [False, False, False, True] * 4 and not any(x["assignment"] for x in prep))
 for g in GRADES:
     want = sorted(s for gg, s, _t in plan if gg == g)
     got = c.list_existing_lessons(SITE, "science", g)
@@ -74,23 +81,52 @@ for g in GRADES:
         page = f.read()
     missing = [t for gg, s, t in plan if gg == g and ('href="./%s/"' % s not in page or "<h3>%s</h3>" % t not in page)]
     check("the %s page lists every seeded lesson with its title" % g, not missing and 'class="empty"' not in page, missing[:3])
-    files_ok = all(all(os.path.isfile(os.path.join(SITE, "science", *g.split("/"), s, n))
-                       for n in ("index.html", "quiz.html", "assignment.html", "attachments.json"))
-                   for gg, s, _t in plan if gg == g)
-    check("every seeded lesson in %s has its pages and an attachments.json" % g, files_ok)
+    bad = []
+    for x in PLAN:
+        if x["group"] != g:
+            continue
+        d = os.path.join(SITE, "science", *g.split("/"), x["slug"])
+        with open(os.path.join(d, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        key = "science/%s/%s" % (g, x["slug"])
+        ok = (os.path.isfile(os.path.join(d, "quiz.html")) and os.path.isfile(os.path.join(d, "attachments.json"))
+              and os.path.isfile(os.path.join(d, "assignment.html")) == x["assignment"]
+              and ('href="/%s/quiz.html"' % key in idx) == x["quiz"]
+              and ('href="/%s/assignment.html"' % key in idx) == x["assignment"]
+              and "0 questions" not in idx)
+        if not ok:
+            bad.append(x["slug"])
+    check("every seeded lesson in %s has exactly the pages and links the seed asks for" % g, not bad, bad[:4])
 
 # seeding again on a copy changes nothing (the lessons are the Quiz Maker's own output, and existing ones are kept)
 tmp = tempfile.mkdtemp()
 try:
     shutil.copytree(os.path.join(SITE, "science"), os.path.join(tmp, "science"))
     check("seeding again keeps every existing lesson", sl.seed(tmp, SEED, log=lambda *_a: None) == [])
-    one = {"subject": "science", "groups": [{"group": GRADES[0], "chapters": [{"lessons": ["Cells"]}]}]}
-    shutil.rmtree(os.path.join(tmp, "science", *GRADES[0].split("/"), "chapter-1-lesson-1"))
+    one = {"subject": "science", "groups": [{"group": GRADES[1], "chapters": [{"lessons": ["Cells"]}]}]}
+    shutil.rmtree(os.path.join(tmp, "science", *GRADES[1].split("/"), "chapter-1-lesson-1"))
     made = sl.seed(tmp, one, log=lambda *_a: None)
-    with open(os.path.join(tmp, "science", *GRADES[0].split("/"), "chapter-1-lesson-1", "index.html"), encoding="utf-8") as f:
+    with open(os.path.join(tmp, "science", *GRADES[1].split("/"), "chapter-1-lesson-1", "index.html"), encoding="utf-8") as f:
         lesson = f.read()
     check("a seeded lesson is a Quiz Maker lesson page with the owner's title",
           made == ["chapter-1-lesson-1"] and "Chapter 1 Lesson 1 | Cells" in lesson and 'class="media-slot"' in lesson)
+    # --rewrite: an existing lesson gets a new title and loses its quiz link and assignment page; its files stay
+    att = os.path.join(tmp, "science", *GRADES[1].split("/"), "chapter-1-lesson-2", "attachments.json")
+    with open(att, "w", encoding="utf-8") as f:
+        f.write('[{"title": "Kept", "drive_file_id": "1keepAAAAAAAAAAAA", "type": "pdf"}]')
+    two = {"subject": "science", "groups": [{"group": GRADES[1], "title_format": "Unit {chapter} | {title}", "assignment": False,
+                                             "chapters": [{"lessons": ["Cells", {"title": "Atoms", "quiz": False}]}]}]}
+    check("without --rewrite existing lessons are kept", sl.seed(tmp, two, log=lambda *_a: None) == [])
+    made = sl.seed(tmp, two, log=lambda *_a: None, rewrite=(GRADES[1],))
+    d2 = os.path.join(tmp, "science", *GRADES[1].split("/"), "chapter-1-lesson-2")
+    with open(os.path.join(d2, "index.html"), encoding="utf-8") as f:
+        idx = f.read()
+    with open(att, encoding="utf-8") as f:
+        kept = f.read()
+    check("--rewrite: new title, no quiz link, no assignment page, files kept",
+          made == ["chapter-1-lesson-1", "chapter-1-lesson-2"] and "<h1>Unit 1 | Atoms</h1>" in idx and "quiz.html" not in idx.split("lesson-links")[1][:400]
+          and not os.path.exists(os.path.join(d2, "assignment.html")) and os.path.isfile(os.path.join(d2, "quiz.html")) and "Kept" in kept, (made, kept))
+    check("the title format: an empty title keeps only the head", sl.lesson_title(2, 3, "", "Unit {chapter} | {title}") == "Unit 2" and sl.lesson_title(2, 3, "") == "Chapter 2 Lesson 3")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
