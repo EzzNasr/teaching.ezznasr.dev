@@ -41,7 +41,7 @@ t('refused: uploading for another subject', NA(upload(W.T, 'programming', P)));
 t('refused: uploading with a lesson of another subject', NA(upload(W.T, 'math', P)));
 t('refused: a student uploading', (x => x.ok === false)(upload(W.S1, 'math', M)));
 
-const item = id => ({ title: 'Worksheet', drive_file_id: id, type: 'pdf' });
+const item = id => ({ title: 'Worksheet', drive_file_id: id, type: 'pdf', section: 'lesson' });
 r = as(W.T, { action: 'admin_set_attachments', lesson: M, items: [item(up.file_id)] });
 t('teacher session saves the lesson\'s file list', r.ok === true && r.items.length === 1, J(r));
 r = post({ action: 'get_attachments', lesson: M });
@@ -68,9 +68,12 @@ const bad = items => as(W.T, { action: 'admin_set_attachments', lesson: M, items
 t('refused: not a list', bad({ title: 'x' }).ok === false);
 t('refused: a bad Drive id', bad([item('javascript:alert(1)')]).ok === false);
 t('refused: a bad type', bad([{ title: 'x', drive_file_id: up.file_id, type: '<b>' }]).ok === false);
+t('a file for the quiz page and one for the assignment page are kept with their section', (x => x.ok === true && x.items[0].section === 'quiz' && x.items[1].section === 'assignment')(bad([Object.assign(item(up.file_id), { section: 'quiz' }), Object.assign(item(up.file_id), { section: 'assignment' })])));
+t('a file without a section belongs to the lesson page', (x => x.ok === true && x.items[0].section === 'lesson')(bad([{ title: 'x', drive_file_id: up.file_id, type: 'pdf' }])));
+t('refused: an unknown section', bad([Object.assign(item(up.file_id), { section: 'home' })]).ok === false);
 t('refused: more than 40 files', bad(Array.from({ length: 41 }, () => item(up.file_id))).ok === false);
 r = bad([{ title: '  <b>x</b>\u0001 ', drive_file_id: up.file_id, type: 'PDF', extra: 'dropped' }]);
-t('titles are trimmed, types lowered, other fields dropped (rendered as text by the page)', r.ok === true && J(r.items) === J([{ title: '<b>x</b>', drive_file_id: up.file_id, type: 'pdf' }]), J(r));
+t('titles are trimmed, types lowered, other fields dropped (rendered as text by the page)', r.ok === true && J(r.items) === J([{ title: '<b>x</b>', drive_file_id: up.file_id, type: 'pdf', section: 'lesson' }]), J(r));
 t('the list was not changed by the refused saves', post({ action: 'get_attachments', lesson: M }).items[0].title === '<b>x</b>');
 
 // delete

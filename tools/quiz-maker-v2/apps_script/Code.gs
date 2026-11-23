@@ -1711,13 +1711,14 @@ function handleDeleteAttachment(payload) {
 }
 
 // ---- A lesson's file list on the server (Phase 2.5 step G) -------------------------------------------------------
-// One row per lesson in the "Attachments" tab: items_json = [{title, drive_file_id, type}], the same shape as a
-// lesson's attachments.json. The teacher's browser page (dashboard/my-lessons.html) uploads a file
+// One row per lesson in the "Attachments" tab: items_json = [{title, drive_file_id, type, section}], the shape of a
+// lesson's attachments.json plus section = the page that shows the file: "lesson" (default), "quiz" or "assignment". The teacher's browser page (dashboard/my-lessons.html) uploads a file
 // (upload_attachment) and saves the new list here; the lesson page (assets/attachments.js) shows the
 // attachments.json entries first, then these. get_attachments is public: titles and Drive ids are what the page shows
 // anyway (the files are "anyone with the link").
 var ATTACH_LIST_HEADERS = ["lesson", "items_json", "updated_at", "updated_by"];
 var ATTACH_LIST_MAX = 40;
+var ATTACH_SECTIONS = ["lesson", "quiz", "assignment"];
 function _attachListCacheKey(lesson) { return "atl:" + _md5(lesson); }
 
 function _findAttachListRow(sheet, lesson) {
@@ -1750,7 +1751,9 @@ function _cleanAttachItems(items) {
     var type = it && typeof it.type === "string" ? it.type.trim().toLowerCase() : "";
     if (!/^[A-Za-z0-9_-]{10,200}$/.test(id)) throw new Error("A file has an invalid Drive id.");
     if (!/^[a-z0-9]{0,10}$/.test(type)) throw new Error("A file has an invalid type.");
-    return { title: title || "Untitled", drive_file_id: id, type: type };
+    var section = it && it.section != null && it.section !== "" ? String(it.section) : "lesson";   // which page shows it
+    if (ATTACH_SECTIONS.indexOf(section) === -1) throw new Error("A file has an invalid section.");
+    return { title: title || "Untitled", drive_file_id: id, type: type, section: section };
   });
 }
 

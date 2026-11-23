@@ -9,7 +9,7 @@
   "tools/quiz-maker-v2/apps_script/Requirements.gs",
   "tools/quiz-maker-v2/apps_script/Revenue.gs"
  ],
- "count": 1084,
+ "count": 1085,
  "items": {
   "ATTACH_LIST_HEADERS": {
    "kind": "var",
@@ -20,6 +20,11 @@
    "kind": "var",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
    "hash": "2ebf66a32bbb879a"
+  },
+  "ATTACH_SECTIONS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "3bbe7b336d626bee"
   },
   "ATTENDANCE_HEADERS": {
    "kind": "var",
@@ -1034,7 +1039,7 @@
   "_cleanAttachItems": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "0520ae17554afe55"
+   "hash": "19dd10c903e04c81"
   },
   "_cleanGroupName": {
    "kind": "function",

@@ -21,7 +21,8 @@
 //   3. In that folder only the file list and its files: attachments.json (changed or added, never deleted) and
 //      attachment files (.pdf .png .jpg .jpeg .webp .gif). Never the lesson pages (index.html, quiz.html,
 //      assignment.html), stylesheets or any other file. No links (symlinks), no submodules.
-//   4. attachments.json must be the Quiz Maker's own shape: a list of {title, drive_file_id, type}.
+//   4. attachments.json must be the Quiz Maker's own shape: a list of {title, drive_file_id, type}, with an optional
+//      section (lesson | quiz | assignment: the page that shows the file).
 //   5. Size: 2 MB per file (8 MB for a PDF), 20 MB for the whole pull request.
 const fs = require('fs');
 const path = require('path');
@@ -52,7 +53,8 @@ function checkFileList(file, text) {
   const errs = [];
   v.forEach((it, i) => {
     const ok = it && typeof it === 'object' && !Array.isArray(it) &&
-      Object.keys(it).every(k => ['title', 'drive_file_id', 'type'].includes(k)) &&
+      Object.keys(it).every(k => ['title', 'drive_file_id', 'type', 'section'].includes(k)) &&
+      (it.section === undefined || ['lesson', 'quiz', 'assignment'].includes(it.section)) &&
       typeof it.title === 'string' && it.title.length <= 200 &&
       typeof it.drive_file_id === 'string' && /^[A-Za-z0-9_-]{10,200}$/.test(it.drive_file_id) &&
       (it.type === undefined || (typeof it.type === 'string' && /^[a-z0-9]{0,10}$/i.test(it.type)));
@@ -175,6 +177,8 @@ function selfTest() {
     ['symlink', ok([f(L + 'x.png', '../../../assets', { status: 'A', mode: '120000' })]).ok, false],
     ['bad JSON in the file list', ok([f(L + 'attachments.json', '{')]).ok, false],
     ['the file list is not a list', ok([f(L + 'attachments.json', '{"title":"x"}')]).ok, false],
+    ['a file for the quiz page passes', ok([f(L + 'attachments.json', JSON.stringify([{ title: 'x', drive_file_id: '1zaxQFvbs2wp7Xq9NPW', type: 'pdf', section: 'quiz' }]))]).ok, true],
+    ['an unknown section', ok([f(L + 'attachments.json', JSON.stringify([{ title: 'x', drive_file_id: '1zaxQFvbs2wp7Xq9NPW', type: 'pdf', section: 'home' }]))]).ok, false],
     ['an extra field in the file list', ok([f(L + 'attachments.json', JSON.stringify([{ title: 'x', drive_file_id: '1zaxQFvbs2wp7Xq9NPW', type: 'pdf', html: '<b>' }]))]).ok, false],
     ['a bad Drive id in the file list', ok([f(L + 'attachments.json', JSON.stringify([{ title: 'x', drive_file_id: 'javascript:alert(1)', type: 'pdf' }]))]).ok, false],
     ['too big', ok([f(L + 'pic.png', '', { status: 'A', size: 3 * 1048576 })]).ok, false],

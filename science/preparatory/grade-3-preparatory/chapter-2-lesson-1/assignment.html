@@ -42,6 +42,16 @@
     background:var(--panel-soft); color:var(--ink-dim); border:1px solid var(--line); border-radius:9px; padding:9px; cursor:pointer;
     transition:border-color .15s ease, color .15s ease; }
   .qz-mode-btn.active{ border-color:var(--accent); color:var(--accent-strong); }
+  /* ---- attachments (files for this page, Phase 2.5 G) ---- */
+  .attachments{ margin-top:32px; }
+  .attach-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+  .attach-head h2{ font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-dim); font-weight:600; }
+  .attach-empty{ padding:18px 20px; color:var(--ink-dim); font-size:13.5px; }
+  .attach-empty code{ font-family:var(--mono); background:var(--panel-soft); padding:0.1em 0.4em; font-size:0.85em; border:1px solid var(--line); border-radius:4px; }
+  .attach-item{ padding:14px 16px; margin-bottom:10px; border-radius:12px; }
+  .attach-item__title{ font-family:var(--mono); font-size:13px; color:var(--ink); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .attach-item__actions a{ font-family:var(--mono); font-size:11px; letter-spacing:0.04em; color:var(--accent-strong); text-decoration:none; }
+  .attach-item iframe{ width:100%; height:340px; border:1px solid var(--line); border-radius:10px; background:var(--panel-soft); }
 </style>
 </head>
 <body class="track-one">
@@ -68,6 +78,14 @@
     </div>
 
     <div id="assign-root" data-subject="science" data-lesson="chapter-2-lesson-1" data-mode="graded" aria-live="polite"></div>
+
+    <div class="attachments" id="attachments-root" data-section="assignment" hidden>
+      <div class="attach-head">
+        <h2>Files</h2>
+        <span class="stamp planned" id="attachments-stamp">Loading&hellip;</span>
+      </div>
+      <div id="attachments-list"></div>
+    </div>
   </div>
 </main>
 
@@ -79,6 +97,8 @@
 <script src="/assets/auth.js"></script>
 <script src="/assets/video.js?v=3"></script>
 <script src="/assets/assign.js"></script>
+<script src="/assets/attachments.js"></script>
+<script>AttachEngine.mount('#attachments-root');</script>
 <script>AssignEngine.mount('#assign-root');</script>
 <script>(function(){var slot=document.querySelector('.media-slot');if(!slot)return;var frame=slot.querySelector('iframe');if(!frame)return;var root=document.getElementById('assign-root');var subject=root?root.getAttribute('data-subject'):null;var lesson=root?root.getAttribute('data-lesson'):null;var key='teaching_last_submission:'+(subject||'?')+':'+(lesson||'?');function done(){try{return !!localStorage.getItem(key);}catch(e){return false;}}var overlay=document.createElement('div');overlay.className='video-lock';overlay.innerHTML='<span class="video-lock__icon" aria-hidden="true">\uD83D\uDD12</span><span class="video-lock__msg">Submit the assignment below to unlock this video.</span>';function lock(){if(slot.contains(overlay))return;slot.classList.add('is-locked');slot.appendChild(overlay);}function unlock(){slot.classList.remove('is-locked');if(slot.contains(overlay))slot.removeChild(overlay);}function sync(){if(done())unlock();else lock();}sync();overlay.addEventListener('click',function(){overlay.classList.add('is-tapped');overlay.classList.remove('shake');void overlay.offsetWidth;overlay.classList.add('shake');});if(root)new MutationObserver(sync).observe(root,{childList:true,subtree:true});})();</script>
 <script>(function(){var root=document.documentElement,toggle=document.getElementById('theme-toggle'),stored;try{stored=localStorage.getItem('teaching-theme')}catch(e){}var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');function apply(theme){root.setAttribute('data-theme',theme);toggle.setAttribute('aria-pressed',theme==='dark'?'true':'false');toggle.setAttribute('aria-label',theme==='dark'?'Switch to light mode':'Switch to dark mode');toggle.querySelector('.theme-icon').textContent=theme==='dark'?'\u2600':'\u263E';try{localStorage.setItem('teaching-theme',theme)}catch(e){}}apply(initial);toggle.addEventListener('click',function(){apply(root.getAttribute('data-theme')==='dark'?'light':'dark')})})();</script>

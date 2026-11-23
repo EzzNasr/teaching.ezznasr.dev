@@ -93,6 +93,9 @@
     var root = document.querySelector(rootSelector);
     if (!root) return;
 
+    // Which page this is: the lesson page shows files without a section (and "lesson"); the quiz and assignment pages
+    // show only theirs, and stay hidden when they have none.
+    var section = root.getAttribute("data-section") || "lesson";
     var stamp = root.querySelector("#attachments-stamp");
     var listWrap = root.querySelector("#attachments-list");
     if (!listWrap) return;
@@ -108,13 +111,17 @@
         var id = it.drive_file_id ? String(it.drive_file_id) : "";
         if (id && seen[id]) return;
         if (id) seen[id] = true;
-        all.push(it);
+        if ((it.section || "lesson") === section) all.push(it);
       });
       renderList(all);
     });
 
     function renderList(items) {
       listWrap.innerHTML = "";
+      if (section !== "lesson") {
+        root.hidden = !items.length;
+        if (!items.length) return;
+      }
 
       if (!items.length) {
         if (stamp) { stamp.textContent = "Coming soon"; stamp.className = "stamp planned"; }
