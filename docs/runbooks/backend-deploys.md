@@ -10,3 +10,4 @@ Older, hand-pasted deploys are recorded in `docs/attendance/decisions.md`.*
 | 2026-11-19 15:34 | 71 | `ac091b4` | 70 | AttendanceAll | smoke green |
 | 2026-11-20 00:38 | 72 | `0681cfb` | 71 | AttendanceAll | smoke green |
 | 2026-11-20 13:10 | 73 | `d48be25` | 72 | AttendanceAll | smoke green |
+| 2026-11-23 13:19 | 74 | `acebdbf` | 73 | Code, Revenue.gs | smoke green |
