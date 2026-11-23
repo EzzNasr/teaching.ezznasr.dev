@@ -1885,6 +1885,17 @@
       ]
     },
     {
+      "id": "R-P25-G-PAGE",
+      "title": "Phase 2.5 G: dashboard/my-lessons.html (?mock=1) in a browser: only his subjects' lessons, grouped by grade, fixed names shown as text, no add/rename/delete; per lesson the three videos are saved (watch link to embed), cleared and said to start locked, a bad link refused; quiz questions added (multiple choice, true/false), checked before saving, moved, deleted and saved, teacher-app questions kept read-only; files uploaded (title, type, subject, lesson), listed and deleted after a confirm; outside his subjects refused; unique ids; 390 and 1280 px, light and dark, English with nothing left untranslated, no sideways scroll",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "needs": "playwright",
+      "cmd": [
+        "python",
+        "tests/e2e_p25_my_lessons.py"
+      ]
+    },
+    {
       "id": "R-P25-F-PAGE",
       "title": "Phase 2.5 F: dashboard/my-revenue.html (?mock=1) in a browser: cards > courses > course (lesson, price, videos, visible) > lesson (videos, sales, latest purchases); one Download report button gives a self-contained HTML balance sheet (prints to A4, rows never split, escaped names) and an Excel-safe CSV; English mode; read only; 390 and 1280 px, light and dark",
       "status": "active",
