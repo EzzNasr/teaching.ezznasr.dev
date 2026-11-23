@@ -3,18 +3,24 @@
 *Refactor Phase 2.5, steps E and G (2026-11-23). How a second teacher fills in his lessons, and what stops him
 from changing anything else.*
 
-**You make the lessons, he fills them in.** You seed every lesson (its folder, its name, its pages, its place on the
-grade page). He cannot rename, add or delete a lesson. He adds:
+**You make the lessons, he fills them in, in his browser.** You seed every lesson (its folder, its name, its pages,
+its place on the grade page). He cannot rename, add or delete a lesson. He signs in on the site and opens
+**«دروسي»** (`dashboard/my-lessons.html`, linked from «فريقي», «إيراداتي» and his staff home). For each of his
+lessons he sets:
 
-| What | How | Who checks it |
+| What | On «دروسي» | Where it is saved |
 |---|---|---|
-| The three videos of a lesson (lesson, quiz, assignment) | Quiz Maker in teacher mode, **Update** next to each video. Goes straight to the backend; the lesson page does not change | The backend: his token only works on his subjects (R-P25-B) |
-| Quiz questions | Quiz Maker, **Load for editing**, add questions, **Save quiz questions**. Backend only, no page change | The backend, same token |
-| Files (PDFs, slides, worksheets) | Quiz Maker, Attachment section: uploads to Drive and adds a line to the lesson's `attachments.json`. That file goes to GitHub in a pull request from a `teacher/<name>/...` branch | The **Teacher publish check**, then you (approve and merge) |
+| The three videos (lesson, quiz solution, assignment solution) | Paste a link, **حفظ**. A new video starts locked; he opens it from «الوصول للدروس» | Backend (Videos tab) |
+| Quiz questions (multiple choice, true/false) | Add, edit, move, delete, **احفظ الأسئلة** | Backend (QuizContent tab) |
+| Files (PDF, images, Word, PowerPoint, up to 15 MB) | Choose a file, give it a name, **ارفع**; delete with **امسح** | Drive (attachments folder) + the lesson's list on the backend (Attachments tab); the lesson page shows it |
 
-The assignment page (its text, how students submit, its questions) is yours too: it lives inside the lesson page.
-Fixed names keep this simple; they are not a hard rule. If he needs more (for example the assignment questions), it
-can be added later.
+No desktop app and no GitHub are needed. The server checks every save against his subjects (tests R-P25-B, R-P25-G).
+The assignment page itself (its text, how students submit, its questions) stays yours. Fixed names keep this simple;
+they are not a hard rule, and more can be opened to him later.
+
+Two other ways still work, for you or a teacher who prefers them: the desktop Quiz Maker in teacher mode (same
+limits: names read-only, no Generate, no new or deleted lessons), and pull requests that only change a lesson's
+`attachments.json` (the check below).
 
 ## Seeding lessons (you)
 
@@ -63,16 +69,11 @@ Every `attachments.json` you already have passes these rules (test R-P25-E).
 
 ## Every lesson (the teacher)
 
-1. Quiz Maker in teacher mode (his token): only his subjects show, lesson names are read-only, and there is no
-   Generate, New lesson or Delete. He picks the lesson under "Open an existing lesson".
-2. Videos: paste the link, click **Update**. Quiz questions: **Load for editing**, add them, **Save quiz questions**.
-   Both are live at once; nothing to commit.
-3. Files: Attachment section, **Upload to Drive & add to lesson**. Then in GitHub Desktop: *Current branch > New
-   branch* `teacher/<name>/<lesson>` (for example `teacher/science-teacher/ch1-lesson1-files`), commit the changed
-   `attachments.json`, *Publish branch*, *Create Pull Request*.
-4. The checks run. A red **Teacher publish check** lists every refused file and why.
+1. Sign in on the site, open **«دروسي»**, pick the lesson.
+2. Paste the video links and press **حفظ** next to each; add the quiz questions and press **احفظ الأسئلة**; upload the
+   files. Students see it at once (a new video stays locked until he opens it).
 
-## Every lesson (you)
+## Pull requests (only if he uses GitHub)
 
 Open the pull request, look at *Files changed*, then **Approve** and **Merge**. GitHub Pages publishes it in a minute.
 Do not merge while a check is red.

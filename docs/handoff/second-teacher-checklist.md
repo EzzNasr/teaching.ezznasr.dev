@@ -20,7 +20,8 @@ npm run deploy:backend          # dry run
 npm run deploy:backend -- --yes # the deploy
 ```
 
-This ships steps A (security), B (separation fix), C (science subject) and F (teacher revenue report) together.
+This ships steps A (security), B (separation fix), C (science subject), F (teacher revenue report) and G (his
+browser page «دروسي»: quiz questions and files from a signed-in session, the lesson file list) together.
 Commit the new row the script adds to `docs/runbooks/backend-deploys.md`.
 
 ## 3. Make him a teacher
@@ -32,7 +33,7 @@ Commit the new row the script adds to `docs/runbooks/backend-deploys.md`.
       then shows Science only.
 - [ ] Optional: he links Telegram on «فريقي» so payment requests for Science reach him.
 
-## 4. GitHub (for his lesson pages)
+## 4. GitHub (optional: only if he will send files by pull request)
 
 - [ ] Invite his GitHub account (Settings > Collaborators, role Write).
 - [ ] In `.github/teachers.json` on `main`: put his account in `"github"`, his name in `"name"`, and rename the handle
@@ -41,15 +42,13 @@ Commit the new row the script adds to `docs/runbooks/backend-deploys.md`.
 
 ## 5. Live trial (together with Claude)
 
-A demo teacher account and demo data on the live site: sign in, add a video and a quiz question to one seeded lesson,
-attach one file through a pull request, check «إيراداتي» and the downloaded report, check what he cannot do (rename a
-lesson, add one, another subject, your students, your revenue page), then remove the demo account, demo rows and the
-demo file.
+A demo teacher account on the live site: sign in, open «دروسي», add a video, a quiz question and a file to one seeded
+lesson, check the lesson page shows them, check «إيراداتي», check what he cannot do (another subject, rename or add a
+lesson, your students, your revenue page), then remove the demo account, the demo video, question and file.
 
 ## 6. His lessons
 
 You seed them; he fills them in. The lessons of both grades (`science/preparatory/grade-3-preparatory/`, 3rd Prep,
 and `science/secondary/grade-1-secondary/`, 1st Secondary, Integrated Science) come from
 `tools/quiz-maker-v2/seeds/science.json` (`teacher-publishing.md`, "Seeding lessons"). He cannot rename, add or
-delete a lesson; he adds the videos and quiz questions (backend, his token) and the files (`attachments.json`, pull
-request).
+delete a lesson; he adds the videos, quiz questions and files on «دروسي» in his browser.
