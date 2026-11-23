@@ -11,8 +11,8 @@ lessons he sets:
 | What | On «دروسي» | Where it is saved |
 |---|---|---|
 | The three videos (lesson, quiz solution, assignment solution) | Paste a link, **حفظ**. A new video starts locked; he opens it from «الوصول للدروس» | Backend (Videos tab) |
-| Quiz questions (multiple choice, true/false) | Add, edit, move, delete, **احفظ الأسئلة** | Backend (QuizContent tab) |
-| Files (PDF, images, Word, PowerPoint, up to 15 MB) | Choose a file, give it a name, **ارفع**; delete with **امسح** | Drive (attachments folder) + the lesson's list on the backend (Attachments tab); the lesson page shows it |
+| Quiz questions | Add multiple choice / true-false one by one, or **+ لصق مجموعة أسئلة**: paste many in the Quiz Maker's bulk format (also matching and written). The format's instructions fold out and have a copy button, so he can send them to his AI assistant and paste its answer. Then **احفظ الأسئلة** | Backend (QuizContent tab; written model answers in WrittenModels, never shown to students) |
+| Files (PDF, images, Word, PowerPoint, up to 15 MB) | One box per page: the lesson page, the quiz page, the assignment page. Choose a file, give it a name, **ارفع**; delete with **امسح** | Drive (attachments folder) + the lesson's list on the backend (Attachments tab, with the page each file belongs to); that page shows it |
 
 No desktop app and no GitHub are needed. The server checks every save against his subjects (tests R-P25-B, R-P25-G).
 The assignment page itself (its text, how students submit, its questions) stays yours. Fixed names keep this simple;
