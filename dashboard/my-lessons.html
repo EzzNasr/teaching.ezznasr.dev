@@ -299,7 +299,7 @@
         box.appendChild(el("p", { class: "small", text: "السؤال ده اتعمل من برنامج المدرس؛ بيفضل زي ما هو. تقدر تمسحه أو تغيّر مكانه بس." }));
         return box;
       }
-      var prompt = el("textarea", { "aria-label": tr("نص السؤال"), placeholder: tr("اكتب السؤال هنا") });
+      var prompt = el("textarea", { dir: "auto", "aria-label": tr("نص السؤال"), placeholder: tr("اكتب السؤال هنا") });
       prompt.value = String(q.prompt || "");
       prompt.addEventListener("input", function () { q.prompt = prompt.value; });
       box.appendChild(prompt);
@@ -318,7 +318,7 @@
         q.options.forEach(function (o, k) {
           var c = el("input", { type: "checkbox", "aria-label": tr("إجابة صح"), checked: q.correct.indexOf(k) !== -1 });
           c.addEventListener("change", function () { q.correct = q.correct.filter(function (x) { return x !== k; }); if (c.checked) q.correct.push(k); q.correct.sort(); });
-          var txt = el("input", { type: "text", "aria-label": tr("اختيار {0}", [k + 1]), placeholder: tr("اختيار {0}", [k + 1]) });
+          var txt = el("input", { type: "text", dir: "auto", "aria-label": tr("اختيار {0}", [k + 1]), placeholder: tr("اختيار {0}", [k + 1]) });
           txt.value = String(o == null ? "" : o);
           txt.addEventListener("input", function () { q.options[k] = txt.value; });
           var del = el("button", { class: "l-btn ghost small", type: "button", text: "×", "aria-label": tr("امسح الاختيار") });
@@ -375,7 +375,7 @@
     var list = el("div", { id: "ml-flist" }, [el("p", { class: "l-state", text: "بنجيب الملفات…" })]);
     var msg = el("span", { class: "l-msg", role: "status", id: "ml-files-msg" });
     var fileIn = el("input", { type: "file", id: "ml-file", accept: ".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt", "aria-label": tr("اختار ملف") });
-    var titleIn = el("input", { type: "text", id: "ml-file-title", placeholder: tr("اسم الملف زي ما الطلاب هيشوفوه"), "aria-label": tr("اسم الملف") });
+    var titleIn = el("input", { type: "text", dir: "auto", id: "ml-file-title", placeholder: tr("اسم الملف زي ما الطلاب هيشوفوه"), "aria-label": tr("اسم الملف") });
     var up = el("button", { class: "l-btn", type: "button", id: "ml-upload", text: "ارفع" });
     var items = [], owners = [];
     card.appendChild(list);
