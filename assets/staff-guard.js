@@ -38,6 +38,7 @@
     "master": WORK,
     "access": WORK,
     "my-team": ["teacher"],
+    "my-revenue": ["teacher", "admin"],   // Phase 2.5 F: a teacher's own numbers (the owner may look too)
     "team": ["admin"],
     "teacher-stats": ["admin"],
     "revenue": ["admin"],

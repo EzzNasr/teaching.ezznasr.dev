@@ -263,7 +263,7 @@
     ["{0} — Teaching Portal", "{0} — Teaching Portal"],
     ["صفحات الإدارة", "Admin pages"],
     ["النتايج", "Results"], ["الوصول للدروس", "Lesson access"], ["المتابعة", "Follow-up"], ["المطلوبات", "Requirements"],
-    ["التصحيح", "Grading"], ["الفريق", "Team"], ["الإيرادات", "Revenue"], ["الرئيسية", "Home"], ["فريقي", "My team"],
+    ["التصحيح", "Grading"], ["الفريق", "Team"], ["الإيرادات", "Revenue"], ["الرئيسية", "Home"], ["فريقي", "My team"], ["إيراداتي", "My revenue"],
     ["وضع التجربة — بيانات وهمية، ولا يتم حفظ أي شيء", "Test mode — sample data, nothing is saved"], ["وضع التجربة — أرقام وهمية، ولا يتم حفظ أي شيء", "Test mode — sample numbers, nothing is saved"],
     ["صفحة الدخول ما اتحمّلتش. اعمل تحديث للصفحة.", "The sign-in part didn't load. Refresh the page."],
     ["ما قدرناش نحمّل {0}", "Couldn't load {0}"], ["لم يتم تحميل {0}", "Couldn't load {0}"],

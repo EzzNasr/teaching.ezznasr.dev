@@ -1426,6 +1426,11 @@ function doPost(e) {
         return _json(payload.action === "admin_revenue_report" ? admin_revenue_report(payload)
           : payload.action === "admin_revenue_set_price" ? admin_revenue_set_price(payload) : admin_revenue_fill_old(payload));
 
+      // Phase 2.5 F: a teacher's own read-only revenue page (dashboard/my-revenue.html), filtered to his subjects.
+      case "teacher_revenue_report":
+        if (typeof teacher_revenue_report !== "function") throw new Error("Not implemented yet: " + payload.action);
+        return _json(teacher_revenue_report(payload));
+
       case "ping":
         _requireAdmin(payload);
         return _json(_p2Post("p4_pingDecorate", { ok: true, message: "pong" }, payload));
@@ -8111,6 +8116,8 @@ var P4_ACTIONS = (function () {
   add("p4_admin_set_teacher p4_admin_list_teachers p4_admin_set_group_owner p4_admin_tg_unlink p4_admin_list_edit_log p4_admin_teacher_stats", { rule: "O", needs: [] });
   // Revenue page (Revenue.gs, Nov 2026): owner only
   add("admin_revenue_report admin_revenue_set_price admin_revenue_fill_old", { rule: "O", needs: [] });
+  // Phase 2.5 F: the teacher's own revenue page, read only; the handler keeps only his subjects (assistants: never)
+  add("teacher_revenue_report", { rule: "T", needs: [], ses: true });
   // New teacher-side actions
   add("p4_teacher_update_student", { rule: "T", needs: ["SP"], St: ["student"], ses: true });
   add("p4_teacher_set_assistant p4_teacher_list_assistants p4_teacher_revoke_assistant", { rule: "T", needs: [], ses: true });

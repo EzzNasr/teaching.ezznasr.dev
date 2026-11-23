@@ -23,9 +23,15 @@
      admin_revenue_set_price  {price}            -> {price}
      admin_revenue_fill_old   {dry_run?}         -> {fillable | filled, price}
    The report holds counts and sums only: no student name, phone or payment reference.
+     teacher_revenue_report   {}                 -> the TEACHER's read-only page (dashboard/my-revenue.html, Phase 2.5 F):
+                                                    cards, courses > lessons (price, videos, visible), every purchase in
+                                                    HIS subjects (student name, item, method, date; never a phone or a
+                                                    payment reference). The owner may call it too and gets every subject.
+                                                    Assistants and students: never.
 
-   FILE RULES: defines only rev_* / REV_* names plus the three handlers; reads the Payments and Groups tabs,
-   writes only the Payments "amount" column (created on the first write) and one Script Property.
+   FILE RULES: defines only rev_* / REV_* names plus the four handlers; reads the Payments and Groups tabs (and, for
+   teacher_revenue_report, Videos, Lessons and QuizContent), writes only the Payments "amount" column (created on the
+   first write) and one Script Property.
    ========================================================================== */
 
 var REV_PRICE_PROP = "REV_LESSON_PRICE_EGP";
@@ -233,4 +239,124 @@ function admin_revenue_fill_old(payload) {
     return { ok: true, price: price, fillable: rows.length, filled: rows.length };
   };
   return dry ? work() : _withLock(work);
+}
+
+
+/* ---------------------------------------------------------------- the teacher's own page (Phase 2.5 F) */
+
+// The caller's context when he may open the teacher page, or null: a teacher by session (his subjects) or the owner.
+function rev_teacherCtx_(payload) {
+  try {
+    var ctx = typeof p4_ctx === "function" ? p4_ctx(payload || {}) : null;
+    if (!ctx) return null;
+    if (ctx.kind === "owner") return ctx;
+    if (ctx.kind === "teacher" && ctx.via === "session" && ctx.subjects && ctx.subjects.length) return ctx;
+  } catch (e) { /* denied */ }
+  return null;
+}
+
+// A tab as {values, col: name -> 0-based index}, or null.
+function rev_tab_(ss, name) {
+  var sh = ss.getSheetByName(name);
+  if (!sh || sh.getLastRow() < 2) return null;
+  var values = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues(), col = {};
+  values[0].forEach(function (h, i) { h = String(h || "").trim(); if (h && !(h in col)) col[h] = i; });
+  return { values: values, col: col };
+}
+
+function rev_key_(v) {
+  var s = String(v == null ? "" : v).trim().toLowerCase().replace(/^\/+|\/+$/g, "");
+  try { if (typeof _canonKey === "function" && s.indexOf("#") === -1) s = _canonKey(s); } catch (e) { /* keep s */ }
+  return s;
+}
+
+// The course of a lesson = its grade folder: "science/secondary/grade-1-secondary/lesson-1" -> "science/secondary/
+// grade-1-secondary". A subscription scope "programming/baccalaureate/grade-1-secondary#ch3" -> its grade folder.
+function rev_courseOf_(key) {
+  var k = String(key || "");
+  if (k.indexOf("#") !== -1) return k.split("#")[0];
+  var i = k.lastIndexOf("/");
+  return i > 0 ? k.slice(0, i) : k;
+}
+
+function rev_day_(v) {
+  if (v instanceof Date && !isNaN(v.getTime())) return Utilities.formatDate(v, TZ, "yyyy-MM-dd");
+  var m = /^(\d{4}-\d{2}-\d{2})/.exec(String(v == null ? "" : v).trim());
+  return m ? m[1] : "";
+}
+
+function rev_flag_(v) { return typeof _isTruthyFlag === "function" ? _isTruthyFlag(v) : v === true || String(v).toLowerCase() === "true"; }
+
+function teacher_revenue_report(payload) {
+  var ctx = rev_teacherCtx_(payload);
+  if (!ctx) return rev_denied_();
+  var mine = function (key) { return !!key && (ctx.kind === "owner" || p4_inSubjects_(ctx, key)); };
+  var ss = _ss(), price = rev_lessonPrice_();
+  var lessons = {}, courses = {};
+  var lessonOf = function (key) {
+    var k = rev_key_(key);
+    if (!mine(k) || k.indexOf("#") !== -1 || k.split("/").length < 2) return null;
+    return lessons[k] || (lessons[k] = { key: k, course: rev_courseOf_(k), videos: 0, paid_videos: 0, visible: true, quiz: false,
+                                          price: price, sales: { count: 0, amount: 0 }, pending: 0 });
+  };
+  var courseOf = function (key) {
+    return courses[key] || (courses[key] = { key: key, lessons: 0, videos: 0, sales: { count: 0, amount: 0 }, subscriptions: { count: 0, amount: 0 } });
+  };
+  var V = rev_tab_(ss, "Videos");
+  if (V && "lesson" in V.col) for (var i = 1; i < V.values.length; i++) {
+    var L = lessonOf(V.values[i][V.col.lesson]);
+    if (!L || ("embed_url" in V.col && !String(V.values[i][V.col.embed_url] || "").trim())) continue;
+    L.videos++;
+    if ("locked" in V.col && rev_flag_(V.values[i][V.col.locked])) L.paid_videos++;
+  }
+  var Q = rev_tab_(ss, "QuizContent");
+  if (Q && "lesson" in Q.col) for (var q = 1; q < Q.values.length; q++) { var LQ = lessonOf(Q.values[q][Q.col.lesson]); if (LQ) LQ.quiz = true; }
+  var LS = rev_tab_(ss, "Lessons");
+  if (LS && "lesson" in LS.col && "locked" in LS.col) for (var l = 1; l < LS.values.length; l++) {
+    var LL = lessonOf(LS.values[l][LS.col.lesson]);
+    if (LL && rev_flag_(LS.values[l][LS.col.locked])) LL.visible = false;
+  }
+  var out = { ok: true, generated_at: typeof _cairoIso === "function" ? _cairoIso(new Date()) : String(new Date()),
+              subjects: ctx.kind === "owner" ? ["*"] : ctx.subjects.slice(), currency: "EGP", lesson_price: price,
+              cards: { students: 0, courses: 0, lessons: 0, purchases: 0, total_sales: 0, pending: 0, unpriced: 0 },
+              courses: [], lessons: [], purchases: [] };
+  var P = rev_payments_(ss);
+  if (P && "status" in P.col && "scope" in P.col) for (var r = 1; r < P.values.length; r++) {
+    var st = String(rev_cell_(P, r, "status") || "").trim().toLowerCase();
+    if (st !== "approved" && st !== "pending") continue;
+    var scope = rev_key_(rev_cell_(P, r, "scope"));
+    if (!mine(scope)) continue;
+    var it = rev_item_(scope), amount = rev_amountOf_(P, r);
+    var LP = it.kind === "lesson" ? lessonOf(scope) : null;
+    if (st === "pending") { out.cards.pending++; if (LP) LP.pending++; continue; }
+    out.cards.purchases++; out.cards.total_sales += amount || 0;
+    if (amount === null) out.cards.unpriced++;
+    var C = courseOf(rev_courseOf_(scope));
+    if (LP) { LP.sales.count++; LP.sales.amount += amount || 0; }
+    else { C.subscriptions.count++; C.subscriptions.amount += amount || 0; }
+    out.purchases.push({ date: rev_day_(rev_cell_(P, r, "decided_at")) || rev_day_(rev_cell_(P, r, "created_at")),
+                         student: String(rev_cell_(P, r, "name") == null ? "" : rev_cell_(P, r, "name")).trim().slice(0, 80),
+                         item: scope, kind: it.kind, course: rev_courseOf_(scope), amount: amount, method: "website" });
+  }
+  Object.keys(lessons).sort().forEach(function (k) {
+    var L = lessons[k], C = courseOf(L.course);
+    out.lessons.push(L);
+    C.lessons++; C.videos += L.videos; C.sales.count += L.sales.count; C.sales.amount += L.sales.amount;
+  });
+  Object.keys(courses).sort().forEach(function (k) {
+    var C = courses[k];
+    C.total = { count: C.sales.count + C.subscriptions.count, amount: C.sales.amount + C.subscriptions.amount };
+    out.courses.push(C);
+  });
+  out.purchases.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+  out.cards.courses = out.courses.length;
+  out.cards.lessons = out.lessons.length;
+  try {
+    if (ctx.kind === "owner") {
+      out.cards.students = _sheetValuesAsObjects(_students()).filter(function (s) { return !rev_flag_(s.is_admin) && !String(s.role || "").trim(); }).length;
+    } else {
+      out.cards.students = typeof p4_linked_ === "function" ? p4_linked_(ctx).length : 0;
+    }
+  } catch (e) { out.cards.students = 0; }
+  return out;
 }

@@ -84,6 +84,8 @@ PAGES = [
      "استثناءات المجموعات", None),
     ("student-summary.html?mock=1", "#ss-q", "ملخص الطالب", "Student summary",
      [("#fu-root", "Choose the student:")], "اختار الطالب", ("#ss-q", "sa")),
+    ("my-revenue.html?mock=1", "#mr-cards", "إيراداتي", "My revenue",
+     [("#mr-download", "Download report"), ("#mr-cards", "Total sales"), ("#mr-courses", "Science"), ("nav a[aria-current=page]", "My revenue")], "كل الكورسات", None),
     ("my-team.html?mock=1", "#mt-root h2", "فريقي", "My team",
      [("#mt-root", "Your assistants"), ("#mt-root", "Link Telegram"), ("nav", "RESULTS")], "مساعدينك", ("#mt-root input[type=tel]", "0123")),
 ]

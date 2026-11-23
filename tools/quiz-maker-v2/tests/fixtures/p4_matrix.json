@@ -814,6 +814,16 @@
       "fields": {}
     },
     {
+      "action": "teacher_revenue_report",
+      "rule": "T",
+      "needs": [],
+      "via": [
+        "ses"
+      ],
+      "filter": null,
+      "fields": {}
+    },
+    {
       "action": "p4_tg_unlink",
       "rule": "T",
       "needs": [],

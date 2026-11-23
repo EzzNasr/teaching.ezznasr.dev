@@ -1863,6 +1863,27 @@
         "node",
         "tests/test_p25_publish.js"
       ]
+    },
+    {
+      "id": "R-P25-F",
+      "title": "Phase 2.5 F: teacher_revenue_report (Revenue.gs): a teacher session sees only his subjects (cards, courses > lessons with price, videos, visible, quiz, sales; every approved purchase with student, item, method, date; no phone, no reference); another teacher sees only his; assistants, students, tokens and anonymous refused; the owner may open it and his own admin_revenue_report is unchanged and owner only; nothing written",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "cmd": [
+        "node",
+        "tests/test_p25_revenue.js"
+      ]
+    },
+    {
+      "id": "R-P25-F-PAGE",
+      "title": "Phase 2.5 F: dashboard/my-revenue.html (?mock=1) in a browser: cards > courses > course (lesson, price, videos, visible) > lesson (videos, sales, latest purchases); one Download report button gives a self-contained HTML balance sheet (prints to A4, rows never split, escaped names) and an Excel-safe CSV; English mode; read only; 390 and 1280 px, light and dark",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "needs": "playwright",
+      "cmd": [
+        "python",
+        "tests/e2e_p25_my_revenue.py"
+      ]
     }
   ]
 }
