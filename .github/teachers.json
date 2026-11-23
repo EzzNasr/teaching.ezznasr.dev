@@ -1,0 +1,11 @@
+{
+  "_readme": "Teachers who publish lessons through pull requests (docs/handoff/teacher-publishing.md). Only the owner edits this file, on main. handle = the <name> in the teacher's branch names teacher/<name>/...; github = his GitHub account (the check refuses a pull request opened by any other account); subjects = the folders he may change; auto_merge = false: the owner approves every pull request, true: it merges by itself once every check is green.",
+  "teachers": {
+    "science-teacher": {
+      "name": "Science teacher",
+      "github": "",
+      "subjects": ["science"],
+      "auto_merge": false
+    }
+  }
+}

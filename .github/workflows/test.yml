@@ -11,6 +11,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Read-only token: a pull request (a teacher's too) runs this workflow with its own files, so it gets no write access.
+permissions:
+  contents: read
+
 concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true

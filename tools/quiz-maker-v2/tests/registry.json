@@ -1853,6 +1853,16 @@
         "python",
         "tests/e2e_p25_home.py"
       ]
+    },
+    {
+      "id": "R-P25-E",
+      "title": "Phase 2.5 E: teacher publishing check (scripts/check_teacher_pr.js + .github/workflows/teacher-publish.yml): rule examples; every owner lesson page passes; the workflow runs from main on pull_request_target, reads the pull request as data, no pull-request text in shell lines, auto-merge only by config; teachers.json valid with auto-merge off; end to end in a temp git repo a lesson branch passes and branches touching dashboard, another subject, workflows, the rules, engines, the front page or adding a script are refused with reasons",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "cmd": [
+        "node",
+        "tests/test_p25_publish.js"
+      ]
     }
   ]
 }

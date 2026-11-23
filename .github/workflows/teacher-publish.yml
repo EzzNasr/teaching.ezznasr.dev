@@ -1,0 +1,54 @@
+name: teacher publish check
+# Refactor Phase 2.5, step E. Runs for pull requests from teacher/<name>/... branches and refuses anything the owner
+# would not push himself (scripts/check_teacher_pr.js; rules and settings in docs/handoff/teacher-publishing.md).
+#
+# pull_request_target on purpose: this workflow, the checker and .github/teachers.json always come from main, so a
+# teacher cannot change the rules in his own pull request. His files are only READ with git (fetched as data); no
+# code from the pull request is ever run here.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: teacher-publish-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Teacher publish check
+    if: startsWith(github.event.pull_request.head.ref, 'teacher/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch the pull request's files (data only, nothing is run)
+        env:
+          PR: ${{ github.event.pull_request.number }}
+        run: git fetch --no-tags origin "+refs/pull/${PR}/head:refs/remotes/pr/head"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: check
+        name: Is this something the owner would push?
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: node scripts/check_teacher_pr.js --base "$BASE_SHA" --head "$HEAD_SHA" --branch "$HEAD_REF" --author "$AUTHOR"
+      - name: Auto-merge (only for a teacher the owner set to "auto_merge" in .github/teachers.json)
+        if: steps.check.outputs.ok == 'true' && steps.check.outputs.auto_merge == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr review "$PR" -R "$GITHUB_REPOSITORY" --approve --body "Teacher publish check passed. This teacher is on auto-merge (.github/teachers.json); it merges once every check is green."
+          gh pr merge "$PR" -R "$GITHUB_REPOSITORY" --auto --squash
