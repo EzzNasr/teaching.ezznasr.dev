@@ -30,6 +30,7 @@ Nothing deploys anything else. The backend is deployed with clasp by `npm run de
 | 5 | [security-model.md](security-model.md) | How identity and permissions work, and the risk areas (no exploit detail: the repo is public) | 15 min |
 | 6 | [../TESTING.md](../TESTING.md), [../REGRESSION.md](../REGRESSION.md) | The test gate and all 155 registered cases (153 active), including the two refactor guards | 10 min |
 | 7 | [refactor-log.md](refactor-log.md) | What the refactoring has changed so far, step by step, with the commit to revert | 5 min |
+| 7b | [teacher-publishing.md](teacher-publishing.md), [second-teacher-checklist.md](second-teacher-checklist.md) | How another teacher publishes lessons (checked pull requests) and the owner's steps to add one | 10 min |
 | 8 | [../attendance/](../attendance/README.md), [../whatsapp/](../whatsapp/README.md), [../runbooks/](../runbooks/) | Per-feature decisions, deploy records, operations | as needed |
 
 Private documents (outside the repo, in the owner's `Docs/` folder; ask the owner):

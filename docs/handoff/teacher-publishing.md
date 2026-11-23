@@ -69,6 +69,6 @@ by itself once every check is green. To go back, set it to `false`; his next pul
 
 1. Settings > Collaborators: **Remove** him. He can no longer push or open pull requests.
 2. Delete his entry from `.github/teachers.json`.
-3. Backend: make him a student again (Team page in the dashboard), and remove his teacher token
-   (`P4_TEACHER_TOKENS` script property) so his Quiz Maker stops working.
+3. Backend: make him a student again (Team page in the dashboard), and remove his teacher token in the Apps Script
+   editor with `p4_revoke_teacher_token("<his name>")`, so his Quiz Maker stops working.
 His lessons stay on the site until you remove them.
