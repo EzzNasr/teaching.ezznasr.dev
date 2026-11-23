@@ -24,7 +24,7 @@ import time
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from modules import drive_bridge
+from modules import drive_bridge, teacher_mode
 
 # --------------------------------------------------------------------------
 # Path resolution — has to work both as a raw script AND as a frozen
@@ -211,6 +211,9 @@ def set_lesson_video(web_app_url, admin_token, lesson, slot, video_url, title, h
 
     embed_url = normalize_video_url(video_url)
     drive_bridge.set_video(web_app_url, admin_token, lesson, slot, embed_url)
+    if teacher_mode.locks_lessons():
+        # A teacher never changes lesson pages (Phase 2.5 step G): the backend row is all video.js needs.
+        return embed_url, True
     # The video IS set now — just not fetched into this page yet — so bake
     # "Loading video…", not "add a YouTube embed URL to replace this box".
     update_media_slot(html_path, "", title, placeholder=VIDEO_LOADING_PLACEHOLDER)
