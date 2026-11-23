@@ -569,7 +569,7 @@
   "P4S_SUBJECTS": {
    "kind": "var",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "8e912dd55ef153af"
+   "hash": "b589ff549d49c09e"
   },
   "P4TG_ALPHABET": {
    "kind": "var",
@@ -654,7 +654,7 @@
   "P4T_SUBJECTS": {
    "kind": "var",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "ca79be31fd9e86d5"
+   "hash": "50987524ab242587"
   },
   "P4T_TELEGRAM_HEADERS": {
    "kind": "var",
@@ -709,7 +709,7 @@
   "P4_SUBJECTS": {
    "kind": "var",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "67c57858ec016fa1"
+   "hash": "396bb8ea70603e60"
   },
   "PAYMENT_HEADERS": {
    "kind": "var",

@@ -2,7 +2,7 @@
 window.I18n && window.I18n.add([
   ["كل اللي يقدر يدخل صفحات الإدارة، وآخر التعديلات اللي عملوها.", "Everyone who can open the admin pages, and the latest changes they made."],
   // subjects
-  ["رياضة", "Math"], ["إنجليزي", "English"], ["برمجة", "Programming"],
+  ["رياضة", "Math"], ["إنجليزي", "English"], ["برمجة", "Programming"], ["علوم", "Science"],
   // what an assistant can do
   ["شاشة المتابعة (الحضور والواجبات والكويزات)", "The follow-up screen (attendance, homework and quizzes)"],
   ["تسجيل الحضور", "Taking attendance"],

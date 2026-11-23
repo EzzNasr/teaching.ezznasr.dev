@@ -52,7 +52,7 @@ CONFIG_PATH = os.path.join(EXE_DIR, "quiz_maker_config.json")
 # search below can't find it (e.g. the app got moved somewhere unrelated).
 ABS_FALLBACK_SITE_ROOT = r"D:\projects\teaching-site-new\teaching.ezznasr.dev"
 
-SUBJECTS = [("programming", "Programming"), ("english", "English"), ("math", "Math")]
+SUBJECTS = [("programming", "Programming"), ("english", "English"), ("math", "Math"), ("science", "Science")]
 
 SUBMIT_MODES = [
     ("text", "Paste text"),
@@ -884,6 +884,8 @@ def lesson_url_path(subject_slug, group_relpath, lesson_slug):
 TRACK_CLASS_BY_GROUP = {
     ("programming", "baccalaureate/grade-1-secondary"): "track-one",   # orange
     ("programming", "baccalaureate/grade-2-secondary"): "track-two",   # blue (= default)
+    ("science", "preparatory/grade-3-preparatory"): "track-one",      # Science, 3rd Prep
+    ("science", "secondary/grade-1-secondary"): "track-two",          # Integrated Science, 1st Secondary
 }
 
 

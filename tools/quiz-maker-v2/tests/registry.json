@@ -1821,6 +1821,27 @@
         "node",
         "tests/test_p25_separation.js"
       ]
+    },
+    {
+      "id": "R-P25-C",
+      "title": "Phase 2.5 C: the science subject: a science teacher (session, token) works on science lessons only and is refused elsewhere; the three backend subject lists agree; science/ has the 3rd Prep and 1st Secondary grade pages with an empty lesson grid, no subscription widget, SEO and sitemap; links resolve; home card says Math; dashboards label science",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "cmd": [
+        "node",
+        "tests/test_p25_science.js"
+      ]
+    },
+    {
+      "id": "R-P25-C-QM",
+      "title": "Phase 2.5 C: the Quiz Maker knows science: SUBJECTS, teacher mode, the two grade folders found as groups with their accents, the first lesson card replaces the coming-soon note, a science token shows only Science",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "needs": "python",
+      "cmd": [
+        "python",
+        "tests/test_p25_science_qm.py"
+      ]
     }
   ]
 }

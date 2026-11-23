@@ -122,7 +122,7 @@
   function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); return n; }
 
   // ---------- words ----------
-  var SUBJECT = { math: "رياضة", english: "إنجليزي", programming: "برمجة" };
+  var SUBJECT = { math: "رياضة", english: "إنجليزي", programming: "برمجة", science: "علوم" };
   function subjects(scope) {
     var list = Array.isArray(scope) ? scope : String(scope || "").split(",");
     return list.map(function (s) { s = String(s).trim(); return SUBJECT[s] || s; }).filter(Boolean);

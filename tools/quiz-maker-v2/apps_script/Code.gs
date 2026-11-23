@@ -7859,7 +7859,7 @@ function _p3bAudit(payload, action, res) {
 // ============================================================================
 // 1. Subjects
 // ============================================================================
-var P4_SUBJECTS = ["programming", "english", "math"];
+var P4_SUBJECTS = ["programming", "english", "math", "science"];
 
 // Per-request globals (Apps Script starts every request with a fresh global scope; p4_gate resets them anyway).
 var P4_CTX_ = null;
@@ -9123,7 +9123,7 @@ function p4_selfTest_people() {
 //                   p4_teacher_update_student.
 // ============================================================================
 
-var P4T_SUBJECTS = ["programming", "english", "math"];
+var P4T_SUBJECTS = ["programming", "english", "math", "science"];
 var P4T_STU_COLS = ["teacher_scope", "assistant_of"];
 var P4T_GROUPOWNERS_HEADERS = ["group", "owner_id", "created_at"];
 var P4T_TELEGRAM_HEADERS = ["teacher_id", "chat_id", "linked_at"];
@@ -10209,7 +10209,7 @@ function p4_selfTest_tg() {
 // Nothing runs at load time.
 // ============================================================================
 
-var P4S_SUBJECTS = ["programming", "english", "math"];
+var P4S_SUBJECTS = ["programming", "english", "math", "science"];
 var P4S_CACHE_KEY = "p4stats:v1";
 var P4S_CACHE_SECONDS = 300;
 // Only the exact label Code.gs writes into Payments.note for chapter / term subscriptions

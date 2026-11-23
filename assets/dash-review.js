@@ -17,7 +17,7 @@
 (function () {
   "use strict";
 
-  var SUBJECTS = { programming: "Programming", english: "English", math: "Math" };
+  var SUBJECTS = { programming: "Programming", english: "English", math: "Math", science: "Science" };
 
   function create(h) {
     var el = h.el;

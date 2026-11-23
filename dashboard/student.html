@@ -272,7 +272,7 @@ window.PageLang = (function () {
   function reviewWording() {
     if (!AR_()) return { srcQuiz: "Quiz mistakes", srcAssign: "Assignment mistakes" };
     return {
-      chapter: "Chapter", lesson: "Lesson", other: "دروس أخرى", subjects: { programming: "برمجة", english: "إنجليزي", math: "رياضيات" },
+      chapter: "Chapter", lesson: "Lesson", other: "دروس أخرى", subjects: { programming: "برمجة", english: "إنجليزي", math: "رياضيات", science: "علوم" },
       srcQuiz: "غلطات الكويز", srcAssign: "غلطات الواجب",
       srcHead: function (w, a) { return w ? "غلطت في " + nQ(w) + " · من " + nA(a) : nA(a) + " · مفيش غلطات"; },
       noMistakes: function () { return "مفيش غلطات هنا — شغل ممتاز!"; },

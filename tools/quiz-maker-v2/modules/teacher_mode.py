@@ -18,7 +18,7 @@ token means "no restriction": nothing is filtered and nothing is refused.
 
 _FULL_SUBJECTS = {}      # id(list) -> original (slug, label) pairs, so apply() can be re-run with a new token
 _STATE = {"restricted": False, "allowed": None, "identity": None}
-KNOWN_SUBJECTS = ("programming", "english", "math")
+KNOWN_SUBJECTS = ("programming", "english", "math", "science")
 
 
 class TeacherModeError(Exception):

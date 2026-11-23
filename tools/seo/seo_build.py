@@ -168,7 +168,7 @@ def lesson_name(cfg, root, rel):
 def find_git_root(start):
     cur = start
     while True:
-        if os.path.isdir(os.path.join(cur, ".git")):
+        if os.path.exists(os.path.join(cur, ".git")):   # a folder, or a file in a git worktree
             return cur
         parent = os.path.dirname(cur)
         if parent == cur:

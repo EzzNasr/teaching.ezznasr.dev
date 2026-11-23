@@ -48,8 +48,18 @@
       "level": "Intermediate to advanced"
     },
     "math": {
-      "phrase": "SAT / EST math lesson",
+      "phrase": "Math lesson",
       "level": "High school"
+    },
+    "science/preparatory/grade-3-preparatory": {
+      "phrase": "Science lesson for Grade 3 Preparatory",
+      "label_ar": "العلوم",
+      "level": "Grade 3 Preparatory"
+    },
+    "science/secondary/grade-1-secondary": {
+      "phrase": "Integrated Science lesson for Grade 1 Secondary",
+      "label_ar": "العلوم المتكاملة",
+      "level": "Grade 1 Secondary"
     }
   },
   "lesson_description_tail": "{phrase}: video walkthrough, {questions}-question quiz and guided assignment.",
@@ -57,8 +67,8 @@
   "lesson_description_tail_ar": "درس من مادة {label_ar} مع فيديو شرح واختبار تفاعلي وواجب.",
   "pages": {
     "/": {
-      "title": "{site_name} — Programming, Math & English Lessons",
-      "description": "Concept-first lessons with video walkthroughs, instant-feedback quizzes and guided assignments: Baccalaureate programming & AI, SAT/EST math and English.",
+      "title": "{site_name} — Programming, Math, Science & English Lessons",
+      "description": "Concept-first lessons with video walkthroughs, instant-feedback quizzes and guided assignments: Baccalaureate programming & AI, math, science and English.",
       "crumb": "Home"
     },
     "/programming/": {
@@ -82,9 +92,24 @@
       "crumb": "More lessons"
     },
     "/math/": {
-      "title": "SAT & EST Math Lessons and Practice | {site_name}",
-      "description": "Math lessons and practice for SAT and EST: probability, differential equations and focused problem sets, with quizzes and assignments.",
+      "title": "Math Lessons and Practice | {site_name}",
+      "description": "Math lessons and practice: probability, differential equations and focused problem sets, with quizzes and assignments.",
       "crumb": "Math"
+    },
+    "/science/": {
+      "title": "Science & Integrated Science Lessons | {site_name}",
+      "description": "Science lessons for 3rd preparatory and Integrated Science lessons for 1st secondary students, with video explanations, quizzes and assignments.",
+      "crumb": "Science"
+    },
+    "/science/preparatory/grade-3-preparatory/": {
+      "title": "العلوم للصف الثالث الإعدادي | {site_name}",
+      "description": "دروس العلوم للصف الثالث الإعدادي مع فيديوهات شرح واختبارات تفاعلية وواجبات بعد كل درس.",
+      "crumb": "الصف الثالث الإعدادي"
+    },
+    "/science/secondary/grade-1-secondary/": {
+      "title": "العلوم المتكاملة للصف الأول الثانوي | {site_name}",
+      "description": "دروس العلوم المتكاملة للصف الأول الثانوي مع فيديوهات شرح واختبارات تفاعلية وواجبات بعد كل درس.",
+      "crumb": "الصف الأول الثانوي"
     },
     "/english/": {
       "title": "English Lessons: Interview Prep & Grammar | {site_name}",
