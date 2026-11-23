@@ -29,6 +29,12 @@ check("each science grade has its own accent", [c.track_class_for_group("science
 tmp = tempfile.mkdtemp()
 try:
     shutil.copytree(os.path.join(SITE, "science"), os.path.join(tmp, "science"))
+    gpage = os.path.join(tmp, "science", *GRADES[1].split("/"), "index.html")
+    EMPTY_NOTE = chr(10) + '<p class="empty">Lessons coming soon.</p>' + chr(10)
+    with open(gpage, encoding="utf-8") as f:     # back to the empty grade page (before the owner's seeded lessons)
+        empty = c._GRID_CONTAINER_RE.sub(lambda m: m.group(1) + EMPTY_NOTE + m.group(3), f.read(), count=1)
+    with open(gpage, "w", encoding="utf-8") as f:
+        f.write(empty)
     kind = c.upsert_lesson_card(tmp, "science", GRADES[1], "chapter-1-lesson-1-matter", "Chapter 1 Lesson 1 | Matter", "States of matter.")
     with open(os.path.join(tmp, "science", *GRADES[1].split("/"), "index.html"), encoding="utf-8") as f:
         html = f.read()

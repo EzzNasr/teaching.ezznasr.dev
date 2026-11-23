@@ -1,0 +1,11 @@
+{
+  "_readme": "The owner's Science lessons (refactor Phase 2.5 step G). Run: python tools/quiz-maker-v2/seed_lessons.py tools/quiz-maker-v2/seeds/science.json. One title per lesson (empty = numbered only, 'Chapter 1 Lesson 1'); existing lessons are kept, so add a title and run it again to add a lesson. The teacher fills them in; he cannot rename, add or delete them.",
+  "subject": "science",
+  "subject_title": "Science",
+  "groups": [
+    {"group": "preparatory/grade-3-preparatory",
+     "chapters": [{"lessons": ["", "", ""]}, {"lessons": ["", "", ""]}, {"lessons": ["", "", ""]}]},
+    {"group": "secondary/grade-1-secondary",
+     "chapters": [{"lessons": ["", "", ""]}, {"lessons": ["", "", ""]}, {"lessons": ["", "", ""]}]}
+  ]
+}

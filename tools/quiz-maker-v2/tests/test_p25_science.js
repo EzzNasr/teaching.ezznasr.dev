@@ -65,7 +65,8 @@ GRADES.forEach(g => {
   t(g + ': page and style exist', exists(g + '/index.html') && exists(g + '/style.css'));
   t('the science page links to ' + g, portal.includes('href="./' + g.slice('science/'.length) + '/"'));
   const s = exists(g + '/index.html') ? read(g + '/index.html') : '';
-  t(g + ': empty lesson grid the Quiz Maker can fill', /<div class="lessons">\s*<p class="empty">[^<]*<\/p>\s*<\/div>\s*<\/div>\s*<\/section>/.test(s));
+  const grid = (s.match(/<div class="lessons">([\s\S]*?)<\/div>\s*<\/div>\s*<\/section>/) || [])[1];
+  t(g + ': a lesson grid the Quiz Maker fills (seeded lessons, or the coming-soon note)', grid !== undefined && (/^\s*<p class="empty">[^<]*<\/p>\s*$/.test(grid) || /<a class="lesson" href="\.\/chapter-\d+-lesson-\d+\/">/.test(grid)));
   t(g + ': no chapter/term subscription widget (programming only)', !/subscribe\.js|id="subscriptions"/.test(s));
   t(g + ': SEO block stamped', s.includes('<!-- SEO:START') && s.includes('<link rel="canonical" href="https://teaching.ezznasr.dev/' + g + '/">'));
   t(g + ': in the sitemap', read('sitemap.xml').includes('https://teaching.ezznasr.dev/' + g + '/'));
