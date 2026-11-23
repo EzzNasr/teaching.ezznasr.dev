@@ -60,7 +60,7 @@ html.ti-active { overflow: hidden; }
   animation: ti-push var(--ti-ms) ease-in forwards;
 }
 .ti-figure {
-  position: relative; height: min(76vh, 760px); aspect-ratio: 3 / 4;
+  position: relative; height: min(66vh, 720px); aspect-ratio: 3 / 4;
   opacity: 0; transform: translateY(70px) scale(.5);
   animation: ti-rise calc(var(--ti-ms) * .6) calc(var(--ti-ms) * .14) cubic-bezier(.16, 1.25, .3, 1) forwards;
 }
