@@ -1,35 +1,50 @@
 # Teacher publishing
 
-*Refactor Phase 2.5, step E (2026-11-23). How a second teacher puts his own lessons on the site, and what stops him
+*Refactor Phase 2.5, steps E and G (2026-11-23). How a second teacher fills in his lessons, and what stops him
 from changing anything else.*
 
-A teacher's work goes two ways:
+**You make the lessons, he fills them in.** You seed every lesson (its folder, its name, its pages, its place on the
+grade page). He cannot rename, add or delete a lesson. He adds:
 
-| What | Where it goes | Who checks it |
+| What | How | Who checks it |
 |---|---|---|
-| Videos, quiz questions, written-answer models | Straight to the backend from the Quiz Maker, with his own teacher token | The backend: his token only works on his subjects (separation test R-P25-B) |
-| Lesson pages (the files in his subject folder) | A GitHub pull request from a `teacher/<name>/...` branch | The **Teacher publish check** in CI, then you (approve and merge), or auto-merge once you trust him |
+| The three videos of a lesson (lesson, quiz, assignment) | Quiz Maker in teacher mode, **Update** next to each video. Goes straight to the backend; the lesson page does not change | The backend: his token only works on his subjects (R-P25-B) |
+| Quiz questions | Quiz Maker, **Load for editing**, add questions, **Save quiz questions**. Backend only, no page change | The backend, same token |
+| Files (PDFs, slides, worksheets) | Quiz Maker, Attachment section: uploads to Drive and adds a line to the lesson's `attachments.json`. That file goes to GitHub in a pull request from a `teacher/<name>/...` branch | The **Teacher publish check**, then you (approve and merge) |
+
+The assignment page (its text, how students submit, its questions) is yours too: it lives inside the lesson page.
+Fixed names keep this simple; they are not a hard rule. If he needs more (for example the assignment questions), it
+can be added later.
+
+## Seeding lessons (you)
+
+1. Write the chapters and lessons in `tools/quiz-maker-v2/seeds/science.json` (one title per lesson).
+2. Run `python tools/quiz-maker-v2/seed_lessons.py tools/quiz-maker-v2/seeds/science.json`. It uses the Quiz Maker's
+   own lesson writer: folder `chapter-<n>-lesson-<m>`, title `Chapter <n> Lesson <m> | <your title>`, an empty quiz,
+   no video, then the SEO step. Lessons that already exist are left alone, so adding a lesson later is: add its title,
+   run it again.
+3. Commit and push as usual. To rename a lesson later: Quiz Maker (your owner token), **Load for editing**, change the
+   name, **Generate**. The folder stays the same.
 
 ## What the check refuses
 
 `scripts/check_teacher_pr.js`, run by `.github/workflows/teacher-publish.yml`. The rules and the teacher list come
 from `main`, so a teacher cannot change them in his own pull request; his files are only read, never run.
 
+A teacher pull request may change only `attachments.json` and attachment files (`.pdf .png .jpg .jpeg .webp .gif`)
+inside lesson folders that **already exist on `main`** in his subjects. Everything else is refused, with the reason:
+
 - A branch that is not `teacher/<name>/...`, a name that is not in `.github/teachers.json`, or a pull request opened
   by any GitHub account other than that teacher's.
-- Any file outside his subject folders (for Science: `science/<grade>/...`). His subject's front page
-  (`science/index.html`), `assets/`, `dashboard/`, the backend, `tools/`, `scripts/`, `tests/`, `docs/`, `.github/`
-  and every root file are refused. Two shared files the Quiz Maker rewrites are allowed only when every change in them
-  is about his subjects: `sitemap.xml` and `assets/lesson-titles.json`.
-- Anything but lesson files: `.html .css .json .png .jpg .jpeg .webp .gif .pdf`. No links (symlinks), no submodules.
-- Script in a lesson page other than the shared engines (`/assets/<engine>.js`), JSON data blocks, and the small inline
-  scripts your own pages already use. Also refused: event-handler attributes, `javascript:` links, `<object>`,
-  `<embed>`, `<base>`, `<meta refresh>`, frames other than YouTube / Vimeo / Google Drive, and the parts of inline SVG
-  that can run or load content.
-- CSS with script tricks or `@import`; JSON that does not parse.
+- A new lesson folder, a deleted or moved lesson, or a change to a lesson page (`index.html`, `quiz.html`,
+  `assignment.html`): "lesson pages are made by the owner".
+- The grade pages, his subject's front page, `sitemap.xml`, `assets/lesson-titles.json`, and anything outside his
+  subject folders (`assets/`, `dashboard/`, the backend, `tools/`, `scripts/`, `.github/`, root files).
+- Stylesheets, scripts or any other file in a lesson; links (symlinks), submodules.
+- An `attachments.json` that is not the Quiz Maker's own list of `{title, drive_file_id, type}`, or that is deleted.
 - Files over 2 MB (8 MB for a PDF), or more than 20 MB in one pull request.
 
-Your own lessons already on `main` all pass these rules (test R-P25-E).
+Every `attachments.json` you already have passes these rules (test R-P25-E).
 
 ## One-time setup (you, on github.com)
 
@@ -48,11 +63,14 @@ Your own lessons already on `main` all pass these rules (test R-P25-E).
 
 ## Every lesson (the teacher)
 
-1. Quiz Maker in teacher mode (his token): only his subjects show. Generate the lesson into his copy of the site.
-   Videos and quiz questions go to the backend at that moment.
-2. GitHub Desktop: *Current branch > New branch* `teacher/<name>/<lesson>`, for example
-   `teacher/science-teacher/ch1-lesson1-matter`. Commit the changed files, *Publish branch*, then *Create Pull Request*.
-3. The checks run. A red **Teacher publish check** lists every refused file and why.
+1. Quiz Maker in teacher mode (his token): only his subjects show, lesson names are read-only, and there is no
+   Generate, New lesson or Delete. He picks the lesson under "Open an existing lesson".
+2. Videos: paste the link, click **Update**. Quiz questions: **Load for editing**, add them, **Save quiz questions**.
+   Both are live at once; nothing to commit.
+3. Files: Attachment section, **Upload to Drive & add to lesson**. Then in GitHub Desktop: *Current branch > New
+   branch* `teacher/<name>/<lesson>` (for example `teacher/science-teacher/ch1-lesson1-files`), commit the changed
+   `attachments.json`, *Publish branch*, *Create Pull Request*.
+4. The checks run. A red **Teacher publish check** lists every refused file and why.
 
 ## Every lesson (you)
 

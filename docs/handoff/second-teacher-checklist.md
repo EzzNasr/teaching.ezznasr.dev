@@ -39,14 +39,17 @@ Commit the new row the script adds to `docs/runbooks/backend-deploys.md`.
       `science-teacher` if you like (his branches are `teacher/<handle>/...`). Keep `"auto_merge": false`.
 - [ ] Ruleset on `main` and the Actions settings: `teacher-publishing.md`, "One-time setup".
 
-## 5. Live trial (plan step G, together with Claude)
+## 5. Live trial (together with Claude)
 
-A demo teacher account and demo data on the live site: sign in, publish one lesson with a video through a pull
-request, check «إيراداتي» and the downloaded report, check what he cannot see (another subject, your students,
-your revenue page), then remove the demo account, demo rows and demo lesson.
+A demo teacher account and demo data on the live site: sign in, add a video and a quiz question to one seeded lesson,
+attach one file through a pull request, check «إيراداتي» and the downloaded report, check what he cannot do (rename a
+lesson, add one, another subject, your students, your revenue page), then remove the demo account, demo rows and the
+demo file.
 
 ## 6. His lessons
 
-The Science pages are ready and empty: `science/preparatory/grade-3-preparatory/` (3rd Prep) and
-`science/secondary/grade-1-secondary/` (1st Secondary, Integrated Science). Each shows "Lessons coming soon" until the
-first lesson is generated with the Quiz Maker.
+You seed them; he fills them in. The lessons of both grades (`science/preparatory/grade-3-preparatory/`, 3rd Prep,
+and `science/secondary/grade-1-secondary/`, 1st Secondary, Integrated Science) come from
+`tools/quiz-maker-v2/seeds/science.json` (`teacher-publishing.md`, "Seeding lessons"). He cannot rename, add or
+delete a lesson; he adds the videos and quiz questions (backend, his token) and the files (`attachments.json`, pull
+request).

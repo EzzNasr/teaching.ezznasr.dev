@@ -1834,7 +1834,7 @@
     },
     {
       "id": "R-P25-C-QM",
-      "title": "Phase 2.5 C: the Quiz Maker knows science: SUBJECTS, teacher mode, the two grade folders found as groups with their accents, the first lesson card replaces the coming-soon note, a science token shows only Science",
+      "title": "Phase 2.5 C+G: the Quiz Maker knows science (SUBJECTS, teacher mode, the two grade folders as groups with their accents, the first card replaces the coming-soon note, a science token shows only Science); the owner's seeded lessons (seeds/science.json) are found in both grades with their titles and pages, seeding again keeps them; a teacher's videos go to the server only; in the real tabs a teacher cannot rename, add or delete lessons, Generate or update the assignment page, while videos, quiz questions and files stay; the owner keeps everything",
       "status": "active",
       "owner": "refactor-2026-11",
       "needs": "python",
@@ -1856,7 +1856,7 @@
     },
     {
       "id": "R-P25-E",
-      "title": "Phase 2.5 E: teacher publishing check (scripts/check_teacher_pr.js + .github/workflows/teacher-publish.yml): rule examples; every owner lesson page passes; the workflow runs from main on pull_request_target, reads the pull request as data, no pull-request text in shell lines, auto-merge only by config; teachers.json valid with auto-merge off; end to end in a temp git repo a lesson branch passes and branches touching dashboard, another subject, workflows, the rules, engines, the front page or adding a script are refused with reasons",
+      "title": "Phase 2.5 E+G: teacher publishing check (scripts/check_teacher_pr.js + .github/workflows/teacher-publish.yml): rule examples; every lesson folder on main is found and every attachments.json passes; the workflow runs from main on pull_request_target, reads the pull request as data, no pull-request text in shell lines, auto-merge only by config; teachers.json valid with auto-merge off; end to end in a temp git repo files added to an existing lesson pass, and renaming a lesson, a new, moved or deleted lesson, a lesson-page edit, the grade page, sitemap, lesson titles, dashboard, another subject, workflows, the rules, engines or a bad file list are refused with reasons",
       "status": "active",
       "owner": "refactor-2026-11",
       "cmd": [
