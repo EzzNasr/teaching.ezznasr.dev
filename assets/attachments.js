@@ -22,6 +22,11 @@
 (function () {
   "use strict";
 
+  // Phase 2.5 step G: the teacher adds files from his browser page (dashboard/my-lessons.html); that list is kept on
+  // the server (get_attachments) and shown after this folder's attachments.json. DRIVE_ENDPOINT is baked in by the
+  // Quiz Maker's "Sync site assets", like video.js. If the server cannot be reached, attachments.json alone is shown.
+  var DRIVE_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpyJWSI9aRseig5JBmydzo34ogfNYv9qQH1HrzIUGcgETF1rk4pE8qO8j7Hp3FrVjCvw/exec";
+
   // Google Drive's /preview endpoint isn't limited to PDFs and images —
   // it renders Office documents too. The original list only had the six
   // below, so a .docx/.pptx/.xlsx attachment silently fell through to
@@ -63,6 +68,27 @@
     return "https://drive.google.com/file/d/" + encodeURIComponent(fileId) + "/preview";
   }
 
+  // This lesson's key, from the page's own folder: /science/secondary/grade-1-secondary/chapter-1-lesson-1/ -> that path.
+  function lessonKey() {
+    var parts = location.pathname.split("/").filter(Boolean);
+    if (parts.length && /\.html?$/i.test(parts[parts.length - 1])) parts.pop();
+    return parts.map(function (p) { try { return decodeURIComponent(p); } catch (e) { return p; } }).join("/");
+  }
+
+  function fromServer() {
+    var lesson = lessonKey();
+    if (!lesson || !/^https:\/\//.test(DRIVE_ENDPOINT)) return Promise.resolve([]);
+    return fetch(DRIVE_ENDPOINT, {
+      method: "POST",
+      // text/plain avoids a CORS preflight against Apps Script; doPost JSON.parses regardless.
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "get_attachments", lesson: lesson }),
+    })
+      .then(function (resp) { return resp.json(); })
+      .then(function (data) { return data && data.ok && Array.isArray(data.items) ? data.items : []; })
+      .catch(function () { return []; });
+  }
+
   function mount(rootSelector) {
     var root = document.querySelector(rootSelector);
     if (!root) return;
@@ -71,12 +97,21 @@
     var listWrap = root.querySelector("#attachments-list");
     if (!listWrap) return;
 
-    fetch("attachments.json", { cache: "no-store" })
+    var fromFile = fetch("attachments.json", { cache: "no-store" })
       .then(function (resp) { return resp.ok ? resp.json() : []; })
       .catch(function () { return []; })
-      .then(function (items) {
-        renderList(Array.isArray(items) ? items : []);
+      .then(function (items) { return Array.isArray(items) ? items : []; });
+    Promise.all([fromFile, fromServer()]).then(function (lists) {
+      var seen = {}, all = [];
+      lists[0].concat(lists[1]).forEach(function (it) {
+        if (!it || typeof it !== "object") return;
+        var id = it.drive_file_id ? String(it.drive_file_id) : "";
+        if (id && seen[id]) return;
+        if (id) seen[id] = true;
+        all.push(it);
       });
+      renderList(all);
+    });
 
     function renderList(items) {
       listWrap.innerHTML = "";

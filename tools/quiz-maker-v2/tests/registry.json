@@ -1875,6 +1875,16 @@
       ]
     },
     {
+      "id": "R-P25-G",
+      "title": "Phase 2.5 G: the teacher fills in lessons from his browser, through the real doPost: a teacher dashboard session saves and reads quiz questions and written models, uploads and deletes files and saves a lesson's file list on the server (admin_set_attachments) only in his subjects; get_attachments is public; the list keeps the attachments.json shape (bad ids, types, more than 40 refused, titles trimmed); a teacher may only add files uploaded for his subjects, files already listed may stay; students, scoped assistants and anonymous callers cannot write; a second (science) teacher never reaches math",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "cmd": [
+        "node",
+        "tests/test_p25_lessons_browser.js"
+      ]
+    },
+    {
       "id": "R-P25-F-PAGE",
       "title": "Phase 2.5 F: dashboard/my-revenue.html (?mock=1) in a browser: cards > courses > course (lesson, price, videos, visible) > lesson (videos, sales, latest purchases); one Download report button gives a self-contained HTML balance sheet (prints to A4, rows never split, escaped names) and an Excel-safe CSV; English mode; read only; 390 and 1280 px, light and dark",
       "status": "active",

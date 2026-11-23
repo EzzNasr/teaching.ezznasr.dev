@@ -9,8 +9,18 @@
   "tools/quiz-maker-v2/apps_script/Requirements.gs",
   "tools/quiz-maker-v2/apps_script/Revenue.gs"
  ],
- "count": 1076,
+ "count": 1084,
  "items": {
+  "ATTACH_LIST_HEADERS": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "9a2aff6e29ba8261"
+  },
+  "ATTACH_LIST_MAX": {
+   "kind": "var",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "2ebf66a32bbb879a"
+  },
   "ATTENDANCE_HEADERS": {
    "kind": "var",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
@@ -956,6 +966,16 @@
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
    "hash": "989feadefbeb437a"
   },
+  "_attachListCacheKey": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "38678897bc671199"
+  },
+  "_attachListOf": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "36ea2ecc48b29904"
+  },
   "_auditAll": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
@@ -1010,6 +1030,11 @@
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
    "hash": "8719cc52af160fb5"
+  },
+  "_cleanAttachItems": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "0520ae17554afe55"
   },
   "_cleanGroupName": {
    "kind": "function",
@@ -1080,6 +1105,11 @@
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
    "hash": "96b517c2ee7c2bca"
+  },
+  "_findAttachListRow": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "dd0ed9584ac619ad"
   },
   "_findLessonRow": {
    "kind": "function",
@@ -3144,7 +3174,7 @@
   "doPost": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "971b5111563bebf0"
+   "hash": "1a57c1cbb2127209"
   },
   "findPhoneCollisions": {
    "kind": "function",
@@ -3756,6 +3786,11 @@
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
    "hash": "19f34fbc8236b5dc"
   },
+  "handleAdminSetAttachments": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "135f829ee71838b8"
+  },
   "handleAdminSetLessonLock": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
@@ -3799,7 +3834,12 @@
   "handleDeleteAttachment": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "5cf6d5c6724eba16"
+   "hash": "79002cb5e61600df"
+  },
+  "handleGetAttachments": {
+   "kind": "function",
+   "file": "tools/quiz-maker-v2/apps_script/Code.gs",
+   "hash": "ab99b31a39a95cbd"
   },
   "handleGetMyResults": {
    "kind": "function",
@@ -3879,7 +3919,7 @@
   "handleUploadAttachment": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "79d183501718d682"
+   "hash": "cee36f956527d7b4"
   },
   "handleUploadQuizResult": {
    "kind": "function",
