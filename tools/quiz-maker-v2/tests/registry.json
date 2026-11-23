@@ -1842,6 +1842,17 @@
         "python",
         "tests/test_p25_science_qm.py"
       ]
+    },
+    {
+      "id": "R-P25-D",
+      "title": "Phase 2.5 D: home page in a browser (390 and 1280 px, light and dark): three main cards Programming, Math, Science in that order; English in a smaller More row below; every subject link and both science grade pages open; no sideways scroll; cards stack on a phone",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "needs": "playwright",
+      "cmd": [
+        "python",
+        "tests/e2e_p25_home.py"
+      ]
     }
   ]
 }

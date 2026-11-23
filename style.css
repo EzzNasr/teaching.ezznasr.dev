@@ -1213,3 +1213,64 @@ footer {
         animation: none
     }
 }
+
+/* Phase 2.5 D: smaller "More" row under the three main subjects (English today). */
+.more {
+    margin-top: 34px;
+}
+
+.more h3 {
+    margin: 0 0 12px;
+    color: var(--ink-dim);
+    font: 700 12px var(--mono);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+
+.mini-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 18px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+    color: var(--ink);
+    text-decoration: none;
+    transition: transform .2s ease, border-color .2s ease;
+}
+
+.mini-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+}
+
+.mini-title {
+    font-weight: 800;
+    font-size: 15px;
+}
+
+.mini-text {
+    flex: 1;
+    min-width: 0;
+    color: var(--ink-dim);
+    font-size: 13px;
+}
+
+.mini-card .go {
+    color: var(--mint-strong);
+    font: 700 12px var(--mono);
+    white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+    .mini-card {
+        flex-wrap: wrap;
+        gap: 6px 12px;
+    }
+
+    .mini-text {
+        flex-basis: 100%;
+        order: 3;
+    }
+}
