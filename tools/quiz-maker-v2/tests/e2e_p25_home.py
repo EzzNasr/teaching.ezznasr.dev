@@ -67,7 +67,8 @@ with sync_playwright() as p:
             pg.goto(base + "/science/", wait_until="load")
             for a in ("./preparatory/grade-3-preparatory/", "./secondary/grade-1-secondary/"):
                 r = pg.goto(base + "/science/" + a[2:], wait_until="load")
-                check("science grade page %s opens" % a, r is not None and r.status == 200 and "Lessons coming soon" in pg.inner_text("main"))
+                check("science grade page %s opens" % a, r is not None and r.status == 200 and ("Lessons coming soon" in pg.inner_text("main") or
+                      pg.locator('a.lesson[href^="./chapter-1-lesson-1/"]').count() == 1))   # empty, or the owner's seeded lessons
                 check("science grade page %s: no sideways scroll at 390" % a, pg.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"))
         ctx.close()
     browser.close()
