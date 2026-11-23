@@ -29,7 +29,8 @@
       photo: '/assets/teachers/placeholder-programming.svg', placeholder: true
     },
     math: {
-      name: 'Ezz Nasr', nameAr: 'عز نصر',
+      // The owner says Math has its own teacher; name and photo still to come.
+      name: 'Math teacher', nameAr: 'مدرس الرياضيات',
       subject: 'Math', subjectAr: 'الرياضيات',
       photo: '/assets/teachers/placeholder-math.svg', placeholder: true
     },
@@ -55,7 +56,7 @@
   var GLYPH_SPOTS = [[10, 16, 1.0], [84, 12, .8], [6, 62, .9], [90, 56, 1.1], [18, 86, .7], [78, 84, .9], [30, 6, .6], [64, 4, .7]];
 
   // How long the home-page transition shows the teacher before opening the page (ms).
-  var INTRO_MS = 1000;
+  var INTRO_MS = 1500;   // the owner picked "bold, about 1.5 s, full screen" (2026-11-24)
 
   window.TEACHERS = TEACHERS;
 

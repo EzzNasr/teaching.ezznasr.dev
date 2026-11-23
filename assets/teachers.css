@@ -28,7 +28,7 @@ html[data-theme="dark"] body.subject-english { --accent:#ff86a2; --accent-strong
    ========================================================================== */
 html.ti-active { overflow: hidden; }
 .ti-overlay {
-  --ti-ms: 1000ms; --ti-x: 50vw; --ti-y: 50vh;
+  --ti-ms: 1500ms; --ti-x: 50vw; --ti-y: 50vh;
   position: fixed; inset: 0; z-index: 2147483000; display: none; place-items: center;
   overflow: hidden; cursor: pointer; color: #fff; font-family: var(--sans, system-ui, sans-serif);
   -webkit-tap-highlight-color: transparent;
@@ -60,7 +60,7 @@ html.ti-active { overflow: hidden; }
   animation: ti-push var(--ti-ms) ease-in forwards;
 }
 .ti-figure {
-  position: relative; height: min(62vh, 560px); aspect-ratio: 3 / 4;
+  position: relative; height: min(76vh, 760px); aspect-ratio: 3 / 4;
   opacity: 0; transform: translateY(70px) scale(.5);
   animation: ti-rise calc(var(--ti-ms) * .6) calc(var(--ti-ms) * .14) cubic-bezier(.16, 1.25, .3, 1) forwards;
 }
@@ -86,7 +86,7 @@ html.ti-active { overflow: hidden; }
 .ti-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .ti-skip { position: absolute; bottom: 18px; left: 0; right: 0; margin: 0; text-align: center; font: 500 11px var(--mono, monospace); letter-spacing: .08em; opacity: .7; }
 @media (max-width: 600px) {
-  .ti-figure { height: auto; width: min(70vw, 320px); }
+  .ti-figure { height: auto; width: min(82vw, 380px); }
 }
 @keyframes ti-burst { to { clip-path: circle(160vmax at var(--ti-x) var(--ti-y)); } }
 @keyframes ti-rays  { 25% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: .85; transform: rotate(14deg); } }
