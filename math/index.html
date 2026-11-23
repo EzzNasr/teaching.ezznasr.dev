@@ -109,9 +109,11 @@
       document.addEventListener('DOMContentLoaded', init);
     })();
   </script>
+<link rel="stylesheet" href="/assets/teachers.css">
+<script src="/assets/teachers.js" defer></script>
 </head>
 
-<body>
+<body class="subject-math">
 
   <header>
     <div class="titlebar">
@@ -126,7 +128,10 @@
   </header>
 
   <main>
-    <div class="wrap page-head">
+    <div class="subject-hero">
+<div class="subject-deco" aria-hidden="true"><svg viewBox="0 0 1200 400" preserveAspectRatio="none" style="left:0;top:40px;width:100%;height:360px" fill="none"><path class="stroke-1" stroke-width="2.5" vector-effect="non-scaling-stroke" d="M0 250 C100 130 200 130 300 250 S500 370 600 250 S800 130 900 250 S1100 370 1200 250"/><path class="stroke-2" stroke-width="2" stroke-dasharray="6 8" vector-effect="non-scaling-stroke" d="M0 360 L1200 60"/></svg><svg viewBox="0 0 120 120" style="left:52%;top:18px;width:120px;height:120px" fill="none"><circle class="stroke-2" cx="60" cy="60" r="44" stroke-width="2.5"/><path class="stroke-2" stroke-width="2" d="M60 60 L104 60"/></svg><svg viewBox="0 0 120 110" style="left:4%;bottom:60px;width:110px;height:100px" fill="none"><path class="stroke-1 fill-1" stroke-width="2.5" d="M10 100 L60 10 L110 100 Z"/></svg><span class="g" style="left:2%;top:12%">&pi;</span><span class="g" style="left:38%;top:2%">&sum;</span><span class="g" style="left:70%;top:6%">&radic;x</span><span class="g" style="left:30%;bottom:6%">&infin;</span><span class="g" style="left:62%;bottom:4%">&int;</span><span class="g" style="left:16%;top:40%">x&sup2;</span><span class="g" style="left:46%;top:44%">&Delta;</span><span class="g" style="left:8%;bottom:30%">&ne;</span></div>
+<div class="wrap subject-layout"><div class="subject-main">
+<div class="page-head">
       <div class="eyebrow">Math</div>
       <h1>Math</h1>
       <p class="lede">Math. Drawn from prior tutoring in Probability and Differential Equations,
@@ -134,7 +139,7 @@
     </div>
 
     <section class="block" id="lessons">
-      <div class="wrap">
+      <div>
         <div class="section-heading">
           <div>
             <h2>Lessons</h2>
@@ -174,7 +179,14 @@
         </div>
       </div>
     </section>
-  </main>
+  </div>
+<aside class="teacher-card" data-teacher-slot="math" aria-label="Your teacher">
+<div class="tc-photo"><img data-teacher-img src="/assets/teachers/placeholder-math.svg" alt="Photo placeholder for the Math teacher" width="300" height="400" decoding="async"><svg class="tc-deco" viewBox="0 0 300 400" aria-hidden="true" fill="none" stroke="#fff" stroke-opacity=".8"><path stroke-width="2.5" d="M28 380 V24 M20 34 L28 20 L36 34 M28 372 H286 M276 364 L290 372 L276 380"/><path stroke-width="2" d="M28 330 h-6 M28 280 h-6 M28 230 h-6 M28 180 h-6 M28 130 h-6 M28 80 h-6 M78 372 v6 M128 372 v6 M178 372 v6 M228 372 v6"/><path stroke="#ffd29a" stroke-width="3" stroke-opacity=".95" d="M28 300 C 80 300, 110 120, 170 110 S 250 60, 290 40"/><circle cx="170" cy="110" r="6" fill="#ffd29a" stroke="none"/></svg></div>
+<div class="tc-meta"><span class="tc-label">Your teacher</span><strong class="tc-name" data-teacher-name>Ezz Nasr</strong><span class="tc-name-ar" lang="ar" dir="rtl" data-teacher-name>عز نصر</span><span class="tc-line">Probability · Differential equations</span></div>
+</aside>
+</div>
+</div>
+</main>
 
   <footer>
     <div class="wrap">

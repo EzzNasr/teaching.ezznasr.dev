@@ -165,10 +165,12 @@ html.ti-active { overflow: hidden; }
 
 /* ---- Science: atom orbits and an element tile */
 .subject-science .tc-photo { border-radius: 50% 50% 18px 18px / 38% 38% 18px 18px; }
+.subject-science .tc-meta { position: relative; padding-right: 56px; }
 .tc-element {
-  float: right; display: grid; place-items: center; width: 46px; height: 50px; margin: 2px 0 0 10px; border-radius: 8px;
-  border: 2px solid var(--s1); color: var(--s-ink); font: 800 18px/1 var(--sans); position: relative;
+  position: absolute; top: 14px; right: 4px; display: grid; place-items: center; width: 44px; height: 48px; border-radius: 8px;
+  border: 2px solid var(--s1); color: var(--s-ink); font: 800 18px/1 var(--sans);
 }
+@media (max-width: 900px) { .tc-element { top: 0; } }
 .tc-element small { position: absolute; top: 3px; left: 5px; font: 600 9px var(--mono); }
 .subject-science .tc-deco .tc-orbit { transform-origin: 150px 200px; animation: tc-spin 14s linear infinite; }
 .subject-science .tc-deco .tc-orbit:nth-of-type(2) { animation-duration: 19s; animation-direction: reverse; }
@@ -219,4 +221,20 @@ html.ti-active { overflow: hidden; }
 }
 @media (max-width: 600px) {
   .subject-deco .g:nth-child(n+5) { display: none; }
+}
+
+/* ---- the main column is narrower beside the teacher card */
+@media (min-width: 901px) {
+  .subject-main .lessons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 801px) and (max-width: 1120px) {
+  .subject-main .track-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.subject-main .page-head { padding-left: 0; padding-right: 0; }
+
+/* math and english: the card lines up with the page heading */
+body.subject-math .subject-layout > .teacher-card, body.subject-english .subject-layout > .teacher-card { margin-top: 44px; }
+@media (max-width: 900px) {
+  body.subject-math .subject-layout > .teacher-card, body.subject-english .subject-layout > .teacher-card { margin-top: 24px; }
+  body.subject-math .page-head, body.subject-english .page-head { padding-top: 28px; }
 }
