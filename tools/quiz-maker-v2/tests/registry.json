@@ -1866,6 +1866,17 @@
       ]
     },
     {
+      "id": "R-GRADE-1",
+      "title": "Grade pages restyled (programming Senior 1/2, science Prep 3/Senior 1) in a browser at 390 and 1280 px, light and dark: subject theme (grade.css, teachers.css), hero with the grade name and that subject's teacher photo card from teachers.js, every Quiz Maker lesson card kept, chapter headings with lesson count and seen bar, hero totals and chapter jump links that land, a seen tick for lessons opened on this device, subscription mount on programming only, RTL, no sideways scroll, no header blur or endless animation, reduced motion keeps cards still, JavaScript off keeps every card",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "needs": "playwright",
+      "cmd": [
+        "python",
+        "tests/e2e_grade_pages.py"
+      ]
+    },
+    {
       "id": "R-P25-E",
       "title": "Phase 2.5 E+G: teacher publishing check (scripts/check_teacher_pr.js + .github/workflows/teacher-publish.yml): rule examples; every lesson folder on main is found and every attachments.json passes; the workflow runs from main on pull_request_target, reads the pull request as data, no pull-request text in shell lines, auto-merge only by config; teachers.json valid with auto-merge off; end to end in a temp git repo files added to an existing lesson pass, and renaming a lesson, a new, moved or deleted lesson, a lesson-page edit, the grade page, sitemap, lesson titles, dashboard, another subject, workflows, the rules, engines or a bad file list are refused with reasons",
       "status": "active",
