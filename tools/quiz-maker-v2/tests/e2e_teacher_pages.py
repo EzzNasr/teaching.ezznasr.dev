@@ -6,7 +6,7 @@ JavaScript off the plain href still works. Subject pages (programming, math, sci
 light and dark: one photo card for that subject, its photo loads and matches assets/teachers.js, beside the cards on
 desktop and above them on a phone, Arabic name marked lang=ar dir=rtl, the existing links are still there, no sideways
 scroll. Changing the photo in assets/teachers.js alone changes it on the page (one-file swap)."""
-import os, sys, threading, time
+import os, re, sys, threading, time
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -156,7 +156,7 @@ with sync_playwright() as p:
     def patched(route):
         body = open(os.path.join(REPO, "assets", "teachers.js"), encoding="utf-8").read()
         route.fulfill(status=200, content_type="application/javascript",
-                      body=body.replace("/assets/teachers/placeholder-science.svg", "/assets/teachers/placeholder-math.svg"))
+                      body=re.sub(r"(science: \{[^}]*?photo: ')[^']*'", r"\g<1>/assets/teachers/placeholder-math.svg'", body))
     ctx.route("**/assets/teachers.js", patched)
     pg = ctx.new_page()
     pg.goto(base + "/science/", wait_until="load")

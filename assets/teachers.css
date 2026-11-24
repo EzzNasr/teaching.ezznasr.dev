@@ -206,3 +206,6 @@ body.subject-math .subject-layout > .teacher-card, body.subject-english .subject
 /* the footer sits at the bottom of the window even when the page is short */
 body[class*="subject-"] { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 body[class*="subject-"] > main { flex: 1 0 auto; }
+
+/* nothing is drawn over a real face: the axes / atom rings only decorate the placeholders */
+.teacher-card:not(.is-placeholder) .tc-deco { display: none; }
