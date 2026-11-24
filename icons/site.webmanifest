@@ -1,7 +1,12 @@
 {
-  "name": "Ezz Nasr Teaching",
-  "short_name": "Ezz Nasr",
+  "name": "Handasa · هندسة",
+  "short_name": "Handasa",
   "icons": [
+    {
+      "src": "/icons/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
     {
       "src": "/icons/favicon-192.png",
       "sizes": "192x192",
@@ -11,11 +16,20 @@
       "src": "/icons/favicon-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "theme_color": "#0B2318",
-  "background_color": "#0B2318",
+  "theme_color": "#0e2240",
+  "background_color": "#0e2240",
   "display": "standalone",
   "start_url": "/",
-  "lang": "en"
+  "lang": "en",
+  "description": "Programming, AI, Math, Science & English lessons",
+  "id": "/",
+  "dir": "auto"
 }
