@@ -112,6 +112,20 @@ Person (`honorificPrefix` Eng., aliases EzzNasr / Ezz Nasr). Kept on purpose: th
 WhatsApp button "Chat with Ezz" (his number), social links, the attendance pages' Alexandria University branding.
 Undo: `git revert` the commits newest first, then `python tools/seo/seo_build.py`.
 
+## Light/dark palettes (2026-11-24)
+
+The owner asked that dark mode get its own tuned colours instead of reusing the light ones. Three directions were
+shown on Telegram (light and dark, 390 and 1280 px); he picked **C "Day sky / night glow"** and asked for **only the
+home page and the four subject front pages** (the rest of the site keeps `assets/theme.css` as it was).
+
+| Step | What | Commit |
+|---|---|---|
+| P1 | Paired per-mode tokens (OKLCH-built, written as hex): page neutrals, subject `--s1/--s2/--s-glow/--s-ink`, accents, `--on-accent`, grade-card `--track1/2-a/b`, decoration `--deco-1/2`, scoped to `body.home` and `body[class*="subject-"]` in `assets/teachers.css` (loaded only on those 5 pages); home band/tile tokens in `assets/home.css`. Light: deeper colours on a sky-tinted page. Dark: lighter, softer colours on deep indigo, no shadows (raised surfaces, a 1 px ring on hover), background marks glow. Home cards now get dark steps (they used the light ones). Text AA checked; colours only, layout unchanged | `7997e57` |
+
+Undo: `git revert 7997e57`. To extend it to the whole site later, move the two `body.home, body[class*="subject-"]`
+blocks to `:root` / `html[data-theme="dark"]` in `assets/theme.css` and `assets/base.css`, and the inline `:root`
+blocks in `programming/index.html` and `science/index.html`.
+
 ## Notes and follow-ups found along the way
 
 - Do not run anything else heavy while the gate runs on Windows: a polling loop made Git Bash run out of processes and
