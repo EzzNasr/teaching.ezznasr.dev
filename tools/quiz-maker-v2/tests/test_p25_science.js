@@ -71,7 +71,7 @@ GRADES.forEach(g => {
   t(g + ': SEO block stamped', s.includes('<!-- SEO:START') && s.includes('<link rel="canonical" href="https://teaching.ezznasr.dev/' + g + '/">'));
   t(g + ': in the sitemap', read('sitemap.xml').includes('https://teaching.ezznasr.dev/' + g + '/'));
 });
-t('the two cards say 3rd Prep and 1st Secondary', portal.includes('الصف الثالث الإعدادي') && portal.includes('الصف الأول الثانوي') && /Integrated Science/.test(portal));
+t('the two cards say Prep 3 and Senior 1', portal.includes('<h3>Prep 3</h3>') && portal.includes('<h3>Senior 1</h3>') && /Integrated Science/.test(portal));
 const hrefs = [...portal.matchAll(/href="(\.\/[^"#]*)"/g)].map(m => m[1]);
 t('every relative link on the science page resolves', hrefs.length >= 2 && hrefs.every(h => exists(path.join('science', h, h.endsWith('/') ? 'index.html' : ''))), hrefs.join(', '));
 const home = read('index.html');
