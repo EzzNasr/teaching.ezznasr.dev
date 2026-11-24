@@ -135,6 +135,19 @@
       "note": "existing Node test, unchanged"
     },
     {
+      "id": "R-SUB-ADMIN",
+      "title": "Subscriptions card for a signed-in admin: get_subscription_options says signed_in + viewer admin (student / guest / stale too), and the real subscribe.js in a fake page shows the options as a preview (no buy buttons) instead of the sign-in prompt, also against the old Version 74 reply; students keep their buy buttons; assets copy = template copy",
+      "status": "active",
+      "owner": "S1",
+      "cmd": [
+        "node",
+        "tests/test_subscribe_admin.js",
+        "apps_script/Code.gs",
+        "../.."
+      ],
+      "note": "Bug 2026-11-25: the owner (admin) saw the sign-in prompt on a grade page while signed in. signed_in was !!phone, and an admin has no subscriber phone."
+    },
+    {
       "id": "R-E12",
       "title": "follow-up backend: overview facts, attendance, group + template saves, record_watch",
       "status": "active",

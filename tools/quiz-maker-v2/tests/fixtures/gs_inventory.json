@@ -2134,7 +2134,7 @@
   "_subscriberPhone": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "0926de8c093735d1"
+   "hash": "1b651f9fed630cee"
   },
   "_subscriptionGradeSuffix": {
    "kind": "function",
@@ -3864,7 +3864,7 @@
   "handleGetSubscriptionOptions": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "2f0134deba670c98"
+   "hash": "aecc432477fa10ad"
   },
   "handleGetVideo": {
    "kind": "function",

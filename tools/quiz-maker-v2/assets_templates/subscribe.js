@@ -14,6 +14,8 @@
                                     as video.js's locked-video prompt; the
                                     panel reloads once a session appears)
      - signed in                -> get_subscription_options {grade, ...}
+                                    (an admin gets the same cards as a
+                                    read-only preview: no "اشتراك" button)
                                     one card per returned chapter, plus one
                                     card for the current term, each with a
                                     state:
@@ -124,6 +126,10 @@
     } catch (e) {
       return null;
     }
+  }
+
+  function isAdminSession(s) {
+    return !!(s && (s.role === "admin" || s.is_admin === true));
   }
 
   // -- which grade is this? ------------------------------------------------
@@ -369,7 +375,7 @@
       return back;
     }
 
-    function buildCard(item, session, yearEnd) {
+    function buildCard(item, session, yearEnd, preview) {
       var card = el("div", { class: "sp-card" });
       var flip = el("div", { class: "sp-flip" });
       var front = el("div", { class: "sp-face sp-face-front" });
@@ -386,7 +392,7 @@
       }
       front.appendChild(top);
       flip.appendChild(front);
-      if (item.state === "available") {
+      if (item.state === "available" && !preview) {
         var buy = el("button", { class: "sp-btn", type: "button" }, ["اشتراك"]);
         buy.addEventListener("click", function () {
           var wasOpen = flip === openForm;
@@ -406,9 +412,16 @@
       return card;
     }
 
-    function showOptions(data, session) {
+    function showOptions(data, session, preview) {
       clear();
       head("افتح دروس الفيديو باشتراك في فصل أو في الترم كاملاً.");
+      if (preview) {
+        panel.appendChild(
+          el("div", { class: "sp-box" }, [
+            el("p", { class: "sp-note" }, ["معاينة المعلم: هذه خيارات الاشتراك كما يراها الطالب. الشراء متاح لحسابات الطلاب فقط."]),
+          ]),
+        );
+      }
       var grid = el("div", { class: "sp-grid" });
       var chapters = data.chapters || [];
       if (!chapters.length && !data.term) {
@@ -430,6 +443,7 @@
             },
             session,
             data.year_end,
+            preview,
           ),
         );
       });
@@ -447,6 +461,7 @@
             },
             session,
             data.year_end,
+            preview,
           ),
         );
       }
@@ -469,9 +484,14 @@
         grade: grade,
       }).then(
         function (data) {
-          // Code.gs answers signed_in:false for a stale/expired session (no error) — treat it as signed out.
-          if (data.signed_in === false) showSignedOut();
-          else showOptions(data, session);
+          // An admin sees the options as a preview (no buy buttons). Code.gs says so with
+          // viewer:"admin". A backend from before that field (Version 74 and older) answered
+          // signed_in:false for every admin, which put a sign-in prompt in front of a signed-in
+          // teacher, so with no viewer field the cached session's role decides instead.
+          var preview = data.viewer === "admin" || (!("viewer" in data) && isAdminSession(session));
+          // Otherwise signed_in:false means a stale/expired session (no error) — treat it as signed out.
+          if (data.signed_in === false && !preview) showSignedOut();
+          else showOptions(data, session, preview);
         },
         function (err) {
           showProblem(err.message);

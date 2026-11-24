@@ -2839,8 +2839,9 @@ function _gradeChapters(ss, base) {
 }
 
 // The signed-in student's canonical phone, or "" (no/stale session, or an admin session).
-function _subscriberPhone(payload) {
-  if (_sessionState(payload) !== "student") return "";
+// Pass the _sessionState you already have to skip a second Students read.
+function _subscriberPhone(payload, state) {
+  if ((state || _sessionState(payload)) !== "student") return "";
   var found = _findStudentRow(_students(), payload.student_id);
   return found ? (_canonicalPhone(found.phone) || String(found.phone)) : "";
 }
@@ -2886,10 +2887,14 @@ function _pendingSubscriptionScopes(ss, phone) {
 
 // Public read (like get_video): a missing/stale session just means "not signed in", and every
 // item then shows "available". Never creates a tab.
+// signed_in is about the SESSION, not about having a student row to buy with: an admin is
+// signed in too (viewer "admin", every item "available", nothing held). It used to be
+// !!phone, so a signed-in admin got signed_in:false and the page asked them to sign in.
 function handleGetSubscriptionOptions(payload) {
   var base = _gradeFolder(payload.grade), suffix = GRADE_SCOPE_FOLDERS[base];
   var ss = _ss();
-  var phone = _subscriberPhone(payload);
+  var session = _sessionState(payload);
+  var phone = _subscriberPhone(payload, session);
   var held = phone ? _heldSubscriptionScopes(ss, phone) : {};
   var pending = phone ? _pendingSubscriptionScopes(ss, phone) : {};
   var current = _gradeCurrentTerm(suffix);
@@ -2909,7 +2914,9 @@ function handleGetSubscriptionOptions(payload) {
     var tState = held[base + "#t" + current] ? "owned" : (pending[base + "#t" + current] ? "pending" : "available");
     term = { term: current, lessons: termLessons, price: TERM_PRICE_EGP, state: tState };
   }
-  return { ok: true, grade: base.split("/").pop(), signed_in: !!phone, year_end: _gradeYearEnd(suffix),
+  return { ok: true, grade: base.split("/").pop(), signed_in: session === "student" || session === "admin",
+           viewer: session === "admin" ? "admin" : (session === "student" ? "student" : "guest"),
+           year_end: _gradeYearEnd(suffix),
            pay_info_chapter: _payInfoProp("PAY_INSTRUCTIONS_CHAPTER"),
            pay_info_term: _payInfoProp("PAY_INSTRUCTIONS_TERM"),
            current_term: current, prices: { chapter: CHAPTER_PRICE_EGP, term: TERM_PRICE_EGP },
