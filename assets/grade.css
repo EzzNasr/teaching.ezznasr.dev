@@ -99,6 +99,13 @@ html[data-theme="dark"] .grade-page .lessons .chapter-head::before{ color:#06152
 .ch-bar{ display:inline-block; width:88px; height:6px; border-radius:99px; background:color-mix(in srgb, var(--s1) 14%, var(--g-line)); overflow:hidden; }
 .ch-bar i{ display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--s1), var(--s2)); }
 .ch-done{ font:600 11px 'DM Mono',monospace; direction:ltr; }
+/* a unit's quiz link at the end of its heading (Quiz Maker, science Prep 3: <a class="unit-quiz">...<span>Quiz</span></a>) */
+.grade-page .chapter-head .unit-quiz{ order:3; display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; text-decoration:none;
+  border:1.5px solid var(--s1); color:var(--s-ink); background:var(--g-card); font:700 12px 'Manrope','Cairo',sans-serif; transition:transform .2s ease; }
+.grade-page .chapter-head .unit-quiz span{ font:inherit; color:inherit; letter-spacing:0; }
+.grade-page .chapter-head .unit-quiz:hover{ transform:translateY(-2px); background:color-mix(in srgb, var(--s1) 12%, var(--g-card)); }
+.grade-page .chapter-head .ch-meta{ order:2; }
+@media (prefers-reduced-motion: reduce){ .grade-page .chapter-head .unit-quiz:hover{ transform:none; } }
 
 /* lesson card */
 .grade-page .lesson{ position:relative; min-height:0; padding:18px 18px 16px; gap:10px; border-radius:16px;
