@@ -15,7 +15,6 @@ That is all. The `<img>` written in each subject page only shows when JavaScript
 
 ## Other knobs in `assets/teachers.js`
 
-- `INTRO_MS`: how long the home-page transition lasts (the owner picked about 1.5 s).
-- `GLYPHS`: the symbols that burst around the teacher per subject.
+- `INTRO_MS`: how long the home-page transition lasts (0.8 s: a small teacher card over a dimmed page; the owner found the 1.5 s full-screen version too heavy).
 
 Test: R-TEACH-1 (`tools/quiz-maker-v2/tests/e2e_teacher_pages.py`).

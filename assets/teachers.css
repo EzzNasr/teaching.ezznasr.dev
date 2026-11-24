@@ -26,74 +26,41 @@ html[data-theme="dark"] body.subject-english { --accent:#ff86a2; --accent-strong
 /* ==========================================================================
    1. Home-page transition: the teacher, larger than life
    ========================================================================== */
-html.ti-active { overflow: hidden; }
+/* Light on purpose (owner, 2026-11-24: the full-screen version lagged on his laptop and phone):
+   a small card pops up over a dimmed page; only opacity and transform animate, no blur, filters,
+   clip-path or big shadows, and no aspect-ratio / color-mix so older browsers get the same thing. */
 .ti-overlay {
-  --ti-ms: 1500ms; --ti-x: 50vw; --ti-y: 50vh;
-  position: fixed; inset: 0; z-index: 2147483000; display: none; place-items: center;
-  overflow: hidden; cursor: pointer; color: #fff; font-family: var(--sans, system-ui, sans-serif);
-  -webkit-tap-highlight-color: transparent;
+  --ti-ms: 800ms;
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 2147483000; display: none;
+  align-items: center; justify-content: center; padding: 16px;
+  cursor: pointer; font-family: var(--sans, system-ui, sans-serif); -webkit-tap-highlight-color: transparent;
 }
-.ti-overlay.is-on { display: grid; }
+.ti-overlay.is-on { display: flex; }
 .ti-backdrop {
-  position: absolute; inset: 0;
-  background:
-    radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--s-glow) 55%, transparent), transparent 42%),
-    linear-gradient(150deg, var(--s1), var(--s2) 60%, #071226 120%);
-  clip-path: circle(0 at var(--ti-x) var(--ti-y));
-  animation: ti-burst calc(var(--ti-ms) * .4) cubic-bezier(.2, .7, .2, 1) forwards;
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: rgba(7, 18, 38, .5);
+  opacity: 0; animation: ti-fade 180ms ease-out forwards;
 }
-.ti-rays {
-  position: absolute; inset: -60%; opacity: 0;
-  background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(255, 255, 255, .13) 0 5deg, transparent 5deg 16deg);
-  mask-image: radial-gradient(circle at 50% 50%, #000 0, transparent 55%);
-  animation: ti-rays var(--ti-ms) ease-out forwards;
+.ti-card {
+  position: relative; width: 240px; max-width: 66vw; border-radius: 20px; overflow: hidden;
+  background: #fff; color: #10233f; box-shadow: 0 14px 34px rgba(0, 0, 0, .3);
+  opacity: 0; transform: translateY(14px) scale(.92);
+  animation: ti-pop 300ms cubic-bezier(.2, .9, .3, 1.12) forwards; will-change: transform, opacity;
 }
-.ti-glyphs { position: absolute; inset: 0; }
-.ti-glyphs span {
-  position: absolute; transform: translate(-50%, -50%) scale(.2) rotate(-25deg); opacity: 0;
-  font: 700 48px/1 var(--mono, monospace); color: rgba(255, 255, 255, .9); text-shadow: 0 0 24px var(--s-glow);
-  animation: ti-glyph calc(var(--ti-ms) * .6) cubic-bezier(.2, 1.3, .4, 1) forwards;
-}
-@keyframes ti-glyph { to { opacity: .5; transform: translate(-50%, -50%) scale(1) rotate(0); } }
-.ti-stage {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 16px;
-  animation: ti-push var(--ti-ms) ease-in forwards;
-}
-.ti-figure {
-  position: relative; height: min(66vh, 720px); aspect-ratio: 3 / 4;
-  opacity: 0; transform: translateY(70px) scale(.5);
-  animation: ti-rise calc(var(--ti-ms) * .6) calc(var(--ti-ms) * .14) cubic-bezier(.16, 1.25, .3, 1) forwards;
-}
-.ti-halo {
-  position: absolute; inset: -18%; border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--s-glow) 90%, #fff) 0, transparent 62%);
-  filter: blur(10px); opacity: 0;
-  animation: ti-halo var(--ti-ms) ease-out forwards;
-}
-.ti-photo {
-  position: relative; display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 30px;
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, .9), 0 0 70px 14px color-mix(in srgb, var(--s-glow) 80%, transparent), 0 40px 90px rgba(0, 0, 0, .45);
-  view-transition-name: teacher-photo;
-}
-.ti-caption {
-  text-align: center; opacity: 0; transform: translateY(18px);
-  animation: ti-up calc(var(--ti-ms) * .38) calc(var(--ti-ms) * .42) ease-out forwards;
-}
-.ti-kicker { display: block; font: 700 12px var(--mono, monospace); letter-spacing: .32em; text-transform: uppercase; opacity: .9; }
-.ti-name { display: block; font: 800 clamp(32px, 5.4vw, 60px)/1.05 var(--sans, system-ui, sans-serif); letter-spacing: -.035em; text-shadow: 0 4px 26px rgba(0, 0, 0, .35); }
-.ti-placeholder-tag { display: none; margin-top: 8px; padding: 3px 10px; border-radius: 999px; background: rgba(0, 0, 0, .35); font: 600 10px var(--mono, monospace); letter-spacing: .12em; text-transform: uppercase; }
-.ti-overlay.is-placeholder .ti-placeholder-tag { display: inline-block; }
+html[data-theme="dark"] .ti-card { background: #102744; color: #f5f8ff; }
+.ti-photo-box { position: relative; height: 0; padding-top: 125%; background: linear-gradient(150deg, var(--s1), var(--s2)); }
+.ti-photo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.ti-caption { padding: 12px 14px 14px; text-align: center; }
+.ti-kicker { display: block; color: var(--s1); font: 700 10px var(--mono, monospace); letter-spacing: .2em; text-transform: uppercase; }
+.ti-name { display: block; margin-top: 2px; font: 800 20px/1.2 var(--sans, system-ui, sans-serif); letter-spacing: -.02em; }
+.ti-placeholder-tag { display: none; margin-top: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(16, 35, 63, .1); font: 600 9px var(--mono, monospace); letter-spacing: .1em; text-transform: uppercase; }
+html[data-theme="dark"] .ti-placeholder-tag { background: rgba(255, 255, 255, .12); }
+.ti-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: linear-gradient(90deg, var(--s1), var(--s2));
+  transform: scaleX(0); transform-origin: 0 50%; animation: ti-bar var(--ti-ms) linear forwards; }
 .ti-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.ti-skip { position: absolute; bottom: 18px; left: 0; right: 0; margin: 0; text-align: center; font: 500 11px var(--mono, monospace); letter-spacing: .08em; opacity: .7; }
-@media (max-width: 600px) {
-  .ti-figure { height: auto; width: min(82vw, 380px); }
-}
-@keyframes ti-burst { to { clip-path: circle(160vmax at var(--ti-x) var(--ti-y)); } }
-@keyframes ti-rays  { 25% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: .85; transform: rotate(14deg); } }
-@keyframes ti-rise  { to { opacity: 1; transform: none; } }
-@keyframes ti-halo  { 30% { opacity: 0; transform: scale(.6); } 70% { opacity: .95; transform: scale(1.05); } 100% { opacity: .75; transform: scale(1); } }
-@keyframes ti-up    { to { opacity: 1; transform: none; } }
-@keyframes ti-push  { 82% { transform: none; filter: none; } 100% { transform: scale(1.07); filter: brightness(1.12); } }
+.ti-skip { position: absolute; bottom: 18px; left: 0; right: 0; margin: 0; text-align: center; color: #fff; font: 500 11px var(--mono, monospace); opacity: .75; }
+@keyframes ti-fade { to { opacity: 1; } }
+@keyframes ti-pop  { to { opacity: 1; transform: none; } }
+@keyframes ti-bar  { to { transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) { .ti-overlay { display: none !important; } }
 
 /* ==========================================================================
@@ -120,7 +87,7 @@ html.ti-active { overflow: hidden; }
   background: linear-gradient(155deg, var(--s1), var(--s2));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--s-glow) 40%, transparent), 0 14px 36px color-mix(in srgb, var(--s1) 30%, transparent);
 }
-.tc-photo img { display: block; width: 100%; height: 100%; object-fit: cover; view-transition-name: teacher-photo; }
+.tc-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .tc-photo svg.tc-deco { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .tc-meta { display: grid; gap: 2px; padding: 14px 6px 4px; }
 .tc-label { font: 600 10.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); }
@@ -172,10 +139,6 @@ html.ti-active { overflow: hidden; }
 }
 @media (max-width: 900px) { .tc-element { top: 0; } }
 .tc-element small { position: absolute; top: 3px; left: 5px; font: 600 9px var(--mono); }
-.subject-science .tc-deco .tc-orbit { transform-origin: 150px 200px; animation: tc-spin 14s linear infinite; }
-.subject-science .tc-deco .tc-orbit:nth-of-type(2) { animation-duration: 19s; animation-direction: reverse; }
-.subject-science .tc-deco .tc-orbit:nth-of-type(3) { animation-duration: 24s; }
-@keyframes tc-spin { to { transform: rotate(360deg); } }
 
 /* ---- English: a speech bubble */
 .subject-english .tc-meta {
@@ -196,10 +159,8 @@ html.ti-active { overflow: hidden; }
    ========================================================================== */
 .subject-deco { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .subject-deco svg { position: absolute; }
-.subject-deco .g { position: absolute; font: 600 clamp(18px, 2.6vw, 32px) var(--mono); color: color-mix(in srgb, var(--s1) 26%, transparent); white-space: nowrap; animation: deco-float 9s ease-in-out infinite alternate; }
-.subject-deco .g:nth-child(2n) { animation-duration: 12s; color: color-mix(in srgb, var(--s2) 30%, transparent); }
-.subject-deco .g:nth-child(3n) { animation-duration: 15s; }
-@keyframes deco-float { to { transform: translateY(-14px) rotate(-3deg); } }
+.subject-deco .g { position: absolute; font: 600 clamp(18px, 2.6vw, 32px) var(--mono); color: color-mix(in srgb, var(--s1) 26%, transparent); white-space: nowrap; }
+.subject-deco .g:nth-child(2n) { color: color-mix(in srgb, var(--s2) 30%, transparent); }
 
 .subject-math .subject-deco {
   background-image:
@@ -217,8 +178,7 @@ html.ti-active { overflow: hidden; }
 .subject-deco .fill-2 { fill: color-mix(in srgb, var(--s2) 22%, transparent); }
 
 @media (prefers-reduced-motion: reduce) {
-  .subject-deco .g, .subject-science .tc-deco .tc-orbit, .subject-programming .tc-name::after { animation: none !important; }
-}
+  .subject-deco .g, }
 @media (max-width: 600px) {
   .subject-deco .g:nth-child(n+5) { display: none; }
 }

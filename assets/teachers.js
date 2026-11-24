@@ -12,8 +12,8 @@
    The repo is PUBLIC: only add a photo the owner has approved for publishing.
 
    It also plays the home-page transition: clicking a subject card marked
-   data-teacher="..." shows that teacher big for about a second, then opens the
-   link. It never blocks the link:
+   data-teacher="..." pops up a small card with that teacher for under a
+   second, then opens the link. It never blocks the link:
      - without JavaScript, or if anything here fails, the plain href just works;
      - prefers-reduced-motion, or a modified click (Ctrl, Shift, middle button,
        new tab), goes straight to the page;
@@ -46,17 +46,8 @@
     }
   };
 
-  // Symbols that burst around the teacher in the home-page transition.
-  var GLYPHS = {
-    programming: ['{ }', '</>', '=>', '()', ';', '01', '[ ]', '#'],
-    math: ['π', '∑', '√', '∞', '∫', 'Δ', 'x²', '≠'],
-    science: ['⚛', 'H₂O', 'CO₂', 'Na', 'Δ', 'e⁻', 'O₂', 'Fe'],
-    english: ['Aa', '“ ”', '?', '!', 'ABC', '&', '…', 'Hi']
-  };
-  var GLYPH_SPOTS = [[10, 16, 1.0], [84, 12, .8], [6, 62, .9], [90, 56, 1.1], [18, 86, .7], [78, 84, .9], [30, 6, .6], [64, 4, .7]];
-
   // How long the home-page transition shows the teacher before opening the page (ms).
-  var INTRO_MS = 1500;   // the owner picked "bold, about 1.5 s, full screen" (2026-11-24)
+  var INTRO_MS = 800;    // owner 2026-11-24: lighter; the 1.5 s full-screen version lagged on his devices
 
   window.TEACHERS = TEACHERS;
 
@@ -92,13 +83,11 @@
     el.setAttribute('data-teacher-intro', '');
     el.innerHTML =
       '<div class="ti-backdrop"></div>' +
-      '<div class="ti-rays" aria-hidden="true"></div>' +
-      '<div class="ti-glyphs" aria-hidden="true"></div>' +
-      '<div class="ti-stage">' +
-        '<div class="ti-figure"><span class="ti-halo" aria-hidden="true"></span>' +
-          '<img class="ti-photo" alt="" decoding="async"></div>' +
+      '<div class="ti-card">' +
+        '<div class="ti-photo-box"><img class="ti-photo" alt="" decoding="async"></div>' +
         '<div class="ti-caption"><span class="ti-kicker"></span><strong class="ti-name"></strong>' +
           '<span class="ti-placeholder-tag">Photo placeholder</span></div>' +
+        '<span class="ti-bar" aria-hidden="true"></span>' +
       '</div>' +
       '<p class="ti-live" role="status" aria-live="polite"></p>' +
       '<p class="ti-skip" aria-hidden="true">Esc or tap to skip</p>';
@@ -123,23 +112,8 @@
     overlay.querySelector('.ti-photo').src = t.photo;
     overlay.querySelector('.ti-kicker').textContent = t.subject;
     overlay.querySelector('.ti-name').textContent = t.name;
-    var gl = overlay.querySelector('.ti-glyphs'), sy = GLYPHS[key] || [];
-    gl.innerHTML = '';
-    for (var i = 0; i < sy.length && i < GLYPH_SPOTS.length; i++) {
-      var g = document.createElement('span'), at = GLYPH_SPOTS[i];
-      g.textContent = sy[i];
-      g.style.left = at[0] + '%'; g.style.top = at[1] + '%';
-      g.style.fontSize = 'calc(' + at[2] + ' * clamp(28px, 6vw, 72px))';
-      g.style.animationDelay = 'calc(var(--ti-ms) * ' + (0.12 + i * 0.03).toFixed(2) + ')';
-      gl.appendChild(g);
-    }
     overlay.querySelector('.ti-live').textContent = 'Opening ' + t.subject + '…';
     overlay.style.setProperty('--ti-ms', INTRO_MS + 'ms');
-    var r = link.getBoundingClientRect();
-    var cx = Math.min(Math.max(r.left + r.width / 2, 0), window.innerWidth);
-    var cy = Math.min(Math.max(r.top + r.height / 2, 0), window.innerHeight);
-    overlay.style.setProperty('--ti-x', Math.round(cx) + 'px');   // the burst starts from the card that was clicked
-    overlay.style.setProperty('--ti-y', Math.round(cy) + 'px');
     overlay.onclick = function () { go(href); };
     leaving = false;
     overlay.classList.remove('is-on');
