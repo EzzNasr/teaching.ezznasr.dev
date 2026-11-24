@@ -1098,16 +1098,51 @@ def lesson_position(slug, title=""):
     return None, None
 
 
-def _chapter_heading(chapter):
+_UNIT_QUIZ_ICON = ('<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" '
+                   'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/>'
+                   '<path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>')
+
+
+def _unit_quiz_link(chapter, href):
+    return ('<a class="unit-quiz" href="{h}" aria-label="Unit {n} quiz">{icon}<span>Quiz</span></a>'
+            .format(h=href, n=chapter, icon=_UNIT_QUIZ_ICON))
+
+
+def _chapter_heading(chapter, quiz_href=None):
     if chapter is None:
         return ('<div class="chapter-head" role="heading" aria-level="3" id="intro">'
                 '<span>\u0645\u0642\u062f\u0645\u0629</span><i>Introduction</i></div>')
     ar = "\u0627\u0644\u0641\u0635\u0644 " + _AR_ORDINALS.get(chapter, str(chapter))
+    quiz = _unit_quiz_link(chapter, quiz_href) if quiz_href else ""
     return ('<div class="chapter-head" role="heading" aria-level="3" id="chapter-{n}">'
-            '<span>{ar}</span><i>Chapter {n}</i></div>').format(n=chapter, ar=ar)
+            '<span>{ar}</span><i>Chapter {n}</i>{quiz}</div>').format(n=chapter, ar=ar, quiz=quiz)
 
 
-def layout_grid_cards(cards):
+_QUIZ_LINK_RE = re.compile(r'class="lesson-link[^"]*"\s+href="[^"]*/quiz\.html"')
+
+
+def unit_quizzes(index_path, cards):
+    """{chapter: "./slug/quiz.html"} for each chapter of 2+ lessons in which exactly ONE lesson links a quiz (a unit whose only quiz is
+    its exam, like 3rd Prep Science). Chapters with a quiz in several lessons (programming) get none. Read from each
+    lesson's own page next to the grade page."""
+    found, size = {}, {}
+    base = os.path.dirname(index_path)
+    for c in cards:
+        chap, _ = lesson_position(c["slug"], c["title"])
+        if chap is None:
+            continue
+        size[chap] = size.get(chap, 0) + 1
+        try:
+            with open(os.path.join(base, c["slug"], "index.html"), "r", encoding="utf-8") as f:
+                html = f.read()
+        except OSError:
+            continue
+        if _QUIZ_LINK_RE.search(html):
+            found.setdefault(chap, []).append(c["slug"])
+    return {ch: "./" + slugs[0] + "/quiz.html" for ch, slugs in found.items() if len(slugs) == 1 and size[ch] > 1}
+
+
+def layout_grid_cards(cards, quizzes=None):
     """cards: dicts with slug/number/title/desc/open_label. Returns the inner HTML of <div class="lessons"> (cards sorted by chapter
     and lesson, renumbered, with a heading row per chapter). With no chaptered lesson the cards are left in the given order."""
     pos = [lesson_position(c["slug"], c["title"]) for c in cards]
@@ -1122,7 +1157,7 @@ def layout_grid_cards(cards):
     out, last = [], object()
     for n, (c, (chap, _les)) in enumerate(items, 1):
         if chaptered and chap != last:
-            out.append(_chapter_heading(chap)); last = chap
+            out.append(_chapter_heading(chap, (quizzes or {}).get(chap))); last = chap
         num = str(n).zfill(width) if chaptered else str(c["number"])
         out.append('<a class="lesson" href="./{slug}/"><span class="number">{num}</span>'
                    '<h3>{title}</h3><p>{desc}</p><span class="open">{open_label}</span></a>'.format(
@@ -1130,8 +1165,9 @@ def layout_grid_cards(cards):
     return "\n".join(out) + "\n"
 
 
-def _write_grid_index(content, m, cards):
-    return content[:m.start()] + m.group(1) + "\n" + layout_grid_cards(cards) + m.group(3) + content[m.end():]
+def _write_grid_index(content, m, cards, index_path=None):
+    quizzes = unit_quizzes(index_path, cards) if index_path else None
+    return content[:m.start()] + m.group(1) + "\n" + layout_grid_cards(cards, quizzes) + m.group(3) + content[m.end():]
 
 
 def upsert_grid_lesson_card(index_path, lesson_slug, lesson_title, lesson_desc):
@@ -1152,7 +1188,7 @@ def upsert_grid_lesson_card(index_path, lesson_slug, lesson_title, lesson_desc):
         next_n = max((int(c["number"]) for c in cards), default=0) + 1
         cards.append({"slug": lesson_slug, "number": str(next_n).zfill(width), "title": lesson_title, "desc": lesson_desc, "open_label": open_label})
     with open(index_path, "w", encoding="utf-8") as f:
-        f.write(_write_grid_index(content, m, cards))
+        f.write(_write_grid_index(content, m, cards, index_path))
 
 
 def normalize_grid_index(index_path):
@@ -1165,7 +1201,7 @@ def normalize_grid_index(index_path):
     cards = _parse_grid_cards(m.group(2))
     if not cards:
         return False
-    new = _write_grid_index(content, m, cards)
+    new = _write_grid_index(content, m, cards, index_path)
     if new == content:
         return False
     with open(index_path, "w", encoding="utf-8") as f:
@@ -1189,7 +1225,7 @@ def remove_grid_lesson_card(index_path, lesson_slug):
         return None
     remaining = [c for c in cards if c["slug"] != lesson_slug]
     with open(index_path, "w", encoding="utf-8") as f:
-        f.write(_write_grid_index(content, m, remaining))
+        f.write(_write_grid_index(content, m, remaining, index_path))
     return removed["raw"]
 
 
