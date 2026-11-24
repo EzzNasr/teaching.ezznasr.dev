@@ -1,0 +1,209 @@
+/* ==========================================================================
+   home.css — the Handasa · هندسة home page (loaded last on / only).
+
+   Idea: the page is an engineering drawing. The hero is blueprint paper with
+   Euclid's first construction (two compass circles give an equal triangle),
+   and each subject is a drawing "sheet" with a title block, so the subjects
+   are the first thing to read after the headline.
+   Card hooks (#lessons .grid > a.card, .more .mini-card, data-teacher) are
+   kept for the teacher transition (assets/teachers.js) and its tests.
+   ========================================================================== */
+:root{
+  --bp-paper:#eef4fb;
+  --bp-line:rgba(37,99,235,.10);
+  --bp-line-major:rgba(37,99,235,.18);
+  --bp-ink:#0e2240;
+  --bp-dim:#5e6f87;
+  --bp-guide:#5fb6ff;
+  --bp-arc:#f2a93b;
+  --sheet:#ffffff;
+  --sheet-line:#cfdcec;
+}
+html[data-theme="dark"]{
+  --bp-paper:#0a1a30;
+  --bp-line:rgba(143,208,255,.07);
+  --bp-line-major:rgba(143,208,255,.14);
+  --bp-ink:#f2f6ff;
+  --bp-dim:#a9bad0;
+  --bp-guide:#8fd0ff;
+  --bp-arc:#f5bd5c;
+  --sheet:#102744;
+  --sheet-line:#2a4a6d;
+}
+
+/* ---------------------------------------------------------------- hero: blueprint paper */
+.bp-hero{
+  position:relative; overflow:hidden;
+  padding:36px 0 40px;
+  background:
+    linear-gradient(var(--bp-line-major) 1px, transparent 1px) 0 0 / 120px 120px,
+    linear-gradient(90deg, var(--bp-line-major) 1px, transparent 1px) 0 0 / 120px 120px,
+    linear-gradient(var(--bp-line) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, var(--bp-line) 1px, transparent 1px) 0 0 / 24px 24px,
+    var(--bp-paper);
+  color:var(--bp-ink);
+  border-bottom:1px solid var(--sheet-line);
+}
+.bp-hero::after{ display:none; }           /* the old hero's decoration */
+.bp-wrap{
+  display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);
+  align-items:center; gap:32px;
+}
+.bp-hero .hero-kicker{
+  display:inline-flex; align-items:center; gap:8px; margin:0 0 18px;
+  padding:6px 12px; border-radius:999px;
+  background:color-mix(in srgb, var(--sheet) 85%, transparent);
+  border:1px solid var(--sheet-line);
+  font:600 12px/1.2 'DM Mono', ui-monospace, monospace; letter-spacing:.02em; color:var(--bp-dim);
+  text-transform:none;
+}
+.bp-hero .hero-kicker::before{ display:none; }
+.bp-hero .hero-kicker [lang="ar"]{ font:800 15px/1 'Cairo', sans-serif; color:var(--bp-ink); }
+.bp-hero .hero-kicker i{ font-style:normal; opacity:.8; }
+.bp-hero h1{
+  margin:0 0 18px; max-width:12.5em;
+  font:800 clamp(36px, 5vw, 56px)/1.04 'Manrope', sans-serif; letter-spacing:-.035em;
+  color:var(--bp-ink);
+}
+.bp-hl{
+  position:relative; white-space:nowrap;
+  background:linear-gradient(90deg, var(--brand-blue, #2563eb), color-mix(in srgb, var(--brand-blue, #2563eb) 55%, var(--bp-guide)));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.bp-hl::after{                               /* the logo's amber arc, under the words */
+  content:""; position:absolute; left:4%; right:4%; bottom:-.2em; height:.32em;
+  border:3px solid var(--bp-arc); border-bottom:0; border-radius:50% 50% 0 0 / 100% 100% 0 0;
+  transform:scaleY(-1); opacity:.9;
+}
+.bp-hero p.bp-lede{ margin:0 0 24px; max-width:34em; font-size:17px; line-height:1.6; color:var(--bp-dim); }
+.bp-hero .cta{
+  background:var(--bp-ink); color:var(--bp-paper); border-radius:999px; padding:14px 24px;
+  box-shadow:0 12px 26px -12px rgba(14,34,64,.6);
+}
+.bp-hero .cta:hover{ background:var(--brand-blue, #2563eb); color:#fff; }
+.bp-hero .cta span{ color:var(--bp-arc); }
+
+/* the drawing */
+.bp-drawing{ margin:0; justify-self:end; width:100%; max-width:400px; }
+.bp-drawing svg{ display:block; width:100%; height:auto; overflow:visible; }
+.bp-guides path, .bp-guides circle{ fill:none; stroke:var(--bp-guide); stroke-width:1.2; stroke-dasharray:4 5; opacity:.75; }
+.bp-arc{ fill:none; stroke:var(--bp-arc); stroke-width:3.2; stroke-linecap:round; }
+.bp-tri{ fill:color-mix(in srgb, var(--brand-blue, #2563eb) 12%, transparent); stroke:var(--bp-ink); stroke-width:3; stroke-linejoin:round; }
+.bp-dim path{ fill:none; stroke:var(--bp-dim); stroke-width:1.2; }
+.bp-dim text, .bp-caption{ font:500 13px 'DM Mono', ui-monospace, monospace; fill:var(--bp-dim); text-anchor:middle; }
+.bp-caption{ font-size:11.5px; text-anchor:start; letter-spacing:.02em; }
+.bp-pts circle{ fill:var(--bp-paper); stroke:var(--bp-ink); stroke-width:2.4; }
+.bp-pts .bp-apex{ fill:var(--bp-arc); stroke:var(--bp-arc); }
+
+/* draw it once, like a compass would */
+@media (prefers-reduced-motion: no-preference){
+  .bp-arc{ stroke-dasharray:380; stroke-dashoffset:380; animation:bp-draw 1.1s .25s ease-out forwards; }
+  .bp-arc2{ animation-delay:.75s; }
+  .bp-tri{ stroke-dasharray:370; stroke-dashoffset:370; fill-opacity:0; animation:bp-draw .9s 1.45s ease-out forwards, bp-fill .5s 2.2s ease-out forwards; }
+  .bp-pts .bp-apex{ transform-origin:210px 136px; transform:scale(0); animation:bp-pop .35s 1.4s ease-out forwards; }
+}
+@keyframes bp-draw{ to{ stroke-dashoffset:0; } }
+@keyframes bp-fill{ to{ fill-opacity:1; } }
+@keyframes bp-pop{ to{ transform:scale(1); } }
+
+/* ---------------------------------------------------------------- subjects: drawing sheets */
+.subjects-first{ padding:36px 0 72px; }
+.subjects-first .lessons-head{ margin-bottom:22px; }
+.sheet-label{
+  margin:0 0 8px; font:600 12px 'DM Mono', ui-monospace, monospace; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--brand-blue, #2563eb);
+}
+.sheet-label [lang="ar"]{ font:700 14px 'Cairo', sans-serif; letter-spacing:0; text-transform:none; }
+.subjects-first .lessons-head h2{ font-size:clamp(30px, 4vw, 42px); letter-spacing:-.03em; margin:0 0 8px; }
+.subjects-first .lessons-head p:not(.sheet-label){ max-width:40em; }
+
+.subjects-first .grid{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:22px; }
+.card.sheet{
+  --c:var(--s1, var(--accent)); --c-ink:var(--s-ink, var(--accent-strong));
+  position:relative; display:flex; flex-direction:column; gap:10px;
+  min-height:340px; padding:22px 24px 0; overflow:hidden;
+  background:var(--sheet); color:var(--ink);
+  border:1px solid var(--sheet-line); border-radius:16px;
+  box-shadow:0 1px 0 rgba(16,35,63,.04), 0 14px 30px -18px rgba(16,35,63,.25);
+  text-decoration:none;
+  transition:transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
+.card.sheet::before{                          /* the sheet's inner frame */
+  content:""; position:absolute; inset:8px; border:1px dashed var(--sheet-line); border-radius:10px; pointer-events:none;
+}
+.card.sheet::after{                           /* faint grid in the drawing area */
+  content:""; position:absolute; left:0; right:0; top:0; height:150px; pointer-events:none; opacity:.6;
+  background:
+    linear-gradient(var(--bp-line) 1px, transparent 1px) 0 0 / 16px 16px,
+    linear-gradient(90deg, var(--bp-line) 1px, transparent 1px) 0 0 / 16px 16px;
+  -webkit-mask-image:linear-gradient(#000, transparent); mask-image:linear-gradient(#000, transparent);
+}
+.card.sheet > *{ position:relative; z-index:1; }
+.card.sheet:hover, .card.sheet:focus-visible{
+  transform:translateY(-6px); border-color:var(--c);
+  box-shadow:0 26px 44px -22px color-mix(in srgb, var(--c) 55%, transparent);
+}
+.sheet-corner{                                /* registration mark, top right */
+  position:absolute !important; top:18px; right:18px; width:22px; height:22px;
+  border-top:2px solid var(--c); border-right:2px solid var(--c); border-radius:0 6px 0 0; opacity:.8;
+}
+.sheet-icon{ width:56px; height:56px; color:var(--c); }
+.sheet-icon .draw{ fill:none; stroke:currentColor; stroke-width:3.4; stroke-linecap:round; stroke-linejoin:round; }
+.sheet-icon .guide{ stroke-width:1.4; stroke-dasharray:3 4; opacity:.6; }
+.sheet-icon circle{ fill:var(--bp-arc); }
+@media (prefers-reduced-motion: no-preference){
+  .card.sheet:hover .sheet-icon .draw:not(.guide){ stroke-dasharray:160; animation:sheet-redraw .7s ease-out; }
+}
+@keyframes sheet-redraw{ from{ stroke-dashoffset:160; } to{ stroke-dashoffset:0; } }
+
+.card.sheet .chip-top{
+  position:static; align-self:flex-start; margin-top:2px; width:auto; height:auto; display:block;
+  padding:0; background:none; border:0; border-radius:0; box-shadow:none;
+  font:600 11.5px 'DM Mono', ui-monospace, monospace; letter-spacing:.1em; text-transform:uppercase; color:var(--c-ink);
+}
+.card.sheet h3{ margin:0; font:800 30px/1.1 'Manrope', sans-serif; letter-spacing:-.03em; color:var(--ink); }
+.sheet-ar{ align-self:flex-start; text-align:start; margin-top:-4px; font:700 17px/1.3 'Cairo', sans-serif; color:var(--ink-dim); }
+.card.sheet p{ margin:2px 0 0; color:var(--ink-dim); font-size:14.5px; line-height:1.55; }
+.card.sheet .go{                              /* replaced by the title block; kept for screen readers */
+  position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;
+}
+.title-block{
+  display:grid; grid-template-columns:1fr auto; margin:auto -24px 0; border-top:1px solid var(--sheet-line);
+}
+.tb-cell{ padding:13px 24px; font:600 12px/1.35 'DM Mono', ui-monospace, monospace; color:var(--ink); }
+.tb-cell b{ display:block; font-weight:500; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-dim); }
+.tb-go{
+  display:flex; align-items:center; gap:8px; border-left:1px solid var(--sheet-line);
+  background:var(--c); color:#fff; font-size:13px; letter-spacing:.04em;
+}
+html[data-theme="dark"] .tb-go{ color:#07162a; }
+.tb-go span{ transition:transform .2s ease; }
+.card.sheet:hover .tb-go span{ transform:translateX(4px); }
+
+/* the English row, as a slim sheet */
+.subjects-first .more{ margin-top:26px; }
+.subjects-first .mini-card{
+  background:var(--sheet); border:1px solid var(--sheet-line); border-left:4px solid var(--s1, var(--accent));
+  border-radius:12px;
+}
+
+/* ---------------------------------------------------------------- small screens */
+@media (max-width: 900px){
+  .bp-wrap{ grid-template-columns:1fr; gap:8px; }
+  .bp-copy{ position:relative; z-index:1; }
+  .bp-drawing{                               /* behind the headline, so the subjects come up sooner */
+    position:absolute; right:-70px; top:-6px; width:330px; max-width:none; margin:0;
+    opacity:.32; pointer-events:none;
+  }
+  .bp-caption, .bp-dim{ display:none; }
+  .subjects-first .grid{ grid-template-columns:1fr; gap:16px; }
+  .card.sheet{ min-height:0; }
+}
+@media (max-width: 520px){
+  .bp-hero{ padding:28px 0 40px; }
+  .bp-drawing{ width:260px; right:-90px; }
+  .bp-hl{ white-space:normal; }
+  .bp-lede{ font-size:16px; }
+  .card.sheet h3{ font-size:26px; }
+  .subjects-first{ padding:40px 0 56px; }
+}

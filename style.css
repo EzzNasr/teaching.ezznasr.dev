@@ -241,16 +241,6 @@ html[data-theme='dark'] .theme-label::after {
     transform: translateY(-3px);
     background: var(--mint-strong);
 }
-
-.steps {
-    padding: 0 0 72px;
-}
-
-.steps-head {
-    padding: 56px 0 30px;
-}
-
-.steps-head h2,
 .lessons-head h2 {
     margin: 0 0 8px;
     font-size: 28px;
@@ -258,70 +248,15 @@ html[data-theme='dark'] .theme-label::after {
     letter-spacing: -.03em;
 }
 
-.steps-head p,
 .lessons-head p {
     margin: 0;
     color: var(--ink-dim);
 }
-
-.steps-head p {
-    max-width: 520px;
-}
-
-.step-grid,
 .grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 16px;
 }
-
-.step {
-    min-height: 200px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 26px;
-    border-radius: 18px;
-    color: #fff;
-}
-
-.step .num {
-    align-self: flex-end;
-    font: 800 40px var(--mono);
-    opacity: .9;
-}
-
-.step h3 {
-    margin: 0 0 6px;
-    font-size: 16px;
-    font-weight: 800;
-}
-
-.step p {
-    margin: 0;
-    font-size: 13.5px;
-    line-height: 1.6;
-    opacity: .92;
-}
-
-.step--a {
-    background: var(--accent-deep);
-}
-
-.step--b {
-    background: var(--sky-block);
-    color: var(--ink);
-}
-
-.step--b .num {
-    opacity: .35;
-}
-
-.step--c {
-    background: var(--mint);
-    color: var(--ink-on-mint);
-}
-
 .lessons {
     padding: 0 0 80px;
 }
@@ -531,7 +466,6 @@ footer {
         padding: 0 20px;
     }
 
-    .step-grid,
     .grid {
         grid-template-columns: 1fr;
     }
@@ -569,11 +503,6 @@ footer {
     .hero h1 {
         font-size: clamp(38px, 12vw, 54px);
     }
-
-    .steps-head {
-        padding-top: 42px;
-    }
-
     .footer-bottom {
         display: block;
         line-height: 1.8;

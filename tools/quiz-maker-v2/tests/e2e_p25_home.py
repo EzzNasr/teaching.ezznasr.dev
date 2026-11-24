@@ -54,6 +54,9 @@ with sync_playwright() as p:
         card = cards.nth(0).bounding_box()
         check(tag + "the English row is smaller than a main card", mini["height"] < card["height"], (mini["height"], card["height"]))
         check(tag + "no sideways scroll", pg.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"))
+        check(tag + "no 'How it works' section (owner, Handasa home)", pg.locator(".steps, #steps-title").count() == 0 and "How it works" not in pg.inner_text("main"))
+        head = pg.locator("#lessons-title").bounding_box()
+        check(tag + "the subjects heading is on the first screen", head["y"] + head["height"] <= 900, head["y"])
         if width == 390:
             xs = {round(cards.nth(i).bounding_box()["x"]) for i in range(3)}
             check(tag + "the cards stack in one column", len(xs) == 1, xs)

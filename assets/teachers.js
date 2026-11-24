@@ -24,7 +24,7 @@
 
   var TEACHERS = {
     programming: {
-      name: 'Ezz Nasr', nameAr: 'عز نصر',
+      name: 'Eng. EzzNasr', nameAr: 'م. عز نصر',
       subject: 'Programming', subjectAr: 'البرمجة',
       photo: '/assets/teachers/placeholder-programming.svg', placeholder: true
     },
@@ -40,7 +40,7 @@
       photo: '/assets/teachers/placeholder-science.svg', placeholder: true
     },
     english: {
-      name: 'Ezz Nasr', nameAr: 'عز نصر',
+      name: 'Eng. EzzNasr', nameAr: 'م. عز نصر',
       subject: 'English', subjectAr: 'الإنجليزية',
       photo: '/assets/teachers/placeholder-english.svg', placeholder: true
     }
