@@ -30,7 +30,7 @@
     },
     math: {
       // The owner says Math has its own teacher; name and photo still to come.
-      name: 'Math teacher', nameAr: 'مدرس الرياضيات',
+      name: 'Mr. Sherif', nameAr: 'أ. شريف',
       subject: 'Math', subjectAr: 'الرياضيات',
       photo: '/assets/teachers/placeholder-math.svg', placeholder: true
     },
