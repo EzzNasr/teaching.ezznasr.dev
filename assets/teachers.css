@@ -209,3 +209,13 @@ body[class*="subject-"] > main { flex: 1 0 auto; }
 
 /* nothing is drawn over a real face: the axes / atom rings only decorate the placeholders */
 .teacher-card:not(.is-placeholder) .tc-deco { display: none; }
+
+/* big screens: the subject pages grow instead of sitting in a narrow middle column */
+@media (min-width: 1600px) {
+  body[class*="subject-"] { --maxw: 1400px; }
+  .subject-layout { grid-template-columns: minmax(0, 1fr) 330px; gap: 48px; }
+}
+@media (min-width: 1920px) {
+  body[class*="subject-"] { --maxw: 1560px; }
+  .subject-layout { grid-template-columns: minmax(0, 1fr) 360px; }
+}
