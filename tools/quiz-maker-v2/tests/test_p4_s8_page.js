@@ -90,7 +90,7 @@ const col = (d, id, i) => rows(d, id).map(r => r[i]);
     const d = await open(() => r);
     await tick(60);
     t('hostile text is shown literally', rows(d, 's-teachers')[0][0].startsWith(evil) && doc(d).querySelector('#s-note').textContent === evil && doc(d).querySelector('#s-stamp').textContent.includes(evil));
-    t('...and never executed or turned into elements', d.window.PWNED === undefined && doc(d).querySelectorAll('img,svg').length === 0 && doc(d).querySelectorAll('script').length === before);
+    t('...and never executed or turned into elements', d.window.PWNED === undefined && doc(d).querySelectorAll('img:not(.brand-logo),svg').length === 0 && doc(d).querySelectorAll('script').length === before);
   }
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

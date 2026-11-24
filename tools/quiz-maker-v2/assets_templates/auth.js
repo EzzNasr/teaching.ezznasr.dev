@@ -50,7 +50,7 @@
 
   // Handasa logo + name on top of every sign-in screen (modal and inline gate).
   function brandHead() {
-    return el("div", { class: "aew-brand" }, [
+    return el("div", { class: "aew-brand", translate: "no" }, [
       el("img", { src: "/assets/brand/handasa-mark.svg", alt: "", width: "26", height: "26" }),
       el("span", {}, ["Handasa"]),
       el("span", { class: "aew-brand-ar", lang: "ar" }, ["هندسة"])

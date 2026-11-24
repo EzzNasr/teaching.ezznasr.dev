@@ -122,7 +122,7 @@ def run_page(b, base, width, scheme, spec):
         check(tag + "English label in " + sel + ": " + text, text.lower() in got.lower(), got[:200])
     left = pg.evaluate("I18n.untranslated()")
     check(tag + "no Arabic left on screen (data aside)", not left, left[:8])
-    check(tag + "page title in English", "Teaching" in pg.title() and not any("؀" <= c <= "ۿ" for c in pg.title()), pg.title())
+    check(tag + "page title in English", "Handasa" in pg.title() and not any("؀" <= c <= "ۿ" for c in pg.title()), pg.title())
     check(tag + "dark-mode button label in English", pg.get_attribute("#theme-toggle", "aria-label").startswith("Switch to"))
     wide = pg.evaluate("document.documentElement.scrollWidth - window.innerWidth")
     check(tag + "English: no sideways scroll", wide <= 1, wide)

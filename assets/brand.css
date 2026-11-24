@@ -44,7 +44,8 @@ a:hover > .brand-logo{ transform:rotate(-6deg) scale(1.06); }
 }
 .brand-ar::before{ content:"·"; margin-inline-end:.45em; font-family:'Manrope', sans-serif; opacity:.8; }
 /* compact staff tools: the bare logo before the page title */
-.brand-home{ flex:0 0 auto; display:inline-flex; }
+.brand-home{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; min-width:48px; min-height:48px;
+  margin:-10px; } /* 48px tap target, laid out as the 28px logo so the header row keeps its width */
 /* dashboards: the brand sits in a compact bar */
 .d-brand .brand-logo{ width:26px; height:26px; border-radius:7px; }
 .d-brand .brand-name{ font-size:15px; }
