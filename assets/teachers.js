@@ -26,7 +26,7 @@
     programming: {
       name: 'Eng. EzzNasr', nameAr: 'م. عز نصر',
       subject: 'Programming', subjectAr: 'البرمجة',
-      photo: '/assets/teachers/placeholder-programming.svg', placeholder: true
+      photo: '/assets/teachers/ezz.jpg', placeholder: false   // owner's photo, 2026-11-24
     },
     math: {
       // The owner says Math has its own teacher; name and photo still to come.
@@ -42,7 +42,7 @@
     english: {
       name: 'Eng. EzzNasr', nameAr: 'م. عز نصر',
       subject: 'English', subjectAr: 'الإنجليزية',
-      photo: '/assets/teachers/placeholder-english.svg', placeholder: true
+      photo: '/assets/teachers/ezz.jpg', placeholder: false   // same teacher as Programming
     }
   };
 
