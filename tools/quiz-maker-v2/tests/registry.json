@@ -1845,7 +1845,7 @@
     },
     {
       "id": "R-P25-D",
-      "title": "Phase 2.5 D: home page in a browser (390 and 1280 px, light and dark): three main cards Programming, Math, Science in that order; English in a smaller More row below; every subject link and both science grade pages open; no sideways scroll; cards stack on a phone; Handasa home: no 'How it works', the subjects heading is on the first screen; one compact round WhatsApp float (no Facebook float) that covers no footer link at the bottom",
+      "title": "Phase 2.5 D: home page in a browser (390 and 1280 px, light and dark): three main cards Programming, Math, Science in that order; English in a smaller More row below; every subject link and both science grade pages open; no sideways scroll; cards stack on a phone; Handasa home: no 'How it works', the subjects heading is on the first screen; one compact round WhatsApp float (no Facebook float) that covers no footer link at the bottom; the logo is inline, redraws on hover, white tile in dark mode",
       "status": "active",
       "owner": "refactor-2026-11",
       "needs": "playwright",
@@ -1930,7 +1930,7 @@
     },
     {
       "id": "R-BRAND-1",
-      "title": "Handasa · هندسة rebrand on every page: one BRAND block per <head> (favicon .ico/.svg, apple-touch icon, manifest, theme-color, brand.css) and no loose icon links; every title carries Handasa (the short name when long, none only when the name fills 65 chars; attendance keeps the university's name); stamped pages have og:site_name and the Handasa share card, lessons and home name the Organization with its logo; every header shows the logo; no old «EZZ NASR · TEACHING» / «Teaching Portal» anywhere visible; manifest names, colours and icon files at their sizes (maskable included, .ico 16/32/48); logo SVGs need no font; sitemap/robots valid; Quiz Maker templates, site_name() and window carry the brand; i18n «{0} — Handasa»; seo_build --check and apply_brand --dry change nothing",
+      "title": "Handasa · هندسة rebrand on every page: one BRAND block per <head> (favicon .ico/.svg, apple-touch icon, manifest, theme-color, brand.css, brand.js) and no loose icon links; every title carries Handasa (the short name when long, none only when the name fills 65 chars; attendance keeps the university's name); stamped pages have og:site_name and the Handasa share card, lessons and home name the Organization with its logo; every header shows the logo; no old «EZZ NASR · TEACHING» / «Teaching Portal» anywhere visible; manifest names, colours and icon files at their sizes (maskable included, .ico 16/32/48); logo SVGs need no font; sitemap/robots valid; Quiz Maker templates, site_name() and window carry the brand; i18n «{0} — Handasa»; seo_build --check and apply_brand --dry change nothing",
       "status": "active",
       "owner": "refactor-2026-11",
       "needs": "python",

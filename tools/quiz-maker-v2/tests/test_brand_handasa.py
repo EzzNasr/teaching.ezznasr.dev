@@ -52,7 +52,8 @@ OLD = re.compile(r"EZZ NASR|Teaching Portal|Ezz Nasr : Teaching|Ezz Nasr · Teac
 BRAND_BLOCK = re.compile(r"<!-- BRAND:START.*?<!-- BRAND:END -->", re.S)
 NEED = ['<link rel="icon" href="/icons/favicon.ico"', '<link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">',
         '<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">', '<link rel="manifest" href="/icons/site.webmanifest">',
-        '<meta name="theme-color"', '<link rel="stylesheet" href="/assets/brand.css">']
+        '<meta name="theme-color"', '<link rel="stylesheet" href="/assets/brand.css">',
+        '<script src="/assets/brand.js" defer></script>']
 LOOSE = re.compile(r'<link\s+rel="(?:shortcut )?icon"|<link\s+rel="apple-touch-icon"|<link\s+rel="manifest"|<meta\s+name="theme-color"')
 
 bad = {"block": [], "loose": [], "title": [], "og": [], "logo": [], "old": []}

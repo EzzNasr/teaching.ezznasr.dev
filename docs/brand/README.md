@@ -14,10 +14,11 @@ Chosen by the owner on 2026-11-24 (Telegram). The sheets here are the record of 
 | Path | What |
 |---|---|
 | `assets/brand/handasa-mark.svg` | the logo (navy tile, white «هـ», amber arc) — source of truth |
-| `assets/brand/handasa-mark-dark.svg` | the same on #1d4f91 for dark mode (brand.css swaps it in) |
+| `assets/brand/handasa-mark-dark.svg` | dark mode: white tile, navy letter, amber arc (owner's pick D2; brand.css swaps it in) |
 | `assets/brand/handasa-maskable.svg` | full-bleed square for Android |
 | `assets/brand/handasa-glyph.svg` | the bare letter + arc in currentColor |
-| `assets/brand.css` | header lockup, footer credit, `--brand-*` colour tokens |
+| `assets/brand.css` | header lockup, footer credit, WhatsApp float, logo redraw, `--brand-*` / `--logo-*` tokens |
+| `assets/brand.js` | swaps the logo `<img>` for inline SVG so it redraws on hover (stamped on every page) |
 | `icons/` | favicon .ico/.svg, 16/32/180/192/512 PNGs, maskable, `og-handasa.png` share card, `site.webmanifest` |
 | `tools/brand/build_brand.py` | redraws everything in `icons/` from the SVGs |
 | `tools/brand/apply_brand.py` | the one-off page swap (idempotent) |

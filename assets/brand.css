@@ -12,6 +12,8 @@
   --brand-sky:#5fb6ff;    /* construction-line blue */
   --brand-amber:#f2a93b;  /* the arc under «هـ» */
   --brand-ink:#0e2240;
+  --logo-tile:#0e2240;    /* the logo's tile (inline logo, see brand.js) */
+  --logo-glyph:#ffffff;
 }
 html[data-theme="dark"]{
   --brand-navy:#1d4f91;
@@ -19,6 +21,8 @@ html[data-theme="dark"]{
   --brand-sky:#8fd0ff;
   --brand-amber:#f5bd5c;
   --brand-ink:#f2f6ff;
+  --logo-tile:#ffffff;    /* dark mode: white tile, navy letter (owner, 2026-11-24) */
+  --logo-glyph:#0e2240;
 }
 
 /* ---- header lockup: <img.brand-logo> + <span.brand-name>Handasa<span.brand-ar>هندسة</span></span> ---- */
@@ -26,9 +30,11 @@ html[data-theme="dark"]{
   width:28px; height:28px; flex:0 0 auto; display:inline-block; vertical-align:middle;
   border-radius:8px; transition:transform .25s ease;
 }
-html[data-theme="dark"] .brand-logo{
+html[data-theme="dark"] img.brand-logo, html[data-theme="dark"] img.brand-hero-logo{
   content:url("/assets/brand/handasa-mark-dark.svg");
-  box-shadow:0 0 0 1px rgba(255,255,255,.14);
+}
+html[data-theme="dark"] .brand-logo{
+  box-shadow:0 1px 3px rgba(0,0,0,.35);
 }
 /* whatever the page styles its brand link as, logo and name sit side by side */
 a:has(> .brand-logo){ display:inline-flex; align-items:center; gap:10px; text-decoration:none; }
@@ -105,3 +111,19 @@ html body a.facebook-float{ display:none !important; }
 @media (prefers-reduced-motion: reduce){
   html body a.whatsapp-float.whatsapp-float, html body a.whatsapp-float.whatsapp-float > span{ transition:none; }
 }
+
+/* ---- the logo redraws on hover (brand.js swaps the <img> for inline SVG) ---- */
+.brand-svg{ display:block; overflow:visible; }
+.brand-svg .logo-tile{ fill:var(--logo-tile); transition:fill .3s ease; }
+.brand-svg g{ fill:var(--logo-glyph); }
+.brand-svg.is-drawing .logo-glyph{
+  fill-opacity:0; stroke:var(--logo-glyph); stroke-width:1.6px; vector-effect:non-scaling-stroke;
+  stroke-dasharray:1; stroke-dashoffset:1;
+  animation:logo-draw .6s ease-out forwards, logo-fill .35s .55s ease-out forwards;
+}
+.brand-svg.is-drawing .logo-arc{
+  stroke-dasharray:1; stroke-dashoffset:1; animation:logo-draw .45s .35s ease-out forwards;
+}
+@keyframes logo-draw{ to{ stroke-dashoffset:0; } }
+@keyframes logo-fill{ to{ fill-opacity:1; } }
+@media (prefers-reduced-motion: reduce){ .brand-svg.is-drawing *{ animation:none !important; } }

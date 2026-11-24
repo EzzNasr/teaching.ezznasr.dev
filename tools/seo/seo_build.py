@@ -15,7 +15,7 @@ What it does (idempotent - safe to run any number of times):
     grade pages are indexable and listed in sitemap.xml.
   * every page (private ones too) also gets ONE brand block right after it:
         <!-- BRAND:START ... -->  favicon / app icon / manifest / theme-color links
-        and /assets/brand.css  <!-- BRAND:END -->
+        and /assets/brand.css + brand.js  <!-- BRAND:END -->
     so a new logo or icon set reaches every page in one run.
   * writes sitemap.xml, robots.txt and icons/site.webmanifest (name, icons, colours).
   * internal links of the form  .../index.html  become  .../  (one URL per page).
@@ -49,6 +49,7 @@ STRIP_BRAND = [
     r'<link\s+rel="manifest"[^>]*>',
     r'<meta\s+name="theme-color"[^>]*>',
     r'<link\s+rel="stylesheet"\s+href="/assets/brand\.css[^"]*"\s*/?>',
+    r'<script\s+src="/assets/brand\.js[^"]*"[^>]*>\s*</script>',
 ]
 
 SKIP_DIRS = {"tools", ".git", "node_modules", "Docs", "packaged", "__pycache__"}
@@ -442,6 +443,7 @@ def brand_block(cfg):
         '<link rel="manifest" href="/icons/site.webmanifest">',
         '<meta name="theme-color" content="{}">'.format(cfg.get("theme_color", "#0e2240")),
         '<link rel="stylesheet" href="/assets/brand.css">',
+        '<script src="/assets/brand.js" defer></script>',
         BRAND_END,
     ]
 

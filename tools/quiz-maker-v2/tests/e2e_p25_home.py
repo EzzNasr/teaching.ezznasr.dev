@@ -68,6 +68,13 @@ with sync_playwright() as p:
             const r = e.getBoundingClientRect(); return r.width && !(r.right <= f.x || r.left >= f.x + f.width || r.bottom <= f.y || r.top >= f.y + f.height); }).map(e => e.textContent.trim())""", fb)
         check(tag + "at the bottom the button covers no footer link", not hits, hits)
         pg.evaluate("window.scrollTo(0, 0)")
+        pg.wait_for_function("document.querySelectorAll('svg.brand-svg').length >= 2", timeout=5000)
+        check(tag + "the logos are inline (brand.js), none left as <img>", pg.locator("img.brand-logo, img.brand-hero-logo").count() == 0)
+        pg.hover("header a.mark")
+        check(tag + "hovering the header logo redraws it", pg.locator("header svg.brand-svg.is-drawing").count() == 1)
+        tile = pg.evaluate("getComputedStyle(document.querySelector('header svg.brand-svg .logo-tile')).fill")
+        check(tag + "logo tile: navy in light mode, white in dark mode", tile == ("rgb(255, 255, 255)" if dark else "rgb(14, 34, 64)"), tile)
+        pg.mouse.move(5, 5)
         if width == 390:
             xs = {round(cards.nth(i).bounding_box()["x"]) for i in range(3)}
             check(tag + "the cards stack in one column", len(xs) == 1, xs)
