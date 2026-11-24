@@ -91,6 +91,27 @@ attendance fixes D22-D25, `ac091b4`). Version 71 = `ac091b4` (then 72 and 73 by 
 | Branch protection on `main` (ruleset, see `teacher-publishing.md`); rotate `ADMIN_TOKEN` (SEC-01); set `PASSWORD_PEPPER` | the owner |
 | Phases 4-9 | after Phase 3, in the frozen order (5 before 4) |
 
+## Handasa rebrand (2026-11-24)
+
+Owner's choices on Telegram: keep `teaching.ezznasr.dev` (the domain is the single `site_url` setting), the name reads
+**Handasa · هندسة**, footer credit "by Eng. EzzNasr", logo C (the real Arabic «هـ», Cairo ExtraBold, over an amber arc),
+Blueprint colours (the existing blue plus the logo's navy and amber as `--brand-*` tokens). Brand layer only, so the
+teacher-themed home/subject pages (branch `claude/recursing-babbage-72f1b3`) merge cleanly. No backend text had the
+old name, so no deploy.
+
+| Step | What | Commit |
+|---|---|---|
+| R1 | Logo SVGs in `assets/brand/`; `tools/brand/build_brand.py` renders favicon .ico/.svg, 16/32/180/192/512 PNGs, a maskable icon and the share card `icons/og-handasa.png` (replaces `og-default.png`) | `4d049ea` |
+| R2 | SEO: `site_name`/`short_name`/alt names (old name kept as an alias on purpose), Organization JSON-LD with logo, full manifest; `seo_build.py` stamps a BRAND block (icons, manifest, theme-color, `/assets/brand.css`) into every page | `810f786` |
+| R3 | Quiz Maker window «Handasa · Lesson Maker», `site_name()` fallback | `765a905` |
+| R4 | Header lockup + footer credit in 185 pages and the templates via the one-off `tools/brand/apply_brand.py` (idempotent); logo on the sign-in/reset/first-time screens (`auth.js`, both copies); staff titles and i18n «{0} — Handasa» | `2cda509` |
+| R5 | Test R-BRAND-1 (`tests/test_brand_handasa.py`); long titles fall back to «Handasa»; logo on the compact staff tools; 404 title | `de3a76d` |
+
+R6 (owner, same day): the author is «Eng. EzzNasr» in the footer credit, `<meta name="author">` and the JSON-LD
+Person (`honorificPrefix` Eng., aliases EzzNasr / Ezz Nasr). Kept on purpose: the author/founder data, the credit, the
+WhatsApp button "Chat with Ezz" (his number), social links, the attendance pages' Alexandria University branding.
+Undo: `git revert` the commits newest first, then `python tools/seo/seo_build.py`.
+
 ## Notes and follow-ups found along the way
 
 - Do not run anything else heavy while the gate runs on Windows: a polling loop made Git Bash run out of processes and

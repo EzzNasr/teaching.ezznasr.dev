@@ -96,6 +96,14 @@ org = [n for n in ld["@graph"] if n.get("@type") == "Organization"]
 check("home JSON-LD: Organization Handasa with logo, founded by the author",
       org and org[0]["name"] == NAME and org[0]["logo"].endswith("/icons/favicon-512.png")
       and org[0].get("founder", {}).get("@id", "").endswith("#person"), org)
+person = [n for n in ld["@graph"] if n.get("@type") == "Person"]
+check("home JSON-LD: the author is «Eng. EzzNasr» (plain spellings as aliases)",
+      person and person[0]["name"] == "Eng. EzzNasr" and "EzzNasr" in person[0].get("alternateName", []), person)
+old_credit = [p for p in pages if "by Ezz Nasr" in read(os.path.join(SITE, p))]
+check("footer credit reads «by Eng. EzzNasr» everywhere", not old_credit, old_credit)
+authors = [p for p in pages if '<meta name="author"' in read(os.path.join(SITE, p))
+           and '<meta name="author" content="Eng. EzzNasr">' not in read(os.path.join(SITE, p))]
+check("every author meta tag says Eng. EzzNasr", not authors, authors)
 site_node = [n for n in ld["@graph"] if n.get("@type") == "WebSite"]
 check("home JSON-LD: WebSite published by the Organization",
       site_node and site_node[0]["publisher"]["@id"].endswith("#organization"))

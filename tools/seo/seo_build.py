@@ -343,7 +343,11 @@ def breadcrumb(cfg, root, rel, kind):
 
 def json_ld(cfg, root, rel, kind, meta, canonical, lang):
     site = cfg["site_url"]
-    person = {"@type": "Person", "name": cfg["author_name"], "url": cfg["author_url"]}
+    person = {"@type": "Person", "@id": site + "/#person", "name": cfg["author_name"], "url": cfg["author_url"]}
+    if cfg.get("author_alt_names"):
+        person["alternateName"] = cfg["author_alt_names"]
+    if cfg.get("author_honorific"):
+        person["honorificPrefix"] = cfg["author_honorific"]
     org_ref = {"@type": "Organization", "@id": site + "/#organization", "name": cfg["site_name"], "url": site + "/"}
     if cfg.get("logo"):
         org_ref["logo"] = site + cfg["logo"] if cfg["logo"].startswith("/") else cfg["logo"]
@@ -362,7 +366,7 @@ def json_ld(cfg, root, rel, kind, meta, canonical, lang):
         if cfg.get("site_alt_names"):
             org["alternateName"] = cfg["site_alt_names"]
         graph.append(org)
-        graph.append(dict(person, **{"@id": site + "/#person", "sameAs": cfg.get("same_as", [])}))
+        graph.append(dict(person, sameAs=cfg.get("same_as", [])))
     elif schema == "collection":
         graph.append({"@type": "CollectionPage", "name": meta["title"], "url": canonical,
                       "description": meta["description"], "inLanguage": lang,

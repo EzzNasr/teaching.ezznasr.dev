@@ -12,7 +12,13 @@
     "teaching.ezznasr.dev"
   ],
   "site_url": "https://teaching.ezznasr.dev",
-  "author_name": "Ezz Nasr",
+  "author_name": "Eng. EzzNasr",
+  "author_alt_names": [
+    "EzzNasr",
+    "Ezz Nasr",
+    "Eng. Ezz Nasr"
+  ],
+  "author_honorific": "Eng.",
   "author_url": "https://ezznasr.dev",
   "logo": "/icons/favicon-512.png",
   "theme_color": "#0e2240",

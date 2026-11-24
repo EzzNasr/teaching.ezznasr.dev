@@ -19,8 +19,8 @@ SKIP = {".git", "node_modules", "tests", "__pycache__", "packaged", "Docs", "doc
 
 MARK = ('<img class="brand-logo" src="/assets/brand/handasa-mark.svg" alt="" width="28" height="28">'
         '<span class="brand-name">Handasa<span class="brand-ar" lang="ar">هندسة</span></span>')
-CREDIT = "Handasa · هندسة · by Ezz Nasr"
-CREDIT_ENT = "Handasa &middot; هندسة &middot; by Ezz Nasr"
+CREDIT = "Handasa · هندسة · by Eng. EzzNasr"
+CREDIT_ENT = "Handasa &middot; هندسة &middot; by Eng. EzzNasr"
 FOOT = '<span class="brand-foot">' + CREDIT + ' ·</span> '
 
 RULES = [
@@ -38,9 +38,9 @@ RULES = [
     ("footer", re.compile(r'&copy; 2026 Ezz Nasr &middot; '), '&copy; 2026 ' + CREDIT_ENT + ' &middot; '),
     ("footer", re.compile(r'(<(?:p|div) class="footer-note">)(?!<span class="brand-foot">)(teaching\.ezznasr\.dev/)'), r'\1' + FOOT + r'\2'),
     # bare credits (grade pages, 404, home/subject footers) get the same isolating span
-    ("footer", re.compile(r'(?<!<span class="brand-foot">)(?<!© 2026 )(?<!&copy; 2026 )Handasa · هندسة · by Ezz Nasr'),
+    ("footer", re.compile(r'(?<!<span class="brand-foot">)(?<!© 2026 )(?<!&copy; 2026 )Handasa · هندسة · by Eng. EzzNasr'),
      '<span class="brand-foot">' + CREDIT + '</span>'),
-    ("footer", re.compile(r'(?<!<span class="brand-foot">)(© 2026 |&copy; 2026 )(Handasa (?:·|&middot;) هندسة (?:·|&middot;) by Ezz Nasr)'),
+    ("footer", re.compile(r'(?<!<span class="brand-foot">)(© 2026 |&copy; 2026 )(Handasa (?:·|&middot;) هندسة (?:·|&middot;) by Eng. EzzNasr)'),
      r'<span class="brand-foot">\1\2</span>'),
     # compact staff tools (follow-up, requirements, team, ...): just the logo, linking home
     ("mark", re.compile(r'(<div class="(?:fu|rq)-top-row">\s*)(<h1 class="(?:fu|rq)-title">)'),
