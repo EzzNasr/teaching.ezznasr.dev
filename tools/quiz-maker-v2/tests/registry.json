@@ -136,7 +136,7 @@
     },
     {
       "id": "R-SUB-ADMIN",
-      "title": "Subscriptions card for a signed-in admin: get_subscription_options says signed_in + viewer admin (student / guest / stale too), and the real subscribe.js in a fake page shows the options as a preview (no buy buttons) instead of the sign-in prompt, also against the old Version 74 reply; students keep their buy buttons; assets copy = template copy",
+      "title": "Subscriptions card for a signed-in admin: get_subscription_options says signed_in + viewer admin (student / guest / stale too; guests get no cards or prices), and the real subscribe.js in a fake page shows the options as a preview (no buy buttons) instead of the sign-in prompt, also against the old Version 74 reply; students keep their buy buttons; assets copy = template copy",
       "status": "active",
       "owner": "S1",
       "cmd": [

@@ -34,8 +34,8 @@ const opts = creds => post(Object.assign({ action: 'get_subscription_options', g
   const a = opts(ADMIN), s = opts(STU), g = opts(null), st = opts({ student_id: STU.student_id, session_token: 'stale' });
   t('backend: an admin session is signed in (viewer admin), options listed as available', a.ok && a.signed_in === true && a.viewer === 'admin' && a.chapters.length === 1 && a.chapters[0].state === 'available', JSON.stringify(a));
   t('backend: a student session is signed in (viewer student)', s.ok && s.signed_in === true && s.viewer === 'student', JSON.stringify(s));
-  t('backend: no session is a guest, not signed in', g.ok && g.signed_in === false && g.viewer === 'guest');
-  t('backend: a stale session is a guest, not signed in', st.ok && st.signed_in === false && st.viewer === 'guest');
+  t('backend: no session is a guest, not signed in, and gets no cards or prices', g.ok && g.signed_in === false && g.viewer === 'guest' && !g.chapters && !g.term && !g.prices, JSON.stringify(g));
+  t('backend: a stale session is a guest too, no cards or prices', st.ok && st.signed_in === false && st.viewer === 'guest' && !st.chapters && !st.prices);
 }
 
 // ---- a tiny DOM, just what subscribe.js touches ---------------------------------------------

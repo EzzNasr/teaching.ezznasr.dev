@@ -220,6 +220,7 @@ const setTag = (creds, lesson, chapter, term) => post(Object.assign({ action: 'a
 const C = cr(reg('01000000004', 'd', 'Nour'));
 const D = cr(reg('01000000005', 'e', 'Layla'));
 const E = cr(reg('01000000006', 'f', 'Hana'));
+const V = cr(reg('01000000077', 'v', 'Viewer'));   // signed in, never buys: the "plain student" view
 const G1_C5_L1 = G1 + '/chapter-5-lesson-1-files';
 setVideo(G1_C5_L1, 'lesson', ID.a);
 setTag(ADMIN, G1_C5_L1, 5, 2);
@@ -228,21 +229,24 @@ const reqSub = (creds, body) => post(Object.assign({ action: 'request_subscripti
 const stOf = (o, n) => (o.chapters.find(c => c.chapter === n) || {}).state;
 const pendingId = () => cell('Payments', tab('Payments').getLastRow(), 'payment_id');
 {
-  let o = opts(null, 'grade-1-secondary');
-  t('public options: chapters 1, 3, 5 only (untagged lesson adds nothing)', o.ok && o.chapters.map(c => c.chapter).join() === '1,3,5', JSON.stringify(o));
+  const guest = opts(null, 'grade-1-secondary');
+  t('a logged-out visitor gets no cards and no prices, just signed_in:false', guest.ok && guest.signed_in === false && guest.viewer === 'guest' && !('chapters' in guest) && !('term' in guest) && !('prices' in guest) && !('pay_info_chapter' in guest), JSON.stringify(guest));
+  let o = opts(V, 'grade-1-secondary');
+  t('student options: chapters 1, 3, 5 only (untagged lesson adds nothing)', o.ok && o.chapters.map(c => c.chapter).join() === '1,3,5', JSON.stringify(o));
   t('chapter items carry term, price 250 and lesson count', o.chapters[0].term === 1 && o.chapters[0].price === 250 && o.chapters[0].lessons === 2 && o.chapters[2].term === 2);
   t('term option is the current term (default 1), 1000 EGP, lessons counted', o.term && o.term.term === 1 && o.term.price === 1000 && o.term.lessons === 3, JSON.stringify(o.term));
   t('year_end, current_term and prices are reported', o.year_end === '2027-08-01' && o.current_term === 1 && o.prices.chapter === 250 && o.prices.term === 1000);
-  t('a logged-out visitor is not signed in and sees everything "available"', o.signed_in === false && o.chapters.every(c => c.state === 'available') && o.term.state === 'available');
-  t('a stale session is treated as logged out, no error', opts({ student_id: C.student_id, session_token: 'stale' }, 'grade-1-secondary').signed_in === false);
-  t('grade 2 lists only its own chapter', opts(null, 'grade-2-secondary').chapters.map(c => c.chapter).join() === '1');
-  t('"1", "g1" and the full folder all name grade 1', ['1', 'g1', G1].every(g => opts(null, g).grade === 'grade-1-secondary'));
+  t('a student who bought nothing is signed in and sees everything "available"', o.signed_in === true && o.chapters.every(c => c.state === 'available') && o.term.state === 'available');
+  const stale = opts({ student_id: C.student_id, session_token: 'stale' }, 'grade-1-secondary');
+  t('a stale session is treated as logged out (no cards), no error', stale.ok && stale.signed_in === false && !('chapters' in stale));
+  t('grade 2 lists only its own chapter', opts(V, 'grade-2-secondary').chapters.map(c => c.chapter).join() === '1');
+  t('"1", "g1" and the full folder all name grade 1', ['1', 'g1', G1].every(g => opts(V, g).grade === 'grade-1-secondary'));
   t('an unknown grade is refused', !opts(null, 'grade-3-secondary').ok && !opts(null, '').ok);
   env.props.CURRENT_TERM_G1 = '2';
-  o = opts(null, 'grade-1-secondary');
+  o = opts(V, 'grade-1-secondary');
   t('CURRENT_TERM_G1=2 switches the term option to term 2 (1 lesson)', o.term.term === 2 && o.term.lessons === 1 && o.chapters.length === 3, JSON.stringify(o.term));
   env.props.CURRENT_TERM_G1 = '3';
-  t('a current term with no tagged lessons gives no term option', opts(null, 'grade-1-secondary').term === null);
+  t('a current term with no tagged lessons gives no term option', opts(V, 'grade-1-secondary').term === null);
   delete env.props.CURRENT_TERM_G1;
 }
 
@@ -364,12 +368,12 @@ const pendingId = () => cell('Payments', tab('Payments').getLastRow(), 'payment_
   env.props.PAY_INSTRUCTIONS = 'lesson text 75 EGP';
   env.props.PAY_INSTRUCTIONS_CHAPTER = 'chapter text 250 EGP';
   env.props.PAY_INSTRUCTIONS_TERM = 'term text 1000 EGP';
-  let po = opts(null, 'grade-1-secondary');
+  let po = opts(V, 'grade-1-secondary');
   t('chapter and term each get their own payment text', po.pay_info_chapter === 'chapter text 250 EGP' && po.pay_info_term === 'term text 1000 EGP', JSON.stringify(po));
   t('the per-lesson text never leaks into subscription options', !('pay_info' in po) && !JSON.stringify(po).includes('lesson text'));
   t('the per-lesson lock box still uses PAY_INSTRUCTIONS', get({}, G1_C1_L1).pay_info === 'lesson text 75 EGP' || get({}, G1_C1_L1).pay_info === undefined);
   delete env.props.PAY_INSTRUCTIONS; delete env.props.PAY_INSTRUCTIONS_CHAPTER; delete env.props.PAY_INSTRUCTIONS_TERM;
-  po = opts(null, 'grade-1-secondary');
+  po = opts(V, 'grade-1-secondary');
   t('...and each is an empty string when its property is unset', po.pay_info_chapter === '' && po.pay_info_term === '');
 
   const ov = post(Object.assign({ action: 'admin_access_overview' }, ADMIN));

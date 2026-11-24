@@ -3864,7 +3864,7 @@
   "handleGetSubscriptionOptions": {
    "kind": "function",
    "file": "tools/quiz-maker-v2/apps_script/Code.gs",
-   "hash": "aecc432477fa10ad"
+   "hash": "d8f12d50f1f588c9"
   },
   "handleGetVideo": {
    "kind": "function",

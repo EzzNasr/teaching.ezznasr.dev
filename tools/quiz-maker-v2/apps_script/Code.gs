@@ -2885,8 +2885,8 @@ function _pendingSubscriptionScopes(ss, phone) {
   return out;
 }
 
-// Public read (like get_video): a missing/stale session just means "not signed in", and every
-// item then shows "available". Never creates a tab.
+// Signed-in read: a missing/stale session just means "not signed in" (no error), and then the
+// reply carries no chapters, term or prices at all. Never creates a tab.
 // signed_in is about the SESSION, not about having a student row to buy with: an admin is
 // signed in too (viewer "admin", every item "available", nothing held). It used to be
 // !!phone, so a signed-in admin got signed_in:false and the page asked them to sign in.
@@ -2894,6 +2894,10 @@ function handleGetSubscriptionOptions(payload) {
   var base = _gradeFolder(payload.grade), suffix = GRADE_SCOPE_FOLDERS[base];
   var ss = _ss();
   var session = _sessionState(payload);
+  // Not signed in (or a stale session): no cards, no prices — the page shows the sign-in prompt.
+  if (session !== "student" && session !== "admin") {
+    return { ok: true, grade: base.split("/").pop(), signed_in: false, viewer: "guest" };
+  }
   var phone = _subscriberPhone(payload, session);
   var held = phone ? _heldSubscriptionScopes(ss, phone) : {};
   var pending = phone ? _pendingSubscriptionScopes(ss, phone) : {};

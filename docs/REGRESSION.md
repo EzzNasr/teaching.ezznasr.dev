@@ -58,7 +58,7 @@ repo, so R-E23 to R-E26 are reserved and unused.
 | R-E09 | one active session per account | active |  | `tests/test_single_session.js` |
 | R-E10 | quiz access override rows | active |  | `tests/test_quiz_access_override.js` |
 | R-E11 | chapter/term subscriptions and the paywall | active |  | `tests/test_subscriptions.js` |
-| R-SUB-ADMIN | Subscriptions card for a signed-in admin: get_subscription_options says signed_in + viewer admin (student / guest / stale too), and the real subscribe.js in a fake page shows the options as a preview (no buy buttons) instead of the sign-in prompt, also against the old Version 74 reply; students keep their buy buttons; assets copy = template copy | active |  | `tests/test_subscribe_admin.js` |
+| R-SUB-ADMIN | Subscriptions card for a signed-in admin: get_subscription_options says signed_in + viewer admin (student / guest / stale too; guests get no cards or prices), and the real subscribe.js in a fake page shows the options as a preview (no buy buttons) instead of the sign-in prompt, also against the old Version 74 reply; students keep their buy buttons; assets copy = template copy | active |  | `tests/test_subscribe_admin.js` |
 | R-E12 | follow-up backend: overview facts, attendance, group + template saves, record_watch | active |  | `tests/test_followup.js` |
 | R-E13 | real overview output vs followup-logic.js data shape | active |  | `tests/test_followup_contract.js` |
 | R-E14 | follow-up status rules + Cairo deadlines (pure) | active |  | `tests/test_followup_logic.js` |
