@@ -17,7 +17,7 @@ window.I18n && window.I18n.add([
   ["{0} مدفوع", "{0} paid"], ["مستنية موافقة", "Waiting for approval"],
   ["بدون مبلغ", "No amount"], ["ج.م", "EGP"], ["تحويل على الموقع", "Transfer on the website"],
   ["اشتراك الفصل {0}", "Chapter {0} subscription"], ["اشتراك الترم {0}", "Term {0} subscription"],
-  ["علوم", "Science"], ["رياضيات", "Math"], ["برمجة", "Programming"], ["إنجليزي", "English"],
+  ["رياضيات", "Math"], ["برمجة", "Programming"], ["إنجليزي", "English"],
   ["الصف الثالث الإعدادي", "3rd Preparatory"], ["الصف الأول الثانوي", "1st Secondary"], ["الصف الثاني الثانوي", "2nd Secondary"], ["الصف الثالث الثانوي", "3rd Secondary"],
   ["بنجيب الأرقام…", "Loading the numbers…"],
   ["نزل ملفين: التقرير (افتحه واطبعه PDF) وملف المشتريات لإكسل.", "Two files downloaded: the report (open it and print to PDF) and the purchases file for Excel."],

@@ -68,8 +68,8 @@ check("the science seed has lessons in both grades", SEED["subject"] == "science
       sorted({g for g, _s, _t in plan}) == sorted(GRADES), sorted({g for g, _s, _t in plan}))
 check("seeded folders are neutral (chapter-<n>-lesson-<m>)", all(re.fullmatch(r"chapter-\d+-lesson-\d+", s) for _g, s, _t in plan))
 prep = [x for x in PLAN if x["group"] == GRADES[0]]
-check("3rd Prep is the teacher's list: 4 units x (شرح, تجميعات المعاصر, حل, امتحانين شاملين)",
-      [x["title"] for x in prep[:4]] == ["Unit 1 | شرح", "Unit 1 | تجميعات المعاصر", "Unit 1 | حل", "Unit 1 | امتحانين شاملين"]
+check("3rd Prep is the teacher's list: 4 units x (شرح, تجميعات Give reason & What happens, حل أسئلة, امتحانين شاملين)",
+      [x["title"] for x in prep[:4]] == ["Unit 1 | شرح", "Unit 1 | تجميعات Give reason & What happens", "Unit 1 | حل أسئلة", "Unit 1 | امتحانين شاملين"]
       and len(prep) == 16 and prep[-1]["slug"] == "chapter-4-lesson-4", [x["title"] for x in prep[:4]])
 check("3rd Prep: only the exams have a quiz, no lesson has an assignment",
       [x["quiz"] for x in prep] == [False, False, False, True] * 4 and not any(x["assignment"] for x in prep))

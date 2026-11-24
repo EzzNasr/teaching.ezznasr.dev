@@ -68,12 +68,12 @@
     },
     "science/preparatory/grade-3-preparatory": {
       "phrase": "Science lesson for Grade 3 Preparatory",
-      "label_ar": "العلوم",
+      "label_ar": "Science",
       "level": "Grade 3 Preparatory"
     },
     "science/secondary/grade-1-secondary": {
       "phrase": "Integrated Science lesson for Grade 1 Secondary",
-      "label_ar": "العلوم المتكاملة",
+      "label_ar": "Integrated Science",
       "level": "Grade 1 Secondary"
     }
   },
@@ -92,14 +92,14 @@
       "crumb": "Programming"
     },
     "/programming/baccalaureate/grade-1-secondary/": {
-      "title": "البرمجة والذكاء الاصطناعي للصف الأول الثانوي | {site_name}",
+      "title": "Senior 1 Programming & AI | {site_name}",
       "description": "دروس مادة البرمجة والذكاء الاصطناعي للصف الأول الثانوي (البكالوريا المصرية) مع فيديوهات شرح واختبارات تفاعلية وواجبات بعد كل درس.",
-      "crumb": "الصف الأول الثانوي"
+      "crumb": "Senior 1"
     },
     "/programming/baccalaureate/grade-2-secondary/": {
-      "title": "البرمجة والذكاء الاصطناعي للصف الثاني الثانوي | {site_name}",
+      "title": "Senior 2 Programming & AI | {site_name}",
       "description": "دروس مادة البرمجة والذكاء الاصطناعي للصف الثاني الثانوي (البكالوريا المصرية) مع فيديوهات شرح واختبارات تفاعلية وواجبات بعد كل درس.",
-      "crumb": "الصف الثاني الثانوي"
+      "crumb": "Senior 2"
     },
     "/programming/other/": {
       "title": "More Programming Lessons: Functions & Robotics | {site_name}",
@@ -117,14 +117,14 @@
       "crumb": "Science"
     },
     "/science/preparatory/grade-3-preparatory/": {
-      "title": "العلوم للصف الثالث الإعدادي | {site_name}",
-      "description": "دروس العلوم للصف الثالث الإعدادي مع فيديوهات شرح واختبارات تفاعلية وواجبات بعد كل درس.",
-      "crumb": "الصف الثالث الإعدادي"
+      "title": "Prep 3 Science | {site_name}",
+      "description": "دروس Science لـ Prep 3 (الصف الثالث الإعدادي) مع فيديوهات شرح واختبارات تفاعلية وواجبات بعد كل درس.",
+      "crumb": "Prep 3"
     },
     "/science/secondary/grade-1-secondary/": {
-      "title": "العلوم المتكاملة للصف الأول الثانوي | {site_name}",
-      "description": "دروس العلوم المتكاملة للصف الأول الثانوي مع فيديوهات شرح واختبارات تفاعلية وواجبات بعد كل درس.",
-      "crumb": "الصف الأول الثانوي"
+      "title": "Senior 1 Integrated Science | {site_name}",
+      "description": "دروس Integrated Science لـ Senior 1 (الصف الأول الثانوي) مع فيديوهات شرح واختبارات تفاعلية وواجبات بعد كل درس.",
+      "crumb": "Senior 1"
     },
     "/english/": {
       "title": "English Lessons: Interview Prep & Grammar | {site_name}",

@@ -8,10 +8,10 @@
      "quiz": false,
      "assignment": false,
      "chapters": [
-       {"lessons": ["شرح", "تجميعات المعاصر", "حل", {"title": "امتحانين شاملين", "quiz": true}]},
-       {"lessons": ["شرح", "تجميعات المعاصر", "حل", {"title": "امتحانين شاملين", "quiz": true}]},
-       {"lessons": ["شرح", "تجميعات المعاصر", "حل", {"title": "امتحانين شاملين", "quiz": true}]},
-       {"lessons": ["شرح", "تجميعات المعاصر", "حل", {"title": "امتحانين شاملين", "quiz": true}]}
+       {"lessons": ["شرح", "تجميعات Give reason & What happens", "حل أسئلة", {"title": "امتحانين شاملين", "quiz": true}]},
+       {"lessons": ["شرح", "تجميعات Give reason & What happens", "حل أسئلة", {"title": "امتحانين شاملين", "quiz": true}]},
+       {"lessons": ["شرح", "تجميعات Give reason & What happens", "حل أسئلة", {"title": "امتحانين شاملين", "quiz": true}]},
+       {"lessons": ["شرح", "تجميعات Give reason & What happens", "حل أسئلة", {"title": "امتحانين شاملين", "quiz": true}]}
      ]},
     {"group": "secondary/grade-1-secondary",
      "chapters": [{"lessons": ["", "", ""]}, {"lessons": ["", "", ""]}, {"lessons": ["", "", ""]}]}

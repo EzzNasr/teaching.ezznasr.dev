@@ -126,7 +126,7 @@
   function data(text) { return el("span", { translate: "no", text: text }); }   // names and titles are never translated
 
   // ---------- labels ----------
-  var SUBJECT = { science: "علوم", math: "رياضيات", programming: "برمجة", english: "إنجليزي" };
+  var SUBJECT = { science: "Science", math: "رياضيات", programming: "برمجة", english: "إنجليزي" };
   var GRADE = { "grade-3-preparatory": "الصف الثالث الإعدادي", "grade-1-secondary": "الصف الأول الثانوي", "grade-2-secondary": "الصف الثاني الثانوي", "grade-3-secondary": "الصف الثالث الثانوي" };
   function humanize(slug) { return String(slug || "").replace(/[-_]+/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); }); }
   function courseName(key) {

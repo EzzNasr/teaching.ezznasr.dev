@@ -146,7 +146,7 @@
   function say(msg, text, kind) { msg.className = "l-msg" + (kind ? " " + kind : ""); msg.textContent = text || ""; }
 
   // ---------- labels ----------
-  var SUBJECT = { science: "علوم", math: "رياضيات", programming: "برمجة", english: "إنجليزي" };
+  var SUBJECT = { science: "Science", math: "رياضيات", programming: "برمجة", english: "إنجليزي" };
   var GRADE = { "grade-3-preparatory": "الصف الثالث الإعدادي", "grade-1-secondary": "الصف الأول الثانوي", "grade-2-secondary": "الصف الثاني الثانوي", "grade-3-secondary": "الصف الثالث الثانوي" };
   function humanize(slug) { return String(slug || "").replace(/[-_]+/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); }); }
   function courseOf(key) { var p = String(key).split("/"); p.pop(); return p.join("/"); }

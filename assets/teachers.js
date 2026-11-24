@@ -36,7 +36,7 @@
     },
     science: {
       name: 'Mr. Adam', nameAr: 'أ. آدم',
-      subject: 'Science', subjectAr: 'العلوم',
+      subject: 'Science', subjectAr: 'Science',
       photo: '/assets/teachers/science.jpg', placeholder: false   // owner's photo, 2026-11-24
     },
     english: {

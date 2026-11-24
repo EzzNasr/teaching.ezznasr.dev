@@ -5,7 +5,7 @@ window.I18n && window.I18n.add([
   ["الدروس بيعملها صاحب الموقع بأساميها. إنت بتضيف لكل درس الفيديوهات وأسئلة الكويز والملفات، من هنا على طول.",
    "The site owner makes the lessons and their names. You add each lesson's videos, quiz questions and files, right here."],
   ["النتايج", "Results"], ["الوصول للدروس", "Lesson access"], ["المتابعة", "Follow-up"], ["التصحيح", "Grading"], ["فريقي", "My team"], ["إيراداتي", "My revenue"],
-  ["علوم", "Science"], ["رياضيات", "Math"], ["برمجة", "Programming"], ["إنجليزي", "English"],
+  ["رياضيات", "Math"], ["برمجة", "Programming"], ["إنجليزي", "English"],
   ["الصف الثالث الإعدادي", "3rd Preparatory"], ["الصف الأول الثانوي", "1st Secondary"], ["الصف الثاني الثانوي", "2nd Secondary"], ["الصف الثالث الثانوي", "3rd Secondary"],
   ["مكانك", "Where you are"], ["كل الدروس", "All lessons"],
   ["لسه مفيش دروس في موادك. صاحب الموقع بيضيفها.", "No lessons in your subjects yet. The site owner adds them."],

@@ -61,7 +61,7 @@ def run(b, base, width, scheme):
     pg.locator("#t-add-open").click()
     check(tag + "add panel opens with assistant chosen", pg.locator("#t-add").is_visible() and pg.locator("#t-add-go").inner_text() == "ضيفه مساعد")
     pg.locator("#t-add [data-kind=teacher]").click()
-    check(tag + "choosing teacher shows the subjects (4, science included)", pg.locator(".t-subjects input").count() == 4 and "علوم" in pg.inner_text(".t-subjects") and pg.locator("#t-add-go").inner_text() == "خلّيه مدرّس")
+    check(tag + "choosing teacher shows the subjects (4, science included)", pg.locator(".t-subjects input").count() == 4 and "Science" in pg.inner_text(".t-subjects") and pg.locator("#t-add-go").inner_text() == "خلّيه مدرّس", (pg.locator(".t-subjects input").count(), pg.inner_text(".t-subjects"), pg.locator("#t-add-go").inner_text()))
     pg.locator("#t-phone").fill("01000000077")
     pg.locator("#t-add-go").click()
     pg.wait_for_selector("#t-msg.err", timeout=3000)
