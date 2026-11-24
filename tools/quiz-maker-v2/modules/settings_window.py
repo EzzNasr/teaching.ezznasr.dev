@@ -23,7 +23,7 @@ class SettingsWindow(tk.Toplevel):
     def __init__(self, app):
         super().__init__(app)
         self.app = app
-        self.title("Settings — Lesson Maker")
+        self.title("Settings — Handasa Lesson Maker")
         self.configure(bg=theme.P["bg"])
         self._skinned = True                      # styled here, not by the generic dialog skin
         common.fit_geometry(self, 720, 780, min_w=600, min_h=480)

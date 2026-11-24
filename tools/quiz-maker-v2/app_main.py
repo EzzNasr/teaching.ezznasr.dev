@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-app_main.py — Lesson Maker for teaching.ezznasr.dev: four sections (left sidebar) sharing one
+app_main.py — Handasa Lesson Maker for teaching.ezznasr.dev: four sections (left sidebar) sharing one
 site root and one Drive bridge config:
 
   1. Quiz Maker        — generate a lesson (index/quiz/assignment/attachments.json)
@@ -92,7 +92,7 @@ SECTIONS = (
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Lesson Maker — teaching.ezznasr.dev")
+        self.title("Handasa · Lesson Maker — teaching.ezznasr.dev")
         theme.apply(self)                       # the site's palette, Segoe UI, flat cards (modules/theme.py)
         self.configure(bg=theme.P["bg"])
 
@@ -143,9 +143,9 @@ class App(tk.Tk):
         self.sidebar.pack_propagate(False)
         brand = tk.Frame(self.sidebar, bg=P["nav"])
         brand.pack(fill="x", padx=20, pady=(22, 18))
-        tk.Label(brand, text="Lesson Maker", bg=P["nav"], fg="#ffffff", font=theme.FONTS["brand"],
+        tk.Label(brand, text="Handasa · هندسة", bg=P["nav"], fg="#ffffff", font=theme.FONTS["brand"],
                  anchor="w").pack(fill="x")
-        tk.Label(brand, text="teaching.ezznasr.dev", bg=P["nav"], fg=P["nav_dim"], font=theme.FONTS["small"],
+        tk.Label(brand, text="Lesson Maker · teaching.ezznasr.dev", bg=P["nav"], fg=P["nav_dim"], font=theme.FONTS["small"],
                  anchor="w").pack(fill="x")
         self.nav_frame = tk.Frame(self.sidebar, bg=P["nav"])
         self.nav_frame.pack(fill="x")

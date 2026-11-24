@@ -1295,9 +1295,9 @@ def site_name():
     """The one place the site's name lives: tools/seo/seo_config.json -> "site_name"."""
     try:
         with open(os.path.join(SEO_DIR, "seo_config.json"), "r", encoding="utf-8") as f:
-            return json.load(f).get("site_name") or "Teaching"
+            return json.load(f).get("site_name") or "Handasa"
     except Exception:
-        return "Teaching"
+        return "Handasa"
 
 
 def run_seo_build(site_root):
