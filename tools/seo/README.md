@@ -3,15 +3,25 @@
 One config file, one command.
 
     tools/seo/seo_config.json   <- site name, url, per-page titles/descriptions, social links
-    python tools/seo/seo_build.py          # stamp every page + sitemap.xml + robots.txt + manifest
+    python tools/seo/seo_build.py          # stamp every page (SEO + BRAND blocks) + sitemap.xml + robots.txt + manifest
     python tools/seo/seo_build.py --check  # dry run
-    python tools/seo/seo_build.py --og     # redraw icons/og-default.png (needs Pillow)
+    python tools/brand/build_brand.py      # redraw icons + share card from assets/brand/*.svg (Playwright)
 
 ## Change the site name
 Edit `"site_name"` in `seo_config.json`, run `seo_build.py`, commit. Titles, Open Graph,
 JSON-LD, the web manifest and every generated lesson pick it up.
 (`site_alt_names` is a hand-kept list of aliases - leave the old name there on purpose after a rename.)
-Run `--og` too so the share image shows the new name.
+Run `python tools/brand/build_brand.py` too so the share card shows the new name.
+
+## Change the domain
+Edit `"site_url"` only, run `seo_build.py`. Canonicals, Open Graph, JSON-LD, sitemap and robots follow.
+(Also update `CNAME` and the GitHub Pages setting.)
+
+## Brand block
+Every page, private ones included, also gets a `<!-- BRAND:START -->` block (favicon .ico/.svg,
+apple-touch icon, manifest, theme-color, `/assets/brand.css`). Logo sources: `assets/brand/*.svg`.
+The header/footer lockup markup was swapped once by `tools/brand/apply_brand.py`; the Quiz Maker
+templates carry it for new pages.
 
 ## What is indexed
 | Page type | Robots | In sitemap |
