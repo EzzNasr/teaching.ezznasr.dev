@@ -516,8 +516,24 @@
     "#auth-engine-widget .aew-menu-name{padding:11px 14px 8px;font-size:11.5px;color:var(--ink-dim,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}",
     "#auth-engine-widget .aew-menu-item{padding:11px 14px;font-size:13px;}",
     "@media (max-width:640px){#auth-engine-widget .aew-av .aew-name{display:none;}#auth-engine-widget .aew-av{padding:0 7px 0 0;gap:5px;}}",
-    "@media (max-width:520px){#auth-engine-widget{right:8px;}#auth-engine-widget .aew-dash{padding:0 11px;font-size:12px;}}"
+    "@media (max-width:520px){#auth-engine-widget{right:8px;}#auth-engine-widget .aew-dash{padding:0 11px;font-size:12px;}}",
+    // docked: inside the site header, just before the theme toggle (see dockSlot)
+    "#auth-engine-widget.aew-docked{position:relative;top:auto;right:auto;z-index:20;transform:none;opacity:1;flex:0 0 auto;margin-inline-start:auto;margin-inline-end:10px;}",
+    "#auth-engine-widget.aew-docked .aew-toggle{box-shadow:none;padding:6px 14px;font-size:12px;line-height:1.2;}",
+    "#auth-engine-widget.aew-docked .aew-pill{box-shadow:none;}",
+    "#auth-engine-widget.aew-docked .aew-menu{right:0;left:auto;}",
+    "html[dir=rtl] #auth-engine-widget.aew-docked .aew-menu{left:0;right:auto;}",
+    "@media (max-width:520px){#auth-engine-widget.aew-docked{margin-inline-end:6px;}#auth-engine-widget.aew-docked .aew-toggle{padding:6px 11px;font-size:11.5px;}#auth-engine-widget.aew-docked .aew-dash{display:none;}}"
   ].join("");
+
+  // The site header (home, subject, grade, lesson, quiz and assignment pages,
+  // the my-* dashboards) has a theme toggle: the pill sits just before it, in
+  // the header's own row, instead of floating over it. Pages without one
+  // (compact staff tools) keep the fixed corner pill.
+  function dockSlot() {
+    var toggle = document.querySelector("header .titlebar #theme-toggle, header .topbar #theme-toggle, header .titlebar .theme-toggle, header .topbar .theme-toggle");
+    return toggle && toggle.parentNode ? toggle : null;
+  }
 
   function injectWidgetStyle() {
     if (document.getElementById(WIDGET_STYLE_ID)) return;
@@ -628,14 +644,20 @@
       widget = el("div", { id: WIDGET_ID }, [signInBtn]);
     }
 
-    document.body.appendChild(widget);
-    // Slide the pill out of the way while scrolling down; it returns on scroll up.
+    var slot = dockSlot();
+    if (slot) {
+      widget.classList.add("aew-docked");
+      slot.parentNode.insertBefore(widget, slot);
+    } else {
+      document.body.appendChild(widget);
+    }
+    // Slide the floating pill out of the way while scrolling down; it returns on scroll up.
     if (!window.__aewScroll) {
       window.__aewScroll = true;
       var lastY = window.scrollY || 0;
       window.addEventListener("scroll", function () {
         var w = document.getElementById(WIDGET_ID);
-        if (!w) return;
+        if (!w || w.classList.contains("aew-docked")) return;
         var y = window.scrollY || 0;
         if (y > lastY + 8 && y > 120) {
           w.classList.add("aew-hide");
