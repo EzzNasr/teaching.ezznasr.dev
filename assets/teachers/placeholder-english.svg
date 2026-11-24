@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400" role="img" aria-label="Photo placeholder: English teacher">
+  <!-- PLACEHOLDER: not a real photo. Replace via assets/teachers.js (see docs/teacher-photos.md). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e4577a"/><stop offset="1" stop-color="#f2a33a"/></linearGradient>
+    <radialGradient id="hl" cx=".5" cy=".3" r=".6"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="300" height="400" fill="url(#bg)"/>
+  <rect width="300" height="400" fill="url(#hl)"/>
+  <g fill="#fff" fill-opacity=".9">
+    <circle cx="150" cy="150" r="62"/>
+    <path d="M30 400c0-86 54-150 120-150s120 64 120 150z"/>
+  </g>
+  <g font-family="ui-monospace, Menlo, monospace" font-weight="700" text-anchor="middle">
+    <rect x="62" y="334" width="176" height="30" rx="15" fill="#000" fill-opacity=".45"/>
+    <text x="150" y="354" font-size="13" fill="#fff" letter-spacing="2">PHOTO PLACEHOLDER</text>
+  </g>
+</svg>

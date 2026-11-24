@@ -74,7 +74,9 @@
     rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="/assets/theme.css">
+  <link rel="stylesheet" href="/assets/teachers.css">
   <script src="/assets/theme.js" defer></script>
+  <script src="/assets/teachers.js" defer></script>
 </head>
 
 <body>
@@ -134,17 +136,17 @@
           <p>Each subject is the entry point for focused lessons, quizzes, and assignment support.</p>
         </div>
         <div class="grid">
-          <a class="card" href="/programming/"><span class="chip-top">01</span>
+          <a class="card" href="/programming/" data-teacher="programming"><span class="chip-top">01</span>
             <h3>Programming</h3>
             <p>Build a strong foundation with concept-first lessons, live-coding demos, quizzes, and guided assignments.
             </p><span class="go">Explore programming <span aria-hidden="true">→</span></span>
           </a>
-          <a class="card" href="/math/"><span class="chip-top">02</span>
+          <a class="card" href="/math/" data-teacher="math"><span class="chip-top">02</span>
             <h3>Math</h3>
             <p>Strengthen your reasoning with probability, differential equations, and focused problem sets.
             </p><span class="go">Explore math <span aria-hidden="true">→</span></span>
           </a>
-          <a class="card" href="/science/"><span class="chip-top">03</span>
+          <a class="card" href="/science/" data-teacher="science"><span class="chip-top">03</span>
             <h3>Science</h3>
             <p>Science for 3rd preparatory and Integrated Science for 1st secondary: clear explanations, videos, and a quiz after every lesson.
             </p><span class="go">Explore science <span aria-hidden="true">→</span></span>
@@ -152,7 +154,7 @@
         </div>
         <section class="more" aria-labelledby="more-title">
           <h3 id="more-title">More</h3>
-          <a class="mini-card" href="/english/"><span class="mini-title">English</span>
+          <a class="mini-card" href="/english/" data-teacher="english"><span class="mini-title">English</span>
             <span class="mini-text">C1+ fluency, interview and call-centre practice, guided quizzes.</span><span
               class="go">Explore <span aria-hidden="true">→</span></span></a>
         </section>

@@ -1855,6 +1855,17 @@
       ]
     },
     {
+      "id": "R-TEACH-1",
+      "title": "Teacher-themed pages in a browser: on the home page a subject card shows that teacher's overlay (photo and name from assets/teachers.js) then opens its link; Esc skips; Enter plays it; reduced motion goes straight there; with JavaScript off the plain href works. Programming, Math, Science, English front pages at 390 and 1280 px, light and dark: one photo card per subject whose photo loads and matches teachers.js, beside the cards on desktop and above them on a phone, Arabic name RTL, existing links kept, no sideways scroll; changing teachers.js alone swaps the photo",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "needs": "playwright",
+      "cmd": [
+        "python",
+        "tests/e2e_teacher_pages.py"
+      ]
+    },
+    {
       "id": "R-P25-E",
       "title": "Phase 2.5 E+G: teacher publishing check (scripts/check_teacher_pr.js + .github/workflows/teacher-publish.yml): rule examples; every lesson folder on main is found and every attachments.json passes; the workflow runs from main on pull_request_target, reads the pull request as data, no pull-request text in shell lines, auto-merge only by config; teachers.json valid with auto-merge off; end to end in a temp git repo files added to an existing lesson pass, and renaming a lesson, a new, moved or deleted lesson, a lesson-page edit, the grade page, sitemap, lesson titles, dashboard, another subject, workflows, the rules, engines or a bad file list are refused with reasons",
       "status": "active",
