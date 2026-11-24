@@ -207,8 +207,10 @@ def git_lastmod(root, rel):
 # --------------------------------------------------------------------------- per-page metadata
 def make_title(cfg, name):
     sep, site = cfg["title_separator"], cfg["site_name"]
-    full = name + sep + site
-    return full if len(full) <= cfg["title_target_max"] else name
+    for brand in (site, cfg.get("short_name")):   # long lesson names fall back to the short name first
+        if brand and len(name + sep + brand) <= cfg["title_target_max"]:
+            return name + sep + brand
+    return name
 
 
 def lesson_question_count(root, rel):

@@ -1927,6 +1927,17 @@
         "python",
         "tests/e2e_p25_my_revenue.py"
       ]
+    },
+    {
+      "id": "R-BRAND-1",
+      "title": "Handasa · هندسة rebrand on every page: one BRAND block per <head> (favicon .ico/.svg, apple-touch icon, manifest, theme-color, brand.css) and no loose icon links; every title carries Handasa (the short name when long, none only when the name fills 65 chars; attendance keeps the university's name); stamped pages have og:site_name and the Handasa share card, lessons and home name the Organization with its logo; every header shows the logo; no old «EZZ NASR · TEACHING» / «Teaching Portal» anywhere visible; manifest names, colours and icon files at their sizes (maskable included, .ico 16/32/48); logo SVGs need no font; sitemap/robots valid; Quiz Maker templates, site_name() and window carry the brand; i18n «{0} — Handasa»; seo_build --check and apply_brand --dry change nothing",
+      "status": "active",
+      "owner": "refactor-2026-11",
+      "needs": "python",
+      "cmd": [
+        "python",
+        "tests/test_brand_handasa.py"
+      ]
     }
   ]
 }

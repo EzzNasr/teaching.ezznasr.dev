@@ -42,6 +42,9 @@ RULES = [
      '<span class="brand-foot">' + CREDIT + '</span>'),
     ("footer", re.compile(r'(?<!<span class="brand-foot">)(© 2026 |&copy; 2026 )(Handasa (?:·|&middot;) هندسة (?:·|&middot;) by Ezz Nasr)'),
      r'<span class="brand-foot">\1\2</span>'),
+    # compact staff tools (follow-up, requirements, team, ...): just the logo, linking home
+    ("mark", re.compile(r'(<div class="(?:fu|rq)-top-row">\s*)(<h1 class="(?:fu|rq)-title">)'),
+     r'\1<a class="brand-home" href="/" aria-label="Handasa"><img class="brand-logo" src="/assets/brand/handasa-mark.svg" alt="" width="28" height="28"></a>\2'),
 ]
 
 
