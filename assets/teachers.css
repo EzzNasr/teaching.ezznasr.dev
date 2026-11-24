@@ -238,3 +238,11 @@ body.subject-math .subject-layout > .teacher-card, body.subject-english .subject
   body.subject-math .subject-layout > .teacher-card, body.subject-english .subject-layout > .teacher-card { margin-top: 24px; }
   body.subject-math .page-head, body.subject-english .page-head { padding-top: 28px; }
 }
+
+/* an English heading inside the big Arabic-style heading (Science) */
+.section-heading.arabic h1[lang="en"] { direction: ltr; font-family: var(--sans); letter-spacing: -.04em; }
+.section-heading.arabic h1[lang="en"]::after { right: auto; left: 2px; }
+
+/* the footer sits at the bottom of the window even when the page is short */
+body[class*="subject-"] { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+body[class*="subject-"] > main { flex: 1 0 auto; }
