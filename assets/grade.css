@@ -1,0 +1,186 @@
+/* ==========================================================================
+   grade.css: the grade pages (programming Senior 1 / Senior 2, science Prep 3 / Senior 1).
+   Loaded after the page's own style.css, theme.css and teachers.css; body.grade-page plus
+   body.subject-programming | subject-science picks the subject colours (--s1 --s2 --s-glow
+   --s-ink from teachers.css).
+
+   Light on older phones: no blur, no filters, no endless animation; only transform and
+   opacity move, and nothing moves with prefers-reduced-motion.
+   The lesson grid markup is the Quiz Maker's (a.lesson / .chapter-head inside .lessons):
+   style it here, never change its HTML by hand.
+   ========================================================================== */
+
+/* ---- per-mode tokens */
+body.grade-page{
+  --g-bg:#f4f7fb;
+  --g-card:#ffffff;
+  --g-line:#d6e1ef;
+  --g-ink:#10233f;
+  --g-dim:#5d6e86;
+  --g-chip:#ffffff;
+  --g-hero-a:color-mix(in srgb, var(--s1) 11%, #f4f7fb);
+  --g-shadow:0 14px 30px -18px rgba(16,35,63,.35);
+  --g-seen:#168a56;
+  --accent:var(--s1); --accent-strong:var(--s-ink); --accent-soft:color-mix(in srgb, var(--s1) 14%, #fff);
+  background:var(--g-bg); color:var(--g-ink);
+  font-family:'Manrope','Cairo',system-ui,sans-serif;
+  overflow-x:hidden;
+}
+html[data-theme="dark"] body.grade-page{
+  --g-bg:#091a32;
+  --g-card:#102744;
+  --g-line:#244260;
+  --g-ink:#f5f8ff;
+  --g-dim:#aabbd0;
+  --g-chip:#102744;
+  --g-hero-a:color-mix(in srgb, var(--s1) 16%, #091a32);
+  --g-shadow:0 16px 32px -18px rgba(0,0,0,.6);
+  --g-seen:#34d68f;
+  --accent-soft:color-mix(in srgb, var(--s1) 22%, #091a32);
+}
+.grade-page header{ backdrop-filter:none; -webkit-backdrop-filter:none; background:var(--g-bg); }
+html[data-theme="dark"] .grade-page header{ background:var(--g-bg); }
+.grade-page :lang(ar), .grade-page [dir="rtl"]{ font-family:'Cairo','Manrope',system-ui,sans-serif; }
+
+/* ---- hero */
+.grade-hero{ position:relative; isolation:isolate; overflow:hidden; padding:44px 0 40px;
+  background:radial-gradient(520px 300px at 12% 0%, color-mix(in srgb, var(--s-glow) 22%, transparent), transparent 70%),
+             linear-gradient(180deg, var(--g-hero-a), var(--g-bg)); }
+.grade-hero .subject-deco .g{ color:color-mix(in srgb, var(--s1) 18%, transparent); }
+.grade-hero-grid{ display:grid; grid-template-columns:minmax(0,1fr) 220px; gap:40px; align-items:center; }
+.grade-hero-main{ min-width:0; }
+.grade-crumbs{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 14px; font:600 12px 'DM Mono',monospace; color:var(--g-dim); }
+.grade-crumbs a{ color:var(--s-ink); text-decoration:none; }
+.grade-crumbs a:hover{ text-decoration:underline; }
+.grade-page .kicker{ background:var(--g-chip); color:var(--s-ink); border:1px solid color-mix(in srgb, var(--s1) 35%, var(--g-line)); }
+.grade-page .grade-hero h1{ margin:16px 0 12px; font:800 clamp(46px,7vw,80px)/1 'Manrope',sans-serif; letter-spacing:-.05em;
+  background:linear-gradient(90deg, var(--s1), var(--s2)); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; }
+.grade-page .grade-hero h1 span{ display:inline-block; margin-top:8px; font:800 clamp(24px,3.2vw,34px)/1.3 'Cairo',sans-serif; letter-spacing:0;
+  color:var(--g-ink); -webkit-text-fill-color:var(--g-ink); }
+.grade-page .grade-hero p{ color:var(--g-dim); max-width:620px; margin:0; font-size:17px; }
+.grade-stats{ display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
+.gs-item{ display:inline-flex; align-items:baseline; gap:4px; padding:6px 12px; border-radius:999px; background:var(--g-chip); border:1px solid var(--g-line); color:var(--g-dim); font-size:13px; }
+.gs-item b{ color:var(--g-ink); font:800 15px 'Manrope',sans-serif; }
+.gs-seen b{ color:var(--g-seen); }
+.grade-jump{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.gj-link{ display:inline-flex; align-items:center; gap:8px; padding:7px 8px 7px 13px; border-radius:12px; text-decoration:none;
+  background:linear-gradient(135deg, var(--s1), var(--s2)); color:#fff; font:700 13px 'Cairo',sans-serif; box-shadow:var(--g-shadow); transition:transform .2s ease; }
+.gj-link small{ display:inline-grid; place-items:center; min-width:22px; height:22px; padding:0 6px; border-radius:7px; background:rgba(255,255,255,.22); font:700 11px 'DM Mono',monospace; }
+.gj-link:hover{ transform:translateY(-2px); }
+html[data-theme="dark"] .gj-link{ color:#06152b; }
+html[data-theme="dark"] .gj-link small{ background:rgba(6,21,43,.18); }
+
+/* the teacher card, small, in the hero (markup and photo from teachers.js) */
+.grade-hero .teacher-card{ box-shadow:var(--g-shadow); }
+.grade-hero .tc-name{ font-size:18px; }
+.grade-hero .tc-photo{ aspect-ratio:1 / 1; }
+.grade-hero .tc-photo img{ object-position:50% 18%; }
+.grade-page .subject-programming .tc-name::after, .grade-page.subject-programming .tc-name::after{ animation:none; }
+
+/* ---- lessons section */
+.grade-page .section{ padding:28px 0 72px; }
+.grade-page .section-head h2{ font:800 26px/1.2 'Manrope',sans-serif; letter-spacing:-.03em; color:var(--g-ink); }
+.grade-page .section-head p{ color:var(--g-dim); }
+
+/* chapter heading: a lane header with a numbered tile, the count and a seen bar (grade.js) */
+.grade-page .lessons{ grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+.grade-page .lessons .chapter-head{ grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px;
+  margin:26px 0 2px; padding:12px 14px; border:1px solid var(--g-line); border-radius:16px; background:var(--g-card); box-shadow:var(--g-shadow); }
+.grade-page .lessons .chapter-head:first-child{ margin-top:0; }
+.grade-page .lessons .chapter-head::before{ content:attr(data-ch); display:grid; place-items:center; width:40px; height:40px; border-radius:12px; flex:0 0 auto;
+  background:linear-gradient(135deg, var(--s1), var(--s2)); color:#fff; font:800 18px 'Manrope',sans-serif; }
+html:not(.grade-js) .grade-page .lessons .chapter-head::before{ content:'\25C6'; font-size:14px; }
+html[data-theme="dark"] .grade-page .lessons .chapter-head::before{ color:#06152b; }
+.grade-page .chapter-head span{ font:800 20px/1.3 'Cairo',sans-serif; letter-spacing:0; color:var(--g-ink); }
+.grade-page .chapter-head i{ color:var(--s-ink); }
+.ch-meta{ margin-inline-start:auto; display:inline-flex; align-items:center; gap:10px; font:600 12px 'Cairo',sans-serif; color:var(--g-dim); }
+.ch-bar{ display:inline-block; width:88px; height:6px; border-radius:99px; background:color-mix(in srgb, var(--s1) 14%, var(--g-line)); overflow:hidden; }
+.ch-bar i{ display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--s1), var(--s2)); }
+.ch-done{ font:600 11px 'DM Mono',monospace; direction:ltr; }
+
+/* lesson card */
+.grade-page .lesson{ position:relative; min-height:0; padding:18px 18px 16px; gap:10px; border-radius:16px;
+  background:var(--g-card); border:1px solid var(--g-line); box-shadow:var(--g-shadow); overflow:hidden; }
+.grade-page .lesson::before{ content:''; position:absolute; inset:0 0 auto 0; height:4px; background:linear-gradient(90deg, var(--s1), var(--s2)); opacity:.85; }
+.grade-page .lesson:hover{ transform:translateY(-4px); border-color:color-mix(in srgb, var(--s1) 55%, var(--g-line)); box-shadow:0 20px 34px -18px color-mix(in srgb, var(--s1) 55%, transparent); }
+.grade-page .lesson h3{ color:var(--g-ink); font:800 16.5px/1.4 'Manrope','Cairo',sans-serif; overflow-wrap:anywhere; }
+.grade-page .lesson p{ color:var(--g-dim); }
+.grade-page .lesson p:empty{ display:none; }
+.grade-page .lesson .number{ background:color-mix(in srgb, var(--s1) 13%, var(--g-card)); color:var(--s-ink); }
+.grade-page .lesson .open{ margin-top:auto; padding:9px 15px; font-size:12.5px; }
+.grade-page .lesson.is-seen::after{ content:'\2713  شاهدته'; position:absolute; top:16px; inset-inline-end:14px; padding:2px 9px; border-radius:999px;
+  font:700 11px 'Cairo',sans-serif; color:var(--g-seen); background:color-mix(in srgb, var(--g-seen) 14%, var(--g-card)); }
+.grade-page .lessons .empty{ background:var(--g-card); border-color:var(--g-line); color:var(--g-dim); }
+
+/* ---- subscriptions (programming only; subscribe.js draws .sp-*) */
+.grade-page #subscriptions .sp-panel{ background:var(--g-card); border:1px solid var(--g-line); border-radius:22px; box-shadow:var(--g-shadow); position:relative; overflow:hidden; }
+.grade-page #subscriptions .sp-panel::before{ content:''; position:absolute; inset:0 0 auto 0; height:5px; background:linear-gradient(90deg, var(--s1), var(--s2)); }
+.grade-page #subscriptions .sp-kicker{ background:linear-gradient(135deg, var(--s1), var(--s2)); }
+.grade-page #subscriptions .sp-face, .grade-page #subscriptions .sp-box{ background:var(--g-bg); border-color:var(--g-line); box-shadow:none; }
+.grade-page #subscriptions .sp-price{ color:var(--s-ink); }
+.grade-page #subscriptions .sp-btn{ background:var(--s1); border-color:var(--s1); }
+.grade-page #subscriptions .sp-btn.sp-ghost{ background:transparent; color:var(--s-ink); }
+
+.grade-page footer{ border-color:var(--g-line); color:var(--g-dim); }
+
+/* ---- phone */
+@media (max-width:900px){
+  .grade-hero-grid{ grid-template-columns:minmax(0,1fr); gap:22px; }
+  .grade-page .lessons{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:620px){
+  .grade-hero{ padding:58px 0 26px; }
+  .grade-page .lessons{ grid-template-columns:minmax(0,1fr); gap:12px; }
+  .grade-page .lessons .chapter-head{ margin-top:20px; }
+  .ch-meta{ margin-inline-start:0; width:100%; }
+  .ch-bar{ flex:1; }
+  .grade-page .lesson{ min-height:0; }
+  .subject-deco .g:nth-child(n+4){ display:none; }
+}
+
+/* ==========================================================================
+   Direction B ("Band"): a dark band like the home page and lessons as a list.
+   Mock-up only, switched on with <html class="look-b">.
+   ========================================================================== */
+html.look-b body.grade-page{ --g-hero-a:#0e2240; }
+html.look-b .grade-page header{ background:#0e2240; border-color:transparent; }
+html.look-b .grade-page header .brand-name, html.look-b .grade-page header .back{ color:#fff; }
+html.look-b .grade-page header .theme-toggle{ background:rgba(255,255,255,.08); color:#fff; border-color:rgba(255,255,255,.2); }
+html.look-b .grade-hero{ padding:40px 0 86px; color:#fff;
+  background:radial-gradient(620px 320px at 80% 0%, color-mix(in srgb, var(--s1) 55%, transparent), transparent 72%),
+             radial-gradient(520px 300px at 10% 100%, color-mix(in srgb, var(--s2) 35%, transparent), transparent 72%), #0e2240; }
+html[data-theme="dark"].look-b .grade-hero, html[data-theme="dark"].look-b .grade-page header{ background-color:#071022; }
+html.look-b .grade-hero .subject-deco .g{ color:rgba(255,255,255,.1); }
+html.look-b .grade-hero .subject-deco svg{ opacity:.35; }
+html.look-b .grade-crumbs, html.look-b .grade-page .grade-hero p{ color:#c8d6ee; }
+html.look-b .grade-crumbs a{ color:var(--s-glow); }
+html.look-b .grade-page .kicker{ background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.2); color:#fff; }
+html.look-b .grade-page .grade-hero h1{ background:none; color:#fff; -webkit-text-fill-color:#fff; }
+html.look-b .grade-page .grade-hero h1 span{ color:var(--s-glow); -webkit-text-fill-color:var(--s-glow); }
+html.look-b .gs-item{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); color:#c8d6ee; }
+html.look-b .gs-item b{ color:#fff; }
+html.look-b .gj-link{ background:#fff; color:#0e2240; }
+html.look-b .gj-link small{ background:color-mix(in srgb, var(--s1) 18%, #fff); color:var(--s-ink); }
+html.look-b .grade-hero .teacher-card{ transform:translateY(40px); }
+html.look-b .grade-page .section{ margin-top:-46px; position:relative; }
+html.look-b .grade-page .section-head{ background:var(--g-card); border:1px solid var(--g-line); border-radius:18px; padding:18px 20px; box-shadow:var(--g-shadow); }
+/* list rows instead of cards */
+html.look-b .grade-page .lessons{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px 14px; }
+html.look-b .grade-page .lessons .chapter-head{ background:transparent; border:0; box-shadow:none; padding:6px 2px; border-bottom:2px solid color-mix(in srgb, var(--s1) 30%, var(--g-line)); border-radius:0; }
+html.look-b .grade-page .lessons .chapter-head::before{ width:34px; height:34px; border-radius:50%; font-size:15px; }
+html.look-b .grade-page .lesson{ display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"num title go" "num desc go" "num seen go"; align-items:center; gap:2px 14px; padding:14px 16px; border-radius:14px; }
+html.look-b .grade-page .lesson::before{ inset:0 auto 0 0; width:4px; height:auto; }
+html[dir="rtl"].look-b .grade-page .lesson::before{ inset:0 0 0 auto; }
+html.look-b .grade-page .lesson .number{ grid-area:num; width:42px; height:42px; justify-content:center; padding:0; border-radius:12px; font-size:13px; }
+html.look-b .grade-page .lesson h3{ grid-area:title; font-size:15.5px; }
+html.look-b .grade-page .lesson p{ grid-area:desc; font-size:12.5px; }
+html.look-b .grade-page .lesson .open{ grid-area:go; margin:0; padding:8px 12px; font-size:0; gap:0; }
+html.look-b .grade-page .lesson .open:after{ font-size:12px; }
+html.look-b .grade-page .lesson.is-seen::after{ grid-area:seen; position:static; justify-self:start; margin-top:4px; }
+@media (max-width:900px){ html.look-b .grade-page .lessons{ grid-template-columns:minmax(0,1fr); } html.look-b .grade-hero .teacher-card{ transform:none; } }
+@media (max-width:620px){ html.look-b .grade-hero{ padding-bottom:70px; } }
+
+@media (prefers-reduced-motion: reduce){
+  .grade-page .lesson, .gj-link{ transition:none; }
+  .grade-page .lesson:hover, .gj-link:hover{ transform:none; }
+}
