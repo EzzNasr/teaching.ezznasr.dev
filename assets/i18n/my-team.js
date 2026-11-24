@@ -1,6 +1,6 @@
 /* Words of dashboard/my-team.html (a teacher's own team «فريقي»), Arabic ↔ English. See assets/i18n.js. */
 window.I18n && window.I18n.add([
-  ["{0} — Ezz Nasr : Teaching", "{0} — Ezz Nasr : Teaching"],
+  ["{0} — Handasa", "{0} — Handasa"],
   ["مساعدينك، وربط التليجرام علشان توصلك طلبات الدفع.", "Your assistants, and linking Telegram so payment requests reach you."],
   ["مساعد", "Assistant"], ["شيل", "Remove"],
   ["تشيل {0} من مساعدينك؟ هيتقفل عليه من أول طلب.", "Remove {0} from your assistants? It closes for them on their next request."],

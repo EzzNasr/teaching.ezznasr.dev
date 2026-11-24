@@ -1,6 +1,6 @@
 /* Words of dashboard/my-revenue.html (a teacher's own revenue «إيراداتي», Phase 2.5 F), Arabic ↔ English. See assets/i18n.js. */
 window.I18n && window.I18n.add([
-  ["{0} — Ezz Nasr : Teaching", "{0} — Ezz Nasr : Teaching"],
+  ["{0} — Handasa", "{0} — Handasa"],
   ["إيراداتي", "My revenue"],
   ["أرقام موادك إنت بس: طلابك ودروسك ومبيعاتك. الصفحة للقراية بس.", "Numbers for your subjects only: your students, lessons and sales. This page is read only."],
   ["مكانك", "Where you are"], ["كل الكورسات", "All courses"], ["نزّل التقرير", "Download report"],

@@ -1,0 +1,58 @@
+/* ==========================================================================
+   brand.css — the Handasa · هندسة brand layer, linked from EVERY page by the
+   BRAND block that tools/seo/seo_build.py stamps into each <head>.
+
+   Holds only brand things (logo lockup, footer credit, brand colour tokens),
+   so page layouts and per-subject themes stay in their own CSS.
+   Logo files: assets/brand/*.svg (see tools/brand/build_brand.py).
+   ========================================================================== */
+:root{
+  --brand-navy:#0e2240;   /* logo tile, browser theme colour */
+  --brand-blue:#2563eb;   /* Blueprint blue (the site's accent family) */
+  --brand-sky:#5fb6ff;    /* construction-line blue */
+  --brand-amber:#f2a93b;  /* the arc under «هـ» */
+  --brand-ink:#0e2240;
+}
+html[data-theme="dark"]{
+  --brand-navy:#1d4f91;
+  --brand-blue:#5f9bff;
+  --brand-sky:#8fd0ff;
+  --brand-amber:#f5bd5c;
+  --brand-ink:#f2f6ff;
+}
+
+/* ---- header lockup: <img.brand-logo> + <span.brand-name>Handasa<span.brand-ar>هندسة</span></span> ---- */
+.brand-logo{
+  width:28px; height:28px; flex:0 0 auto; display:inline-block; vertical-align:middle;
+  border-radius:8px; transition:transform .25s ease;
+}
+html[data-theme="dark"] .brand-logo{
+  content:url("/assets/brand/handasa-mark-dark.svg");
+  box-shadow:0 0 0 1px rgba(255,255,255,.14);
+}
+/* whatever the page styles its brand link as, logo and name sit side by side */
+a:has(> .brand-logo){ display:inline-flex; align-items:center; gap:10px; text-decoration:none; }
+a:hover > .brand-logo{ transform:rotate(-6deg) scale(1.06); }
+.brand-name{
+  display:inline-flex; align-items:baseline; gap:.45em;
+  font:800 17px/1 'Manrope', 'Cairo', ui-sans-serif, system-ui, sans-serif;
+  letter-spacing:-.01em; text-transform:none; white-space:nowrap;
+}
+.brand-ar{
+  font-family:'Cairo', 'Manrope', sans-serif; font-weight:700; font-size:.92em;
+  opacity:.68;
+}
+.brand-ar::before{ content:"·"; margin-inline-end:.45em; font-family:'Manrope', sans-serif; opacity:.8; }
+/* dashboards: the brand sits in a compact bar */
+.d-brand .brand-logo{ width:26px; height:26px; border-radius:7px; }
+.d-brand .brand-name{ font-size:15px; }
+@media (max-width:420px){
+  .brand-ar{ display:none; }
+  .brand-name{ font-size:16px; }
+}
+
+/* ---- footer credit: «Handasa · هندسة · by Ezz Nasr» ---- */
+.brand-foot{
+  font-family:'Manrope', 'Cairo', ui-sans-serif, system-ui, sans-serif; font-weight:700; letter-spacing:0;
+  white-space:nowrap; direction:ltr; unicode-bidi:isolate;   /* reads the same on Arabic (RTL) pages */
+}

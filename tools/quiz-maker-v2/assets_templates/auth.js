@@ -48,6 +48,15 @@
   var SESSION_KEY = "teaching_session";
   var DRIVE_ENDPOINT = "{{DRIVE_ENDPOINT}}";
 
+  // Handasa logo + name on top of every sign-in screen (modal and inline gate).
+  function brandHead() {
+    return el("div", { class: "aew-brand" }, [
+      el("img", { src: "/assets/brand/handasa-mark.svg", alt: "", width: "26", height: "26" }),
+      el("span", {}, ["Handasa"]),
+      el("span", { class: "aew-brand-ar", lang: "ar" }, ["هندسة"])
+    ]);
+  }
+
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     attrs = attrs || {};
@@ -436,6 +445,9 @@
     " .aew-logout{color:var(--status-fail,#c1443b);}" +
     ".aew-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;}" +
     ".aew-modal{background:var(--panel-soft,#fff);border:1px solid var(--line,#ddd);border-radius:16px;padding:28px 26px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.28);font-family:var(--sans,sans-serif);position:relative;box-sizing:border-box;}" +
+    ".aew-brand{display:flex;align-items:center;gap:9px;margin:0 0 14px;font:800 15px/1 Manrope,Cairo,var(--sans,sans-serif);color:var(--ink,#0e2240);letter-spacing:-.01em;}" +
+    ".aew-brand img{width:26px;height:26px;border-radius:7px;display:block;}" +
+    ".aew-brand .aew-brand-ar{font-family:Cairo,sans-serif;font-weight:700;opacity:.65;}" +
     ".aew-modal h3{margin:0 0 4px;font-size:16px;color:var(--ink,#111);font-family:var(--sans,sans-serif);}" +
     ".aew-modal .aew-sub{margin:0 0 16px;font-size:12.5px;color:var(--ink-dim,#888);font-family:var(--mono,monospace);}" +
     ".aew-modal .aew-field{margin-bottom:12px;}" +
@@ -757,6 +769,7 @@
         if (e.key === "Enter") submit();
       });
 
+      modal.appendChild(brandHead());
       modal.appendChild(el("h3", {}, ["Sign in"]));
       modal.appendChild(el("div", { class: "aew-field" }, [input]));
       modal.appendChild(error);
@@ -903,6 +916,7 @@
         if (e.key === "Enter") submit();
       });
 
+      modal.appendChild(brandHead());
       modal.appendChild(el("h3", {}, ["Reset password"]));
       modal.appendChild(
         el("p", { class: "aew-sub" }, [
@@ -1012,6 +1026,7 @@
         if (e.key === "Enter") submit();
       });
 
+      modal.appendChild(brandHead());
       modal.appendChild(el("h3", {}, ["First time here"]));
       modal.appendChild(el("p", { class: "aew-sub" }, [maskPhone(phone)]));
       modal.appendChild(el("div", { class: "aew-field" }, [nameInput]));
@@ -1264,6 +1279,7 @@
       var card = el("div", { class: "qz-card frame" }, [
         el("span", { class: "tick-br" }),
         el("span", { class: "tick-bl" }),
+        brandHead(),
         el("p", { class: "qz-question" }, ["Sign in with your phone number"]),
         el("div", { class: "qz-field" }, [phoneInput]),
         errorMsg,

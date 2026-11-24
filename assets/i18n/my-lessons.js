@@ -1,6 +1,6 @@
 /* Words of dashboard/my-lessons.html (a teacher fills in the owner's lessons «دروسي», Phase 2.5 G), Arabic ↔ English. See assets/i18n.js. */
 window.I18n && window.I18n.add([
-  ["{0} — Ezz Nasr : Teaching", "{0} — Ezz Nasr : Teaching"],
+  ["{0} — Handasa", "{0} — Handasa"],
   ["دروسي", "My lessons"],
   ["الدروس بيعملها صاحب الموقع بأساميها. إنت بتضيف لكل درس الفيديوهات وأسئلة الكويز والملفات، من هنا على طول.",
    "The site owner makes the lessons and their names. You add each lesson's videos, quiz questions and files, right here."],

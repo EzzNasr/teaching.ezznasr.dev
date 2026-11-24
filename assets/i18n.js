@@ -260,7 +260,7 @@
   var COMMON = [
     ["الوضع الداكن", "Switch to dark mode"], ["الوضع الفاتح", "Switch to light mode"],
     ["تحديث", "Refresh"], ["جاري التحميل…", "Loading…"], ["جاري التحقق من تسجيل الدخول…", "Checking your sign-in…"],
-    ["{0} — Teaching Portal", "{0} — Teaching Portal"],
+    ["{0} — Handasa", "{0} — Handasa"],
     ["صفحات الإدارة", "Admin pages"],
     ["النتايج", "Results"], ["الوصول للدروس", "Lesson access"], ["المتابعة", "Follow-up"], ["المطلوبات", "Requirements"],
     ["التصحيح", "Grading"], ["الفريق", "Team"], ["الإيرادات", "Revenue"], ["الرئيسية", "Home"], ["فريقي", "My team"], ["إيراداتي", "My revenue"], ["دروسي", "My lessons"],
