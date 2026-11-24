@@ -59,3 +59,49 @@ a:hover > .brand-logo{ transform:rotate(-6deg) scale(1.06); }
   font-family:'Manrope', 'Cairo', ui-sans-serif, system-ui, sans-serif; font-weight:700; letter-spacing:0;
   white-space:nowrap; direction:ltr; unicode-bidi:isolate;   /* reads the same on Arabic (RTL) pages */
 }
+
+/* ---- floating WhatsApp button, one behaviour on every page ----------------
+   A compact round button (no always-on text pill, no endless pulse) that keeps
+   clear of the content: the label slides out only on hover / keyboard focus,
+   it respects the phone's safe area, and footers get room underneath it so it
+   never covers the last links. Overrides the older per-page float rules
+   (base.css, style.css, subject pages) - hence the doubled class for weight.
+   The Facebook float is retired (Facebook stays in the footer). */
+html body a.whatsapp-float.whatsapp-float{
+  position:fixed; right:max(20px, env(safe-area-inset-right)); bottom:max(20px, env(safe-area-inset-bottom)); left:auto; top:auto;
+  z-index:40; display:inline-flex; align-items:center; gap:0;
+  height:52px; min-width:52px; padding:0 15px; border-radius:999px;
+  background:#25d366; color:#fff; text-decoration:none;
+  font:700 13px/1 'Manrope', ui-sans-serif, system-ui, sans-serif; letter-spacing:0;
+  box-shadow:0 8px 20px -6px rgba(14,34,64,.35), 0 2px 6px rgba(14,34,64,.12);
+  transform:none; animation:none;
+  transition:transform .2s ease, box-shadow .2s ease, background .2s ease, gap .2s ease;
+}
+html body a.whatsapp-float.whatsapp-float::before, html body a.whatsapp-float.whatsapp-float::after{ display:none; content:none; animation:none; }
+html body a.whatsapp-float.whatsapp-float > span:first-child{
+  display:grid; place-items:center; width:22px; height:22px; flex:0 0 22px;
+  background:none; color:#fff; border-radius:0;
+}
+html body a.whatsapp-float.whatsapp-float > span:first-child svg{ width:22px; height:22px; fill:currentColor; }
+html body a.whatsapp-float.whatsapp-float > span:last-child:not(:first-child){
+  max-width:0; overflow:hidden; white-space:nowrap; opacity:0;
+  transition:max-width .25s ease, opacity .2s ease;
+}
+html body a.whatsapp-float.whatsapp-float:hover,
+html body a.whatsapp-float.whatsapp-float:focus-visible{
+  background:#128c4a; gap:10px; transform:translateY(-2px);
+  box-shadow:0 12px 26px -8px rgba(18,140,74,.55);
+}
+html body a.whatsapp-float.whatsapp-float:hover > span:last-child:not(:first-child),
+html body a.whatsapp-float.whatsapp-float:focus-visible > span:last-child:not(:first-child){ max-width:180px; opacity:1; }
+html body a.whatsapp-float.whatsapp-float:focus-visible{ outline:3px solid #0e2240; outline-offset:3px; }
+html[data-theme="dark"] body a.whatsapp-float.whatsapp-float{ box-shadow:0 8px 22px -6px rgba(0,0,0,.6); }
+html[data-theme="dark"] body a.whatsapp-float.whatsapp-float:focus-visible{ outline-color:#f2f6ff; }
+html body a.facebook-float{ display:none !important; }
+/* room under the footer so the button never sits on its last links */
+@media (max-width: 760px){
+  html body > footer{ padding-bottom:calc(84px + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce){
+  html body a.whatsapp-float.whatsapp-float, html body a.whatsapp-float.whatsapp-float > span{ transition:none; }
+}

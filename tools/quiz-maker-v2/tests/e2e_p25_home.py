@@ -57,6 +57,17 @@ with sync_playwright() as p:
         check(tag + "no 'How it works' section (owner, Handasa home)", pg.locator(".steps, #steps-title").count() == 0 and "How it works" not in pg.inner_text("main"))
         head = pg.locator("#lessons-title").bounding_box()
         check(tag + "the subjects heading is on the first screen", head["y"] + head["height"] <= 900, head["y"])
+        fl = pg.locator("a.whatsapp-float")
+        fb = fl.bounding_box()
+        check(tag + "one compact round WhatsApp button, no Facebook float", fl.count() == 1 and pg.locator("a.facebook-float").count() == 0
+              and fb["width"] <= 60 and fb["height"] <= 60 and fb["height"] >= 48, fb)
+        pg.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        pg.wait_for_timeout(200)
+        fb = fl.bounding_box()
+        hits = pg.evaluate("""(f) => [...document.querySelectorAll('footer a, footer .footer-bottom span')].filter(e => {
+            const r = e.getBoundingClientRect(); return r.width && !(r.right <= f.x || r.left >= f.x + f.width || r.bottom <= f.y || r.top >= f.y + f.height); }).map(e => e.textContent.trim())""", fb)
+        check(tag + "at the bottom the button covers no footer link", not hits, hits)
+        pg.evaluate("window.scrollTo(0, 0)")
         if width == 390:
             xs = {round(cards.nth(i).bounding_box()["x"]) for i in range(3)}
             check(tag + "the cards stack in one column", len(xs) == 1, xs)
