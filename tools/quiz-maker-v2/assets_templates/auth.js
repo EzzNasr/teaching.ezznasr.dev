@@ -523,7 +523,7 @@
     "#auth-engine-widget.aew-docked .aew-pill{box-shadow:none;}",
     "#auth-engine-widget.aew-docked .aew-menu{right:0;left:auto;}",
     "html[dir=rtl] #auth-engine-widget.aew-docked .aew-menu{left:0;right:auto;}",
-    "@media (max-width:520px){#auth-engine-widget.aew-docked{margin-inline-end:6px;}#auth-engine-widget.aew-docked .aew-toggle{padding:6px 11px;font-size:11.5px;}#auth-engine-widget.aew-docked .aew-dash{display:none;}}"
+    "@media (max-width:520px){#auth-engine-widget.aew-docked{margin-inline-end:6px;}#auth-engine-widget.aew-docked .aew-toggle{padding:6px 11px;font-size:11.5px;}#auth-engine-widget.aew-docked .aew-dash{font-size:0;gap:0;padding:0 9px;}}"
   ].join("");
 
   // The site header (home, subject, grade, lesson, quiz and assignment pages,
