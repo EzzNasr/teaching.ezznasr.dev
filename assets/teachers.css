@@ -5,23 +5,71 @@
    Photos and names come from assets/teachers.js (the one file to edit for a photo).
    ========================================================================== */
 
-/* ---- subject colours: --s1 / --s2 the gradient, --s-glow the light, --s-ink text on the page */
-[data-subject="programming"], body.subject-programming { --s1:#2f6fed; --s2:#0fb39a; --s-glow:#43e0c0; --s-ink:#1d4fc4; }
-[data-subject="math"],        body.subject-math        { --s1:#7b4dff; --s2:#f0932b; --s-glow:#ffb35c; --s-ink:#5a2fd6; }
-[data-subject="science"],     body.subject-science     { --s1:#0e9f8f; --s2:#6dbb3a; --s-glow:#7ff0c8; --s-ink:#0a7a6e; }
-[data-subject="english"],     body.subject-english     { --s1:#e4577a; --s2:#f2a33a; --s-glow:#ffb0c2; --s-ink:#b8304f; }
-html[data-theme="dark"] body.subject-programming { --s1:#72a5ff; --s2:#34d6b4; --s-glow:#43e0c0; --s-ink:#9fc2ff; }
-html[data-theme="dark"] body.subject-math        { --s1:#a68bff; --s2:#ffb35c; --s-glow:#ffb35c; --s-ink:#c7b5ff; }
-html[data-theme="dark"] body.subject-science     { --s1:#3fd3c0; --s2:#9be064; --s-glow:#7ff0c8; --s-ink:#7ff0de; }
-html[data-theme="dark"] body.subject-english     { --s1:#ff86a2; --s2:#ffc46b; --s-glow:#ffb0c2; --s-ink:#ffadc0; }
+/* ---- Paired light/dark palette (direction C "Day sky / night glow", owner's pick 2026-11-24).
+   Each mode has its own tuned step of the same hue (built in OKLCH, written as hex for older phones):
+   light = deeper colours on a sky-tinted page; dark = lighter, softer colours on deep indigo, raised
+   surfaces instead of shadows, and background marks that glow a little. Scoped to the pages that load
+   this file (home + the four subject front pages); the rest of the site keeps assets/theme.css. */
+body.home, body[class*="subject-"] {
+  --bg:#e8f6ff; --bg-soft:#daedfb; --panel:#ffffff; --panel-soft:#e4f3fe;
+  --line:#cadeed; --line-strong:#aac5d9; --ink:#0e2043; --ink-dim:#4d627d; --footer:#ffffff;
+  --accent:#2366e9; --accent-strong:#0e49bc; --accent-soft:#ddecff;
+  --mint:#1f9f5e; --mint-strong:#00814c;
+  --on-accent:#ffffff;                       /* text/arrows on an accent fill */
+  --shadow:0 16px 32px rgba(30, 60, 140, .10);
+  --track1-a:#cf630d; --track1-b:#b04000;    /* grade cards: orange, white text */
+  --track2-a:#1f9f5e; --track2-b:#00814c;    /* grade cards: green, white text */
+}
+html[data-theme="dark"] body.home, html[data-theme="dark"] body[class*="subject-"] {
+  --bg:#060a1f; --bg-soft:#0b1029; --panel:#111733; --panel-soft:#181f3d;
+  --line:#283051; --line-strong:#3b456b; --ink:#eff1fa; --ink-dim:#b5bdd5; --footer:#050719;
+  --accent:#85b6ff; --accent-strong:#b1d2ff; --accent-soft:#213459;
+  --mint:#097d47; --mint-strong:#005e39;
+  --on-accent:#070b20;
+  --shadow:none;
+  --track1-a:#a64b00; --track1-b:#803103;    /* deeper fills at night: no glare, white text stays AA */
+  --track2-a:#097d47; --track2-b:#005e39;
+}
+
+/* ---- subject colours: --s1 / --s2 the gradient, --s-glow the light, --s-ink text on the page.
+   [data-subject] = the home cards, body.subject-* = the subject's own page; both get the per-mode step. */
+[data-subject="programming"], body.subject-programming { --s1:#2366e9; --s2:#00b09a; --s-glow:#45dfca; --s-ink:#114cbf; }
+[data-subject="math"],        body.subject-math        { --s1:#7b4cde; --s2:#d77600; --s-glow:#c7b4ff; --s-ink:#6135b5; }
+[data-subject="science"],     body.subject-science     { --s1:#00947b; --s2:#64a737; --s-glow:#45dfca; --s-ink:#007560; }
+[data-subject="english"],     body.subject-english     { --s1:#cd175a; --s2:#cf7d00; --s-glow:#ff9fb4; --s-ink:#a60043; }
+html[data-theme="dark"] [data-subject="programming"], html[data-theme="dark"] body.subject-programming { --s1:#85b6ff; --s2:#45dfca; --s-glow:#5bf0db; --s-ink:#aaceff; }
+html[data-theme="dark"] [data-subject="math"],        html[data-theme="dark"] body.subject-math        { --s1:#bba5ff; --s2:#ffaf68; --s-glow:#d7c4ff; --s-ink:#d0c2ff; }
+html[data-theme="dark"] [data-subject="science"],     html[data-theme="dark"] body.subject-science     { --s1:#00d4be; --s2:#9fd780; --s-glow:#5bf0db; --s-ink:#7ce3d3; }
+html[data-theme="dark"] [data-subject="english"],     html[data-theme="dark"] body.subject-english     { --s1:#ff8fa6; --s2:#fab45f; --s-glow:#ffafc4; --s-ink:#ffb3c1; }
 
 /* the page accent follows the subject (cards with their own accent keep it) */
-body.subject-math    { --accent:#7b4dff; --accent-strong:#5a2fd6; --accent-soft:#ece5ff; }
-body.subject-science { --accent:#0e9f8f; --accent-strong:#0a7a6e; --accent-soft:#d6f4ef; }
-body.subject-english { --accent:#e4577a; --accent-strong:#b8304f; --accent-soft:#ffe3ea; }
-html[data-theme="dark"] body.subject-math    { --accent:#a68bff; --accent-strong:#c7b5ff; --accent-soft:#33275e; }
-html[data-theme="dark"] body.subject-science { --accent:#3fd3c0; --accent-strong:#7ff0de; --accent-soft:#103f3d; }
-html[data-theme="dark"] body.subject-english { --accent:#ff86a2; --accent-strong:#ffadc0; --accent-soft:#4f2232; }
+body.subject-math    { --accent:#7b4cde; --accent-strong:#5e32b2; --accent-soft:#ece7ff; }
+body.subject-science { --accent:#00947b; --accent-strong:#00725d; --accent-soft:#cff5ed; }
+body.subject-english { --accent:#cd175a; --accent-strong:#a20041; --accent-soft:#ffe1e6; }
+html[data-theme="dark"] body.subject-math    { --accent:#bba5ff; --accent-strong:#d3c6ff; --accent-soft:#372e56; }
+html[data-theme="dark"] body.subject-science { --accent:#00d4be; --accent-strong:#8ae5d5; --accent-soft:#004138; }
+html[data-theme="dark"] body.subject-english { --accent:#ff8fa6; --accent-strong:#ffb9c6; --accent-soft:#53242e; }
+
+/* ---- background marks: one token pair per mode. Light = the deep subject colour, faint;
+   dark = the glow colour, a touch stronger, so the marks shine softly instead of looking muddy. */
+[data-subject], body[class*="subject-"] {
+  --deco-1: color-mix(in srgb, var(--s1) 26%, transparent);
+  --deco-2: color-mix(in srgb, var(--s2) 30%, transparent);
+}
+html[data-theme="dark"] [data-subject], html[data-theme="dark"] body[class*="subject-"] {
+  --deco-1: color-mix(in srgb, var(--s-glow) 38%, transparent);
+  --deco-2: color-mix(in srgb, var(--s2) 36%, transparent);
+}
+
+/* grade cards (programming, science) and lesson buttons take the per-mode steps */
+body[class*="subject-"] .track-card.track-one { --accent:var(--track1-a); --accent-strong:var(--track1-b); }
+body[class*="subject-"] .track-card.track-two { --accent:var(--track2-a); --accent-strong:var(--track2-b); }
+html[data-theme="dark"] body[class*="subject-"] .lesson .open { color:var(--on-accent); }
+/* dark: raised surfaces, not shadows */
+html[data-theme="dark"] body[class*="subject-"] .track-card,
+html[data-theme="dark"] body[class*="subject-"] .lesson,
+html[data-theme="dark"] body[class*="subject-"] .lesson .open { box-shadow:none; }
+html[data-theme="dark"] body[class*="subject-"] .teacher-card { box-shadow:0 0 0 1px color-mix(in srgb, var(--s1) 22%, transparent); }
 
 /* ==========================================================================
    1. Home-page transition: the teacher, larger than life
@@ -46,7 +94,7 @@ html[data-theme="dark"] body.subject-english { --accent:#ff86a2; --accent-strong
   opacity: 0; transform: translateY(14px) scale(.92);
   animation: ti-pop 300ms cubic-bezier(.2, .9, .3, 1.12) forwards; will-change: transform, opacity;
 }
-html[data-theme="dark"] .ti-card { background: #102744; color: #f5f8ff; }
+html[data-theme="dark"] .ti-card { background: #111733; color: #eff1fa; }
 .ti-photo-box { position: relative; height: 0; padding-top: 125%; background: linear-gradient(150deg, var(--s1), var(--s2)); }
 .ti-photo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .ti-caption { padding: 12px 14px 14px; text-align: center; }
@@ -159,23 +207,23 @@ html[data-theme="dark"] .ti-placeholder-tag { background: rgba(255, 255, 255, .1
    ========================================================================== */
 .subject-deco { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .subject-deco svg { position: absolute; }
-.subject-deco .g { position: absolute; font: 600 clamp(18px, 2.6vw, 32px) var(--mono); color: color-mix(in srgb, var(--s1) 26%, transparent); white-space: nowrap; }
-.subject-deco .g:nth-child(2n) { color: color-mix(in srgb, var(--s2) 30%, transparent); }
+.subject-deco .g { position: absolute; font: 600 clamp(18px, 2.6vw, 32px) var(--mono); color: var(--deco-1); white-space: nowrap; }
+.subject-deco .g:nth-child(2n) { color: var(--deco-2); }
 
 .subject-math .subject-deco {
   background-image:
-    linear-gradient(color-mix(in srgb, var(--s1) 13%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--s1) 13%, transparent) 1px, transparent 1px),
-    linear-gradient(color-mix(in srgb, var(--s1) 6%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--s1) 6%, transparent) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--deco-1) 50%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--deco-1) 50%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--deco-1) 22%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--deco-1) 22%, transparent) 1px, transparent 1px);
   background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
   mask-image: linear-gradient(180deg, #000 0, #000 40%, transparent 92%);
 }
 .subject-science .subject-deco { mask-image: linear-gradient(180deg, #000 0, transparent 95%); }
-.subject-deco .stroke-1 { stroke: color-mix(in srgb, var(--s1) 34%, transparent); }
-.subject-deco .stroke-2 { stroke: color-mix(in srgb, var(--s2) 40%, transparent); }
-.subject-deco .fill-1 { fill: color-mix(in srgb, var(--s1) 18%, transparent); }
-.subject-deco .fill-2 { fill: color-mix(in srgb, var(--s2) 22%, transparent); }
+.subject-deco .stroke-1 { stroke: var(--deco-1); }
+.subject-deco .stroke-2 { stroke: var(--deco-2); }
+.subject-deco .fill-1 { fill: color-mix(in srgb, var(--deco-1) 55%, transparent); }
+.subject-deco .fill-2 { fill: color-mix(in srgb, var(--deco-2) 55%, transparent); }
 
 @media (prefers-reduced-motion: reduce) {
   .subject-deco .g, }
