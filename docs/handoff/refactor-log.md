@@ -89,6 +89,7 @@ attendance fixes D22-D25, `ac091b4`). Version 71 = `ac091b4` (then 72 and 73 by 
 | Phase 1 remainder: ESLint baseline, Prettier, `@ts-check` | not started; the owner decides in the Phase 3 session whether to fold them in |
 | Phase 8 (brought forward): Quiz Maker no longer freezes | done on branch `claude/priceless-solomon-1720d8`; its CI needs a virtual display (`xvfb-run`) for the new window tests, then a PR |
 | Branch protection on `main` (ruleset, see `teacher-publishing.md`); rotate `ADMIN_TOKEN` (SEC-01); set `PASSWORD_PEPPER` | the owner |
+| Light/dark palette C on the whole site | **unfinished**: live only on home + the four subject front pages (486e48d, owner's choice for now). Lesson pages, grade pages, dashboards, attendance and staff tools keep the old shared colours. Planned in Phase 5.4 (one `tokens.css`), or earlier on its own; needs the owner's go. How: see "Light/dark palettes" below |
 | Phases 4-9 | after Phase 3, in the frozen order (5 before 4) |
 
 ## Handasa rebrand (2026-11-24)
